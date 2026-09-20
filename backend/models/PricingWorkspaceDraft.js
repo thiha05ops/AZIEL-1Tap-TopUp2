@@ -3,6 +3,18 @@ const { SUPPLIER_CURRENCY, REGION } = require("../constants/commerce");
 
 const packageRowSchema = new mongoose.Schema(
     {
+        mappingId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "SupplierProductMapping",
+            default: null
+        },
+        supplierId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Supplier",
+            default: null
+        },
+        supplierCode: { type: String, trim: true, uppercase: true, default: "" },
+        supplierName: { type: String, trim: true, default: "" },
         packageId: {
             type: String,
             trim: true,

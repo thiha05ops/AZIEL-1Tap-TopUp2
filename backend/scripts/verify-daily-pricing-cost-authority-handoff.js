@@ -20,14 +20,15 @@ for (const role of [ROLES.OPERATIONS, ROLES.FINANCE, ROLES.SUPPORT, ROLES.CATALO
 }
 
 assert(workspace.includes('supplierCatalogOfferId: mapping.supplierCatalogOfferId ? String(mapping.supplierCatalogOfferId) : ""'), "Daily Pricing must expose the exact linked offer ID.");
-assert(workspace.includes("storePublicationReadinessReasons({ mapping, pkg, selections: storeSelections"), "Refreshing approved cost must retain independent operational blockers.");
+assert(!workspace.includes("storePublicationReadinessReasons({ mapping, pkg, selections: storeSelections"), "Storefront readiness must not block Daily Pricing preparation.");
+assert(workspace.includes('storeCatalogStatus: storeCatalogSelection ? "SELECTED" : "NOT_SELECTED"'), "Store Catalog state should remain informational in Daily Pricing.");
 assert(pricing.includes('row.supplierCostStatus === "COST_REVIEW_REQUIRED"') && pricing.includes("data-pricing-review-cost"), "Cost-review-required rows must render the review action.");
 assert(pricing.includes('hasPermission?.("SUPPLIER_COST_MANAGE") === true'), "Review cost must be Owner-authority visible only.");
 for (const identity of ["data-mapping-id", "data-offer-id", "data-supplier-code", "data-product-code", "data-package-code", "data-supplier-market"]) {
     assert(pricing.includes(identity), `Daily Pricing handoff is missing ${identity}.`);
 }
 assert(pricing.includes("AZIEL_SUPPLIER_COST_AUTHORITY_REVIEW") && pricing.includes("mappingId: row.mappingId"), "Daily Pricing must reuse the existing exact review controller.");
-assert(pricing.includes('onApproved: async () =>') && pricing.includes("await loadDaily(true)"), "Successful approval must reload and re-preview Daily Pricing.");
+assert(pricing.includes('onApproved: async () =>') && pricing.includes("await loadProductDetail(true)"), "Successful approval must reload and re-preview only the selected Daily Pricing product.");
 assert(!pricing.includes("/cost-authority/promote"), "Daily Pricing must not duplicate the promotion request.");
 
 assert(review.includes("AZIEL_SUPPLIER_COST_AUTHORITY_REVIEW"), "Existing review controller must be reusable.");

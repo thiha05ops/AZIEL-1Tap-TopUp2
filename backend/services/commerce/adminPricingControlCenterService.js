@@ -11,7 +11,7 @@ const StoreCatalogSelection = require("../../models/StoreCatalogSelection");
 const PackagePricingOverride = require("../../models/PackagePricingOverride");
 const { REGION_CURRENCIES, normalizePackageCode, normalizeProductCode, normalizeRegion } = require("../../catalog/catalogProjection");
 const { CANONICAL_PRODUCT_CODES, isCanonicalProductCode } = require("../../catalog/canonicalOperationalCatalog");
-const { buildProductionPricingContext } = require("./productionPricingContextService");
+const { buildProductionPricingContext, loadProductionPricingAuthoritySnapshot } = require("./productionPricingContextService");
 const { createPricingQuote } = require("./pricingQuoteRuntime");
 const { loadCommercePromotionContext } = require("./commercePromotionBridgeService");
 const { resolveCommercePricingPreviewDetailed } = require("./commercePricingPreviewService");
@@ -41,11 +41,8 @@ const PAYMENT_FEE_METHODS = Object.freeze([
 
 async function loadDailyPricingWorkspace({ supplierId = "", supplierMarket = "", productCode = "", region = "TH" } = {}) {
     const normalizedRegion = upper(region || "ALL");
-    const selectionFilter = { status: "ACTIVE" };
-    if (WORKSPACE_REGIONS.includes(normalizedRegion)) selectionFilter.sellingRegions = normalizedRegion;
-    const storeSelections = await StoreCatalogSelection.find(selectionFilter).lean();
-    const storeSelectionScoped = storeSelections.length > 0;
-    const suppliersWithMappings = storeSelectionScoped ? [...new Set(storeSelections.map(item => String(item.supplierId)))] : await SupplierProductMapping.distinct("supplierId", { archivedAt: null });
+    const storeSelections = await StoreCatalogSelection.find({ status: "ACTIVE" }).lean();
+    const suppliersWithMappings = await SupplierProductMapping.distinct("supplierId", { archivedAt: null });
     const suppliers = await Supplier.find({ _id: { $in: suppliersWithMappings }, enabled: true }).sort({ supplierCode: 1 }).lean();
     const projectedSuppliers = suppliers.map(item => ({
         id: String(item._id), supplierId: String(item._id), supplierCode: upper(item.supplierCode),
@@ -53,14 +50,12 @@ async function loadDailyPricingWorkspace({ supplierId = "", supplierMarket = "",
         supportedRegions: Array.isArray(item.supportedRegions) ? item.supportedRegions.map(upper) : [], enabled: item.enabled !== false
     })).filter(item => SUPPLIER_CURRENCY.includes(item.supplierCurrency));
     const requestedProductCode = text(productCode).toLowerCase();
-    const requestedSelection = storeSelections.find(item => item.productCode === requestedProductCode && (!WORKSPACE_REGIONS.includes(normalizedRegion) || item.sellingRegions.includes(normalizedRegion)));
+    const requestedSelection = storeSelections.find(item => item.productCode === requestedProductCode);
     const selected = projectedSuppliers.find(item => item.id === text(supplierId)) || projectedSuppliers.find(item => item.id === String(requestedSelection?.supplierId)) || projectedSuppliers[0] || null;
     if (!selected) return { success: true, suppliers: [], selectedSupplierId: "", products: [], rows: [] };
 
     const selectedSupplierSelections = storeSelections.filter(item => String(item.supplierId) === selected.id);
-    const selectedMappingIds = selectedSupplierSelections.flatMap(item => item.packages || []).map(item => item.supplierProductMappingId);
-    const selectedSupplierMappings = await SupplierProductMapping.find(storeSelectionScoped ? { _id: { $in: selectedMappingIds }, supplierId: selected.id } : { supplierId: selected.id })
-        .select("region productCode packageCode").lean();
+    const selectedSupplierMappings = await SupplierProductMapping.find({ supplierId: selected.id, archivedAt: null }).lean();
     const supplierMarkets = [...selectedSupplierMappings.reduce((counts, item) => {
         const market = upper(item.region);
         if (market) counts.set(market, (counts.get(market) || 0) + 1);
@@ -70,8 +65,25 @@ async function loadDailyPricingWorkspace({ supplierId = "", supplierMarket = "",
     const selectedSupplierMarket = supplierMarkets.some(item => item.value === requestedSupplierMarket)
         ? requestedSupplierMarket
         : supplierMarkets[0]?.value || "";
-    const marketMappings = selectedSupplierMappings.filter(item => upper(item.region) === selectedSupplierMarket);
-    const navigationProductCodes = [...new Set((storeSelectionScoped?storeSelections:marketMappings).map(item => text(item.productCode).toLowerCase()).filter(Boolean))];
+    const packageKeys = selectedSupplierMappings.map(item => ({ productCode: item.productCode, packageCode: item.packageCode }));
+    const mappedProductCodes = [...new Set(selectedSupplierMappings.map(item => item.productCode))];
+    const [packages, products, overrides, supplierOffers] = await Promise.all([
+        packageKeys.length ? CatalogPackage.find({ $or: packageKeys, deletedAt: null }).lean() : [],
+        mappedProductCodes.length ? CatalogProduct.find({ productCode: { $in: mappedProductCodes }, deletedAt: null }).lean() : [],
+        mappedProductCodes.length ? PackagePricingOverride.find({ productCode: { $in: mappedProductCodes } }).lean() : [],
+        SupplierCatalogOffer.find({ _id: { $in: selectedSupplierMappings.map(item => item.supplierCatalogOfferId).filter(Boolean) } }).lean()
+    ]);
+    const overrideMap = new Map(overrides.map(item => [`${item.productCode}:${item.packageCode}:${item.region}`, item.profitOverride]));
+    const packageMap = new Map(packages.map(item => [`${item.productCode}:${item.packageCode}`, item]));
+    const productMap = new Map(products.map(item => [item.productCode, item]));
+    const offerMap = new Map(supplierOffers.map(item => [String(item._id), item]));
+    const mappings = resolvePricingInventoryMappings({
+        mappings: selectedSupplierMappings,
+        packageMap,
+        productMap,
+        offerMap
+    });
+    const navigationProductCodes = [...new Set(mappings.map(item => text(item.productCode).toLowerCase()).filter(Boolean))];
     const navigationCatalogProducts = navigationProductCodes.length
         ? await CatalogProduct.find({
             productCode: { $in: navigationProductCodes },
@@ -121,58 +133,37 @@ async function loadDailyPricingWorkspace({ supplierId = "", supplierMarket = "",
                 }
                 : null,
             imageUrl,
-            mappingCount: storeSelectionScoped
-                ? storeSelections.filter(item => item.productCode === code).reduce((count, item) => count + (item.packages || []).length, 0)
-                : marketMappings.filter(item => item.productCode === code).length,
+            mappingCount: mappings.filter(item => item.productCode === code).length,
             enabled: catalogProduct?.enabled !== false,
             commerceState: catalogProduct?.commerceState || "HIDDEN"
         };
     }).sort((a, b) => a.productName.localeCompare(b.productName));
     const selectedProductCode = navigationProductCodes.includes(requestedProductCode) ? requestedProductCode : navigationProducts[0]?.productCode || "";
-    const activeSelection = selectedSupplierSelections.find(item => item.productCode === selectedProductCode && item.supplierMarket === selectedSupplierMarket);
-    const activeMappingIds = (activeSelection?.packages || []).map(item => item.supplierProductMappingId);
-    const mappingQuery = activeSelection ? { _id: { $in: activeMappingIds }, supplierId: selected.id, region: selectedSupplierMarket } : { supplierId: selected.id, region: selectedSupplierMarket };
-    if (selectedProductCode) mappingQuery.productCode = selectedProductCode;
-    const mappings = await SupplierProductMapping.find(mappingQuery).sort({ productCode: 1, packageCode: 1 }).lean();
-    const packageKeys = mappings.map(item => ({ productCode: item.productCode, packageCode: item.packageCode }));
-    const productCodes = [...new Set(mappings.map(item => item.productCode))];
-    const [packages, products, overrides, supplierOffers] = await Promise.all([
-        packageKeys.length ? CatalogPackage.find({ $or: packageKeys, deletedAt: null }).lean() : [],
-        productCodes.length ? CatalogProduct.find({ productCode: { $in: productCodes } }).lean() : [],
-        productCodes.length ? PackagePricingOverride.find({ productCode: { $in: productCodes } }).lean() : [],
-        SupplierCatalogOffer.find({ _id: { $in: mappings.map(item => item.supplierCatalogOfferId).filter(Boolean) } }).lean()
-    ]);
-    const overrideMap = new Map(overrides.map(item => [`${item.productCode}:${item.packageCode}:${item.region}`, item.profitOverride]));
-    const packageMap = new Map(packages.map(item => [`${item.productCode}:${item.packageCode}`, item]));
-    const productMap = new Map(products.map(item => [item.productCode, item]));
-    const offerMap = new Map(supplierOffers.map(item => [String(item._id), item]));
     const rows = mappings.flatMap(mapping => {
         const pkg = packageMap.get(`${mapping.productCode}:${mapping.packageCode}`);
         if (!pkg) return [];
         const product = productMap.get(mapping.productCode);
+        if (!product || !text(mapping.supplierProductCode) || !text(mapping.supplierPackageCode)) return [];
         const observedSupplierCost = offerMap.get(String(mapping.supplierCatalogOfferId))?.supplierCost || null;
         const costState = workspaceSupplierCostState(mapping, observedSupplierCost);
         const supplierCostEvidence = costState.authoritativeEvidence;
         const supplierCost = costState.approvedSupplierCost;
         const mappingRegion = upper(mapping.region);
-        const exactMappingReady =
-            mapping.mappingMetadata?.readiness?.supplierMapped === true &&
-            Boolean(text(mapping.supplierProductCode)) &&
-            Boolean(text(mapping.supplierPackageCode));
+        const exactMappingReady = Boolean(text(mapping.supplierProductCode)) && Boolean(text(mapping.supplierPackageCode));
         const previewEligible = exactMappingReady && Number.isFinite(costState.previewSupplierCost);
         const preparationReasons = [];
         if (!exactMappingReady) preparationReasons.push(readinessReason("EXACT_MAPPING_REQUIRED", "Exact supplier mapping required"));
         if (!Number.isFinite(costState.previewSupplierCost)) preparationReasons.push(readinessReason("SUPPLIER_CATALOG_COST_REQUIRED", "Current supplier catalog cost required"));
-        if (pkg.enabled === false) preparationReasons.push(readinessReason("CANONICAL_PACKAGE_DISABLED", "Package activation required"));
-        const pricingRegions = canonicalPricingRegions(product, pkg, normalizedRegion, {
-            allowDisabledPackage: Boolean(activeSelection),
-            allowDisabledProduct: Boolean(activeSelection),
-            preparationRegions: activeSelection?.sellingRegions || []
-        });
+        const pricingRegions = pricingTargetRegions("ALL");
         return pricingRegions.map(pricingRegion => {
             const price = pkg.prices?.[pricingRegion] || null;
-            const readinessReasons = [...preparationReasons, ...(activeSelection ? storePublicationReadinessReasons({ mapping, pkg, selections: storeSelections, regions: [pricingRegion] }) : [])]
+            const readinessReasons = [...preparationReasons]
                 .filter((item, index, list) => list.findIndex(candidate => candidate.code === item.code) === index);
+            const storeCatalogSelection = selectedSupplierSelections.find(selection =>
+                selection.productCode === mapping.productCode &&
+                upper(selection.supplierMarket) === upper(mapping.region) &&
+                (selection.packages || []).some(item => String(item.supplierProductMappingId) === String(mapping._id))
+            );
             return {
             rowId: String(mapping._id), mappingId: String(mapping._id), supplierId: selected.id, supplierCode: selected.supplierCode,
             supplierCatalogOfferId: mapping.supplierCatalogOfferId ? String(mapping.supplierCatalogOfferId) : "",
@@ -181,7 +172,7 @@ async function loadDailyPricingWorkspace({ supplierId = "", supplierMarket = "",
             supplierProductCode: mapping.supplierProductCode, supplierPackageCode: mapping.supplierPackageCode,
             executionMode: mapping.executionMode, mappingRegion, targetRegion: normalizedRegion,
             offered: true, previewEligible,
-            preparationSelected: Boolean(activeSelection),
+            preparationSelected: false,
             publicationEligible: readinessReasons.length === 0,
             provisionalPricing: costState.provisional,
             readinessReasons,
@@ -202,6 +193,7 @@ async function loadDailyPricingWorkspace({ supplierId = "", supplierMarket = "",
             fundingCost: Number(supplierCostEvidence.fundingCost || 0),
             otherAcquisitionCost: Number(supplierCostEvidence.otherAcquisitionCost || 0),
             mappingReadiness: mapping.mappingMetadata?.readiness || {}, packageEnabled: pkg.enabled !== false,
+            storeCatalogStatus: storeCatalogSelection ? "SELECTED" : "NOT_SELECTED",
             priceEnabled: price?.enabled !== false && Boolean(price), region: pricingRegion, currency: price?.currency || REGION_CURRENCIES[pricingRegion],
             publishedPrice: price?.amount ?? null, publishedPriceMode: price?.publishedPriceMode || "",
             publishedSupplierPrice: Number.isFinite(supplierCost) ? supplierCost : null,
@@ -224,6 +216,130 @@ async function loadDailyPricingWorkspace({ supplierId = "", supplierMarket = "",
     };
 }
 
+async function pricingSuppliers() {
+    const supplierIds = await SupplierProductMapping.distinct("supplierId", { archivedAt: null });
+    const suppliers = await Supplier.find({ _id: { $in: supplierIds }, enabled: true }).sort({ supplierCode: 1 }).lean();
+    return suppliers.map(item => ({
+        id: String(item._id), supplierId: String(item._id), supplierCode: upper(item.supplierCode),
+        name: text(item.name), supplierName: text(item.name),
+        supplierCurrency: upper(item.supplierCurrency || item.balanceCurrency || item.metadata?.supplierCurrency),
+        supportedRegions: Array.isArray(item.supportedRegions) ? item.supportedRegions.map(upper) : [],
+        enabled: item.enabled !== false
+    })).filter(item => SUPPLIER_CURRENCY.includes(item.supplierCurrency));
+}
+
+async function loadDailyPricingInventory({ supplierId = "" } = {}) {
+    const suppliers = await pricingSuppliers();
+    const selected = suppliers.find(item => item.id === text(supplierId)) || suppliers[0] || null;
+    if (!selected) return { success: true, suppliers: [], selectedSupplierId: "", supplierMarkets: [], navigationProducts: [] };
+    const mappings = await SupplierProductMapping.find({ supplierId: selected.id, archivedAt: null })
+        .select("_id supplierId supplierCode productCode packageCode region enabled productionRole supplierProductCode supplierPackageCode supplierCatalogOfferId supplierCostAuthority mappingMetadata.readiness")
+        .lean();
+    const productCodes = [...new Set(mappings.map(item => text(item.productCode).toLowerCase()).filter(Boolean))];
+    const [deletedPackages, products, offers] = await Promise.all([
+        CatalogPackage.find({ productCode: { $in: productCodes }, deletedAt: { $ne: null } })
+            .select("productCode packageCode deletedAt").lean(),
+        CatalogProduct.find({ productCode: { $in: productCodes }, deletedAt: null })
+            .select("productCode name enabled deletedAt commerceState presentation.imageAssetId").lean(),
+        SupplierCatalogOffer.find({ _id: { $in: mappings.map(item => item.supplierCatalogOfferId).filter(Boolean) } })
+            .select("supplierCost").lean()
+    ]);
+    const deletedPackageKeys = new Set(deletedPackages.map(item => `${item.productCode}:${item.packageCode}`));
+    const packageMap = new Map(mappings
+        .filter(item => !deletedPackageKeys.has(`${item.productCode}:${item.packageCode}`))
+        .map(item => [`${item.productCode}:${item.packageCode}`, { productCode: item.productCode, packageCode: item.packageCode }]));
+    const productMap = new Map(products.map(item => [item.productCode, item]));
+    const offerMap = new Map(offers.map(item => [String(item._id), item]));
+    const resolved = resolvePricingInventoryMappings({ mappings, packageMap, productMap, offerMap });
+    const imageAssetIds = [...new Set(products.map(item => text(item.presentation?.imageAssetId)).filter(Boolean))];
+    const assets = imageAssetIds.length ? await MediaAsset.find({ assetId: { $in: imageAssetIds }, status: "active" })
+        .select("assetId secureUrl url altText").lean() : [];
+    const assetMap = new Map(assets.map(item => [text(item.assetId), item]));
+    const navigationProducts = [...new Set(resolved.map(item => item.productCode))].map(code => {
+        const product = productMap.get(code) || {};
+        const asset = assetMap.get(text(product.presentation?.imageAssetId)) || null;
+        return {
+            productId: code, productCode: code, productName: product.name || code,
+            imageAsset: asset ? { assetId: asset.assetId, secureUrl: asset.secureUrl || "", url: asset.url || "", altText: asset.altText || "" } : null,
+            imageUrl: asset?.secureUrl || asset?.url || "",
+            mappingCount: resolved.filter(item => item.productCode === code).length,
+            enabled: product.enabled !== false,
+            commerceState: product.commerceState || "HIDDEN"
+        };
+    }).sort((left, right) => left.productName.localeCompare(right.productName));
+    const supplierMarkets = [...mappings.reduce((counts, item) => {
+        const market = upper(item.region); if (market) counts.set(market, (counts.get(market) || 0) + 1); return counts;
+    }, new Map())].map(([value, count]) => ({ value, label: value, count })).sort((a, b) => a.value.localeCompare(b.value));
+    return { success: true, generatedAt: new Date().toISOString(), suppliers, selectedSupplierId: selected.id, supplierMarkets, navigationProducts };
+}
+
+async function loadDailyPricingProductDetail({ supplierId = "", productCode = "" } = {}) {
+    const normalizedProductCode = text(productCode).toLowerCase();
+    if (!isStableCatalogProductCode(normalizedProductCode)) throw new AdminPricingControlCenterError("CATALOG_PRODUCT_UNSUPPORTED", "A valid product is required.");
+    const suppliers = await pricingSuppliers();
+    const selected = suppliers.find(item => item.id === text(supplierId)) || suppliers[0] || null;
+    if (!selected) throw new AdminPricingControlCenterError("SUPPLIER_UNAVAILABLE", "Pricing supplier is unavailable.", 404);
+    const mappings = await SupplierProductMapping.find({ supplierId: selected.id, productCode: normalizedProductCode, archivedAt: null }).lean();
+    const packageCodes = [...new Set(mappings.map(item => item.packageCode).filter(Boolean))];
+    const [product, packages, offers, overrides, selections] = await Promise.all([
+        CatalogProduct.findOne({ productCode: normalizedProductCode, deletedAt: null }).lean(),
+        CatalogPackage.find({ productCode: normalizedProductCode, packageCode: { $in: packageCodes }, deletedAt: null }).lean(),
+        SupplierCatalogOffer.find({ _id: { $in: mappings.map(item => item.supplierCatalogOfferId).filter(Boolean) } }).lean(),
+        PackagePricingOverride.find({ productCode: normalizedProductCode }).lean(),
+        StoreCatalogSelection.find({ status: "ACTIVE", supplierId: selected.id, productCode: normalizedProductCode }).lean()
+    ]);
+    if (!product) throw new AdminPricingControlCenterError("CATALOG_PRODUCT_NOT_FOUND", "Pricing product was not found.", 404);
+    const packageMap = new Map(packages.map(item => [`${item.productCode}:${item.packageCode}`, item]));
+    const productMap = new Map([[product.productCode, product]]);
+    const offerMap = new Map(offers.map(item => [String(item._id), item]));
+    const overrideMap = new Map(overrides.map(item => [`${item.productCode}:${item.packageCode}:${item.region}`, item.profitOverride]));
+    const resolved = resolvePricingInventoryMappings({ mappings, packageMap, productMap, offerMap });
+    const rows = resolved.map(mapping => {
+        const pkg = packageMap.get(`${mapping.productCode}:${mapping.packageCode}`);
+        const observedSupplierCost = offerMap.get(String(mapping.supplierCatalogOfferId))?.supplierCost || null;
+        const costState = workspaceSupplierCostState(mapping, observedSupplierCost);
+        const evidence = costState.authoritativeEvidence;
+        const exactMappingReady = Boolean(text(mapping.supplierProductCode)) && Boolean(text(mapping.supplierPackageCode));
+        const previewEligible = exactMappingReady && Number.isFinite(costState.previewSupplierCost);
+        const readinessReasons = [];
+        if (!exactMappingReady) readinessReasons.push(readinessReason("EXACT_MAPPING_REQUIRED", "Exact supplier mapping required"));
+        if (!Number.isFinite(costState.previewSupplierCost)) readinessReasons.push(readinessReason("SUPPLIER_CATALOG_COST_REQUIRED", "Current supplier catalog cost required"));
+        const selection = selections.find(item => upper(item.supplierMarket) === upper(mapping.region) && (item.packages || []).some(entry => String(entry.supplierProductMappingId) === String(mapping._id)));
+        const regionalRows = Object.fromEntries(WORKSPACE_REGIONS.map(pricingRegion => {
+            const price = pkg.prices?.[pricingRegion] || null;
+            return [pricingRegion, {
+                region: pricingRegion, currency: price?.currency || REGION_CURRENCIES[pricingRegion],
+                priceEnabled: price?.enabled !== false && Boolean(price), publishedPrice: price?.amount ?? null,
+                publishedPriceMode: price?.publishedPriceMode || "",
+                profitOverride: overrideMap.get(`${mapping.productCode}:${pkg.packageCode}:${pricingRegion}`) || { mode: "INHERIT", value: null }
+            }];
+        }));
+        return {
+            rowId: String(mapping._id), mappingId: String(mapping._id), supplierId: selected.id, supplierCode: selected.supplierCode,
+            supplierCatalogOfferId: mapping.supplierCatalogOfferId ? String(mapping.supplierCatalogOfferId) : "",
+            productCode: mapping.productCode, productName: product.name || mapping.productCode,
+            packageId: String(pkg._id), packageCode: pkg.packageCode, packageName: pkg.name,
+            supplierProductCode: mapping.supplierProductCode, supplierPackageCode: mapping.supplierPackageCode,
+            executionMode: mapping.executionMode, mappingRegion: upper(mapping.region), offered: true, previewEligible,
+            publicationEligible: readinessReasons.length === 0, provisionalPricing: costState.provisional, readinessReasons,
+            regionalAvailability: regionalAvailability(product, pkg), fulfillmentMappingEnabled: mapping.enabled === true,
+            previewabilityReason: previewEligible ? "" : readinessReasons.map(item => item.message).join(" · "),
+            supplierCost: Number.isFinite(costState.approvedSupplierCost) ? costState.approvedSupplierCost : null,
+            approvedSupplierCost: Number.isFinite(costState.approvedSupplierCost) ? costState.approvedSupplierCost : null,
+            previewSupplierCost: Number.isFinite(costState.previewSupplierCost) ? costState.previewSupplierCost : null,
+            supplierCurrency: evidence.supplierCurrency || observedSupplierCost?.currency || selected.supplierCurrency,
+            observedSupplierCost: observedSupplierCost?.amount ?? null, observedSupplierCurrency: observedSupplierCost?.currency || "", observedSupplierCostAt: observedSupplierCost?.observedAt || null,
+            supplierCostStatus: costState.status, supplierCostTimestamp: evidence.capturedAt || null, supplierCostSource: evidence.source || "supplier_mapping",
+            providerProductCode: mapping.supplierProductCode, providerOfferCode: mapping.supplierPackageCode,
+            fundingCost: Number(evidence.fundingCost || 0), otherAcquisitionCost: Number(evidence.otherAcquisitionCost || 0),
+            mappingReadiness: mapping.mappingMetadata?.readiness || {}, packageEnabled: pkg.enabled !== false,
+            storeCatalogStatus: selection ? "SELECTED" : "NOT_SELECTED", updatedAt: pkg.updatedAt || null,
+            regionalRows
+        };
+    });
+    return { success: true, generatedAt: new Date().toISOString(), supplier: selected, product: { productId: product.productCode, productCode: product.productCode, productName: product.name }, rows };
+}
+
 class AdminPricingControlCenterError extends Error {
     constructor(code, message, statusCode = 400, details = {}) {
         super(message);
@@ -240,6 +356,63 @@ function text(value) {
 
 function upper(value) {
     return text(value).toUpperCase();
+}
+
+function mappingMatchesPublishedAuthority(mapping = {}, pkg = {}) {
+    const mappingSupplierId = text(mapping.supplierId);
+    const providerProductCode = text(mapping.supplierProductCode);
+    const providerOfferCode = text(mapping.supplierPackageCode);
+    const authorities = [pkg.canonicalSupplierCost, pkg.prices?.TH, pkg.prices?.MM].filter(Boolean);
+    return authorities.some(authority => {
+        if (authority.supplierId && text(authority.supplierId) !== mappingSupplierId) return false;
+        if (authority.providerProductCode && text(authority.providerProductCode) !== providerProductCode) return false;
+        if (authority.providerOfferCode && text(authority.providerOfferCode) !== providerOfferCode) return false;
+        return Boolean(authority.supplierId || authority.providerProductCode || authority.providerOfferCode);
+    });
+}
+
+function pricingMappingPreference(mapping = {}, pkg = {}, observedSupplierCost = null) {
+    const costState = workspaceSupplierCostState(mapping, observedSupplierCost);
+    const capturedAt = new Date(costState.authoritativeEvidence?.capturedAt || 0).getTime();
+    return [
+        mappingMatchesPublishedAuthority(mapping, pkg) ? 1 : 0,
+        Number.isFinite(costState.approvedSupplierCost) ? 1 : 0,
+        upper(mapping.productionRole) === "PRIMARY" ? 1 : 0,
+        mapping.enabled === true ? 1 : 0,
+        mapping.mappingMetadata?.readiness?.pricingReady === true ? 1 : 0,
+        Number.isFinite(capturedAt) ? capturedAt : 0
+    ];
+}
+
+function comparePricingMappingPreference(left, right, packageMap, offerMap) {
+    const leftPackage = packageMap.get(`${left.productCode}:${left.packageCode}`) || {};
+    const rightPackage = packageMap.get(`${right.productCode}:${right.packageCode}`) || {};
+    const leftScore = pricingMappingPreference(left, leftPackage, offerMap.get(String(left.supplierCatalogOfferId))?.supplierCost || null);
+    const rightScore = pricingMappingPreference(right, rightPackage, offerMap.get(String(right.supplierCatalogOfferId))?.supplierCost || null);
+    for (let index = 0; index < leftScore.length; index += 1) {
+        if (leftScore[index] !== rightScore[index]) return rightScore[index] - leftScore[index];
+    }
+    return String(left._id).localeCompare(String(right._id));
+}
+
+function resolvePricingInventoryMappings({ mappings = [], packageMap = new Map(), productMap = new Map(), offerMap = new Map() } = {}) {
+    const eligible = mappings.filter(mapping => {
+        const pkg = packageMap.get(`${mapping.productCode}:${mapping.packageCode}`);
+        const product = productMap.get(mapping.productCode);
+        if (!pkg || !product || pkg.deletedAt || product.deletedAt) return false;
+        if (!text(mapping.supplierProductCode) || !text(mapping.supplierPackageCode)) return false;
+        const observedSupplierCost = offerMap.get(String(mapping.supplierCatalogOfferId))?.supplierCost || null;
+        return Number.isFinite(workspaceSupplierCostState(mapping, observedSupplierCost).previewSupplierCost);
+    });
+    const groups = new Map();
+    eligible.forEach(mapping => {
+        const identity = `${mapping.productCode}:${mapping.packageCode}`;
+        if (!groups.has(identity)) groups.set(identity, []);
+        groups.get(identity).push(mapping);
+    });
+    return [...groups.values()]
+        .map(group => group.sort((left, right) => comparePricingMappingPreference(left, right, packageMap, offerMap))[0])
+        .sort((left, right) => `${left.productCode}:${left.packageCode}:${left._id}`.localeCompare(`${right.productCode}:${right.packageCode}:${right._id}`));
 }
 
 function canonicalPricingProductCode(value) {
@@ -414,6 +587,13 @@ function workspaceRegions(region) {
     return [normalizeRegion(normalized)];
 }
 
+// Pricing markets are calculation targets, not Store Catalog availability
+// gates. Every workspace row carries both customer-currency calculations.
+function pricingTargetRegions(region = "ALL") {
+    const normalized = upper(region || "ALL");
+    return normalized === "ALL" ? [...WORKSPACE_REGIONS] : workspaceRegions(normalized);
+}
+
 function readinessReason(code, message) {
     return { code, message };
 }
@@ -440,11 +620,8 @@ function workspaceSupplierCostState(mapping = {}, observedSupplierCost = null) {
 }
 
 function canonicalPricingRegions(product = {}, pkg = {}, region = "ALL", { allowDisabledPackage = false, allowDisabledProduct = false, preparationRegions = [] } = {}) {
-    if (pkg.deletedAt || (product.enabled === false && !allowDisabledProduct) || (pkg.enabled === false && !allowDisabledPackage)) return [];
-    const supported = new Set((preparationRegions.length ? preparationRegions : product.supportedRegions || []).map(upper));
-    return workspaceRegions(region).filter(regionCode =>
-        supported.has(regionCode) && pkg.prices?.[regionCode]?.enabled !== false
-    );
+    if (pkg.deletedAt) return [];
+    return pricingTargetRegions(region);
 }
 
 function storePublicationReadinessReasons({ mapping = {}, pkg = {}, selections = [], regions = [] } = {}) {
@@ -501,6 +678,9 @@ function regionalAvailability(product = {}, pkg = {}) {
 }
 
 function normalizeWorkspaceRow(row = {}, index = 0) {
+    if (row.authorityError) {
+        throw new AdminPricingControlCenterError(row.authorityError, `Row ${index + 1} does not resolve to an active exact supplier mapping.`);
+    }
     if (!isStableCatalogProductCode(row.productCode)) {
         throw new AdminPricingControlCenterError("CATALOG_PRODUCT_UNSUPPORTED", `Row ${index + 1} references an unsupported product.`);
     }
@@ -748,22 +928,9 @@ function previewFailure({ row, pkg, product, region, price, error }) {
     };
 }
 
-async function previewLoadedPackageRegion({ product, pkg, region, row, couponCode = "", actor = null } = {}) {
+async function previewLoadedPackageRegion({ product, pkg, region, row, couponCode = "", actor = null, authoritySnapshot = null } = {}) {
     const configuredPrice = pkg.prices?.[region];
-    if (configuredPrice?.enabled === false) {
-        return {
-            success: true,
-            region,
-            currency: REGION_CURRENCIES[region],
-            productCode: product.productCode,
-            packageCode: pkg.packageCode,
-            supplierCost: row.newSupplierCost,
-            supplierCurrency: row.supplierCurrency,
-            profitabilityStatus: PROFITABILITY_STATUS.INVALID_CONFIGURATION,
-            warnings: [],
-            blockingErrors: [warning("REGIONAL_PRICE_UNAVAILABLE", `${region} price is not configured for this package.`)]
-        };
-    }
+    const hasPublishedPrice = configuredPrice?.amount != null;
     // A newly onboarded package may have authoritative supplier cost but no
     // regional selling price yet. Allow the production policy engine to create
     // the first price in preview/publish instead of requiring a placeholder
@@ -840,10 +1007,11 @@ async function previewLoadedPackageRegion({ product, pkg, region, row, couponCod
             },
             region,
             currency: price.currency,
-            includePublishedPriceOverride: false
+            includePublishedPriceOverride: false,
+            authoritySnapshot
         });
         const quote = createPricingQuote({
-            quoteId: `daily-pricing-preview:${product.productCode}:${pkg.packageCode}:${region}:${Date.now()}`,
+            quoteId: `daily-pricing:${row.mappingId}:${region}:${Date.now()}`,
             issuedAt: new Date().toISOString(),
             validitySeconds: 300,
             owner: { userId: actor?.id || actor?.username || "admin-pricing-workspace" },
@@ -877,8 +1045,11 @@ async function previewLoadedPackageRegion({ product, pkg, region, row, couponCod
             finalPreviewPrice: instruction.finalPrice,
             recommendedSellingPrice: instruction.finalPrice,
             manualOverrideReason: instruction.reason,
-            changed: instruction.finalPrice !== calculatedPreview.currentPublishedPrice,
-            publishedPriceDifference: Number((instruction.finalPrice - calculatedPreview.currentPublishedPrice).toFixed(price.currency === "MMK" ? 0 : 2))
+            currentPublishedPrice: hasPublishedPrice ? calculatedPreview.currentPublishedPrice : null,
+            existingAmount: hasPublishedPrice ? calculatedPreview.currentPublishedPrice : null,
+            priceState: hasPublishedPrice ? (instruction.finalPrice !== calculatedPreview.currentPublishedPrice ? "CHANGED" : "UNCHANGED") : "NEW",
+            changed: !hasPublishedPrice || instruction.finalPrice !== calculatedPreview.currentPublishedPrice,
+            publishedPriceDifference: hasPublishedPrice ? Number((instruction.finalPrice - calculatedPreview.currentPublishedPrice).toFixed(price.currency === "MMK" ? 0 : 2)) : null
         };
         if (instruction.mode !== "CALCULATED") {
             const overridePrice = {
@@ -902,10 +1073,11 @@ async function previewLoadedPackageRegion({ product, pkg, region, row, couponCod
                 },
                 region,
                 currency: overridePrice.currency,
-                includePublishedPriceOverride: true
+                includePublishedPriceOverride: true,
+                authoritySnapshot
             });
             const overrideQuote = createPricingQuote({
-                quoteId: `daily-pricing-override-preview:${product.productCode}:${pkg.packageCode}:${region}:${Date.now()}`,
+                quoteId: `daily-override:${row.mappingId}:${region}:${Date.now()}`,
                 issuedAt: new Date().toISOString(),
                 validitySeconds: 300,
                 owner: { userId: actor?.id || actor?.username || "admin-pricing-workspace" },
@@ -929,10 +1101,12 @@ async function previewLoadedPackageRegion({ product, pkg, region, row, couponCod
                 calculatedPrice: instruction.calculatedPrice,
                 finalPreviewPrice: instruction.finalPrice,
                 recommendedSellingPrice: instruction.finalPrice,
-                currentPublishedPrice: calculatedPreview.currentPublishedPrice,
+                currentPublishedPrice: hasPublishedPrice ? calculatedPreview.currentPublishedPrice : null,
+                existingAmount: hasPublishedPrice ? calculatedPreview.currentPublishedPrice : null,
+                priceState: "MANUAL_OVERRIDE",
                 manualOverrideReason: instruction.reason,
-                changed: instruction.finalPrice !== calculatedPreview.currentPublishedPrice,
-                publishedPriceDifference: Number((instruction.finalPrice - calculatedPreview.currentPublishedPrice).toFixed(price.currency === "MMK" ? 0 : 2))
+                changed: !hasPublishedPrice || instruction.finalPrice !== calculatedPreview.currentPublishedPrice,
+                publishedPriceDifference: hasPublishedPrice ? Number((instruction.finalPrice - calculatedPreview.currentPublishedPrice).toFixed(price.currency === "MMK" ? 0 : 2)) : null
             };
         }
         return {
@@ -961,10 +1135,7 @@ function rowStatusFromRegional(regional = []) {
 }
 
 function selectedPublicationDecision(row = {}) {
-    const pricingReadinessPublish = row.preparationSelected === true &&
-        row.mappingId &&
-        row.mappingReadiness?.pricingReady !== true;
-    if (row.changed !== true && !pricingReadinessPublish) return { action: "NO_OP", reason: "No changes" };
+    if (row.changed !== true) return { action: "NO_OP", reason: "No changes" };
     if (row.publishEligible !== true || (row.blockingErrors || []).length) {
         return { action: "BLOCKED", reason: "Blocked by pricing preview" };
     }
@@ -1062,23 +1233,8 @@ async function batchPreviewDailyPricing({ rows = [], couponCode = "", actor = nu
     const supplier = await resolvePricingSupplier({ supplierId, region, requireFulfillmentRegion: false });
     const mappingIds = rows.map(row => text(row.mappingId)).filter(id => mongoose.Types.ObjectId.isValid(id));
     const mappingMap = mappingIds.length
-        ? new Map((await SupplierProductMapping.find({ _id: { $in: mappingIds } }).lean()).map(mapping => [String(mapping._id), mapping]))
+        ? new Map((await SupplierProductMapping.find({ _id: { $in: mappingIds }, supplierId: supplier.supplierId, archivedAt: null }).lean()).map(mapping => [String(mapping._id), mapping]))
         : new Map();
-    const preparationSelections = mappingIds.length
-        ? await StoreCatalogSelection.find({
-            status: "ACTIVE",
-            supplierId: supplier.supplierId,
-            ...(WORKSPACE_REGIONS.includes(upper(region)) ? { sellingRegions: upper(region) } : {})
-        }).lean()
-        : [];
-    const preparationMappingIds = new Set(preparationSelections.flatMap(selection =>
-        (selection.packages || [])
-            .filter(item => {
-                const mapping = mappingMap.get(String(item.supplierProductMappingId));
-                return mapping && selection.productCode === mapping.productCode && upper(item.packageCode) === upper(mapping.packageCode) && upper(selection.supplierMarket) === upper(mapping.region);
-            })
-            .map(item => String(item.supplierProductMappingId))
-    ));
     const mappingOffers = mappingIds.length
         ? await SupplierCatalogOffer.find({ _id: { $in: [...mappingMap.values()].map(mapping => mapping.supplierCatalogOfferId).filter(Boolean) } }).lean()
         : [];
@@ -1090,7 +1246,7 @@ async function batchPreviewDailyPricing({ rows = [], couponCode = "", actor = nu
     const resolvedInputRows = rows.map(row => {
         const pkg = packagesById.get(text(row.packageId));
         const mapping = mappingMap.get(text(row.mappingId));
-        if (supplier.mode === "API" && !mapping) {
+        if (!mapping) {
             return { ...row, productCode: row.productCode || row.productId, newSupplierCost: null, authorityError: "SUPPLIER_MAPPING_REQUIRED" };
         }
         if (text(row.mappingId) && (!mapping || String(mapping.supplierId) !== supplier.supplierId)) {
@@ -1099,7 +1255,6 @@ async function batchPreviewDailyPricing({ rows = [], couponCode = "", actor = nu
         const observedSupplierCost = mappingOfferMap.get(String(mapping?.supplierCatalogOfferId))?.supplierCost || null;
         const costState = workspaceSupplierCostState(mapping, observedSupplierCost);
         const supplierCostEvidence = costState.authoritativeEvidence;
-        const preparationSelected = Boolean(mapping && preparationMappingIds.has(String(mapping._id)));
         const mapped = mapping ? {
             productCode: mapping.productCode,
             packageCode: mapping.packageCode,
@@ -1108,13 +1263,13 @@ async function batchPreviewDailyPricing({ rows = [], couponCode = "", actor = nu
             supplierPackageCode: mapping.supplierPackageCode,
             mappingRegion: mapping.region,
             mappingReadiness: mapping.mappingMetadata?.readiness || {},
-            newSupplierCost: preparationSelected ? costState.previewSupplierCost : costState.approvedSupplierCost,
+            newSupplierCost: costState.previewSupplierCost,
             approvedSupplierCost: costState.approvedSupplierCost,
             observedSupplierCost: observedSupplierCost?.amount ?? null,
             observedSupplierCurrency: observedSupplierCost?.currency || "",
-            provisionalPricing: preparationSelected && costState.provisional,
+            provisionalPricing: costState.provisional,
             costAuthorityState: costState.status,
-            preparationSelected,
+            preparationSelected: false,
             supplierCostTimestamp: supplierCostEvidence.capturedAt || row.supplierCostTimestamp,
             supplierCostSource: supplierCostEvidence.source || "supplier_mapping",
             providerProductCode: mapping.supplierProductCode,
@@ -1166,6 +1321,7 @@ async function batchPreviewDailyPricing({ rows = [], couponCode = "", actor = nu
     ]);
     const productMap = new Map(products.map(product => [product.productCode, product]));
     const packageMap = new Map(packages.map(pkg => [`${pkg.productCode}:${pkg.packageCode}`, pkg]));
+    const authoritySnapshot = await loadProductionPricingAuthoritySnapshot({ products, packages, now: new Date() });
 
     const previewRows = await Promise.all(unique.map(async row => {
         const product = productMap.get(row.productCode);
@@ -1188,21 +1344,15 @@ async function batchPreviewDailyPricing({ rows = [], couponCode = "", actor = nu
                 regions: []
             };
         }
-        const selectedPreparation = preparationSelections.find(selection =>
-            (selection.packages || []).some(item => String(item.supplierProductMappingId) === String(row.mappingId))
-        );
-        const requestedRegions = canonicalPricingRegions(product, pkg, region, {
-            allowDisabledPackage: row.preparationSelected,
-            allowDisabledProduct: row.preparationSelected,
-            preparationRegions: selectedPreparation?.sellingRegions || []
-        });
+        const requestedRegions = pricingTargetRegions("ALL");
         const regional = await Promise.all(requestedRegions.map(region => previewLoadedPackageRegion({
             product,
             pkg,
             region,
             row,
             couponCode,
-            actor
+            actor,
+            authoritySnapshot
         })));
         const existingPrices = WORKSPACE_REGIONS.map(regionCode => pkg.prices?.[regionCode]).filter(Boolean);
         const selectedExistingPrices = requestedRegions
@@ -1245,7 +1395,7 @@ async function batchPreviewDailyPricing({ rows = [], couponCode = "", actor = nu
             packageEnabled: pkg.enabled !== false,
             readinessReasons: [
                 ...(row.provisionalPricing ? [readinessReason("EXACT_MAPPING_COST_APPROVAL_REQUIRED", "Cost approval required")] : []),
-                ...(pkg.enabled === false ? [readinessReason("CANONICAL_PACKAGE_DISABLED", "Package activation required")] : [])
+                ...(pkg.enabled === false ? [readinessReason("PACKAGE_NOT_OFFERED", "Package is not currently offered; pricing remains available.")] : [])
             ],
             supplierVersion: row.supplierVersion || existingPrices.find(price => price?.supplierVersion)?.supplierVersion || "",
             supplierCostTimestamp: row.supplierCostTimestamp,
@@ -1261,7 +1411,7 @@ async function batchPreviewDailyPricing({ rows = [], couponCode = "", actor = nu
             // Operational pricing readiness is independent from explicit admin
             // selection intent. Folding row.selected into this flag deadlocks
             // initially-unselected READY rows in the browser.
-            publishEligible: !blockingErrors.length && row.provisionalPricing !== true && (pkg.enabled !== false || row.preparationSelected),
+            publishEligible: !blockingErrors.length && row.provisionalPricing !== true,
             warnings,
             blockingErrors,
             regions: regional,
@@ -1290,15 +1440,7 @@ async function publishDailyPricing({
     supplierId = "",
     skipDraftCleanup = false
 } = {}) {
-    if (publishAll === true) {
-        throw new AdminPricingControlCenterError(
-            "WORKSPACE_PUBLISH_ALL_DISABLED",
-            "Publish All is temporarily disabled for Daily Pricing Workspace.",
-            400
-        );
-    }
-
-    const selectedRegions = workspaceRegions(region);
+    const selectedRegions = pricingTargetRegions(region || "ALL");
     if (!selectedRegions.length) {
         throw new AdminPricingControlCenterError(
             "WORKSPACE_REGION_REQUIRED",
@@ -1317,50 +1459,6 @@ async function publishDailyPricing({
         await resolvePricingSupplier({ supplierId, region: selectedRegion, requireFulfillmentRegion: false })
     ])));
     const suppliersByRegion = new Map(supplierEntries);
-
-    // Mapping identity and authoritative cost are pricing authority. Mapping
-    // enablement is fulfillment transport authority and must not gate pricing.
-    const selectedMappingIds = rows
-        .filter(row => row.selected !== false)
-        .map(row => text(row.mappingId))
-        .filter(id => mongoose.Types.ObjectId.isValid(id));
-    if (selectedMappingIds.length) {
-        const publicationMappings = await SupplierProductMapping.find({
-            _id: { $in: selectedMappingIds },
-            supplierId
-        }).lean();
-        const pricingOffers = await SupplierCatalogOffer.find({ _id: { $in: publicationMappings.map(mapping => mapping.supplierCatalogOfferId).filter(Boolean) } }).lean();
-        const mappingOffersById = new Map(pricingOffers.map(offer => [String(offer._id), offer]));
-        const authoritativeMappings = publicationMappings.filter(mapping => {
-            const offer = mappingOffersById.get(String(mapping.supplierCatalogOfferId));
-            const evidence = mapping.supplierCostAuthority?.rawSupplierCost != null ? mapping.supplierCostAuthority : mapping.mappingMetadata?.supplierCost || {};
-            const cost = Number(offer?.supplierCost?.amount ?? evidence.rawSupplierCost ?? evidence.priceUsd ?? evidence.netDealerPrice);
-            return Boolean(text(mapping.supplierProductCode)) && Boolean(text(mapping.supplierPackageCode)) && Number.isFinite(cost);
-        });
-        if (authoritativeMappings.length !== new Set(selectedMappingIds).size) {
-            throw new AdminPricingControlCenterError(
-                "SUPPLIER_COST_AUTHORITY_NOT_READY",
-                "Publishing requires an exact supplier mapping with authoritative supplier cost.",
-                409
-            );
-        }
-        const publicationSelections = await StoreCatalogSelection.find({ status: "ACTIVE", supplierId }).lean();
-        const readinessFailures = publicationMappings.flatMap(mapping =>
-            pricingPersistenceReadinessReasons({
-                mapping,
-                selections: publicationSelections,
-                regions: selectedRegions
-            }).map(reason => ({ mappingId: String(mapping._id), ...reason }))
-        );
-        if (readinessFailures.length) {
-            throw new AdminPricingControlCenterError(
-                readinessFailures[0].code,
-                readinessFailures.map(item => item.message).filter((message, index, list) => list.indexOf(message) === index).join(" · "),
-                409,
-                { readinessFailures }
-            );
-        }
-    }
 
     /*
      * Preview all requested regions in one pass. This produces one authoritative
@@ -1465,11 +1563,7 @@ async function publishDailyPricing({
             const calculatedPrice = Number(regionalPreview?.finalPreviewPrice ?? regionalPreview?.recommendedSellingPrice);
             const regionalBlockingErrors = regionalPreview?.blockingErrors || [];
 
-            const pricingReadinessPublish = row.preparationSelected === true &&
-                row.mappingId &&
-                row.mappingReadiness?.pricingReady !== true;
-
-            if (regionalPreview && regionalPreview.changed !== true && !pricingReadinessPublish) {
+            if (regionalPreview && regionalPreview.changed !== true) {
                 results.push({
                     region: selectedRegion,
                     productCode: row.productCode,
@@ -1518,7 +1612,6 @@ async function publishDailyPricing({
          */
         const canonicalSupplier = suppliersByRegion.get(publishableRegions[0]);
         const patch = {
-            ...(normalized.preparationSelected === true ? { enabled: true } : {}),
             ...(normalized.supplierCostEdited === true ? { canonicalSupplierCost: {
                 supplierId: canonicalSupplier.supplierId,
                 supplierCode: canonicalSupplier.supplierCode,
@@ -1585,19 +1678,18 @@ async function publishDailyPricing({
                 patch,
                 actor
             });
-            const pricingReadiness = await markMappingPricingReady(row, actor);
 
             publishableRegions.forEach(selectedRegion => {
                 results.push({
                     region: selectedRegion,
                     productCode: row.productCode,
                     packageCode: row.packageCode,
-                    published: update.changed === true || pricingReadiness.changed === true,
+                    published: update.changed === true,
                     supplierCost: normalized.newSupplierCost,
                     sellingPrice: pricePatches[selectedRegion].amount,
-                    skipped: update.changed !== true && pricingReadiness.changed !== true,
-                    reason: update.changed || pricingReadiness.changed ? "" : "No changes",
-                    changedFields: [...(update.changedFields || []), ...(pricingReadiness.changed ? ["mappingMetadata.readiness.pricingReady"] : [])]
+                    skipped: update.changed !== true,
+                    reason: update.changed ? "" : "No changes",
+                    changedFields: update.changedFields || []
                 });
             });
         } catch (error) {
@@ -1813,11 +1905,16 @@ module.exports = Object.freeze({
     resolveWorkspacePriceInstruction,
     buildWorkspacePricePatch,
     canonicalPricingRegions,
+    pricingTargetRegions,
     workspaceSupplierCostState,
+    pricingMappingPreference,
+    resolvePricingInventoryMappings,
     storePublicationReadinessReasons,
     pricingPersistenceReadinessReasons,
     batchPreviewDailyPricing,
     loadDailyPricingWorkspace,
+    loadDailyPricingInventory,
+    loadDailyPricingProductDetail,
     bulkBackfillSupplierCosts,
     publishDailyPricing,
     previewPackagePricing

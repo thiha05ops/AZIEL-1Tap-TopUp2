@@ -159,10 +159,14 @@ function publicFxAuthority(row) {
     };
 }
 
-async function listFxAuthorities() {
-    const rows = await ExchangeRateAuthority.find({ status: "ACTIVE" })
-        .sort({ fromCurrency: 1, toCurrency: 1, effectiveFrom: -1, updatedAt: -1 })
-        .lean();
+async function listFxAuthorities(trace = null) {
+    serviceTrace(trace, "FX_AUTHORITY_QUERY_STARTED", {
+        modelConnection: ExchangeRateAuthority.db?.name || ""
+    });
+    const query = ExchangeRateAuthority.find({ status: "ACTIVE" })
+        .sort({ fromCurrency: 1, toCurrency: 1, effectiveFrom: -1, updatedAt: -1 });
+    const rows = await boundedQuery(query).lean();
+    serviceTrace(trace, "FX_AUTHORITY_QUERY_COMPLETED", { count: rows.length });
     const seen = new Set();
     return rows.filter(row => {
         const key = `${row.fromCurrency}_${row.toCurrency}`;
@@ -531,7 +535,7 @@ async function getPricingConsoleState(options = {}) {
         readCatalogProducts(trace),
         readConsolePolicies(new Date(), trace),
         listSupplierCostDraftRows(),
-        listFxAuthorities()
+        listFxAuthorities(trace)
     ]);
     serviceTrace(trace, "PRODUCT_GROUPING_STARTED");
     const affected = affectedSummaryFromPackages(catalogPackages);
@@ -585,6 +589,38 @@ async function getPricingConsoleState(options = {}) {
         policies,
         fxAuthorities
     });
+}
+
+async function getPricingSettingsState(options = {}) {
+    const trace = options.trace || null;
+    serviceTrace(trace, "SETTINGS_SERVICE_STARTED");
+    const [policyRecords, fxAuthorities] = await Promise.all([
+        readConsolePolicies(new Date(), trace),
+        listFxAuthorities(trace)
+    ]);
+    const policies = CONFIG_KEYS.map(item => {
+        const active = latestPolicyForKey(policyRecords, "ACTIVE", item.region, item.currency);
+        if (!active) {
+            throw new AdminPricingEngineError(
+                "PRICING_POLICY_CONFIGURATION_MISSING",
+                `Active ${item.region}/${item.currency} pricing policy is unavailable.`,
+                503,
+                { stage: "SETTINGS_POLICY_VALIDATION" }
+            );
+        }
+        const draft = visibleDraftPolicy(policyRecords, item.region, item.currency);
+        return {
+            region: item.region,
+            currency: item.currency,
+            active: publicPolicy(active, "active", neutralPolicyConfig()),
+            draft: publicPolicy(draft, draft ? "draft" : "active-copy", configFromPolicy(active))
+        };
+    });
+    serviceTrace(trace, "SETTINGS_RESPONSE_MAPPING_COMPLETED", {
+        policies: policies.length,
+        fxAuthorities: fxAuthorities.length
+    });
+    return plainJson({ policies, fxAuthorities });
 }
 
 async function runPricingEngineDiagnostics(trace = null) {
@@ -861,6 +897,7 @@ module.exports = {
     PRICING_BOOTSTRAP_DEADLINE_MS,
     QUERY_MAX_TIME_MS,
     getPricingConsoleState,
+    getPricingSettingsState,
     neutralPolicyConfig,
     publishPricing,
     runPricingEngineDiagnostics,

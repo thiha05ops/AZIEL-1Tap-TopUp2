@@ -9,6 +9,7 @@ const { ADMIN_AUDIT_ACTIONS, writeAdminAudit } = require("../services/adminAudit
 const {
     AdminPricingEngineError,
     getPricingConsoleState,
+    getPricingSettingsState,
     publishPricing,
     runPricingEngineDiagnostics,
     saveFxAuthorities,
@@ -18,6 +19,8 @@ const {
 const {
     AdminPricingControlCenterError,
     batchPreviewDailyPricing,
+    loadDailyPricingInventory,
+    loadDailyPricingProductDetail,
     loadDailyPricingWorkspace,
     publishDailyPricing
     ,savePackageProfitOverride
@@ -168,6 +171,7 @@ function sendPricingError(req, res, error) {
             success: false,
             code: "PRICING_DATA_UNAVAILABLE",
             message: "Pricing data is temporarily unavailable. Please retry.",
+            stage: error?.stage || trace?.lastCheckpoint || "unknown",
             requestId: trace?.requestId
         });
     }
@@ -209,6 +213,22 @@ router.get("/admin/pricing-engine", pricingLifecycle, ...pricingAuth(PERMISSIONS
         req.pricingTrace?.markCompleted();
         res.setHeader("Content-Type", "application/json; charset=utf-8");
         return res.send(serialized);
+    } catch (error) {
+        return sendPricingError(req, res, error);
+    }
+});
+
+router.get("/admin/pricing-engine/settings", pricingLifecycle, ...pricingAuth(PERMISSIONS.CATALOG_READ), async (req, res) => {
+    try {
+        req.pricingTrace?.log("SETTINGS_ROUTE_HANDLER_ENTERED");
+        const state = await withBootstrapDeadline(getPricingSettingsState({ trace: req.pricingTrace }), req.pricingTrace);
+        if (res.headersSent || req.aborted || req.pricingTrace?.completed) return;
+        req.pricingTrace?.log("SETTINGS_RESPONSE_SENT", {
+            policies: Array.isArray(state.policies) ? state.policies.length : 0,
+            fxAuthorities: Array.isArray(state.fxAuthorities) ? state.fxAuthorities.length : 0
+        });
+        req.pricingTrace?.markCompleted();
+        return res.json({ success: true, requestId: req.pricingTrace?.requestId, ...state });
     } catch (error) {
         return sendPricingError(req, res, error);
     }
@@ -322,6 +342,25 @@ router.get("/admin/pricing-engine/workspace", adminMiddleware, requireAdminPermi
             supplierMarket: req.query?.supplierMarket || "",
             productCode: req.query?.productCode || "",
             region: req.query?.region || "TH"
+        }));
+    } catch (error) {
+        return sendPricingError(req, res, error);
+    }
+});
+
+router.get("/admin/pricing-engine/inventory", adminMiddleware, requireAdminPermission(PERMISSIONS.CATALOG_READ), async (req, res) => {
+    try {
+        return res.json(await loadDailyPricingInventory({ supplierId: req.query?.supplierId || "" }));
+    } catch (error) {
+        return sendPricingError(req, res, error);
+    }
+});
+
+router.get("/admin/pricing-engine/products/:productCode", adminMiddleware, requireAdminPermission(PERMISSIONS.CATALOG_READ), async (req, res) => {
+    try {
+        return res.json(await loadDailyPricingProductDetail({
+            supplierId: req.query?.supplierId || "",
+            productCode: req.params.productCode || ""
         }));
     } catch (error) {
         return sendPricingError(req, res, error);

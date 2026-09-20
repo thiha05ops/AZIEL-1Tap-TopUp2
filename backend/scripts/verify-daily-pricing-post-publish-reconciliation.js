@@ -15,9 +15,9 @@ const service = fs.readFileSync(path.join(root, "backend/services/commerce/admin
     "Publish response was uncertain",
     "verify the published value before retrying",
     "preserveOnError",
-    "seq !== daily.loadSeq",
+    "seq !== daily.detailSeq",
     "currentScope === publishScope",
-    "daily.loadController?.abort()",
+    "daily.detailController?.abort()",
     "renderRows();",
     "failedCount > 0",
     "Partially published"

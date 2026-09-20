@@ -4,11 +4,11 @@
     const rememberDailyScope=state=>sessionStorage.setItem("aziel.dailyPricing.scope",JSON.stringify({supplierMarket:state.supplierMarket,product:state.selectedProductId,customerMarket:state.region}));
 
     const daily = {
-        loaded: false, loading: false, products: [], navigationProducts: [], policies: [], suppliers: [], supplierMarkets: [], region: ["TH","MM"].includes(rememberedDaily.customerMarket)?rememberedDaily.customerMarket:"TH",
+        loaded: false, loading: false, detailLoaded: false, detailLoading: false, detailRows: [], detailCache: new Map(), products: [], navigationProducts: [], policies: [], suppliers: [], supplierMarkets: [], region: ["TH","MM"].includes(rememberedDaily.customerMarket)?rememberedDaily.customerMarket:"TH",
         supplierId: "", supplierMarket: String(rememberedDaily.supplierMarket||"").toUpperCase(), selectedProductId: String(rememberedDaily.product||""), edits: new Map(), priceEdits: new Map(), selected: new Set(), previews: new Map(), search: "", previewSeq: 0,
         previewCompleted: false, previewError: "",
-        previewController: null, previewTimer: null, saveTimer: null, publishing: false,
-        loadController: null, loadSeq: 0,
+        previewController: null, previewTimer: null, saveTimer: null, draftController: null, draftSeq: 0, publishing: false,
+        loadController: null, loadSeq: 0, detailController: null, detailSeq: 0, pendingPreviewKeys: null,
         productBrowserOpen: true,
         productBrowserSearch: ""
     };
@@ -22,6 +22,8 @@
     const priceEditKey = (row, region) => `${rowKey(row)}:${region}`;
     const money = (value, currency) => value == null ? "-" : `${Number(value).toLocaleString(undefined, { maximumFractionDigits: 2 })} ${currency}`;
     const publishOutcome = window.AZIEL_PRICING_PUBLISH_OUTCOME;
+    const WORKSPACE_CHUNK_SIZE = 200;
+    const chunks = rows => Array.from({ length: Math.ceil(rows.length / WORKSPACE_CHUNK_SIZE) }, (_, index) => rows.slice(index * WORKSPACE_CHUNK_SIZE, (index + 1) * WORKSPACE_CHUNK_SIZE));
 
     async function pricingFetch(url, options = {}) {
         const token = localStorage.getItem("adminToken") || "";
@@ -32,7 +34,7 @@
             headers: { "Content-Type": "application/json", ...(options.headers || {}), Authorization: `Bearer ${token}` }
         });
         const body = await response.json().catch(() => ({}));
-        if (!response.ok || body.success === false) { const error = new Error(body.message || body.code || "Pricing request failed."); error.code = body.code || ""; error.status = response.status; throw error; }
+        if (!response.ok || body.success === false) { const error = new Error(body.message || body.code || "Pricing request failed."); error.code = body.code || ""; error.stage = body.stage || ""; error.requestId = body.requestId || ""; error.status = response.status; throw error; }
         return body;
     }
 
@@ -58,26 +60,12 @@
         return daily.suppliers.find(supplier => String(supplier.id || supplier.supplierId || supplier._id) === daily.supplierId) || null;
     }
 
+    function workspaceRows() {
+        return [...daily.detailCache.values()].flat();
+    }
+
     function regionRows() {
-        const rows = new Map();
-        daily.products.filter(product => !daily.selectedProductId || product.productId === daily.selectedProductId).forEach(product => {
-            (product.packages || []).forEach(pkg => {
-                const key = `${upper(product.productCode)}:${upper(pkg.packageCode)}`;
-                if (!rows.has(key)) rows.set(key, { ...pkg, productName: product.productName, productCode: product.productCode, regionalRows: {} });
-                const row = rows.get(key);
-                row.regionalRows[upper(pkg.region)] = pkg;
-                if (pkg.savedDraftSupplierCost != null) {
-                    row.savedDraftSupplierCost = pkg.savedDraftSupplierCost;
-                    row.savedDraftSupplierId = pkg.savedDraftSupplierId;
-                    row.savedDraftSupplierCurrency = pkg.savedDraftSupplierCurrency;
-                }
-                if (row.publishedSupplierPrice == null && pkg.publishedSupplierPrice != null) {
-                    row.publishedSupplierPrice = pkg.publishedSupplierPrice;
-                    row.publishedSupplierCurrency = pkg.publishedSupplierCurrency;
-                }
-            });
-        });
-        return [...rows.values()];
+        return daily.detailRows;
     }
 
     function visibleRows() {
@@ -204,8 +192,8 @@
     }
 
     function dailyBlockingReason() {
-        if (!daily.navigationProducts.length) return "Add a product to the Store Catalog before setting prices.";
-        if (!daily.products.length) return "This Store Catalog product has no selected packages for this selling region.";
+        if (!daily.navigationProducts.length) return "Add a valid supplier-to-canonical mapping before setting prices.";
+        if (daily.selectedProductId && !daily.detailRows.length) return "No valid supplier-to-canonical package mappings are available for this product.";
         if (!["TH", "MM"].every(region => daily.policies.some(policy => policy.region === region && (policy.active || policy.draft)))) return "Failed to load active Thailand and Myanmar pricing policies.";
         if (!daily.selectedProductId) return "Select a product.";
         const supplier = activeSupplier();
@@ -280,7 +268,7 @@
         const warned = regions.find(item => item.warnings?.length);
         if (warned) return { status: "WARNING", reason: `${warned.region}: ${warned.warnings?.[0]?.message || "Commercial warning"}`, regions };
         if (row.offered === false) return { status: "WARNING", reason: `Preview only · ${row.offerabilityReason || "Production mapping is disabled"}`, regions };
-        return { status: "READY", reason: "All active regions ready", regions };
+        return { status: "READY", reason: "TH/MM pricing ready", regions };
     }
 
     function rowSelectionEligible(row) {
@@ -298,7 +286,7 @@
     }
 
     function reconcileSelection(rows = visibleRows()) {
-        const allowed = new Set(rows.filter(rowSelectionEligible).map(rowKey));
+        const allowed = new Set(workspaceRows().filter(rowSelectionEligible).map(rowKey));
         [...daily.selected].forEach(key => {
             if (!allowed.has(key)) daily.selected.delete(key);
         });
@@ -323,8 +311,9 @@
         const publishedPrice = result?.currentPublishedPrice ?? published.publishedPrice;
         const difference = result?.publishedPriceDifference;
         const percent = publishedPrice > 0 && difference != null ? (difference / publishedPrice) * 100 : null;
+        const isNewPrice = result?.priceState === "NEW" || publishedPrice == null;
         const changeEvidence = result
-            ? `<span>Current ${money(publishedPrice, currency)}</span><span>New ${money(sellingPrice, currency)}</span><b class="pricing-change-value">${difference == null ? "No change" : `${difference >= 0 ? "+" : ""}${money(difference, currency)}${percent == null ? "" : ` (${percent >= 0 ? "+" : ""}${percent.toFixed(2)}%)`}`}</b>`
+            ? `<span>Current ${isNewPrice ? "Unpublished / new" : money(publishedPrice, currency)}</span><span>New ${money(sellingPrice, currency)}</span><b class="pricing-change-value">${isNewPrice ? "New price" : difference == null ? "No change" : `${difference >= 0 ? "+" : ""}${money(difference, currency)}${percent == null ? "" : ` (${percent >= 0 ? "+" : ""}${percent.toFixed(2)}%)`}`}</b>`
             : "";
         const reason = result?.blockingErrors?.[0]?.message || result?.warnings?.[0]?.message || "";
         const rawCost = result?.rawSupplierCost ?? result?.supplierCost;
@@ -355,8 +344,13 @@
         const rows = visibleRows();
         reconcileSelection(rows);
         if (!rows.length) {
-            const product = daily.products.find(item => item.productId === daily.selectedProductId);
-            body.innerHTML = `<tr><td colspan="7" class="empty"><strong>No pricing packages are configured for ${text(product?.productName || "this product")} yet.</strong><br><small>Configure packages in Admin Catalog to make pricing rows available.</small></td></tr>`;
+            if (daily.detailLoading) {
+                body.innerHTML = '<tr><td colspan="8" class="empty">Loading selected product pricing...</td></tr>';
+                $("pricingDailySummary").textContent = "Loading packages";
+                return;
+            }
+            const product = daily.navigationProducts.find(item => item.productId === daily.selectedProductId);
+            body.innerHTML = `<tr><td colspan="8" class="empty"><strong>No valid supplier mappings are available for ${text(product?.productName || "this product")} yet.</strong><br><small>Resolve the supplier-to-canonical package mapping to make pricing rows available.</small></td></tr>`;
             $("pricingDailySummary").textContent = "0 packages";
             return;
         }
@@ -378,6 +372,10 @@
                             : "UNCHANGED";
             const blocked = dailyBlockingReason();
             const selectionEligible = rowSelectionEligible(row);
+            const canReviewCost = row.supplierCostStatus === "COST_REVIEW_REQUIRED" && window.AZIEL_ADMIN_AUTH?.hasPermission?.("SUPPLIER_COST_MANAGE") === true;
+            const reviewCostAction = canReviewCost
+                ? `<button class="admin-secondary-btn" type="button" data-pricing-review-cost data-mapping-id="${text(row.mappingId)}" data-offer-id="${text(row.supplierCatalogOfferId)}" data-supplier-code="${text(row.supplierCode || supplier?.supplierCode)}" data-product-code="${text(row.productCode)}" data-package-code="${text(row.packageCode)}" data-supplier-market="${text(row.supplierMarket || daily.supplierMarket)}">Review cost</button>`
+                : "";
             const overrideRegions = daily.region === "ALL" ? ["TH", "MM"] : [daily.region];
             const profitControls = overrideRegions.map(region => {
                 const override = row.regionalRows[region]?.profitOverride || { mode: "INHERIT", value: null };
@@ -390,7 +388,8 @@
                 <td><label class="pricing-cost-input"><input type="number" min="0.000001" step="0.000001" value="${value}" placeholder="${row.observedSupplierCost ?? ""}" data-supplier-cost="${key}" ${blocked ? `disabled title="${blocked}"` : ""}><span>${row.supplierCurrency || supplier?.supplierCurrency || "-"}</span></label><small>${row.observedSupplierCost != null ? `Supplier catalog: ${row.observedSupplierCost} ${row.observedSupplierCurrency}` : "Supplier catalog cost unavailable"}</small></td>
                 <td>${profitControls}</td>
                 <td class="pricing-desktop-region">${regionalResult(row, preview, "TH")}</td><td class="pricing-desktop-region">${regionalResult(row, preview, "MM")}</td>
-                <td><span class="pricing-status is-${displayStatus.toLowerCase()}">${displayStatus}</span><small>${view.reason}</small></td>
+                <td><span class="pricing-status is-${displayStatus.toLowerCase()}">${displayStatus}</span><small>${view.reason}</small><small>${row.storeCatalogStatus === "SELECTED" ? "In Store Catalog" : "Not in Store Catalog"}</small></td>
+                <td>${reviewCostAction}<button class="admin-secondary-btn" type="button" data-publish-package="${key}" ${selectionEligible ? "" : "disabled"}>Publish</button></td>
             </tr>`;
         }).join("");
         $("pricingDailySummary").textContent = `${rows.length} visible · ${daily.selected.size} selected`;
@@ -404,19 +403,25 @@
         const value = mode === "INHERIT" ? null : Number(input.value);
         if (mode !== "INHERIT" && (!Number.isFinite(value) || value < 0)) return;
         await pricingFetch("/api/admin/pricing-engine/workspace/profit-override", { method: "PUT", body: JSON.stringify({ productCode: control.dataset.productCode, packageCode: control.dataset.packageCode, region: control.dataset.region, profitOverride: { mode, value } }) });
-        daily.loaded = false; daily.previews.clear(); await loadDaily(true);
+        daily.previews.clear(); await loadProductDetail(true);
     }
 
     function updatePublishState() {
         reconcileSelection();
         const button = $("pricingPublishBtn");
-        button.disabled = daily.publishing || !activeSupplier() || daily.selected.size === 0;
-        button.innerHTML = `<i class="fa-solid fa-cloud-arrow-up" aria-hidden="true"></i> Publish Changes (${daily.selected.size})`;
+        const changed = workspaceRows().filter(row => previewFor(row)?.changed === true && rowSelectionEligible(row));
+        const productChanged = changed.filter(row => row.productCode === daily.selectedProductId);
+        button.disabled = daily.publishing || !activeSupplier() || changed.length === 0;
+        button.innerHTML = `<i class="fa-solid fa-cloud-arrow-up" aria-hidden="true"></i> Publish All Changes (${changed.length})`;
+        const selectedButton = $("pricingPublishSelectedBtn");
+        if (selectedButton) { selectedButton.disabled = daily.publishing || daily.selected.size === 0; selectedButton.textContent = `Publish Selected (${daily.selected.size})`; }
+        const productButton = $("pricingPublishProductBtn");
+        if (productButton) { productButton.disabled = daily.publishing || productChanged.length === 0; productButton.textContent = `Publish Product Changes (${productChanged.length})`; }
     }
 
     function buildWorkspaceRows() {
         const supplier = activeSupplier();
-        return regionRows().filter(row => daily.edits.has(rowKey(row))).map(row => ({
+        return workspaceRows().filter(row => daily.edits.has(rowKey(row))).map(row => ({
             rowId: rowKey(row), productCode: row.productCode, packageCode: row.packageCode,
             mappingId: row.mappingId,
             newSupplierCost: daily.edits.get(rowKey(row)).value,
@@ -425,9 +430,16 @@
         }));
     }
 
-    function buildPublishRows() {
+    function buildPublishRows(mode = "SELECTION", packageKey = "") {
         const supplier = activeSupplier();
-        return regionRows().filter(row => daily.selected.has(rowKey(row))).map(row => ({
+        const rows = workspaceRows().filter(row => {
+            const preview = previewFor(row);
+            if (mode === "PACKAGE") return rowKey(row) === packageKey;
+            if (mode === "SELECTION") return daily.selected.has(rowKey(row));
+            if (mode === "PRODUCT_CHANGED") return row.productCode === daily.selectedProductId && preview?.changed === true;
+            return preview?.changed === true;
+        }).filter(rowSelectionEligible);
+        return rows.map(row => ({
             rowId: rowKey(row), productCode: row.productCode, packageCode: row.packageCode,
             mappingId: row.mappingId,
             newSupplierCost: daily.edits.has(rowKey(row)) ? daily.edits.get(rowKey(row)).value : (row.supplierCost ?? row.savedDraftSupplierCost ?? row.publishedSupplierPrice),
@@ -439,7 +451,7 @@
 
     function buildPreviewRows() {
         const supplier = activeSupplier();
-        return regionRows().filter(row => row.previewEligible !== false && (daily.edits.has(rowKey(row)) || row.previewSupplierCost != null || row.supplierCost != null || row.savedDraftSupplierCost != null || row.publishedSupplierPrice != null)).map(row => ({
+        return daily.detailRows.filter(row => row.previewEligible !== false && (daily.edits.has(rowKey(row)) || row.previewSupplierCost != null || row.supplierCost != null || row.savedDraftSupplierCost != null || row.publishedSupplierPrice != null)).map(row => ({
             rowId: rowKey(row), productCode: row.productCode, packageCode: row.packageCode,
             mappingId: row.mappingId,
             newSupplierCost: daily.edits.has(rowKey(row)) ? daily.edits.get(rowKey(row)).value : (row.previewSupplierCost ?? row.supplierCost ?? row.savedDraftSupplierCost ?? row.publishedSupplierPrice),
@@ -452,13 +464,14 @@
     function authoritativePreviewRegion() {
         // Supplier mapping region is fulfillment/provider scope. Daily Pricing
         // target region is canonical storefront authority and is independent.
-        return daily.region;
+        return "ALL";
     }
 
-    function schedulePreview() {
+    function schedulePreview(keys = null) {
         clearTimeout(daily.previewTimer);
         daily.previewController?.abort();
         daily.previewSeq += 1;
+        daily.pendingPreviewKeys = keys ? new Set(keys) : null;
         daily.previewCompleted = false;
         daily.previewError = "";
         daily.previewTimer = setTimeout(runPreview, 350);
@@ -466,7 +479,8 @@
 
     async function runPreview() {
         if (!daily.supplierId || !activeSupplier()) return;
-        const rows = buildPreviewRows();
+        const keys = daily.pendingPreviewKeys;
+        const rows = buildPreviewRows().filter(row => !keys || keys.has(rowKey(row)));
         if (!rows.length) {
             daily.previewCompleted = true;
             daily.previewError = "";
@@ -479,13 +493,13 @@
         daily.previewError = "";
         $("pricingDailyState").textContent = "Calculating";
         try {
-            const result = await pricingFetch("/api/admin/pricing-engine/workspace/preview", {
+            const results = [];
+            for (const batch of chunks(rows)) results.push(await pricingFetch("/api/admin/pricing-engine/workspace/preview", {
                 method: "POST", signal: daily.previewController.signal,
-                body: JSON.stringify({ supplierId: daily.supplierId, region: authoritativePreviewRegion(), rows })
-            });
+                body: JSON.stringify({ supplierId: daily.supplierId, region: authoritativePreviewRegion(), rows: batch })
+            }));
             if (seq !== daily.previewSeq) return;
-            daily.previews.clear();
-            (result.rows || []).forEach(row => daily.previews.set(rowKey(row), row));
+            results.flatMap(result => result.rows || []).forEach(row => daily.previews.set(rowKey(row), row));
             daily.previewCompleted = true;
             $("pricingDailyState").textContent = "Preview ready";
             renderRows();
@@ -505,26 +519,43 @@
         daily.saveTimer = setTimeout(saveDraft, 500);
     }
 
+    function draftScopeKey() {
+        return `${daily.supplierId}|${daily.supplierMarket}|${daily.selectedProductId}|${daily.region}|${daily.loadSeq}`;
+    }
+
+    function invalidateDraftSave() {
+        clearTimeout(daily.saveTimer);
+        daily.draftController?.abort();
+        daily.draftController = null;
+        daily.draftSeq += 1;
+    }
+
     async function saveDraft() {
         const rows = buildWorkspaceRows();
         if (!rows.length || !daily.supplierId) return;
+        const scope = draftScopeKey();
+        const seq = ++daily.draftSeq;
+        daily.draftController?.abort();
+        daily.draftController = new AbortController();
         $("pricingDraftState").textContent = "Saving draft...";
         try {
             await pricingFetch("/api/admin/pricing-engine/draft", {
-                method: "PUT",
+                method: "PUT", signal: daily.draftController.signal,
                 body: JSON.stringify({ policies: policyPayload(daily.policies), workspaceRows: rows, workspaceRegion: daily.region, supplierId: daily.supplierId })
             });
+            if (seq !== daily.draftSeq || scope !== draftScopeKey()) return;
             $("pricingDraftState").textContent = "Draft Saved";
         } catch (error) {
+            if (error.name === "AbortError" || seq !== daily.draftSeq || scope !== draftScopeKey()) return;
             $("pricingDraftState").textContent = `Draft failed: ${error.message}`;
         }
     }
 
-    async function publishRows() {
+    async function publishRows(mode = "WORKSPACE_CHANGED", packageKey = "") {
         const publishRegion = authoritativePreviewRegion();
         const regions = publishRegion === "ALL" ? ["TH", "MM"] : [publishRegion];
         reconcileSelection();
-        const rows = buildPublishRows(),publicationIntent=rows.map(row=>({productCode:row.productCode,packageCode:row.packageCode,mappingId:row.mappingId}));
+        const rows = buildPublishRows(mode, packageKey);
         if (!rows.length) return;
         const reviewLines = rows.flatMap(row => {
             const preview = daily.previews.get(rowKey(row));
@@ -542,8 +573,17 @@
         $("pricingDailyState").textContent = "Publishing";
         const publishScope = `${daily.supplierId}|${daily.supplierMarket}|${daily.selectedProductId}|${daily.region}`;
         try {
-            const result = await pricingFetch("/api/admin/pricing-engine/workspace/publish", { method: "POST", body: JSON.stringify({ supplierId: daily.supplierId, region: publishRegion, rows }) });
-            const successKeys = new Set((result.draftCleanup?.clearedKeys || []).map(upper));
+            const batchResults = [];
+            for (const batch of chunks(rows)) batchResults.push(await pricingFetch("/api/admin/pricing-engine/workspace/publish", { method: "POST", body: JSON.stringify({ supplierId: daily.supplierId, region: publishRegion, rows: batch }) }));
+            const result = {
+                results: batchResults.flatMap(item => item.results || []),
+                draftCleanup: { clearedKeys: batchResults.flatMap(item => item.draftCleanup?.clearedKeys || []) },
+                summary: {
+                    published: batchResults.reduce((sum, item) => sum + Number(item.summary?.published || 0), 0),
+                    failed: batchResults.reduce((sum, item) => sum + Number(item.summary?.failed || 0), 0)
+                }
+            };
+            const successKeys = new Set((result.draftCleanup.clearedKeys || []).map(upper));
             successKeys.forEach(key => { daily.edits.delete(key); daily.previews.delete(key); });
             successKeys.forEach(key => { daily.selected.delete(key); daily.priceEdits.delete(key); });
             const publishedCount = Number(result.summary?.published || 0);
@@ -557,10 +597,6 @@
             }
             const currentScope = `${daily.supplierId}|${daily.supplierMarket}|${daily.selectedProductId}|${daily.region}`;
             if (publishedCount > 0 && currentScope === publishScope) {
-                const activation=await pricingFetch(`/api/admin/product-activation?productCode=${encodeURIComponent(daily.selectedProductId)}&supplierMarket=${encodeURIComponent(daily.supplierMarket)}&customerMarket=${encodeURIComponent(publishRegion)}`);
-                const selections=publicationIntent.map(intent=>activation.packages.find(item=>item.mappingId===intent.mappingId&&item.packageCode===intent.packageCode)).filter(Boolean);
-                if(selections.length===publicationIntent.length&&selections.every(item=>item.readiness?.ready)){await pricingFetch(`/api/admin/product-activation/products/${encodeURIComponent(daily.selectedProductId)}/publication`,{method:"POST",body:JSON.stringify({customerMarket:publishRegion,selections:selections.map(item=>({packageCode:item.packageCode,mappingId:item.mappingId,expectedMappingUpdatedAt:item.mappingUpdatedAt,expectedDecisionVersion:item.publication.decisionVersion})),decisionNote:"Daily Pricing explicit Publish Changes decision"})})}
-                else setDailyError("Prices were saved, but one or more packages cannot be published yet. View issue for details; unsafe packages remain private.",false);
                 await loadDaily(true, { preserveOnError: true, postPublish: true });
             }
         } catch (error) {
@@ -581,64 +617,90 @@
         }
     }
 
-    async function loadDaily(force = false, { preserveOnError = false, postPublish = false, failureMessage = "" } = {}) {
-        if ((daily.loading && !force) || (daily.loaded && !force)) return;
-        const previousProductId = daily.selectedProductId;
+    function cancelDetailWork() {
+        daily.detailController?.abort();
+        daily.previewController?.abort();
+        daily.detailSeq += 1;
+        daily.previewSeq += 1;
+        clearTimeout(daily.previewTimer);
+    }
+
+    async function loadInventory(force = false) {
+        if ((daily.loading && !force) || (daily.loaded && !force)) return true;
         const seq = ++daily.loadSeq;
         daily.loadController?.abort();
         daily.loadController = new AbortController();
         daily.loading = true;
-        daily.previewCompleted = false;
-        daily.previewError = "";
-        daily.previews.clear();
         setDailyError("");
-        $("pricingDailyState").textContent = postPublish ? "Published · revalidating" : "Loading";
+        $("pricingDailyState").textContent = "Loading products";
         try {
-            const requestOptions = { signal: daily.loadController.signal };
-            const workspaceParams = new URLSearchParams({ region: daily.region });
-            if (daily.supplierId) workspaceParams.set("supplierId", daily.supplierId);
-            if (daily.supplierMarket) workspaceParams.set("supplierMarket", daily.supplierMarket);
-            if (daily.selectedProductId) workspaceParams.set("productCode", daily.selectedProductId);
-            const [pricing, workspace] = await Promise.all([pricingFetch("/api/admin/pricing-engine", requestOptions), pricingFetch(`/api/admin/pricing-engine/workspace?${workspaceParams}`, requestOptions)]);
-            if (seq !== daily.loadSeq) return;
-            daily.products = Array.isArray(workspace.products) ? workspace.products : [];
-            daily.navigationProducts = Array.isArray(workspace.navigationProducts) ? workspace.navigationProducts : [];
+            const params = new URLSearchParams();
+            if (daily.supplierId) params.set("supplierId", daily.supplierId);
+            const options = { signal: daily.loadController.signal };
+            const [inventory, pricing] = await Promise.all([
+                pricingFetch(`/api/admin/pricing-engine/inventory?${params}`, options),
+                pricingFetch("/api/admin/pricing-engine/settings", options)
+            ]);
+            if (seq !== daily.loadSeq) return false;
+            daily.navigationProducts = Array.isArray(inventory.navigationProducts) ? inventory.navigationProducts : [];
+            daily.suppliers = Array.isArray(inventory.suppliers) ? inventory.suppliers : [];
+            daily.supplierId = inventory.selectedSupplierId || daily.supplierId;
+            daily.supplierMarkets = Array.isArray(inventory.supplierMarkets) ? inventory.supplierMarkets : [];
             daily.policies = Array.isArray(pricing.policies) ? pricing.policies : [];
-            daily.suppliers = Array.isArray(workspace.suppliers) ? workspace.suppliers : [];
-            daily.supplierId = workspace.selectedSupplierId || daily.supplierId;
-            daily.supplierMarkets = Array.isArray(workspace.supplierMarkets) ? workspace.supplierMarkets : [];
-            daily.supplierMarket = workspace.selectedSupplierMarket || "";
-            if (!daily.policies.length) throw new Error("Failed to load pricing policy.");
-            const rows = regionRows();
-            daily.supplierId = restoredSupplierId(rows) || daily.supplierId;
-            daily.edits.clear();
-            rows.forEach(row => { if (row.savedDraftSupplierCost != null) daily.edits.set(rowKey(row), { value: row.savedDraftSupplierCost, restored: true }); });
             daily.loaded = true;
-            daily.selectedProductId = workspace.selectedProductCode || (daily.navigationProducts.some(product => product.productId === previousProductId) ? previousProductId : "");
-            rememberDailyScope(daily);
-            $("pricingDailyState").textContent = "Ready";
-            $("pricingRegionSelect").value = daily.region;
+            $("pricingDailyState").textContent = "Products ready";
             renderProductSelect();
             renderSupplierSelect();
             renderSupplierMarketSelect();
+            return true;
+        } catch (error) {
+            if (error.name === "AbortError" || seq !== daily.loadSeq) return false;
+            setDailyError(error.message, true);
+            $("pricingDailyState").textContent = "Products unavailable";
+            return false;
+        } finally { if (seq === daily.loadSeq) daily.loading = false; }
+    }
+
+    async function loadProductDetail(force = false, { preserveOnError = false, failureMessage = "", postPublish = false } = {}) {
+        if (!daily.selectedProductId || !daily.supplierId) return false;
+        if (daily.detailLoading && !force) return false;
+        cancelDetailWork();
+        invalidateDraftSave();
+        const productId = daily.selectedProductId;
+        const seq = ++daily.detailSeq;
+        daily.detailController = new AbortController();
+        daily.detailLoading = true;
+        daily.previewCompleted = false;
+        daily.previewError = "";
+        setDailyError("");
+        $("pricingDailyState").textContent = postPublish ? "Published · revalidating" : "Loading product";
+        daily.detailRows = daily.detailCache.get(productId) || [];
+        renderRows();
+        try {
+            const params = new URLSearchParams({ supplierId: daily.supplierId });
+            const detail = await pricingFetch(`/api/admin/pricing-engine/products/${encodeURIComponent(productId)}?${params}`, { signal: daily.detailController.signal });
+            if (seq !== daily.detailSeq || productId !== daily.selectedProductId) return false;
+            daily.detailRows = Array.isArray(detail.rows) ? detail.rows : [];
+            daily.detailCache.set(productId, daily.detailRows);
+            daily.detailLoaded = true;
+            daily.detailRows.forEach(row => { if (row.savedDraftSupplierCost != null) daily.edits.set(rowKey(row), { value: row.savedDraftSupplierCost, restored: true }); });
+            $("pricingDailyState").textContent = postPublish ? "Published · revalidated" : "Product ready";
             renderRows();
             schedulePreview();
             return true;
         } catch (error) {
-            if (error.name === "AbortError" || seq !== daily.loadSeq) return;
-            if (preserveOnError) {
-                daily.loaded = true;
-                setDailyError(failureMessage || `Publication succeeded, but authoritative workspace refresh failed: ${error.message}`, true);
-                $("pricingDailyState").textContent = "Published · refresh required";
-                renderRows();
-            } else {
-                daily.loaded = false;
-                setDailyError(error.message, true);
-                $("pricingDailyState").textContent = "Unavailable";
-                $("pricingPackageRows").innerHTML = '<tr><td colspan="7" class="empty">Failed to load production pricing.</td></tr>';
-            }
+            if (error.name === "AbortError" || seq !== daily.detailSeq || productId !== daily.selectedProductId) return false;
+            if (!preserveOnError) daily.detailRows = [];
+            setDailyError(failureMessage || (postPublish ? `Publication succeeded, but authoritative workspace refresh failed: ${error.message}` : error.message), true);
+            $("pricingDailyState").textContent = postPublish ? "Published · refresh required" : "Product unavailable";
+            renderRows();
             return false;
-        } finally { if (seq === daily.loadSeq) daily.loading = false; }
+        } finally { if (seq === daily.detailSeq) daily.detailLoading = false; }
+    }
+
+    async function loadDaily(force = false, options = {}) {
+        if (!daily.loaded) await loadInventory(force);
+        return daily.selectedProductId ? loadProductDetail(force, options) : true;
     }
 
     function fillSettings() {
@@ -692,7 +754,7 @@
         if (settings.loading || (settings.loaded && !force)) return;
         settings.loading = true;
         try {
-            const pricing = await pricingFetch("/api/admin/pricing-engine");
+            const pricing = await pricingFetch("/api/admin/pricing-engine/settings");
             settings.policies = Array.isArray(pricing.policies) ? pricing.policies : [];
             settings.fxAuthorities = Array.isArray(pricing.fxAuthorities) ? pricing.fxAuthorities : [];
             if (!settings.policies.length) throw new Error("Failed to load pricing policy.");
@@ -702,7 +764,8 @@
             $("pricingSettingsState").textContent = "Ready";
         } catch (error) {
             $("pricingSettingsError").hidden = false;
-            $("pricingSettingsError").textContent = error.message;
+            const diagnostic = [error.code, error.stage, error.requestId].filter(Boolean).join(" · ");
+            $("pricingSettingsError").textContent = `${error.message}${diagnostic ? ` (${diagnostic})` : ""}`;
             $("pricingSettingsState").textContent = "Unavailable";
         } finally { settings.loading = false; }
     }
@@ -753,7 +816,7 @@
         const packageKey = key.split(":").slice(0, 2).join(":");
         daily.previews.delete(packageKey);
         $("pricingDraftState").textContent = "Price preview pending";
-        schedulePreview();
+        schedulePreview(new Set([packageKey]));
         updatePublishState();
     }
 
@@ -797,13 +860,9 @@
             daily.region = event.target.value;
             daily.productBrowserOpen = true;
             rememberDailyScope(daily);
-            daily.edits.clear();
-            daily.priceEdits.clear();
-            daily.selected.clear();
-            daily.previews.clear();
             const pricingRegion = $("pricingRegionSelect");
             if (pricingRegion) pricingRegion.value = daily.region;
-            loadDaily(true);
+            renderProductBrowser();
         });
 
         $("pricingProductCards")?.addEventListener("click", event => {
@@ -815,17 +874,16 @@
             daily.selectedProductId = productId;
             daily.productBrowserOpen = false;
             daily.search = "";
-            daily.selected.clear();
-            daily.previews.clear();
             const packageSearch = $("pricingPackageSearch");
             if (packageSearch) packageSearch.value = "";
             rememberDailyScope(daily);
             renderProductBrowser();
             renderSelectedProductIdentity();
-            loadDaily(true);
+            loadProductDetail(true);
         });
 
         $("pricingBackToProducts")?.addEventListener("click", () => {
+            cancelDetailWork();
             daily.productBrowserOpen = true;
             daily.search = "";
             const packageSearch = $("pricingPackageSearch");
@@ -833,12 +891,14 @@
             renderProductBrowser();
         });
 
-        $("pricingRegionSelect")?.addEventListener("change", event => { daily.region = event.target.value;daily.productBrowserOpen=false;rememberDailyScope(daily);daily.edits.clear(); daily.priceEdits.clear(); daily.selected.clear(); daily.previews.clear(); const browserRegion=$("pricingProductBrowserRegion");if(browserRegion)browserRegion.value=daily.region; loadDaily(true); });
-        $("pricingProductSelect")?.addEventListener("change", event => { const value=event.target.value;daily.selectedProductId=daily.navigationProducts.some(item=>item.productId===value)?value:"";event.target.value=daily.selectedProductId;rememberDailyScope(daily);daily.search = ""; $("pricingPackageSearch").value = ""; daily.selected.clear(); daily.previews.clear();if(daily.selectedProductId)loadDaily(true); });
-        $("pricingSupplierSelect")?.addEventListener("change", event => { const supplier=daily.suppliers.find(item=>upper(item.supplierCode)===upper(event.target.value));daily.supplierId=supplier?String(supplier.id||supplier.supplierId||supplier._id):"";daily.supplierMarket="";daily.selectedProductId="";event.target.value=supplier?upper(supplier.supplierCode):"";daily.edits.clear(); daily.priceEdits.clear(); daily.selected.clear(); daily.previews.clear(); if(daily.supplierId)loadDaily(true); });
-        $("pricingSupplierMarketSelect")?.addEventListener("change", event => { const value=upper(event.target.value);daily.supplierMarket=daily.supplierMarkets.some(item=>item.value===value)?value:"";event.target.value=daily.supplierMarket;daily.selectedProductId="";rememberDailyScope(daily);daily.edits.clear();daily.priceEdits.clear();daily.selected.clear();daily.previews.clear();if(daily.supplierMarket)loadDaily(true); });
+        $("pricingRegionSelect")?.addEventListener("change", event => { daily.region = event.target.value;rememberDailyScope(daily);const browserRegion=$("pricingProductBrowserRegion");if(browserRegion)browserRegion.value=daily.region;renderSelectedProductIdentity();renderRows(); });
+        $("pricingProductSelect")?.addEventListener("change", event => { const value=event.target.value;daily.selectedProductId=daily.navigationProducts.some(item=>item.productId===value)?value:"";event.target.value=daily.selectedProductId;rememberDailyScope(daily);daily.search = ""; $("pricingPackageSearch").value = "";if(daily.selectedProductId)loadProductDetail(true); });
+        $("pricingSupplierSelect")?.addEventListener("change", event => { const supplier=daily.suppliers.find(item=>upper(item.supplierCode)===upper(event.target.value));cancelDetailWork();daily.supplierId=supplier?String(supplier.id||supplier.supplierId||supplier._id):"";daily.supplierMarket="";daily.selectedProductId="";daily.detailRows=[];daily.detailCache.clear();event.target.value=supplier?upper(supplier.supplierCode):"";daily.edits.clear(); daily.priceEdits.clear(); daily.selected.clear(); daily.previews.clear(); daily.loaded=false;if(daily.supplierId)loadInventory(true); });
+        $("pricingSupplierMarketSelect")?.addEventListener("change", event => { const value=upper(event.target.value);daily.supplierMarket=daily.supplierMarkets.some(item=>item.value===value)?value:"";event.target.value=daily.supplierMarket;rememberDailyScope(daily); });
         $("pricingPackageSearch")?.addEventListener("input", event => { daily.search = event.target.value; renderRows(); });
         $("pricingPackageRows")?.addEventListener("click", async event => {
+            const packagePublish = event.target.closest("[data-publish-package]");
+            if (packagePublish) return publishRows("PACKAGE", packagePublish.dataset.publishPackage);
             const trigger = event.target.closest("[data-pricing-review-cost]");
             if (!trigger || window.AZIEL_ADMIN_AUTH?.hasPermission?.("SUPPLIER_COST_MANAGE") !== true) return;
             const row = regionRows().find(item => String(item.mappingId) === trigger.dataset.mappingId && String(item.supplierCatalogOfferId) === trigger.dataset.offerId);
@@ -850,12 +910,12 @@
                 mappingId: row.mappingId,
                 onApproved: async () => {
                     $("pricingDailyState").textContent = "Cost approved · refreshing";
-                    await loadDaily(true);
+                    await loadProductDetail(true);
                 }
             });
             if (opened) $("pricingDailyState").textContent = "Ready";
         });
-        $("pricingPackageRows")?.addEventListener("input", event => { const key = event.target.dataset.supplierCost; if (key) { const value = Number(event.target.value); if (Number.isFinite(value) && value > 0) daily.edits.set(key, { value }); else daily.edits.delete(key); daily.previews.delete(key); $("pricingDraftState").textContent = "Unsaved Changes"; schedulePreview(); updatePublishState(); return; } const control = event.target.closest("[data-price-control]"); if (control && event.target.matches("[data-price-value]")) updatePriceEdit(control); });
+        $("pricingPackageRows")?.addEventListener("input", event => { const key = event.target.dataset.supplierCost; if (key) { const value = Number(event.target.value); if (Number.isFinite(value) && value > 0) daily.edits.set(key, { value }); else daily.edits.delete(key); daily.previews.delete(key); $("pricingDraftState").textContent = "Unsaved Changes"; schedulePreview(new Set([key])); updatePublishState(); return; } const control = event.target.closest("[data-price-control]"); if (control && event.target.matches("[data-price-value]")) updatePriceEdit(control); });
         $("pricingPackageRows")?.addEventListener("change", event => {
             if (event.target.matches("[data-row-selection]")) { if (event.target.disabled) return; event.target.checked ? daily.selected.add(event.target.dataset.rowSelection) : daily.selected.delete(event.target.dataset.rowSelection); updatePublishState(); $("pricingDailySummary").textContent = `${visibleRows().length} visible · ${daily.selected.size} selected`; return; }
             const priceControl = event.target.closest("[data-price-control]");
@@ -865,14 +925,16 @@
         $("pricingSelectVisible")?.addEventListener("click", () => selectVisible("ALL"));
         $("pricingSelectChanged")?.addEventListener("click", () => selectVisible("CHANGED"));
         $("pricingClearSelection")?.addEventListener("click", () => selectVisible("CLEAR"));
-        $("pricingPublishBtn")?.addEventListener("click", publishRows);
-        $("pricingRetryRefresh")?.addEventListener("click", () => loadDaily(true, { preserveOnError: daily.loaded }));
+        $("pricingPublishBtn")?.addEventListener("click", () => publishRows("WORKSPACE_CHANGED"));
+        $("pricingPublishSelectedBtn")?.addEventListener("click", () => publishRows("SELECTION"));
+        $("pricingPublishProductBtn")?.addEventListener("click", () => publishRows("PRODUCT_CHANGED"));
+        $("pricingRetryRefresh")?.addEventListener("click", () => daily.productBrowserOpen ? loadInventory(true) : loadProductDetail(true, { preserveOnError: daily.detailLoaded }));
         $("pricingSettingsRegion")?.addEventListener("change", event => { settings.region = event.target.value; fillSettings(); });
         $("pricingSettingsForm")?.addEventListener("input", updateSettingUnits);
         $("pricingSettingsSave")?.addEventListener("click", saveSettings);
-        window.addEventListener("aziel:admin-section-opened", event => { if (event.detail?.section === "pricing-engine") loadDaily(); if (event.detail?.section === "pricing-settings") loadSettings(); });
-        window.addEventListener("aziel:admin-auth-ready", () => { if (document.body.dataset.adminSection === "pricing-engine") loadDaily(); if (document.body.dataset.adminSection === "pricing-settings") loadSettings(); });
-        if (document.body.dataset.adminSection === "pricing-engine") loadDaily();
+        window.addEventListener("aziel:admin-section-opened", event => { if (event.detail?.section === "pricing-engine") loadInventory(); if (event.detail?.section === "pricing-settings") { cancelDetailWork(); loadSettings(); } });
+        window.addEventListener("aziel:admin-auth-ready", () => { if (document.body.dataset.adminSection === "pricing-engine") loadInventory(); if (document.body.dataset.adminSection === "pricing-settings") loadSettings(); });
+        if (document.body.dataset.adminSection === "pricing-engine") loadInventory();
         if (document.body.dataset.adminSection === "pricing-settings") loadSettings();
     }
 

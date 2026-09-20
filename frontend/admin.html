@@ -754,9 +754,9 @@
                             <p>Review supplier costs, compare new customer prices, and publish selected changes.</p>
                         </div>
                         <div class="pricing-v3-header-actions"><span id="pricingDailyState"
-                                class="admin-status-pill">Loading</span><button id="pricingPublishBtn"
+                                class="admin-status-pill">Loading</span><button id="pricingPublishSelectedBtn" class="admin-secondary-btn" type="button" disabled>Publish Selected</button><button id="pricingPublishProductBtn" class="admin-secondary-btn" type="button" disabled>Publish Product Changes</button><button id="pricingPublishBtn"
                                 class="admin-primary-btn" type="button" disabled><i class="fa-solid fa-cloud-arrow-up"
-                                    aria-hidden="true"></i> Publish Selected (0)</button></div>
+                                    aria-hidden="true"></i> Publish All Changes</button></div>
                     </header>
                     <div id="pricingDailyBlocking" class="pricing-v3-blocking" role="alert" hidden></div>
                     <button id="pricingRetryRefresh" class="admin-secondary-btn" type="button" hidden>Retry authoritative refresh</button>
@@ -829,6 +829,7 @@
                                     <th>Thailand price</th>
                                     <th>Myanmar price</th>
                                     <th>Status</th>
+                                    <th>Action</th>
                                 </tr>
                             </thead>
                             <tbody id="pricingPackageRows">

@@ -23,32 +23,35 @@ const { SUPPLIER_CURRENCY } = require("../constants/commerce");
     assert(!seagm, "Suppliers whose only mapping targets a soft-deleted package must not appear as a relevant workspace supplier.");
 
     const wonddAll = await loadDailyPricingWorkspace({ supplierId: wondd.id, productCode: "mlbb", region: "ALL" });
-    assert.strictEqual(new Set(wonddAll.rows.map(row => row.packageCode)).size, 18);
-    assert(wonddAll.rows.every(row => row.supplierCode === "WONDD" && row.mappingRegion === "TH" && row.supplierProductCode === "mlbb" && row.supplierPackageCode));
-    assert.strictEqual(new Set(wonddAll.rows.map(row => row.mappingId)).size, 18);
+    const wonddMlbbRows = wonddAll.rows.filter(row => row.productCode === "mlbb");
+    assert.strictEqual(new Set(wonddMlbbRows.map(row => row.packageCode)).size, 18);
+    assert(wonddMlbbRows.every(row => row.supplierCode === "WONDD" && row.mappingRegion === "TH" && row.supplierProductCode && row.supplierPackageCode));
+    assert.strictEqual(new Set(wonddMlbbRows.map(row => row.mappingId)).size, 18);
     const wonddPass = await loadDailyPricingWorkspace({ supplierId: wondd.id, productCode: "mlbb-twilight-weekly-pass", region: "ALL" });
-    assert.strictEqual(new Set(wonddPass.rows.map(row => row.mappingId)).size, 2, "MLBB pass mappings must remain available under their split canonical product.");
-    const ml86 = wonddAll.rows.find(row => row.packageCode === "MLBB_86");
+    const wonddPassRows = wonddPass.rows.filter(row => row.productCode === "mlbb-twilight-weekly-pass");
+    assert.strictEqual(new Set(wonddPassRows.map(row => row.mappingId)).size, 2, "MLBB pass mappings must remain available under their split canonical product.");
+    const ml86 = wonddMlbbRows.find(row => row.packageCode === "MLBB_86");
     assert.strictEqual(ml86.supplierPackageCode, "ML00086");
     assert.strictEqual(ml86.supplierCost, 41);
     assert.strictEqual(ml86.supplierCurrency, "THB");
 
     const thPreview = await batchPreviewDailyPricing({ supplierId: wondd.id, region: "TH", rows: [{ mappingId: ml86.mappingId, productCode: "mlbb", packageCode: "MLBB_86", newSupplierCost: 999999, selected: true }] });
     assert.strictEqual(thPreview.rows[0].newSupplierCost, 41, "Mapping cost authority must override client cost.");
-    assert.strictEqual(thPreview.rows[0].regions.length, 1);
-    assert.strictEqual(thPreview.rows[0].regions[0].region, "TH");
-    assert.strictEqual(thPreview.rows[0].regions[0].exchangeRate, 1);
-    assert.strictEqual(thPreview.rows[0].regions[0].exchangeRateSource, "same_currency");
-    assert(Number(thPreview.rows[0].regions[0].recommendedSellingPrice) > 41);
+    assert.deepStrictEqual(thPreview.rows[0].regions.map(item => item.region).sort(), ["MM", "TH"]);
+    const thRegion = thPreview.rows[0].regions.find(item => item.region === "TH");
+    assert.strictEqual(thRegion.exchangeRate, 1);
+    assert.strictEqual(thRegion.exchangeRateSource, "same_currency");
+    assert(Number(thRegion.recommendedSellingPrice) > 41);
 
     const pubg60Mapping = await SupplierProductMapping.findOne({ supplierId: fazer.id, productCode: "pubg", packageCode: "PUBG_60_UC", "supplierCostAuthority.rawSupplierCost": { $ne: null } }).select("region").lean();
     assert(pubg60Mapping?.region, "PUBG 60 UC must have an exact FazerCards supplier market.");
     const fazerMm = await loadDailyPricingWorkspace({ supplierId: fazer.id, supplierMarket: pubg60Mapping.region, productCode: "pubg", region: "MM" });
-    const mm60 = fazerMm.rows.find(row => row.packageCode === "PUBG_60_UC");
+    const mm60 = fazerMm.rows.find(row => row.productCode === "pubg" && row.packageCode === "PUBG_60_UC");
     assert(mm60, "Canonical MM-enabled PUBG 60 UC must enter the MM pricing workspace.");
     const mmPreview = await batchPreviewDailyPricing({ supplierId: fazer.id, region: "MM", rows: [{ mappingId: mm60.mappingId, productCode: "pubg", packageCode: "PUBG_60_UC", newSupplierCost: mm60.supplierCost }] });
-    assert.strictEqual(mmPreview.rows[0].regions[0].region, "MM");
-    assert(Number(mmPreview.rows[0].regions[0].exchangeRate) > 0);
+    const mmRegion = mmPreview.rows[0].regions.find(item => item.region === "MM");
+    assert(mmRegion);
+    assert(Number(mmRegion.exchangeRate) > 0);
 
     const mmPolicy = await PricingPolicy.findOne({ status: "ACTIVE", region: "MM", currency: "MMK" }).sort({ updatedAt: -1 }).lean();
     assert(mmPolicy, "Active MM region business policy must exist.");
@@ -66,7 +69,7 @@ const { SUPPLIER_CURRENCY } = require("../constants/commerce");
     if (originalLegacy !== undefined) process.env.EXCHANGE_RATE_THB_MMK = originalLegacy;
     if (originalTable !== undefined) process.env.COMMERCE_EXCHANGE_RATES = originalTable;
 
-    assert.strictEqual(wonddAll.rows.some(row => row.packageCode === "MLBB_1160_186"), false, "Unsupported package must not enter WonDD workspace.");
+    assert.strictEqual(wonddMlbbRows.some(row => row.packageCode === "MLBB_1160_186"), false, "Unsupported package must not enter WonDD workspace.");
     await mongoose.disconnect();
-    console.log(JSON.stringify({ result: "PASS", suppliers: initial.suppliers.map(item => item.supplierCode), wonddMlbbPackages: new Set(wonddAll.rows.map(item => item.packageCode)).size, pricingRegions: [...new Set(wonddAll.rows.map(item => item.region))], mappingRegions: [...new Set(wonddAll.rows.map(item => item.mappingRegion))], mlbb86Cost: ml86.supplierCost, thFx: thPreview.rows[0].regions[0].exchangeRate, fazerPubg60MmFx: mmPreview.rows[0].regions[0].exchangeRate, activeMmPolicyOwnsFx: false, independentMmPairs: mmFx.map(row => `${row.fromCurrency}_${row.toCurrency}`), topupCalls: 0 }, null, 2));
+    console.log(JSON.stringify({ result: "PASS", suppliers: initial.suppliers.map(item => item.supplierCode), wonddMlbbPackages: new Set(wonddMlbbRows.map(item => item.packageCode)).size, pricingRegions: [...new Set(wonddMlbbRows.map(item => item.region))], mappingRegions: [...new Set(wonddMlbbRows.map(item => item.mappingRegion))], mlbb86Cost: ml86.supplierCost, thFx: thRegion.exchangeRate, fazerPubg60MmFx: mmRegion.exchangeRate, activeMmPolicyOwnsFx: false, independentMmPairs: mmFx.map(row => `${row.fromCurrency}_${row.toCurrency}`), topupCalls: 0 }, null, 2));
 })().catch(async error => { await mongoose.disconnect().catch(() => null); console.error("Daily Pricing supplier/region authority verifier failed:", error.message); process.exitCode = 1; });

@@ -74,8 +74,8 @@ assert(!Object.prototype.hasOwnProperty.call(patch, "supplierCost"));
 assert.strictEqual(JSON.stringify({ mapping, selection, neighbors }), protectedBefore, "Price preparation must not mutate protected authorities.");
 assert.deepStrictEqual(
     selectedPublicationDecision({ changed: false, publishEligible: true, preparationSelected: true, mappingId: mapping._id, mappingReadiness: { pricingReady: false } }),
-    { action: "PUBLISH", reason: "" },
-    "Explicit Daily Pricing publish must converge pricing readiness for unchanged prepared rows."
+    { action: "NO_OP", reason: "No changes" },
+    "Unchanged pricing must remain idempotent and must not mutate mapping readiness."
 );
 assert.deepStrictEqual(
     selectedPublicationDecision({ changed: false, publishEligible: true, preparationSelected: true, mappingId: mapping._id, mappingReadiness: { pricingReady: true } }),
@@ -101,14 +101,14 @@ const service = read("backend/services/commerce/adminPricingControlCenterService
 const frontend = read("frontend/js/admin-pricing-engine.js");
 const publishBody = service.slice(service.indexOf("async function publishDailyPricing"), service.indexOf("async function loadPackage"));
 assert(route.includes("error instanceof AdminPricingEngineError || error instanceof AdminPricingControlCenterError"));
-assert(publishBody.includes("pricingPersistenceReadinessReasons"));
+assert(!publishBody.includes("pricingPersistenceReadinessReasons"));
+assert(!publishBody.includes("StoreCatalogSelection.find"));
 assert(!publishBody.includes("storePublicationReadinessReasons"), "Full sellability must remain outside price persistence.");
 assert(!publishBody.includes("withTransaction") && !publishBody.includes("session:"), "Publish path has no Mongo transaction-session concurrency defect.");
-assert(service.includes("markMappingPricingReady"), "Daily Pricing publish must own mapping pricing-readiness convergence.");
-assert(service.includes("DAILY_PRICING_EXPLICIT_PUBLISH"), "Pricing readiness provenance must be explicit.");
+assert(!publishBody.includes("markMappingPricingReady"), "Price persistence must not mutate supplier mapping readiness.");
 assert(frontend.includes('publishOutcome.classify(error) === "UNCERTAIN"'));
 assert(frontend.includes("await loadDaily(true, { preserveOnError: true, postPublish: true"), "Success and uncertainty paths must reload authoritative workspace.");
-assert(frontend.includes("selections.every(item=>item.readiness?.ready)"), "Explicit publication follow-up must remain readiness-gated.");
+assert(!frontend.includes("/api/admin/product-activation"), "Pricing must not trigger Store Catalog publication.");
 
 console.log(JSON.stringify({
     result: "PASS",
@@ -121,7 +121,7 @@ console.log(JSON.stringify({
     deterministicRejectionUncertain: false,
     transportFailureUncertain: true,
     successfulCommitRefreshesWorkspace: true,
-    unchangedPreparedRowsCanConvergePricingReadiness: true,
+    unchangedPreparedRowsCanConvergePricingReadiness: false,
     unrelatedPackagesChanged: 0,
     mappingActivationWrites: 0,
     roleWrites: 0,

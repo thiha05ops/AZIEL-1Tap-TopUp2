@@ -33,7 +33,9 @@ function main() {
     excludes(html, "Storefront Preview", "Legacy storefront simulation must be removed.");
 
     includes(frontend, "supplierId: daily.supplierId", "Preview and publish must carry canonical supplierId.");
-    includes(frontend, 'workspaceParams.set("supplierMarket", daily.supplierMarket)', "Workspace reads must carry exact supplier-market scope.");
+    includes(frontend, "/api/admin/pricing-engine/inventory", "Product navigation must use lightweight unified inventory.");
+    includes(frontend, "/api/admin/pricing-engine/products/", "Package detail must use a selected-product endpoint.");
+    excludes(frontend, 'workspaceParams.set("supplierMarket", daily.supplierMarket)', "Supplier market must not partition Pricing reads.");
     includes(frontend, "selectedProductId", "Daily Pricing must preserve an explicit product selection.");
     includes(frontend, "published.publishedPriceMode === \"POLICY_DERIVED\"", "Legacy compatibility prices must not render as V3 selling prices.");
     includes(frontend, "dailyBlockingReason", "Disabled inputs must expose their exact blocking contract.");
@@ -60,7 +62,8 @@ function main() {
     includes(control, "regionalResults", "Preview API must return the cross-region result contract.");
     includes(control, "selectedRegions", "Publish must support selected-region server recalculation.");
     includes(control, "loadDailyPricingWorkspace", "Workspace rows must be loaded through supplier mapping authority.");
-    includes(control, "region: selectedSupplierMarket", "Workspace mapping query must use exact supplier-market authority.");
+    includes(control, "resolvePricingInventoryMappings", "Workspace inventory must resolve exact mapping authority across supplier markets.");
+    excludes(control, "region: selectedSupplierMarket", "Supplier market must not partition Daily Pricing inventory.");
     includes(control, "canonicalSupplierCost", "Publish must persist one canonical supplier-cost snapshot.");
     includes(drafts, "resolvePricingSupplier", "Draft save must validate canonical supplier.");
     includes(drafts, "supplierId: group.supplierId", "Draft must snapshot canonical supplier identity.");

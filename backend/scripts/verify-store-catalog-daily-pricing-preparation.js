@@ -40,7 +40,7 @@ for (const region of ["TH", "MM"]) {
     assert.strictEqual(rows.length, 3, `${region} preparation must retain all selected non-deleted packages.`);
     assert(rows.every(row => row.customerMarket === region), `${region} pricing authority must remain independent.`);
 }
-assert.deepStrictEqual(canonicalPricingRegions(product, packages[1], "TH"), [], "Legacy behavior must continue suppressing disabled packages.");
+assert.deepStrictEqual(canonicalPricingRegions(product, packages[1], "TH"), ["TH"], "Pricing must retain disabled/non-offered packages without making them sellable.");
 assert.deepStrictEqual(canonicalPricingRegions(product, { ...packages[1], deletedAt: new Date() }, "TH", { allowDisabledPackage: true }), [], "Deleted packages must never enter preparation.");
 
 mappings.forEach((mapping, index) => {
@@ -69,11 +69,10 @@ const frontend = read("frontend/js/admin-pricing-engine.js");
 const catalog = read("backend/services/catalogService.js");
 const preparationSource = service.slice(service.indexOf("async function loadDailyPricingWorkspace"), service.indexOf("class AdminPricingControlCenterError"));
 assert(preparationSource.includes("deletedAt: null"), "Deleted canonical packages must remain excluded by the exact package query.");
-assert(preparationSource.includes("allowDisabledPackage: Boolean(activeSelection)"), "Store Catalog preparation must retain disabled packages.");
-assert(preparationSource.includes("allowDisabledProduct: Boolean(activeSelection)"), "Store Catalog preparation must retain disabled products.");
-assert(preparationSource.includes("preparationRegions: activeSelection?.sellingRegions || []"), "Store Catalog selling regions must drive preparation rows.");
-assert(preparationSource.includes("const storeSelectionScoped = storeSelections.length > 0"), "Actual Store Catalog authority must scope preparation without an environment-mode dependency.");
-assert(preparationSource.includes("SUPPLIER_CATALOG_COST_REQUIRED") && preparationSource.includes("CANONICAL_PACKAGE_DISABLED"));
+assert(preparationSource.includes('SupplierProductMapping.find({ supplierId: selected.id, archivedAt: null })'), "Supplier mappings must be Daily Pricing inventory authority.");
+assert(preparationSource.includes('pricingTargetRegions("ALL")'), "Every pricing row must prepare TH and MM together.");
+assert(!preparationSource.includes("storeSelectionScoped"), "Store Catalog selection must not scope pricing inventory.");
+assert(preparationSource.includes("SUPPLIER_CATALOG_COST_REQUIRED"));
 assert(!preparationSource.includes("PackageMarketPublication"), "Workspace preparation must not mutate publication authority.");
 assert(frontend.includes("previewSupplierCost") && !frontend.includes("provisional preview only"));
 assert(frontend.includes("row.previewSupplierCost == null"), "Observed-cost candidates must not be mislabeled as missing cost.");

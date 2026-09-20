@@ -1,7 +1,9 @@
 "use strict";
 
+const mongoose = require("mongoose");
 const PricingWorkspaceDraft = require("../../models/PricingWorkspaceDraft");
 const CatalogPackage = require("../../models/CatalogPackage");
+const SupplierProductMapping = require("../../models/SupplierProductMapping");
 const { SUPPLIER_CURRENCY, REGION } = require("../../constants/commerce");
 const { normalizePackageCode, normalizeProductCode, normalizeRegion } = require("../../catalog/catalogProjection");
 const { CANONICAL_PRODUCT_CODES, isCanonicalProductCode } = require("../../catalog/canonicalOperationalCatalog");
@@ -59,7 +61,8 @@ function normalizeDraftRows(rows = [], region = "ALL", supplier = {}) {
         const supplierCurrency = normalizeSupplierCurrency(supplier.supplierCurrency, normalizedRegion);
         if (!productId || !packageCode || stagedSupplierCost == null) return null;
         return {
-            rowId: text(row.rowId) || `${productId}:${packageCode}`,
+            rowId: text(row.rowId) || `${text(row.mappingId)}:${productId}:${packageCode}`,
+            mappingId: text(row.mappingId),
             productId,
             region: normalizedRegion,
             supplierCurrency,
@@ -115,7 +118,7 @@ function validationError(message) {
     return error;
 }
 
-async function validateCatalogRows(rows = []) {
+async function validateCatalogRows(rows = [], supplier = {}) {
     if (!rows.length) return rows;
     const productIds = [...new Set(rows.map(row => row.productId))];
     const packageCodes = [...new Set(rows.map(row => row.packageCode))];
@@ -124,17 +127,22 @@ async function validateCatalogRows(rows = []) {
         packageCode: { $in: packageCodes },
         deletedAt: null
     }).select("productCode packageCode prices").lean();
+    const mappingIds = rows.map(row => row.mappingId).filter(id => mongoose.Types.ObjectId.isValid(id));
+    const mappings = mappingIds.length ? await SupplierProductMapping.find({
+        _id: { $in: mappingIds },
+        supplierId: supplier.supplierId,
+        archivedAt: null
+    }).select("_id productCode packageCode supplierProductCode supplierPackageCode").lean() : [];
+    const mappingMap = new Map(mappings.map(mapping => [String(mapping._id), mapping]));
     const packageMap = new Map(packages.map(pkg => [`${canonicalPricingProductCode(pkg.productCode)}:${normalizePackageCode(pkg.packageCode)}`, pkg]));
     rows.forEach(row => {
         const pkg = packageMap.get(`${row.productId}:${row.packageCode}`);
         if (!pkg) {
             throw validationError(`Supplier-cost draft row references an unknown catalog package: ${row.productId}/${row.packageCode}.`);
         }
-        if (row.region !== "ALL" && !pkg.prices?.[row.region]) {
-            throw validationError(`Supplier-cost draft row references a package without ${row.region} pricing: ${row.productId}/${row.packageCode}.`);
-        }
-        if (row.region === "ALL" && !REGION.some(region => pkg.prices?.[region])) {
-            throw validationError(`Supplier-cost draft row references a package without active regional pricing: ${row.productId}/${row.packageCode}.`);
+        const mapping = mappingMap.get(row.mappingId);
+        if (!mapping || canonicalPricingProductCode(mapping.productCode) !== row.productId || normalizePackageCode(mapping.packageCode) !== row.packageCode || !text(mapping.supplierProductCode) || !text(mapping.supplierPackageCode)) {
+            throw validationError(`Supplier-cost draft row does not resolve to an active exact supplier mapping: ${row.productId}/${row.packageCode}.`);
         }
     });
     return rows;
@@ -147,11 +155,12 @@ function publicDraftRow(doc, row) {
         productCode: doc.productId,
         region: doc.region,
         supplierCurrency: doc.supplierCurrency,
-        supplierId: doc.supplierId ? String(doc.supplierId) : "",
-        supplierCode: doc.supplierCode || "",
-        supplierName: doc.supplierName || "Primary supplier",
+        supplierId: row.supplierId ? String(row.supplierId) : (doc.supplierId ? String(doc.supplierId) : ""),
+        supplierCode: row.supplierCode || doc.supplierCode || "",
+        supplierName: row.supplierName || doc.supplierName || "Primary supplier",
         supplierVersion: doc.supplierVersion || "",
         packageId: row.packageId || "",
+        mappingId: row.mappingId ? String(row.mappingId) : "",
         packageCode: row.packageCode,
         stagedSupplierCost: row.stagedSupplierCost,
         rawSupplierCost: row.rawSupplierCost ?? row.stagedSupplierCost,
@@ -196,7 +205,7 @@ function draftRowMap(rows = []) {
 async function saveSupplierCostDraftRows({ rows = [], region = "ALL", supplierId = "", admin = {} } = {}) {
     if (!Array.isArray(rows) || !rows.length) return { saved: [], summary: { requested: 0, saved: 0, groups: 0 } };
     const supplier = await resolvePricingSupplier({ supplierId, region: "ALL" });
-    const normalizedRows = await validateCatalogRows(normalizeDraftRows(rows, "ALL", supplier));
+    const normalizedRows = await validateCatalogRows(normalizeDraftRows(rows, "ALL", supplier), supplier);
     const groups = groupRows(normalizedRows);
     const actor = actorName(admin);
     const now = new Date();
@@ -211,10 +220,15 @@ async function saveSupplierCostDraftRows({ rows = [], region = "ALL", supplierId
         }).lean();
         const existingRows = new Map((current?.packageRows || [])
             .filter(row => row?.status !== "PUBLISHED")
-            .map(row => [normalizePackageCode(row.packageCode), row]));
+            .map(row => [text(row.mappingId) || normalizePackageCode(row.packageCode), row]));
         group.rows.forEach(row => {
-            const previous = existingRows.get(row.packageCode);
-            existingRows.set(row.packageCode, {
+            const identity = row.mappingId || row.packageCode;
+            const previous = existingRows.get(identity);
+            existingRows.set(identity, {
+                mappingId: row.mappingId || previous?.mappingId || null,
+                supplierId: row.supplierId || previous?.supplierId || null,
+                supplierCode: row.supplierCode || previous?.supplierCode || "",
+                supplierName: row.supplierName || previous?.supplierName || "",
                 packageId: row.packageId || previous?.packageId || "",
                 packageCode: row.packageCode,
                 stagedSupplierCost: row.stagedSupplierCost,

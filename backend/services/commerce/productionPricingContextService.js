@@ -4,6 +4,7 @@ const PricingPolicy = require("../../models/PricingPolicy");
 const PackagePricingOverride = require("../../models/PackagePricingOverride");
 const PricingRule = require("../../models/PricingRule");
 const PriceVersion = require("../../models/PriceVersion");
+const ExchangeRateAuthority = require("../../models/ExchangeRateAuthority");
 const { loadActiveExchangeRateAuthority, resolveExchangeRate, snapshotFromAuthority } = require("./exchangeRateService");
 const { resolveSupplierCostSnapshot } = require("./supplierCostService");
 const { STOREFRONT_CURRENCY } = require("../../constants/commerce");
@@ -236,6 +237,44 @@ async function loadActiveRules({ policy, packageContext, region, currency, now =
 
     return rules.map(ruleSnapshot);
 }
+
+function ruleAppliesToContext(rule, { policy, packageContext, region, currency } = {}) {
+    if (text(rule.policyId) !== text(policy?._id)) return false;
+    if (rule.region && upper(rule.region) !== upper(region)) return false;
+    if (rule.currency && upper(rule.currency) !== upper(currency)) return false;
+    const scopeRefs = new Set([
+        "", upper(region), packageContext.gameId, packageContext.gameCode,
+        packageContext.categoryId, packageContext.categoryCode, packageContext.packageId,
+        packageContext.packageRef, packageContext.packageCode
+    ].filter(Boolean).map(text));
+    return upper(rule.scopeType) === "GLOBAL" || !text(rule.scopeReference) || scopeRefs.has(text(rule.scopeReference));
+}
+
+async function loadProductionPricingAuthoritySnapshot({ products = [], packages = [], now = new Date() } = {}) {
+    const productCodes = [...new Set(products.map(item => text(item.productCode || item).toLowerCase()).filter(Boolean))];
+    const packageCodes = [...new Set(packages.map(item => upper(item.packageCode || item)).filter(Boolean))];
+    const active = activeWindowQuery(now);
+    const policies = await PricingPolicy.find({
+        status: "ACTIVE",
+        region: { $in: ["TH", "MM"] },
+        currency: { $in: ["THB", "MMK"] },
+        ...active
+    }).sort({ effectiveFrom: -1, updatedAt: -1, _id: -1 }).lean();
+    const policyIds = policies.map(item => item._id).filter(Boolean);
+    const [fxAuthorities, rules, versions, overrides] = await Promise.all([
+        ExchangeRateAuthority.find({
+            status: "ACTIVE", enabled: true, authoritative: true, ...active
+        }).sort({ effectiveFrom: -1, updatedAt: -1, _id: -1 }).lean(),
+        policyIds.length ? PricingRule.find({ policyId: { $in: policyIds }, status: "ACTIVE", ...active })
+            .sort({ priority: -1, updatedAt: -1, code: 1 }).lean() : [],
+        PriceVersion.find({ status: "PUBLISHED", branchKey: DEFAULT_BRANCH })
+            .sort({ publishedAt: -1, versionNumber: -1, updatedAt: -1 }).lean(),
+        productCodes.length && packageCodes.length ? PackagePricingOverride.find({
+            productCode: { $in: productCodes }, packageCode: { $in: packageCodes }, region: { $in: ["TH", "MM"] }
+        }).lean() : []
+    ]);
+    return Object.freeze({ now, policies, fxAuthorities, rules, versions, overrides });
+}
 function isoDate(value, fallback = new Date()) {
     const date = value instanceof Date ? value : new Date(value || fallback);
     return Number.isNaN(date.getTime())
@@ -313,7 +352,8 @@ async function buildProductionPricingContext({
     region,
     currency,
     now = new Date(),
-    includePublishedPriceOverride = true
+    includePublishedPriceOverride = true,
+    authoritySnapshot = null
 } = {}) {
     const normalizedRegion = upper(region);
     const normalizedCurrency = upper(currency);
@@ -325,17 +365,13 @@ async function buildProductionPricingContext({
         currency: normalizedCurrency,
         now
     });
-    const policy = await loadActivePolicy({
-        region: normalizedRegion,
-        currency: normalizedCurrency,
-        now
-    });
+    const policy = authoritySnapshot
+        ? plain(authoritySnapshot.policies.find(item => upper(item.region) === normalizedRegion && upper(item.currency) === normalizedCurrency))
+        : await loadActivePolicy({ region: normalizedRegion, currency: normalizedCurrency, now });
 
-    const fxAuthority = supplierCost.currency === normalizedCurrency ? null : await loadActiveExchangeRateAuthority({
-        sourceCurrency: supplierCost.currency,
-        targetCurrency: normalizedCurrency,
-        now
-    });
+    const fxAuthority = supplierCost.currency === normalizedCurrency ? null : authoritySnapshot
+        ? authoritySnapshot.fxAuthorities.find(item => upper(item.fromCurrency) === upper(supplierCost.currency) && upper(item.toCurrency) === normalizedCurrency) || null
+        : await loadActiveExchangeRateAuthority({ sourceCurrency: supplierCost.currency, targetCurrency: normalizedCurrency, now });
     const exchangeRate = resolveProductionExchangeRate({
         policy,
         fxAuthority,
@@ -343,11 +379,22 @@ async function buildProductionPricingContext({
         targetCurrency: normalizedCurrency,
         now
     });
-    const [version, rules, packageOverride] = await Promise.all([
-        loadPublishedVersion({ policy, pkg, region: normalizedRegion, now }),
-        loadActiveRules({ policy, packageContext, region: normalizedRegion, currency: normalizedCurrency, now }),
-        includePublishedPriceOverride ? null : PackagePricingOverride.findOne({ productCode: packageContext.gameCode, packageCode: packageContext.packageCode, region: normalizedRegion }).lean()
-    ]);
+    const [version, rules, packageOverride] = authoritySnapshot
+        ? [
+            findPublishedVersionForPackage({ versions: authoritySnapshot.versions, policy, pkg }) ||
+                authoritySnapshot.versions.find(version => isPublishedStorefrontVersion(version) && priceVersionMatchesPolicy(version, policy)) || {
+                versionId: `catalog:${text(pkg?.productCode).toLowerCase()}:${upper(pkg?.packageCode)}:${normalizedRegion}`,
+                versionNumber: 1,
+                branchKey: DEFAULT_BRANCH
+            },
+            authoritySnapshot.rules.filter(rule => ruleAppliesToContext(rule, { policy, packageContext, region: normalizedRegion, currency: normalizedCurrency })).map(ruleSnapshot),
+            includePublishedPriceOverride ? null : authoritySnapshot.overrides.find(item => item.productCode === packageContext.gameCode && upper(item.packageCode) === packageContext.packageCode && upper(item.region) === normalizedRegion) || null
+        ]
+        : await Promise.all([
+            loadPublishedVersion({ policy, pkg, region: normalizedRegion, now }),
+            loadActiveRules({ policy, packageContext, region: normalizedRegion, currency: normalizedCurrency, now }),
+            includePublishedPriceOverride ? null : PackagePricingOverride.findOne({ productCode: packageContext.gameCode, packageCode: packageContext.packageCode, region: normalizedRegion }).lean()
+        ]);
     // Customer preview/quote/checkout always freeze the explicitly published
     // regional catalog amount. Admin Daily Pricing passes false so its preview
     // remains a calculation workspace driven by current cost/FX/policy inputs.
@@ -417,4 +464,5 @@ module.exports = Object.freeze({
     priceVersionMatchesPolicy,
     priceVersionAppliesToPackage,
     findPublishedVersionForPackage
+    ,loadProductionPricingAuthoritySnapshot
 });
