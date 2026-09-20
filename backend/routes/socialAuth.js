@@ -4,6 +4,7 @@ const crypto = require("crypto");
 const express = require("express");
 const passport = require("../config/passport");
 const { issueUserSession } = require("../services/authSessionService");
+const { service: googleAuthHandoffService } = require("../services/googleAuthHandoffService");
 const { classifyGoogleAuthenticationError, classifyGoogleOAuthError, classifyRequestHost, fingerprint, isGoogleTokenExchangeError, logGoogleOAuthDiagnostic, safeRead } = require("../utils/googleOAuthDiagnostics");
 
 function getFrontendUrl(env = process.env) {
@@ -12,7 +13,7 @@ function getFrontendUrl(env = process.env) {
 
 function configured(req, res, next, env = process.env) {
     if (env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET) return next();
-    return res.redirect(`${getFrontendUrl(env)}/login`);
+    return sendBrowserTransition(res, `${getFrontendUrl(env)}/login`);
 }
 
 function urlClass(value, expectedPath) {
@@ -49,17 +50,42 @@ function oauthFailureUrl(env = process.env) {
     return `${getFrontendUrl(env)}/login?oauth=google&error=token_exchange_failed`;
 }
 
+function sendBrowserTransition(res, destination) {
+    const safeDestination = JSON.stringify(String(destination)).replace(/</g, "\\u003c");
+    res.setHeader("Cache-Control", "no-store");
+    res.setHeader("Referrer-Policy", "no-referrer");
+    return res.status(200).type("html").send(`<!doctype html><html><head><meta charset="utf-8"><meta name="referrer" content="no-referrer"><title>Continue</title></head><body><script>window.location.replace(${safeDestination});</script></body></html>`);
+}
+
+function browserOwnedPassportRedirect(authenticate, req, res, next) {
+    const originalRedirect = res.redirect.bind(res);
+    res.redirect = (statusOrUrl, maybeUrl) => {
+        res.redirect = originalRedirect;
+        return sendBrowserTransition(res, maybeUrl || statusOrUrl);
+    };
+    return authenticate(req, res, error => {
+        res.redirect = originalRedirect;
+        return next(error);
+    });
+}
+
 function createSocialAuthRouter(options = {}) {
     const router = express.Router();
     const auth = options.passport || passport;
     const logger = options.logger || console;
     const env = options.env || process.env;
+    const handoffService = options.handoffService || googleAuthHandoffService;
     const requireGoogle = (req, res, next) => configured(req, res, next, env);
 
     router.get("/auth/google", requireGoogle, (req, res, next) => {
         const diagnostic = requestDiagnostic(req, env, options.randomBytes);
         logGoogleOAuthDiagnostic(logger, "GOOGLE_OAUTH_START", diagnostic);
-        return auth.authenticate("google", { scope: ["profile", "email"], prompt: "consent select_account", session: false })(req, res, next);
+        return browserOwnedPassportRedirect(
+            auth.authenticate("google", { scope: ["profile", "email"], prompt: "consent select_account", session: false, state: true }),
+            req,
+            res,
+            next
+        );
     });
 
     router.get("/auth/google/callback", requireGoogle, (req, res, next) => {
@@ -75,7 +101,7 @@ function createSocialAuthRouter(options = {}) {
                 const event = tokenFailure ? "GOOGLE_OAUTH_TOKEN_EXCHANGE_FAILED" : "GOOGLE_OAUTH_AUTHENTICATION_FAILED";
                 logGoogleOAuthDiagnostic(logger, event, { ...diagnostic, errorCategory, providerHttpStatus: tokenFailure ? providerStatus(error) : undefined, elapsedMs: Date.now() - startedAt }, "warn");
                 logGoogleOAuthDiagnostic(logger, "GOOGLE_OAUTH_REDIRECT_ISSUED", { ...diagnostic, destinationOriginClass: "frontend", destinationPathClass: "login" });
-                return res.redirect(oauthFailureUrl(env));
+                return sendBrowserTransition(res, oauthFailureUrl(env));
             }
 
             req.user = user;
@@ -89,19 +115,31 @@ function createSocialAuthRouter(options = {}) {
             } catch (_) {
                 logGoogleOAuthDiagnostic(logger, "GOOGLE_OAUTH_SESSION_FAILED", { ...diagnostic, errorCategory: "GOOGLE_SESSION_ISSUANCE_ERROR", elapsedMs: Date.now() - startedAt }, "warn");
                 logGoogleOAuthDiagnostic(logger, "GOOGLE_OAUTH_REDIRECT_ISSUED", { ...diagnostic, destinationOriginClass: "frontend", destinationPathClass: "login" });
-                return res.redirect(oauthFailureUrl(env));
+                return sendBrowserTransition(res, oauthFailureUrl(env));
             }
 
             try {
-                const params = new URLSearchParams({ token: issued.token, username: user.username || "", displayName: user.displayName || user.username || "", email: user.email || "", region: user.region || "MM", role: user.role || "user" });
+                const handoff = await handoffService.create(issued);
+                const params = new URLSearchParams({ handoff });
                 logGoogleOAuthDiagnostic(logger, "GOOGLE_OAUTH_REDIRECT_ISSUED", { ...diagnostic, destinationOriginClass: "frontend", destinationPathClass: "google_success" });
-                return res.redirect(`${getFrontendUrl(env)}/auth/google/success?${params.toString()}`);
+                return sendBrowserTransition(res, `${getFrontendUrl(env)}/auth/google/success?${params.toString()}`);
             } catch (_) {
                 logGoogleOAuthDiagnostic(logger, "GOOGLE_OAUTH_HANDOFF_FAILED", { ...diagnostic, errorCategory: "GOOGLE_HANDOFF_CONSTRUCTION_ERROR", elapsedMs: Date.now() - startedAt }, "warn");
                 logGoogleOAuthDiagnostic(logger, "GOOGLE_OAUTH_REDIRECT_ISSUED", { ...diagnostic, destinationOriginClass: "frontend", destinationPathClass: "login" });
-                return res.redirect(oauthFailureUrl(env));
+                return sendBrowserTransition(res, oauthFailureUrl(env));
             }
         })(req, res, next);
+    });
+
+    router.post("/auth/google/handoff", async (req, res) => {
+        try {
+            const issued = await handoffService.consume(req.body?.handoff);
+            if (!issued) return res.status(410).json({ success: false, code: "GOOGLE_HANDOFF_INVALID" });
+            res.setHeader("Cache-Control", "no-store");
+            return res.json({ success: true, token: issued.token, user: issued.user });
+        } catch (_) {
+            return res.status(503).json({ success: false, code: "GOOGLE_HANDOFF_UNAVAILABLE" });
+        }
     });
 
     return router;
@@ -110,3 +148,4 @@ function createSocialAuthRouter(options = {}) {
 module.exports = createSocialAuthRouter();
 module.exports.createSocialAuthRouter = createSocialAuthRouter;
 module.exports.getFrontendUrl = getFrontendUrl;
+module.exports.sendBrowserTransition = sendBrowserTransition;

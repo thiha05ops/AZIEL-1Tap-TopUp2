@@ -56,7 +56,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     const oauthParams = new URLSearchParams(window.location.search);
-    if (oauthParams.get("oauth") === "google" && oauthParams.get("error") === "token_exchange_failed") {
+    if (oauthParams.get("oauth") === "google" && ["token_exchange_failed", "handoff_failed"].includes(oauthParams.get("error"))) {
         showMessage(authT("auth.googleFailed", "Google sign-in couldn't be completed. Please try again."), "error");
     }
 
