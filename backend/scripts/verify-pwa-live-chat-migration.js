@@ -113,7 +113,17 @@ function makeHarness({ legacy = true, failInstall = false, failNetwork = false }
         return { respondWithCalls, response: pending ? await pending : null };
     }
 
-    return { stores, dispatch, dispatchFetch, navigations, counts: () => ({ claimed, skipped }) };
+    async function dispatchMessage(data) {
+        let response;
+        events.message({
+            data,
+            ports: [{ postMessage(value) { response = value; } }],
+            waitUntil() {}
+        });
+        return response;
+    }
+
+    return { stores, dispatch, dispatchFetch, dispatchMessage, navigations, counts: () => ({ claimed, skipped }) };
 }
 
 (async () => {
@@ -152,6 +162,10 @@ function makeHarness({ legacy = true, failInstall = false, failNetwork = false }
     await fresh.dispatch("install");
     await fresh.dispatch("activate");
     assert.deepStrictEqual(fresh.navigations, [], "fresh install must not reload a client");
+    const capabilityStatus = await fresh.dispatchMessage({ type: "CHECK_WORKER_CAPABILITY" });
+    assert.strictEqual(capabilityStatus.type, "WORKER_CAPABILITY_STATUS");
+    assert.strictEqual(capabilityStatus.workerRevision, "oauth-navigation-bypass-v1");
+    assert.strictEqual(capabilityStatus.capabilities.oauthNavigationBypass, 1);
 
     for (const url of [
         "https://aziel.test/api/auth/google?returnTo=%2Faccount",
@@ -196,8 +210,9 @@ function makeHarness({ legacy = true, failInstall = false, failNetwork = false }
     assert(failed.stores.has("aziel-runtime-core-v5-storefront-performance"), "failed install must preserve the active shell");
 
     const pwaRuntime = read("frontend/js/pwa-fix.js");
-    assert(pwaRuntime.includes("await registration.update().catch"), "installed apps must check for a new worker on load");
-    assert(!pwaRuntime.includes("controllerchange"), "payment-safe client runtime must not introduce controller reload loops");
+    assert(pwaRuntime.includes("await registration.update().catch"), "installed apps must explicitly check for a new worker");
+    assert(pwaRuntime.includes('addEventListener("controllerchange", checkController)'), "OAuth convergence must observe controller replacement");
+    assert(!/controllerchange[\s\S]{0,500}(?:location\.reload|location\.replace)/.test(pwaRuntime), "controller replacement must not trigger an automatic reload");
     assert(!read("frontend/js/home.js").includes("/api/catalog"), "Home startup must not restore full catalog loading");
     assert(currentLiveChat.includes('data?.settings?.liveChatEnabled === true'));
     assert(currentLiveChat.includes('cache: "no-store"'));

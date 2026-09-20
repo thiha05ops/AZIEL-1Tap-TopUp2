@@ -3,9 +3,10 @@ if (!window.__AZIEL_PWA_FIX_INITIALIZED__) {
 
     initAzielFooterPolish();
     initAzielPwaRefresh();
+    initAzielOAuthReadiness();
     scheduleAzielTrustLogoRender();
     schedulePendingPaymentRecoveryOverlay();
-    registerAzielServiceWorker();
+    window.__AZIEL_SW_REGISTRATION_PROMISE__ = registerAzielServiceWorker();
 
     document.addEventListener("click", e => {
         const link = e.target.closest("a");
@@ -445,13 +446,154 @@ window.ensurePromptPayBankLauncherRuntime = function ensurePromptPayBankLauncher
 
     return window.__AZIEL_PROMPTPAY_BANK_LAUNCHER_RUNTIME_PROMISE__;
 };
+const AZIEL_OAUTH_WORKER_CAPABILITY = 1;
+const AZIEL_OAUTH_CONVERGENCE_TIMEOUT_MS = 12000;
+const AZIEL_WORKER_REPLY_TIMEOUT_MS = 750;
+
+function checkAzielWorkerCapability(worker, timeoutMs = AZIEL_WORKER_REPLY_TIMEOUT_MS) {
+    if (!worker || typeof MessageChannel !== "function") return Promise.resolve(false);
+
+    return new Promise(resolve => {
+        const channel = new MessageChannel();
+        let settled = false;
+        const finish = capable => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timer);
+            channel.port1.onmessage = null;
+            channel.port1.close?.();
+            resolve(capable);
+        };
+        const timer = setTimeout(() => finish(false), timeoutMs);
+
+        channel.port1.onmessage = event => {
+            finish(
+                event.data?.type === "WORKER_CAPABILITY_STATUS" &&
+                Number(event.data?.capabilities?.oauthNavigationBypass) >= AZIEL_OAUTH_WORKER_CAPABILITY
+            );
+        };
+
+        try {
+            worker.postMessage({ type: "CHECK_WORKER_CAPABILITY" }, [channel.port2]);
+        } catch {
+            finish(false);
+        }
+    });
+}
+
+async function waitForAzielOAuthWorker(registration, timeoutMs = AZIEL_OAUTH_CONVERGENCE_TIMEOUT_MS) {
+    if (await checkAzielWorkerCapability(navigator.serviceWorker.controller)) return true;
+
+    return new Promise(resolve => {
+        let settled = false;
+        let checking = false;
+        const finish = capable => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timer);
+            navigator.serviceWorker.removeEventListener("controllerchange", checkController);
+            resolve(capable);
+        };
+        const checkController = async () => {
+            if (settled || checking) return;
+            checking = true;
+            const capable = await checkAzielWorkerCapability(navigator.serviceWorker.controller);
+            checking = false;
+            if (capable) finish(true);
+        };
+        const timer = setTimeout(() => finish(false), timeoutMs);
+
+        navigator.serviceWorker.addEventListener("controllerchange", checkController);
+        registration?.update?.().then(checkController).catch(() => finish(false));
+        checkController();
+    });
+}
+
+function setAzielOAuthPending(pending) {
+    document.querySelectorAll("[data-aziel-google-oauth]").forEach(control => {
+        control.disabled = pending;
+        control.setAttribute("aria-busy", pending ? "true" : "false");
+    });
+}
+
+function reportAzielOAuthConvergenceFailure() {
+    const message = "Google sign-in is updating. Please try again.";
+    const messageNode = document.getElementById("msg");
+    if (messageNode) {
+        messageNode.textContent = message;
+        messageNode.className = "auth-message error";
+    } else if (window.AZIEL_UI?.toast?.error) {
+        window.AZIEL_UI.toast.error(message);
+    }
+}
+
+function waitForAzielRegistration(promise, timeoutMs = AZIEL_OAUTH_CONVERGENCE_TIMEOUT_MS) {
+    return new Promise(resolve => {
+        let settled = false;
+        const finish = registration => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timer);
+            resolve(registration);
+        };
+        const timer = setTimeout(() => finish(null), timeoutMs);
+        Promise.resolve(promise).then(finish).catch(() => finish(null));
+    });
+}
+
+function initAzielOAuthReadiness() {
+    let pendingOAuth = null;
+
+    const startGoogleOAuth = () => {
+        if (pendingOAuth) return pendingOAuth;
+
+        pendingOAuth = (async () => {
+            setAzielOAuthPending(true);
+
+            if (!("serviceWorker" in navigator) || !navigator.serviceWorker.controller) {
+                window.location.assign("/api/auth/google");
+                return true;
+            }
+
+            if (await checkAzielWorkerCapability(navigator.serviceWorker.controller)) {
+                window.location.assign("/api/auth/google");
+                return true;
+            }
+
+            const registration = await waitForAzielRegistration(window.__AZIEL_SW_REGISTRATION_PROMISE__);
+            const capable = await waitForAzielOAuthWorker(registration);
+            if (!capable) {
+                reportAzielOAuthConvergenceFailure();
+                return false;
+            }
+
+            window.location.assign("/api/auth/google");
+            return true;
+        })().finally(() => {
+            setAzielOAuthPending(false);
+            pendingOAuth = null;
+        });
+
+        return pendingOAuth;
+    };
+
+    window.AZIEL_PWA_OAUTH = Object.freeze({ startGoogleOAuth });
+    document.addEventListener("click", event => {
+        const control = event.target.closest?.("[data-aziel-google-oauth]");
+        if (!control) return;
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        startGoogleOAuth();
+    }, true);
+}
+
 function registerAzielServiceWorker() {
-    if (!("serviceWorker" in navigator)) return;
+    if (!("serviceWorker" in navigator)) return Promise.resolve(null);
 
     const localHosts = new Set(["localhost", "127.0.0.1"]);
 
     if (!window.isSecureContext && !localHosts.has(location.hostname)) {
-        return;
+        return Promise.resolve(null);
     }
 
     const notifyUpdateReady = () => {
@@ -468,7 +610,7 @@ function registerAzielServiceWorker() {
         });
     };
 
-    window.addEventListener("load", async () => {
+    return (async () => {
         try {
             const registration = await navigator.serviceWorker.register(
                 "/sw.js",
@@ -477,11 +619,6 @@ function registerAzielServiceWorker() {
                     updateViaCache: "none"
                 }
             );
-
-            // Registration normally schedules an update check, but an explicit
-            // check makes installed-app convergence independent of the browser's
-            // update throttle.
-            await registration.update().catch(() => { });
 
             if (registration.waiting) {
                 activateWaitingWorker(registration);
@@ -503,6 +640,10 @@ function registerAzielServiceWorker() {
                 });
             });
 
+            // Attach lifecycle observers before starting the explicit check so
+            // a fast update cannot install between update() and updatefound.
+            await registration.update().catch(() => { });
+
             document.addEventListener("visibilitychange", () => {
                 const lastCheck = Number(sessionStorage.getItem("aziel.sw.lastUpdateCheck") || 0);
                 if (document.visibilityState === "visible" && Date.now() - lastCheck > 24 * 60 * 60 * 1000) {
@@ -510,6 +651,7 @@ function registerAzielServiceWorker() {
                     registration.update().catch(() => { });
                 }
             });
+            return registration;
         } catch (error) {
             if (localHosts.has(location.hostname)) {
                 console.warn(
@@ -517,6 +659,7 @@ function registerAzielServiceWorker() {
                     error
                 );
             }
+            return null;
         }
-    }, { once: true });
+    })();
 }

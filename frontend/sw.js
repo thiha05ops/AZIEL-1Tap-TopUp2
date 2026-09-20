@@ -1,12 +1,14 @@
 const CACHE_PREFIX = "aziel-runtime";
 // Keep the suffix equal to the deterministic CORE_ASSETS content digest. The
 // migration verifier fails if a precached dependency changes without a bump.
-const SHELL_REVISION = "v7-990cc7f20b2e6c76";
+const SHELL_REVISION = "v7-1672fd90eea54897";
 const CORE_CACHE = `${CACHE_PREFIX}-core-${SHELL_REVISION}`;
 const PAGE_CACHE = `${CACHE_PREFIX}-pages-v3-${SHELL_REVISION}`;
 const CODE_CACHE = `${CACHE_PREFIX}-code-${SHELL_REVISION}`;
 const MEDIA_CACHE = `${CACHE_PREFIX}-media-v3-storefront-performance`;
 const PRESENTATION_CACHE = `${CACHE_PREFIX}-presentation-v1`;
+const WORKER_REVISION = "oauth-navigation-bypass-v1";
+const WORKER_CAPABILITIES = Object.freeze({ oauthNavigationBypass: 1 });
 
 const CORE_ASSETS = [
     "/offline.html",
@@ -163,6 +165,15 @@ async function refreshLegacyPublicClients() {
 }
 
 self.addEventListener("message", event => {
+    if (event.data?.type === "CHECK_WORKER_CAPABILITY") {
+        event.ports?.[0]?.postMessage({
+            type: "WORKER_CAPABILITY_STATUS",
+            workerRevision: WORKER_REVISION,
+            capabilities: WORKER_CAPABILITIES
+        });
+        return;
+    }
+
     if (event.data?.type === "SKIP_WAITING") {
         self.skipWaiting();
     }

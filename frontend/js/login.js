@@ -29,7 +29,6 @@ document.addEventListener("DOMContentLoaded", () => {
     const passwordInput = document.getElementById("password");
     const togglePassword = document.getElementById("togglePassword");
     const rememberMe = document.getElementById("rememberMe");
-    const googleLoginBtn = document.getElementById("googleLoginBtn");
     const twoFactorBox = document.createElement("div");
     twoFactorBox.className = "auth-2fa-box";
     twoFactorBox.hidden = true;
@@ -45,13 +44,6 @@ document.addEventListener("DOMContentLoaded", () => {
     twoFactorInput.placeholder = authT("auth.twoFactor.placeholder", "Enter 6-digit code or recovery code");
     twoFactorBox.append(twoFactorLabel, twoFactorInput);
     msg?.before(twoFactorBox);
-
-    if (googleLoginBtn) {
-        googleLoginBtn.addEventListener("click", (e) => {
-            e.preventDefault();
-            window.location.href = apiUrl("/api/auth/google");
-        });
-    }
 
     setTimeout(() => {
         if (usernameInput) usernameInput.value = "";
