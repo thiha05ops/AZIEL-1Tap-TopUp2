@@ -25,6 +25,9 @@ function main() {
     assert(runtime.includes("aziel:pwaUpdateReady"), "Runtime must expose a restrained update-ready event.");
 
     assert(sw.includes("NEVER_CACHE_PREFIXES") && sw.includes("PRIVATE_NAVIGATION_PREFIXES"), "Service worker must declare API and private-navigation exclusions.");
+    assert(sw.includes('"/api/auth/google"') && sw.includes('"/api/auth/google/callback"'), "Service worker must declare active OAuth navigation bypasses.");
+    assert(!sw.includes('"/auth/google/success"'), "Service worker must not restore obsolete Google token transport.");
+    assert(sw.indexOf('request.mode === "navigate" && isOAuthNavigationPath(url.pathname)') < sw.indexOf("if (isNeverCachePath(url.pathname))"), "OAuth navigation bypass must precede API network-only handling.");
     ["/api/", "/admin", "/account", "/wallet", "/tracking", "/notifications"].forEach(pathPrefix => {
         assert(sw.includes(`"${pathPrefix}"`), `Service worker must never cache ${pathPrefix}.`);
     });

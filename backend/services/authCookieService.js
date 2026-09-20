@@ -48,18 +48,29 @@ function cookieOptions(env = process.env) {
         path: "/",
         maxAge: AUTH_COOKIE_MAX_AGE_MS
     };
-    if (env.AUTH_COOKIE_DOMAIN) options.domain = env.AUTH_COOKIE_DOMAIN;
     return options;
 }
 
+function clearOptions(env = process.env, domain) {
+    const options = cookieOptions(env);
+    delete options.maxAge;
+    if (domain) options.domain = domain;
+    return options;
+}
+
+function clearLegacyDomainCookie(res, env = process.env) {
+    const domain = String(env.AUTH_COOKIE_DOMAIN || "").trim();
+    if (domain) res.clearCookie(AUTH_COOKIE_NAME, clearOptions(env, domain));
+}
+
 function setAuthCookie(res, sessionId, env = process.env) {
+    clearLegacyDomainCookie(res, env);
     res.cookie(AUTH_COOKIE_NAME, encodeSessionCookie(sessionId, env), cookieOptions(env));
 }
 
 function clearAuthCookie(res, env = process.env) {
-    const options = cookieOptions(env);
-    delete options.maxAge;
-    res.clearCookie(AUTH_COOKIE_NAME, options);
+    res.clearCookie(AUTH_COOKIE_NAME, clearOptions(env));
+    clearLegacyDomainCookie(res, env);
 }
 
 function readSessionId(req, env = process.env) {
@@ -70,6 +81,7 @@ module.exports = {
     AUTH_COOKIE_MAX_AGE_MS,
     AUTH_COOKIE_NAME,
     clearAuthCookie,
+    clearLegacyDomainCookie,
     cookieOptions,
     decodeSessionCookie,
     encodeSessionCookie,

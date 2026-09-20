@@ -91,6 +91,19 @@ function main() {
     expectCode("invalid 2FA key", baseProductionEnv({ TWO_FACTOR_ENCRYPTION_KEY: "short" }), "PROD_2FA_KEY_INVALID");
     expectCode("partial Google OAuth", baseProductionEnv({ GOOGLE_CLIENT_ID: "client-id" }), "PROD_GOOGLE_OAUTH_PARTIAL_CONFIG");
 
+    const googleEnv = {
+        GOOGLE_CLIENT_ID: "client-id",
+        GOOGLE_CLIENT_SECRET: "client-secret",
+        GOOGLE_CALLBACK_URL: "https://azielplay.com/api/auth/google/callback",
+        FRONTEND_URL: "https://azielplay.com"
+    };
+    expectReady("same-origin Google OAuth without dedicated auth configuration", baseProductionEnv(googleEnv), true);
+    expectReady("obsolete dedicated auth configuration is ignored", baseProductionEnv({ ...googleEnv, AUTH_ORIGIN: "https://auth.azielplay.com", AUTH_COOKIE_DOMAIN: ".azielplay.com" }), true);
+    expectCode("insecure Google callback", baseProductionEnv({ ...googleEnv, GOOGLE_CALLBACK_URL: "http://azielplay.com/api/auth/google/callback" }), "PROD_GOOGLE_CALLBACK_INVALID");
+    expectCode("malformed Google callback", baseProductionEnv({ ...googleEnv, GOOGLE_CALLBACK_URL: "not-a-url" }), "PROD_GOOGLE_CALLBACK_INVALID");
+    expectCode("wrong Google callback path", baseProductionEnv({ ...googleEnv, GOOGLE_CALLBACK_URL: "https://azielplay.com/api/auth/google/other" }), "PROD_GOOGLE_CALLBACK_PATH_INVALID");
+    expectCode("wrong Google callback origin", baseProductionEnv({ ...googleEnv, GOOGLE_CALLBACK_URL: "https://auth.azielplay.com/api/auth/google/callback" }), "PROD_GOOGLE_CALLBACK_ORIGIN_MISMATCH");
+
     const absentGoogle = expectReady("absent optional Google OAuth", baseProductionEnv(), true);
     assert.strictEqual(absentGoogle.features.googleOAuth, "disabled");
 

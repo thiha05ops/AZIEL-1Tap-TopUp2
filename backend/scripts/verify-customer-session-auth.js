@@ -5,9 +5,11 @@ const fs = require("fs");
 const path = require("path");
 const {
     AUTH_COOKIE_NAME,
+    clearAuthCookie,
     cookieOptions,
     decodeSessionCookie,
-    encodeSessionCookie
+    encodeSessionCookie,
+    setAuthCookie
 } = require("../services/authCookieService");
 const csrf = require("../middleware/customerCsrfMiddleware");
 
@@ -31,9 +33,26 @@ function main() {
     assert.deepStrictEqual(cookieOptions(production), {
         httpOnly: true, secure: true, sameSite: "lax", path: "/", maxAge: 15 * 24 * 60 * 60 * 1000
     });
+    assert.strictEqual(cookieOptions({ ...production, AUTH_COOKIE_DOMAIN: ".azielplay.com" }).domain, undefined, "canonical auth cookie must remain host-only");
+
+    const cookieCalls = [];
+    const cookieResponse = {
+        clearCookie(name, options) { cookieCalls.push({ action: "clear", name, options }); },
+        cookie(name, value, options) { cookieCalls.push({ action: "set", name, value, options }); }
+    };
+    const legacyProduction = { ...production, AUTH_COOKIE_DOMAIN: ".azielplay.com" };
+    setAuthCookie(cookieResponse, "session-id", legacyProduction);
+    assert.strictEqual(cookieCalls[0].action, "clear");
+    assert.strictEqual(cookieCalls[0].options.domain, ".azielplay.com");
+    assert.strictEqual(cookieCalls[1].action, "set");
+    assert.strictEqual(cookieCalls[1].options.domain, undefined);
+    cookieCalls.length = 0;
+    clearAuthCookie(cookieResponse, legacyProduction);
+    assert.deepStrictEqual(cookieCalls.map(call => [call.action, call.options.domain]), [["clear", undefined], ["clear", ".azielplay.com"]]);
 
     assert.strictEqual(csrfResult({ cookie: "aziel_session=x", origin: "https://azielplay.com" }).next, true);
     assert.strictEqual(csrfResult({ cookie: "aziel_session=x", origin: "https://evil.example" }).status, 403);
+    assert.strictEqual(csrfResult({ cookie: "aziel_session=x", origin: "https://auth.azielplay.com" }).status, 403);
     assert.strictEqual(csrfResult({ authorization: "Bearer compatibility", cookie: "aziel_session=x" }).next, true);
     assert.strictEqual(csrfResult({ cookie: "aziel_session=x" }, "GET").next, true);
 
@@ -50,6 +69,8 @@ function main() {
 
     assert(auth.includes('router.get("/auth/me", authMiddleware'));
     assert(auth.includes('router.post("/auth/logout", async'));
+    assert(auth.includes('revokeSession(auth.session.sessionId, auth.user, "logout")'), "logout must revoke the authoritative server session");
+    assert(auth.includes("clearAuthCookie(res)"), "logout must clear canonical and legacy cookie variants through the cookie service");
     assert.strictEqual((auth.match(/setAuthCookie\(res, issued\.session\.sessionId\)/g) || []).length, 2, "password and 2FA login must set the cookie");
     assert(!/token:\s*issued\.token/.test(auth), "login responses must not expose reusable JWTs");
     assert(middleware.includes("readSessionId(req)"));
@@ -67,8 +88,16 @@ function main() {
     assert(userState.includes('AZIEL.apiUrl("/api/auth/me")'));
     assert(userState.includes('credentials: "include"'));
     assert(worker.includes('"/api/"'));
-    assert(!worker.includes("OAUTH_NAVIGATION_PATHS"), "the worker must have no Google-specific authority");
+    assert(worker.includes("OAUTH_NAVIGATION_PATHS"), "the worker must explicitly leave OAuth navigations browser-owned");
+    assert(!worker.includes('"/auth/google/success"'), "obsolete Google success transport must not return");
     assert(!social.includes("res.redirect("), "OAuth routes must not emit HTTP redirects through a service worker");
+    assert(!social.includes("AUTH_ORIGIN"), "obsolete auth origin must not reroute OAuth");
+    const oauthSession = read("backend/config/session.js");
+    assert(oauthSession.includes('name: "aziel.oauth"'));
+    assert(oauthSession.includes('path: "/api/auth/google"'));
+    assert(oauthSession.includes('sameSite: "lax"') && oauthSession.includes("httpOnly: true"));
+    assert(oauthSession.includes("10 * 60 * 1000"), "OAuth state cookie must remain no longer than ten minutes");
+    assert(!oauthSession.includes("domain:"), "OAuth state cookie must remain host-only");
     assert(realtime.includes("verifyUserSessionId(sessionId)"));
     assert(socketClient.includes("withCredentials: true"));
 

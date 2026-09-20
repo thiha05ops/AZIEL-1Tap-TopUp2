@@ -11,10 +11,6 @@ function getFrontendUrl(env = process.env) {
     return (env.FRONTEND_URL || env.CLIENT_URL || "http://127.0.0.1:5500/frontend").replace(/\/$/, "");
 }
 
-function getAuthOrigin(env = process.env) {
-    return String(env.AUTH_ORIGIN || "").replace(/\/$/, "");
-}
-
 function configured(req, res, next, env = process.env) {
     if (env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET) return next();
     return sendBrowserTransition(res, `${getFrontendUrl(env)}/login`);
@@ -81,14 +77,6 @@ function createSocialAuthRouter(options = {}) {
     const requireGoogle = (req, res, next) => configured(req, res, next, env);
 
     router.get("/auth/google", requireGoogle, (req, res, next) => {
-        const authOrigin = getAuthOrigin(env);
-        if (authOrigin) {
-            try {
-                if (new URL(authOrigin).host !== req.get("host")) {
-                    return sendBrowserTransition(res, `${authOrigin}/api/auth/google`);
-                }
-            } catch (_) { /* Production validation rejects invalid configuration. */ }
-        }
         const diagnostic = requestDiagnostic(req, env, options.randomBytes);
         logGoogleOAuthDiagnostic(logger, "GOOGLE_OAUTH_START", diagnostic);
         return browserOwnedPassportRedirect(
@@ -141,5 +129,4 @@ function createSocialAuthRouter(options = {}) {
 module.exports = createSocialAuthRouter();
 module.exports.createSocialAuthRouter = createSocialAuthRouter;
 module.exports.getFrontendUrl = getFrontendUrl;
-module.exports.getAuthOrigin = getAuthOrigin;
 module.exports.sendBrowserTransition = sendBrowserTransition;

@@ -158,18 +158,23 @@ function makeHarness({ legacy = true, failInstall = false, failNetwork = false }
         "https://aziel.test/api/auth/google/callback?code=x&state=y"
     ]) {
         const result = await fresh.dispatchFetch({ method: "GET", mode: "navigate", url });
-        assert.strictEqual(result.respondWithCalls, 1, `${new URL(url).pathname} navigation must remain network-only`);
-        assert.strictEqual(await result.response.text(), "NETWORK");
+        assert.strictEqual(result.respondWithCalls, 0, `${new URL(url).pathname} navigation must remain browser-owned`);
     }
 
     for (const url of [
         "https://aziel.test/api/auth/google",
+        "https://aziel.test/api/auth/google/callback?code=x&state=y",
         "https://aziel.test/api/catalog?region=TH"
     ]) {
         const result = await fresh.dispatchFetch({ method: "GET", mode: "cors", url });
         assert.strictEqual(result.respondWithCalls, 1, `${new URL(url).pathname} fetch must retain API network-only handling`);
         assert.strictEqual(await result.response.text(), "NETWORK");
     }
+
+    assert(
+        swSource.indexOf('request.mode === "navigate" && isOAuthNavigationPath(url.pathname)') < swSource.indexOf("if (isNeverCachePath(url.pathname))"),
+        "OAuth navigation bypass must precede the generic API network-only branch"
+    );
 
     for (const url of [
         "https://aziel.test/api/auth/login",

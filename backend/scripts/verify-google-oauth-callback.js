@@ -98,6 +98,16 @@ async function failureCase(error, expectedEvent, expectedCategory, loggerOverrid
 }
 
 async function main() {
+    const startStub = passportResult(null, null);
+    const startEnv = { ...ENV, AUTH_ORIGIN: "https://auth.azielplay.com" };
+    const startRouter = createSocialAuthRouter({ passport: startStub.passport, logger: captureLogger().logger, env: startEnv });
+    const startRes = response();
+    await runRoute(startRouter, "/auth/google", request(), startRes);
+    assert.strictEqual(startStub.calls.length, 1, "OAuth start must invoke local Passport even when obsolete AUTH_ORIGIN is present");
+    assert.strictEqual(startStub.calls[0].name, "google");
+    assert.strictEqual(startStub.calls[0].options.state, true, "OAuth start must retain Passport state validation");
+    assert.strictEqual(startRes.body, null, "obsolete AUTH_ORIGIN must not produce an auth-subdomain transition");
+
     await failureCase(tokenError("invalid_grant"), "GOOGLE_OAUTH_TOKEN_EXCHANGE_FAILED", "GOOGLE_TOKEN_INVALID_GRANT");
     await failureCase(tokenError("invalid_client"), "GOOGLE_OAUTH_TOKEN_EXCHANGE_FAILED", "GOOGLE_TOKEN_INVALID_CLIENT");
     await failureCase(internalTokenError("ETIMEDOUT"), "GOOGLE_OAUTH_TOKEN_EXCHANGE_FAILED", "GOOGLE_TOKEN_NETWORK_ERROR");
@@ -138,6 +148,7 @@ async function main() {
     assert.strictEqual(res.cookieValue.name, "aziel_session");
     assert.strictEqual(res.cookieValue.options.httpOnly, true);
     assert.strictEqual(res.cookieValue.options.sameSite, "lax");
+    assert.strictEqual(res.cookieValue.options.domain, undefined, "Google callback must issue a host-only customer cookie");
     assert(!String(res.body).includes("JWT_SECRET_VALUE"), "JWT must not appear in the callback response or URL");
     const successLogs = JSON.stringify(observed.records);
     for (const secret of ["SUCCESS_CODE_SECRET", "JWT_SECRET_VALUE", "SESSION_SECRET_ID", "USER_SECRET_ID", "private@example.com"]) assert(!successLogs.includes(secret), `diagnostics leaked ${secret}`);

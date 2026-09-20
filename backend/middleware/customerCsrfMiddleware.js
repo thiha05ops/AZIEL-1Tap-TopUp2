@@ -6,7 +6,6 @@ function allowedOrigins(env = process.env) {
     return new Set([
         env.FRONTEND_URL,
         env.CLIENT_URL,
-        env.AUTH_ORIGIN,
         "https://azielplay.com",
         "https://www.azielplay.com"
     ].filter(Boolean).map(value => {

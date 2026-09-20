@@ -251,32 +251,32 @@ function validateGoogleOAuth(result, env) {
         return;
     }
 
+    let callback;
     try {
-        const parsed = new URL(callbackUrl);
-        if (parsed.protocol !== "https:") {
+        callback = new URL(callbackUrl);
+        if (callback.protocol !== "https:") {
             addError(result, "PROD_GOOGLE_CALLBACK_INVALID", "Google callback URL must be HTTPS in production.", "googleOAuth");
+        }
+        if (callback.pathname !== "/api/auth/google/callback" || callback.search || callback.hash) {
+            addError(result, "PROD_GOOGLE_CALLBACK_PATH_INVALID", "Google callback URL must use the exact /api/auth/google/callback path without a query string or fragment.", "googleOAuth");
         }
     } catch {
         addError(result, "PROD_GOOGLE_CALLBACK_INVALID", "Google callback URL is malformed.", "googleOAuth");
     }
 
-    if (!env.AUTH_ORIGIN) {
-        addError(result, "PROD_AUTH_ORIGIN_MISSING", "AUTH_ORIGIN is required to keep Google OAuth outside the storefront service-worker scope.", "auth");
+    const frontendUrl = String(env.FRONTEND_URL || env.CLIENT_URL || "").trim();
+    if (!frontendUrl) {
+        addError(result, "PROD_GOOGLE_FRONTEND_ORIGIN_MISSING", "FRONTEND_URL is required when Google OAuth is enabled.", "googleOAuth");
     } else {
         try {
-            const authOrigin = new URL(env.AUTH_ORIGIN);
-            if (authOrigin.protocol !== "https:" || authOrigin.pathname !== "/") {
-                addError(result, "PROD_AUTH_ORIGIN_INVALID", "AUTH_ORIGIN must be an HTTPS origin without a path.", "auth");
-            }
-            if (!env.AUTH_COOKIE_DOMAIN) {
-                addError(result, "PROD_AUTH_COOKIE_DOMAIN_MISSING", "AUTH_COOKIE_DOMAIN is required when AUTH_ORIGIN is configured.", "auth");
-            }
-            const callback = new URL(callbackUrl);
-            if (callback.origin !== authOrigin.origin) {
-                addError(result, "PROD_GOOGLE_CALLBACK_AUTH_ORIGIN_MISMATCH", "GOOGLE_CALLBACK_URL must use AUTH_ORIGIN.", "auth");
+            const frontend = new URL(frontendUrl);
+            if (frontend.protocol !== "https:" || frontend.origin !== frontendUrl.replace(/\/$/, "")) {
+                addError(result, "PROD_GOOGLE_FRONTEND_ORIGIN_INVALID", "FRONTEND_URL must be an HTTPS origin without a path when Google OAuth is enabled.", "googleOAuth");
+            } else if (callback && callback.origin !== frontend.origin) {
+                addError(result, "PROD_GOOGLE_CALLBACK_ORIGIN_MISMATCH", "GOOGLE_CALLBACK_URL must use the storefront FRONTEND_URL origin.", "googleOAuth");
             }
         } catch {
-            addError(result, "PROD_AUTH_ORIGIN_INVALID", "AUTH_ORIGIN is malformed.", "auth");
+            addError(result, "PROD_GOOGLE_FRONTEND_ORIGIN_INVALID", "FRONTEND_URL is malformed.", "googleOAuth");
         }
     }
 }

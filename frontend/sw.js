@@ -92,6 +92,11 @@ const NEVER_CACHE_PREFIXES = [
     "/socket.io/"
 ];
 
+const OAUTH_NAVIGATION_PATHS = new Set([
+    "/api/auth/google",
+    "/api/auth/google/callback"
+]);
+
 const PRIVATE_NAVIGATION_PREFIXES = [
     "/admin",
     "/account",
@@ -175,6 +180,11 @@ self.addEventListener("fetch", event => {
 
     if (url.origin !== self.location.origin) return;
 
+    // OAuth navigations must remain owned by the browser network stack.
+    // iOS installed PWAs can reject redirected navigation responses returned
+    // through ServiceWorker.respondWith(). API fetches still remain network-only.
+    if (request.mode === "navigate" && isOAuthNavigationPath(url.pathname)) return;
+
     if (url.pathname === "/api/public/home-presentation") {
         event.respondWith(staleWhileRevalidatePresentation(event, request));
         return;
@@ -204,6 +214,10 @@ function isNeverCachePath(pathname) {
     return NEVER_CACHE_PREFIXES.some(prefix =>
         pathname === prefix || pathname.startsWith(prefix)
     );
+}
+
+function isOAuthNavigationPath(pathname) {
+    return OAUTH_NAVIGATION_PATHS.has(pathname);
 }
 
 function isPrivateNavigation(pathname) {
