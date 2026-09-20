@@ -15,7 +15,7 @@ function keyOf(input) {
     return `${url.pathname}${url.search}`;
 }
 
-function makeHarness({ legacy = true, failInstall = false } = {}) {
+function makeHarness({ legacy = true, failInstall = false, failNetwork = false } = {}) {
     const stores = new Map();
     const oldCore = "aziel-runtime-core-v5-storefront-performance";
     const oldCode = "aziel-runtime-code-v5-storefront-performance";
@@ -72,6 +72,7 @@ function makeHarness({ legacy = true, failInstall = false } = {}) {
             }
         },
         fetch: async request => {
+            if (failNetwork) throw new Error("simulated offline network");
             const pathname = new URL(typeof request === "string" ? request : request.url, "https://aziel.test").pathname;
             const diskPath = path.join(root, "frontend", pathname.replace(/^\//, ""));
             return new Response(fs.existsSync(diskPath) ? fs.readFileSync(diskPath) : "NETWORK", { status: 200 });
@@ -100,7 +101,19 @@ function makeHarness({ legacy = true, failInstall = false } = {}) {
         return pending;
     }
 
-    return { stores, dispatch, navigations, counts: () => ({ claimed, skipped }) };
+    async function dispatchFetch(request) {
+        let pending;
+        let respondWithCalls = 0;
+        events.fetch({
+            request,
+            preloadResponse: Promise.resolve(undefined),
+            respondWith(value) { respondWithCalls += 1; pending = Promise.resolve(value); },
+            waitUntil() {}
+        });
+        return { respondWithCalls, response: pending ? await pending : null };
+    }
+
+    return { stores, dispatch, dispatchFetch, navigations, counts: () => ({ claimed, skipped }) };
 }
 
 (async () => {
@@ -139,6 +152,44 @@ function makeHarness({ legacy = true, failInstall = false } = {}) {
     await fresh.dispatch("install");
     await fresh.dispatch("activate");
     assert.deepStrictEqual(fresh.navigations, [], "fresh install must not reload a client");
+
+    for (const url of [
+        "https://aziel.test/api/auth/google?returnTo=%2Faccount",
+        "https://aziel.test/api/auth/google/callback?code=x&state=y",
+        "https://aziel.test/auth/google/success?token=x"
+    ]) {
+        const result = await fresh.dispatchFetch({ method: "GET", mode: "navigate", url });
+        assert.strictEqual(result.respondWithCalls, 0, `${new URL(url).pathname} navigation must bypass Service Worker respondWith`);
+        assert.strictEqual(result.response, null);
+    }
+
+    for (const url of [
+        "https://aziel.test/api/auth/google",
+        "https://aziel.test/api/catalog?region=TH"
+    ]) {
+        const result = await fresh.dispatchFetch({ method: "GET", mode: "cors", url });
+        assert.strictEqual(result.respondWithCalls, 1, `${new URL(url).pathname} fetch must retain API network-only handling`);
+        assert.strictEqual(await result.response.text(), "NETWORK");
+    }
+
+    for (const url of [
+        "https://aziel.test/api/auth/login",
+        "https://aziel.test/login",
+        "https://aziel.test/products/afk-journey"
+    ]) {
+        const result = await fresh.dispatchFetch({ method: "GET", mode: "navigate", url });
+        assert.strictEqual(result.respondWithCalls, 1, `${new URL(url).pathname} navigation must not receive the OAuth bypass`);
+    }
+
+    const storefrontNavigation = await fresh.dispatchFetch({ method: "GET", mode: "navigate", url: "https://aziel.test/" });
+    assert.strictEqual(storefrontNavigation.respondWithCalls, 1, "ordinary storefront navigation must retain Service Worker handling");
+    assert((await storefrontNavigation.response.text()).includes("<!DOCTYPE html>"));
+
+    const offline = makeHarness({ legacy: false, failNetwork: true });
+    await offline.dispatch("install");
+    const offlineNavigation = await offline.dispatchFetch({ method: "GET", mode: "navigate", url: "https://aziel.test/explore" });
+    assert.strictEqual(offlineNavigation.respondWithCalls, 1);
+    assert((await offlineNavigation.response.text()).includes("You're offline"), "ordinary offline navigation must retain the offline shell");
 
     const failed = makeHarness({ legacy: true, failInstall: true });
     await assert.rejects(failed.dispatch("install"), /simulated precache failure/);

@@ -92,6 +92,12 @@ const NEVER_CACHE_PREFIXES = [
     "/socket.io/"
 ];
 
+const OAUTH_NAVIGATION_PATHS = new Set([
+    "/api/auth/google",
+    "/api/auth/google/callback",
+    "/auth/google/success"
+]);
+
 const PRIVATE_NAVIGATION_PREFIXES = [
     "/admin",
     "/account",
@@ -175,6 +181,11 @@ self.addEventListener("fetch", event => {
 
     if (url.origin !== self.location.origin) return;
 
+    // OAuth navigations must remain owned by the browser network stack.
+    // Returning a redirect through respondWith() is rejected by iOS Safari
+    // when AZIEL runs as an installed PWA.
+    if (request.mode === "navigate" && isOAuthNavigationPath(url.pathname)) return;
+
     if (url.pathname === "/api/public/home-presentation") {
         event.respondWith(staleWhileRevalidatePresentation(event, request));
         return;
@@ -204,6 +215,10 @@ function isNeverCachePath(pathname) {
     return NEVER_CACHE_PREFIXES.some(prefix =>
         pathname === prefix || pathname.startsWith(prefix)
     );
+}
+
+function isOAuthNavigationPath(pathname) {
+    return OAUTH_NAVIGATION_PATHS.has(pathname);
 }
 
 function isPrivateNavigation(pathname) {
