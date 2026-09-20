@@ -58,15 +58,62 @@ function sendBrowserTransition(res, destination) {
 }
 
 function browserOwnedPassportRedirect(authenticate, req, res, next) {
-    const originalRedirect = res.redirect.bind(res);
-    res.redirect = (statusOrUrl, maybeUrl) => {
-        res.redirect = originalRedirect;
-        return sendBrowserTransition(res, maybeUrl || statusOrUrl);
+    const ownsSetHeader = Object.prototype.hasOwnProperty.call(res, "setHeader");
+    const ownsEnd = Object.prototype.hasOwnProperty.call(res, "end");
+    const originalSetHeader = res.setHeader;
+    const originalEnd = res.end;
+    const originalStatusCode = res.statusCode;
+    let location = "";
+    let restored = false;
+
+    function restore() {
+        if (restored) return;
+        restored = true;
+        if (ownsSetHeader) res.setHeader = originalSetHeader;
+        else delete res.setHeader;
+        if (ownsEnd) res.end = originalEnd;
+        else delete res.end;
+    }
+
+    res.setHeader = function setPassportHeader(name, value) {
+        const normalized = String(name || "").toLowerCase();
+        if (normalized === "location") {
+            location = String(value);
+            return res;
+        }
+        if (normalized === "content-length" && location) return res;
+        return originalSetHeader.call(res, name, value);
     };
-    return authenticate(req, res, error => {
-        res.redirect = originalRedirect;
-        return next(error);
-    });
+
+    res.end = function finishPassportResponse(...args) {
+        const status = res.statusCode;
+        restore();
+        if (location && status >= 300 && status < 400) {
+            res.statusCode = originalStatusCode;
+            return sendBrowserTransition(res, location);
+        }
+        return originalEnd.apply(res, args);
+    };
+
+    try {
+        const result = authenticate(req, res, error => {
+            restore();
+            res.statusCode = originalStatusCode;
+            return next(error);
+        });
+        if (result && typeof result.then === "function") {
+            return result.catch(error => {
+                restore();
+                res.statusCode = originalStatusCode;
+                return next(error);
+            });
+        }
+        return result;
+    } catch (error) {
+        restore();
+        res.statusCode = originalStatusCode;
+        throw error;
+    }
 }
 
 function createSocialAuthRouter(options = {}) {

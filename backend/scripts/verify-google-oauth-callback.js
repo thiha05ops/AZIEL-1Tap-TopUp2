@@ -6,6 +6,7 @@ const path = require("path");
 const { createSocialAuthRouter } = require("../routes/socialAuth");
 
 const ENV = { GOOGLE_CLIENT_ID: "configured", GOOGLE_CLIENT_SECRET: "configured", GOOGLE_CALLBACK_URL: "https://azielplay.com/api/auth/google/callback", FRONTEND_URL: "https://azielplay.com" };
+const GOOGLE_AUTHORIZATION_URL = "https://accounts.google.com/o/oauth2/v2/auth?client_id=configured&redirect_uri=https%3A%2F%2Fazielplay.com%2Fapi%2Fauth%2Fgoogle%2Fcallback&state=OPAQUE_STATE_VALUE&scope=profile%20email";
 
 function captureLogger(throwing = false) {
     const records = [];
@@ -18,11 +19,13 @@ function response() {
         statusCode: 200,
         body: null,
         headers: {},
+        committedStatuses: [],
         redirectUrl: "",
         setHeader(name, value) { this.headers[name.toLowerCase()] = value; },
         status(value) { this.statusCode = value; return this; },
-        type(value) { this.contentType = value; return this; },
-        send(value) { this.body = value; return value; },
+        type(value) { this.contentType = value; this.setHeader("Content-Type", value); return this; },
+        send(value) { this.body = value; this.end(); return value; },
+        end() { this.committedStatuses.push(this.statusCode); return this; },
         json(value) { this.body = value; return value; },
         cookie(name, value, options) { this.cookieValue = { name, value, options }; return this; },
         redirect(url) { this.redirectUrl = url; return url; }
@@ -38,7 +41,7 @@ function request(code = "AUTHORIZATION_CODE_SECRET") {
     return { query: { code, state: "STATE_SECRET" }, headers: { host: "azielplay.com" }, protocol: "https", connection: {}, socket: {} };
 }
 
-async function runRoute(router, routePath, req, res) {
+async function runRoute(router, routePath, req, res, onError) {
     const layer = router.stack.find(item => item.route?.path === routePath);
     assert(layer, `missing route ${routePath}`);
     const handlers = layer.route.stack.map(item => item.handle);
@@ -46,7 +49,10 @@ async function runRoute(router, routePath, req, res) {
         if (index >= handlers.length) return;
         let advanced = false;
         await Promise.resolve(handlers[index](req, res, error => {
-            if (error) throw error;
+            if (error) {
+                if (onError) return onError(error);
+                throw error;
+            }
             advanced = true;
         }));
         if (advanced) await dispatch(index + 1);
@@ -61,7 +67,13 @@ function passportResult(error, user) {
         passport: {
             authenticate(name, options, callback) {
                 calls.push({ name, options, hasCallback: typeof callback === "function" });
-                return async (req, res, next) => callback ? callback(error, user, {}) : next();
+                return async (req, res) => {
+                    if (callback) return callback(error, user, {});
+                    res.statusCode = 302;
+                    res.setHeader("Location", GOOGLE_AUTHORIZATION_URL);
+                    res.setHeader("Content-Length", "0");
+                    return res.end();
+                };
             }
         }
     };
@@ -102,11 +114,57 @@ async function main() {
     const startEnv = { ...ENV, AUTH_ORIGIN: "https://auth.azielplay.com" };
     const startRouter = createSocialAuthRouter({ passport: startStub.passport, logger: captureLogger().logger, env: startEnv });
     const startRes = response();
+    const originalStartSetHeader = startRes.setHeader;
+    const originalStartEnd = startRes.end;
     await runRoute(startRouter, "/auth/google", request(), startRes);
     assert.strictEqual(startStub.calls.length, 1, "OAuth start must invoke local Passport even when obsolete AUTH_ORIGIN is present");
     assert.strictEqual(startStub.calls[0].name, "google");
     assert.strictEqual(startStub.calls[0].options.state, true, "OAuth start must retain Passport state validation");
-    assert.strictEqual(startRes.body, null, "obsolete AUTH_ORIGIN must not produce an auth-subdomain transition");
+    assert.strictEqual(startRes.statusCode, 200, "Passport's intermediate redirect must become a browser transition");
+    assert.strictEqual(startRes.headers.location, undefined, "final OAuth start response must not expose a Location header");
+    assert.strictEqual(startRes.headers["content-length"], undefined, "Passport's zero-length redirect body must not be committed");
+    assert.strictEqual(startRes.headers["cache-control"], "no-store");
+    assert.strictEqual(startRes.headers["referrer-policy"], "no-referrer");
+    assert.strictEqual(startRes.headers["content-type"], "html");
+    assert.strictEqual(transitionDestination(startRes), GOOGLE_AUTHORIZATION_URL, "Passport's authorization destination must remain exact and unmodified");
+    assert(transitionDestination(startRes).includes("state=OPAQUE_STATE_VALUE"), "opaque Passport state must remain in the browser transition");
+    assert.deepStrictEqual(startRes.committedStatuses, [200], "the intermediate 302 end must never be committed");
+    assert.strictEqual(startRes.setHeader, originalStartSetHeader, "successful transition must restore setHeader");
+    assert.strictEqual(startRes.end, originalStartEnd, "successful transition must restore end");
+
+    for (const mode of ["next", "throw"]) {
+        const failure = new Error(`start-${mode}`);
+        const failurePassport = {
+            authenticate() {
+                if (mode === "next") return (req, res, next) => next(failure);
+                if (mode === "throw") return () => { throw failure; };
+                return async () => { throw failure; };
+            }
+        };
+        const failureRouter = createSocialAuthRouter({ passport: failurePassport, logger: captureLogger().logger, env: ENV });
+        const failureRes = response();
+        const originalSetHeader = failureRes.setHeader;
+        const originalEnd = failureRes.end;
+        await assert.rejects(runRoute(failureRouter, "/auth/google", request(), failureRes), failure);
+        assert.strictEqual(failureRes.setHeader, originalSetHeader, `${mode} path must restore setHeader`);
+        assert.strictEqual(failureRes.end, originalEnd, `${mode} path must restore end`);
+        assert.strictEqual(failureRes.statusCode, 200, `${mode} path must restore statusCode`);
+    }
+
+    const rejectedError = new Error("start-reject");
+    const rejectedPassport = { authenticate() { return async () => { throw rejectedError; }; } };
+    const rejectedRouter = createSocialAuthRouter({ passport: rejectedPassport, logger: captureLogger().logger, env: ENV });
+    const rejectedRes = response();
+    const originalRejectedSetHeader = rejectedRes.setHeader;
+    const originalRejectedEnd = rejectedRes.end;
+    const receivedErrors = [];
+    await runRoute(rejectedRouter, "/auth/google", request(), rejectedRes, error => { receivedErrors.push(error); });
+    assert.deepStrictEqual(receivedErrors, [rejectedError], "rejected middleware must call next with the original error exactly once");
+    assert.strictEqual(rejectedRes.setHeader, originalRejectedSetHeader, "reject path must restore setHeader");
+    assert.strictEqual(rejectedRes.end, originalRejectedEnd, "reject path must restore end");
+    assert.strictEqual(rejectedRes.statusCode, 200, "reject path must restore statusCode");
+    assert.deepStrictEqual(rejectedRes.committedStatuses, [], "reject path must not commit a response");
+    assert.strictEqual(rejectedRes.body, null, "reject path must not send a response body");
 
     await failureCase(tokenError("invalid_grant"), "GOOGLE_OAUTH_TOKEN_EXCHANGE_FAILED", "GOOGLE_TOKEN_INVALID_GRANT");
     await failureCase(tokenError("invalid_client"), "GOOGLE_OAUTH_TOKEN_EXCHANGE_FAILED", "GOOGLE_TOKEN_INVALID_CLIENT");
