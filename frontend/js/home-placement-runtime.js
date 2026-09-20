@@ -1,247 +1,140 @@
-// AZIEL Home products: persisted catalog placement is the only membership authority.
+// AZIEL Home presentation plane: cached cards first, scoped revalidation second.
 (function () {
-    const HOME_SECTIONS = Object.freeze({
-        POPULAR_MOBILE_GAMES: ["POPULAR_MOBILE_GAMES", "POPULAR_GAME_TOPUP"],
-        ALL_MOBILE_GAMES: ["ALL_MOBILE_GAMES", "POPULAR_GAME_TOPUP", "NEW_GAME_TOPUP"],
-        SOCIAL_TOPUP: ["SOCIAL_TOPUP", "DIGITAL_SERVICES"]
-    });
-    const SECTION_CONFIG = Object.freeze([
+    "use strict";
+    const CACHE_PREFIX = "aziel.home.presentation.v1";
+    const CONFIG = Object.freeze([
         { key: "POPULAR_MOBILE_GAMES", id: "popularGames", target: "popularGamesList", report: "popular-mobile-games" },
         { key: "ALL_MOBILE_GAMES", id: "allMobileGames", target: "allMobileGamesList", report: "all-mobile-games" },
         { key: "SOCIAL_TOPUP", id: "socialTopUp", target: "socialTopUpList", report: "social-topup" }
     ]);
-    const DESKTOP_PANEL_SIZE = 6;
-    const MOBILE_QUERY = "(max-width: 720px)";
-    const MOBILE_GROUP_RAIL_ID = "homeMobileGroupRail";
-    let refreshSequence = 0;
-    let refreshInFlight = null;
-    let regionRefreshQueued = false;
-    let lastSelection = { groups: [] };
-    let lastProducts = [];
-    let lastCatalogReady = false;
-    let mobileLayoutActive = null;
+    const MOBILE = "(max-width: 720px)";
+    let sequence = 0;
+    let lastPayload = null;
 
-    function ready(fn) { if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", fn); else fn(); }
-    async function refreshHomeCatalog() {
-        const sequence = ++refreshSequence;
-        const result = await Promise.allSettled([window.AZIEL_CATALOG?.ensureFresh?.()]);
-        if (sequence !== refreshSequence) return;
-        syncMobileGroupRail();
-        const catalogReady = result[0].status === "fulfilled" && Boolean(window.AZIEL_CATALOG);
-        const products = catalogReady ? catalogProducts() : [];
-        lastProducts = products;
-        lastCatalogReady = catalogReady;
-        renderHomeSections(products, catalogReady);
+    function ready(fn) { if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", fn, { once: true }); else fn(); }
+    function region() {
+        const value = window.AZIEL?.getShopRegion?.()
+            || localStorage.getItem("shopRegion")
+            || localStorage.getItem("selectedRegion")
+            || localStorage.getItem("region")
+            || "MM";
+        return ["TH", "MM"].includes(String(value).toUpperCase()) ? String(value).toUpperCase() : "MM";
     }
-    function renderHomeSections(products, catalogReady) {
-        const selection = { groups: [] };
-        SECTION_CONFIG.forEach(config => renderSection(config, products, selection, catalogReady));
-        if(catalogReady&&!products.length){const config=SECTION_CONFIG[0],section=document.getElementById(config.id),target=document.getElementById(config.target);if(section&&target){target.innerHTML='<div class="home-catalog-empty"><strong>Products are not available right now.</strong></div>';target.removeAttribute("aria-busy");section.hidden=false;section.dataset.homeSelectionSource="empty-catalog"}}
-        lastSelection = selection;
-        window.AZIEL_HOME_SELECTION = Object.freeze({ getSnapshot: () => JSON.parse(JSON.stringify(lastSelection)), refresh: scheduleHomeRefresh });
-        document.dispatchEvent(new CustomEvent("aziel:home-groups-updated", { detail: JSON.parse(JSON.stringify(selection)) }));
+    function key(market) { return `${CACHE_PREFIX}.${market}`; }
+    function validProduct(product) { return Boolean(product && typeof product === "object" && !Array.isArray(product) && String(product.productCode || "").trim() && String(product.displayName || "").trim() && String(product.route || "").trim()); }
+    function validSnapshot(value, market) {
+        if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+        if (value.region !== market || !String(value.revision || "").trim() || !Array.isArray(value.sections)) return false;
+        return value.sections.every(section => section && typeof section === "object" && !Array.isArray(section) && CONFIG.some(config => config.key === section.key) && Array.isArray(section.products) && section.products.every(validProduct));
     }
-    function scheduleHomeRefresh(options = {}) {
-        if (refreshInFlight) { if (options.regionChanged) regionRefreshQueued = true; return refreshInFlight; }
-        refreshInFlight = refreshHomeCatalog().finally(() => {
-            refreshInFlight = null;
-            if (regionRefreshQueued) { regionRefreshQueued = false; scheduleHomeRefresh(); }
-        });
-        return refreshInFlight;
+    function removeCache(market) { try { localStorage.removeItem(key(market)); } catch { /* storage is optional */ } }
+    function readCache(market) {
+        try {
+            const value = JSON.parse(localStorage.getItem(key(market)) || "null");
+            if (validSnapshot(value, market)) return value;
+            if (value !== null) removeCache(market);
+        } catch { removeCache(market); }
+        return null;
     }
-    function catalogProducts() {
-        return uniqueProducts((window.AZIEL_CATALOG?.getProducts?.() || []).map(displayProduct).filter(isHomeSafe)).sort(compareHomeOrder);
+    function writeCache(payload, market) { try { localStorage.setItem(key(market), JSON.stringify(payload)); } catch { /* storage is optional */ } }
+    function mark(name, detail = {}) {
+        performance.mark?.(`aziel-home:${name}`);
+        window.AZIEL_HOME_PERFORMANCE = { ...(window.AZIEL_HOME_PERFORMANCE || {}), [name]: { at: performance.now(), ...detail } };
     }
-    function isHomeSafe(product = {}) {
-        return Boolean(product?.route) && product.enabled !== false && product.homepageEnabled === true && product.discoverable === true && product.publicState !== "HIDDEN";
-    }
-    function belongsToSection(product = {}, section) {
-        const persisted = new Set((product.homepageSections || []).map(value => String(value).trim().toUpperCase()));
-        return (HOME_SECTIONS[section] || []).some(value => persisted.has(value));
-    }
-    function selectProducts(products = [], section) {
-        return uniqueProducts(products.filter(isHomeSafe).filter(product => belongsToSection(product, section))).sort(compareHomeOrder);
-    }
-    function selectPopularProducts(products = []) {
-        return uniqueProducts(products.filter(product => product?.enabled !== false && product.homepageEnabled === true && product.discoverable === true && product.publicCategory === "mobile").filter(product => belongsToSection(product, "POPULAR_MOBILE_GAMES"))).sort(compareHomeOrder);
-    }
-    function selectAllMobileProducts(products = []) {
-        return uniqueProducts(products.filter(product => product?.enabled !== false && product.homepageEnabled === true && product.discoverable === true && product.publicCategory === "mobile").filter(product => belongsToSection(product, "ALL_MOBILE_GAMES"))).sort(compareHomeOrder);
-    }
-    function selectSocialProducts(products = []) { return selectProducts(products, "SOCIAL_TOPUP"); }
-    function personalizeProductSection(products = [], sectionKey = "") {
-        const list = Array.isArray(products) ? [...products] : [];
-        const discovery = window.AZIEL_CUSTOMER_DISCOVERY;
 
-        if (
-            !discovery ||
-            list.length < 2 ||
-            !["POPULAR_MOBILE_GAMES", "ALL_MOBILE_GAMES"].includes(sectionKey)
-        ) {
-            return list;
-        }
-
-        const viewedCodes = new Set(
-            discovery.recentProductCodes()
-                .map(code => String(code || "").trim().toLowerCase())
-                .filter(Boolean)
-        );
-
-        const viewed = discovery.viewedFirst(
-            list,
-            product => codeOf(product)
-        ).filter(product => viewedCodes.has(codeOf(product)));
-
-        const remainder = list
-            .filter(product => !viewedCodes.has(codeOf(product)))
-            .sort((a, b) => {
-                const aName = String(a?.name || codeOf(a)).trim();
-                const bName = String(b?.name || codeOf(b)).trim();
-
-                return aName.localeCompare(
-                    bName,
-                    undefined,
-                    { sensitivity: "base" }
-                );
-            });
-
-        return [
-            ...viewed,
-            ...discovery.rotate(
-                remainder,
-                discovery.homeRotationCursor()
-            )
-        ];
-    }
-    function renderSection(config, products, selection, catalogReady) {
-        const section = document.getElementById(config.id);
-        const target = document.getElementById(config.target);
-        if (!section || !target) return;
-        const selected = catalogReady
-            ? personalizeProductSection(
-                selectProducts(products, config.key),
-                config.key
-            )
-            : [];
-
-        if (!selected.length) {
-            hideSection(section, target, catalogReady ? "no-admin-placement" : "catalog-unavailable");
-            selection.groups.push(groupReport(config.report, [], section.dataset.homeHiddenReason));
-            return;
-        }
-        target.innerHTML = renderPanels(selected, config.report, isMobileViewport() ? selected.length : DESKTOP_PANEL_SIZE);
-        target.removeAttribute("aria-busy");
-        section.hidden = false;
-        section.dataset.homeSelectionSource = "catalog-homepage-sections";
-        delete section.dataset.homeHiddenReason;
-        window.AZIEL_CATALOG_PRESENTATION?.bindImageFallbacks?.(target);
-        selection.groups.push(groupReport(config.report, selected, "catalog-homepage-sections"));
-    }
-    function chunkProducts(products = [], size = DESKTOP_PANEL_SIZE) {
-        const chunkSize = Math.max(1, Number(size) || DESKTOP_PANEL_SIZE);
-        const chunks = [];
-        for (let index = 0; index < products.length; index += chunkSize) chunks.push(products.slice(index, index + chunkSize));
-        return chunks;
-    }
-    function renderPanels(products, groupId, panelSize = DESKTOP_PANEL_SIZE) {
-        const panels = [];
-        chunkProducts(products, panelSize).forEach(chunk => {
-            const items = chunk.map(product => renderProduct(product, groupId)).join("");
-            const mobileTwoRowClass =
-                isMobileViewport() && groupId === "all-mobile-games"
-                    ? " home-product-panel--mobile-two-row"
-                    : "";
-            panels.push(`<div class="home-product-panel${mobileTwoRowClass}" role="list" data-panel-size="${chunk.length}">${items}</div>`);
-        });
-        return panels.join("");
-    }
-    function isMobileViewport() { return window.matchMedia?.(MOBILE_QUERY).matches === true; }
-    function syncMobileGroupRail() {
-        const main = document.querySelector?.("main.az-home");
-        const sections = SECTION_CONFIG
-            .map(config => document.getElementById(config.id))
-            .filter(Boolean);
-
-        if (!main || !sections.length) return;
-
-        const rail = document.getElementById(MOBILE_GROUP_RAIL_ID);
-        mobileLayoutActive = false;
-
-        /*
-         * Merchandising sections own the top-of-home position:
-         * Hero -> Exclusive Offers -> Available Coupons -> product discovery.
-         *
-         * Keep product groups together after coupons instead of moving them
-         * ahead of Exclusive Offers at runtime.
-         */
-        const couponSection = document.getElementById("availableCoupons");
-        let anchor = couponSection;
-
-        sections.forEach(section => {
-            if (anchor) {
-                anchor.insertAdjacentElement("afterend", section);
-            } else {
-                main.appendChild(section);
+    async function refresh({ regionChanged = false } = {}) {
+        const market = region();
+        const requestId = ++sequence;
+        let cached = readCache(market);
+        if (cached) {
+            try {
+                render(cached, "local-cache");
+                mark("presentation-cache-hit", { region: market });
+            } catch {
+                removeCache(market);
+                cached = null;
+                showSkeletons();
+                mark("presentation-cache-invalid", { region: market });
             }
-
-            anchor = section;
-        });
-
-        rail?.remove();
+        }
+        else { mark("presentation-cache-miss", { region: market }); if (regionChanged) showSkeletons(); }
+        const headers = cached?.revision ? { "If-None-Match": `"home-${market}-${cached.revision}"` } : {};
+        const startedAt = performance.now();
+        try {
+            const response = await fetch(`/api/public/home-presentation?region=${encodeURIComponent(market)}`, { headers, credentials: "same-origin" });
+            mark("presentation-network-complete", { region: market, durationMs: Math.round(performance.now() - startedAt), status: response.status });
+            if (requestId !== sequence) return;
+            if (response.status === 304 && cached) return;
+            if (!response.ok) throw new Error(`Presentation request failed (${response.status})`);
+            const payload = await response.json();
+            if (!payload?.success || !validSnapshot(payload, market)) throw new Error("Presentation response is invalid");
+            writeCache(payload, market);
+            if (!cached || cached.revision !== payload.revision) { render(payload, cached ? "network-reconcile" : "network"); mark("cards-reconciled", { region: market }); }
+        } catch (error) {
+            if (requestId !== sequence || cached) return;
+            showUnavailable();
+            if (["localhost", "127.0.0.1"].includes(location.hostname)) console.warn("Home presentation unavailable:", error.message);
+        }
     }
-    function renderProduct(product, groupId) {
-        return `<a href="${escapeAttr(homeRoute(product))}" class="home-product-item ${stateClass(product)}" role="listitem" data-product-code="${escapeAttr(codeOf(product))}" data-commerce-state="${escapeAttr(product.commerceState)}" data-purchasable="${product.purchasable === true}">
-            <img src="${escapeAttr(presentationArtwork(product, groupId))}" alt="${escapeAttr(product.imageAltText || product.name)}" loading="lazy" decoding="async">
-            <span class="home-product-copy">
-                <strong>${escapeHtml(product.name || codeOf(product))}</strong>
-                ${readinessBadge(product)}
-                ${productDescription(product) ? `<small class="home-product-description">${escapeHtml(productDescription(product))}</small>` : ""}
-                <small class="home-product-market">${escapeHtml(productMarket(product))}</small>
-            </span>
+
+    function render(payload, source) {
+        lastPayload = payload;
+        const groups = [];
+        CONFIG.forEach(config => {
+            const section = document.getElementById(config.id);
+            const target = document.getElementById(config.target);
+            if (!section || !target) return;
+            const products = payload.sections.find(item => item.key === config.key)?.products || [];
+            if (!products.length) { section.hidden = true; target.innerHTML = ""; }
+            else { target.innerHTML = panels(products, config.report); target.removeAttribute("aria-busy"); section.hidden = false; section.dataset.homeSelectionSource = source; }
+            groups.push({ id: config.report, source, itemCount: products.length, productCodes: products.map(item => item.productCode) });
+        });
+        const snapshot = { groups };
+        window.AZIEL_HOME_SELECTION = Object.freeze({ getSnapshot: () => JSON.parse(JSON.stringify(snapshot)), refresh });
+        document.dispatchEvent(new CustomEvent("aziel:home-groups-updated", { detail: snapshot }));
+        mark("first-cards-rendered", { source });
+    }
+
+    function panels(products, groupId) {
+        const size = window.matchMedia?.(MOBILE).matches ? products.length : 6;
+        const result = [];
+        for (let offset = 0; offset < products.length; offset += Math.max(1, size)) {
+            const items = products.slice(offset, offset + Math.max(1, size));
+            result.push(`<div class="home-product-panel" role="list" data-panel-size="${items.length}">${items.map((product, index) => productCard(product, groupId, offset + index)).join("")}</div>`);
+        }
+        return result.join("");
+    }
+
+    function productCard(product, groupId, index) {
+        const art = product.artwork || {};
+        const fallback = groupId === "social-topup" ? "/assets/fallbacks/digital-services.svg" : "/assets/fallbacks/game-topup.svg";
+        const eager = groupId === "popular-mobile-games" && index < 2;
+        return `<a href="${attr(resolveProductRoute(product.route, product.productCode))}" class="home-product-item is-${String(product.state || "presented").toLowerCase().replaceAll("_", "-")}" role="listitem" data-product-code="${attr(product.productCode)}">
+            <img src="${attr(art.src || fallback)}"${art.srcset ? ` srcset="${attr(art.srcset)}" sizes="${attr(art.sizes || "")}"` : ""} width="${Number(art.width || 480)}" height="${Number(art.height || 480)}" alt="${attr(art.alt || product.displayName)}" loading="${eager ? "eager" : "lazy"}" decoding="async"${eager ? ' fetchpriority="high"' : ""}>
+            <span class="home-product-copy"><strong>${html(product.displayName || product.productCode)}</strong>${product.state === "COMING_SOON" ? '<span class="home-product-state">Coming Soon</span>' : ""}${product.subtitle ? `<small class="home-product-description">${html(product.subtitle)}</small>` : ""}</span>
         </a>`;
     }
-    function renderPopularGame(product) { return renderProduct(product, "popular-mobile-games"); }
-    function renderAllMobileGame(product) { return renderProduct(product, "all-mobile-games"); }
-    function renderSocialTopUpProduct(product) { return renderProduct(product, "social-topup"); }
-    function renderSocialTopUp(products = []) { return renderPanels(products, "social-topup", isMobileViewport() ? products.length : DESKTOP_PANEL_SIZE); }
-    function displayProduct(product = {}) {
-        const canonical = window.AZIEL_CATALOG?.getProduct?.(codeOf(product)) || product;
-        return window.AZIEL_CATALOG_PRESENTATION?.buildDisplayProduct?.(canonical) || null;
-    }
-    function presentationArtwork(product = {}, groupId = "") {
-        const image = String(product.image || "");
-        if (image && !image.includes("assets/brand/aziel-icon")) return image;
-        return groupId === "social-topup" ? "assets/fallbacks/digital-services.svg" : "assets/fallbacks/game-topup.svg";
-    }
-    function homeRoute(product = {}) { return window.AZIEL_CATALOG_PRESENTATION?.resolveProductRoute?.(product.productRoute || product.route, codeOf(product)) || ""; }
-    function stateClass(product = {}) { return `is-${String(product.commerceState || "HIDDEN").toLowerCase().replaceAll("_", "-")}`; }
-    function readinessBadge(product = {}) { return product.publicState === "COMING_SOON" || product.commerceState === "COMING_SOON" ? '<span class="home-product-state">Coming Soon</span>' : ""; }
-    function productDescription(product = {}) {
-        const value = String(product.shortDescription || product.productKnowledge?.shortDescription || product.searchDescription || product.description || "").trim();
-        const market = productMarket(product);
-        if (!value || value === market) return "";
-        return value.split(/[•·]/)[0].trim();
-    }
-    function productMarket(product = {}) {
-        const market = String(product.displayMarketLabel || product.marketLabel || "").trim();
-        return market || "Digital product";
-    }
-    function compareHomeOrder(a, b) { return Number(a.homepageOrder || 0) - Number(b.homepageOrder || 0) || codeOf(a).localeCompare(codeOf(b)); }
-    function uniqueProducts(products) { const seen = new Set(); return products.filter(product => { const code = codeOf(product); if (!code || seen.has(code)) return false; seen.add(code); return true; }); }
-    function hideSection(section, target, reason) { section.hidden = true; section.dataset.homeHiddenReason = reason; target.innerHTML = ""; }
-    function groupReport(id, items, source) { return { id, source, itemCount: items.length, productCodes: items.map(codeOf).filter(Boolean) }; }
-    function codeOf(product = {}) { return String(product.productCode || "").trim().toLowerCase(); }
-    function escapeHtml(value = "") { return String(value).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#039;"); }
-    function escapeAttr(value = "") { return escapeHtml(value); }
 
-    window.AZIEL_HOME_PLACEMENT_POLICY = Object.freeze({ HOME_SECTIONS, isHomeSafe, belongsToSection, selectProducts, selectPopularProducts, selectAllMobileProducts, selectSocialProducts, chunkProducts });
+    function showSkeletons() { CONFIG.forEach(config => { const section = document.getElementById(config.id); if (section) section.hidden = config.key !== "POPULAR_MOBILE_GAMES"; }); }
+    function showUnavailable() { const target = document.getElementById("popularGamesList"); if (target) { target.innerHTML = '<div class="home-catalog-empty"><strong>Products are temporarily unavailable.</strong></div>'; target.removeAttribute("aria-busy"); } }
+    function resolveProductRoute(route = "", productCode = "") { const value = String(route || "").trim(); if (value && !/^(?:[a-z]+:|\/\/)/i.test(value) && !value.startsWith("javascript:")) return value; const code = String(productCode || "").trim().toLowerCase(); return code ? `product.html?product=${encodeURIComponent(code)}` : "#"; }
+    function isHomeSafe(product = {}) { return Boolean(product.productRoute || product.route) && product.enabled !== false && product.homepageEnabled === true && product.discoverable !== false && product.publicState !== "HIDDEN"; }
+    function belongsToSection(product = {}, section) { const aliases = { POPULAR_MOBILE_GAMES: ["POPULAR_MOBILE_GAMES", "POPULAR_GAME_TOPUP"], ALL_MOBILE_GAMES: ["ALL_MOBILE_GAMES", "POPULAR_GAME_TOPUP", "NEW_GAME_TOPUP"], SOCIAL_TOPUP: ["SOCIAL_TOPUP", "DIGITAL_SERVICES"] }; const values = (product.homepageSections || []).map(value => String(value).toUpperCase()); return (aliases[section] || [section]).some(value => values.includes(value)); }
+    function selectProducts(products = [], section) { return products.filter(isHomeSafe).filter(product => belongsToSection(product, section)).sort((a, b) => Number(a.homepageOrder || 0) - Number(b.homepageOrder || 0) || String(a.productCode || "").localeCompare(String(b.productCode || ""))); }
+    function selectPopularProducts(products = []) { return selectProducts(products, "POPULAR_MOBILE_GAMES").filter(product => product.publicCategory === "mobile"); }
+    function selectAllMobileProducts(products = []) { return selectProducts(products, "ALL_MOBILE_GAMES").filter(product => product.publicCategory === "mobile"); }
+    function selectSocialProducts(products = []) { return selectProducts(products, "SOCIAL_TOPUP"); }
+    function chunkProducts(products = [], size = 6) { const chunks = []; for (let index = 0; index < products.length; index += Math.max(1, size)) chunks.push(products.slice(index, index + Math.max(1, size))); return chunks; }
+    function html(value = "") { return String(value).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#039;"); }
+    function attr(value = "") { return html(value); }
+
+    window.AZIEL_HOME_PRESENTATION = Object.freeze({ refresh, getSnapshot: () => lastPayload ? JSON.parse(JSON.stringify(lastPayload)) : null });
+    window.AZIEL_HOME_PLACEMENT_POLICY = Object.freeze({ isHomeSafe, belongsToSection, selectProducts, selectPopularProducts, selectAllMobileProducts, selectSocialProducts, chunkProducts });
+    window.AZIEL_HOME_PRESENTATION_TESTING = Object.freeze({ region, validSnapshot, key });
     ready(() => {
-        scheduleHomeRefresh();
-        window.addEventListener("aziel:shopRegionChanged", () => scheduleHomeRefresh({ regionChanged: true }));
-        document.addEventListener("aziel:catalog-updated", event => { if (event.detail?.status === "ready") scheduleHomeRefresh(); });
-        window.matchMedia?.(MOBILE_QUERY).addEventListener?.("change", () => {
-            syncMobileGroupRail();
-            renderHomeSections(lastProducts, lastCatalogReady);
-        });
+        mark("shell-ready");
+        refresh();
+        window.addEventListener("aziel:shopRegionChanged", () => refresh({ regionChanged: true }));
+        window.matchMedia?.(MOBILE).addEventListener?.("change", () => { if (lastPayload) render(lastPayload, "viewport-reflow"); });
     });
 })();

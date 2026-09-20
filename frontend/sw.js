@@ -1,12 +1,52 @@
 const CACHE_PREFIX = "aziel-runtime";
-const CORE_CACHE = `${CACHE_PREFIX}-core-v4`;
-const PAGE_CACHE = `${CACHE_PREFIX}-pages-v1`;
-const CODE_CACHE = `${CACHE_PREFIX}-code-v4-empty-store`;
-const MEDIA_CACHE = `${CACHE_PREFIX}-media-v2-phase4`;
+const CORE_CACHE = `${CACHE_PREFIX}-core-v5-storefront-performance`;
+const PAGE_CACHE = `${CACHE_PREFIX}-pages-v2-storefront-performance`;
+const CODE_CACHE = `${CACHE_PREFIX}-code-v5-storefront-performance`;
+const MEDIA_CACHE = `${CACHE_PREFIX}-media-v3-storefront-performance`;
+const PRESENTATION_CACHE = `${CACHE_PREFIX}-presentation-v1`;
 
 const CORE_ASSETS = [
     "/offline.html",
+    "/home.html",
     "/manifest.json",
+    "/css/theme/aziel-design-system.css",
+    "/css/core/motion.css",
+    "/css/core/ui-feedback.css",
+    "/css/core/main.css",
+    "/css/core/layout.css",
+    "/css/core/components.css",
+    "/css/core/footer.css",
+    "/css/theme/wave-background.css",
+    "/css/home/home.css",
+    "/css/home/aziel-home.css",
+    "/css/home/marketplace-reference.css",
+    "/css/home/home-product-system.css",
+    "/css/theme/aziel-header.css",
+    "/css/theme/desktop.css",
+    "/css/theme/mobile.css",
+    "/js/asset.js",
+    "/js/site-settings.js",
+    "/js/locale-loader.js",
+    "/js/i18n.js",
+    "/js/user-state.js",
+    "/js/campaign-runtime.js",
+    "/js/auth-check.js",
+    "/js/header-loader.js",
+    "/core/settings/theme.js",
+    "/js/locale-switcher.js",
+    "/js/catalog-presentation.js",
+    "/js/catalog-runtime.js",
+    "/js/customer-discovery-state.js",
+    "/js/home.js",
+    "/js/home-placement-runtime.js",
+    "/js/home-banner-runtime.js",
+    "/js/home-product-accent.js",
+    "/js/home-footer-accordion.js",
+    "/js/home-deferred-runtime.js",
+    "/js/header.js",
+    "/js/pwa-fix.js",
+    "/assets/banners/hero-desktop-wide.webp",
+    "/assets/banners/hero-mobile.webp",
     "/assets/brand/favicon-16.png",
     "/assets/brand/favicon-32.png",
     "/assets/brand/favicon-48.png",
@@ -56,6 +96,9 @@ const PRIVATE_NAVIGATION_PREFIXES = [
     "/tracking",
     "/notifications",
     "/support",
+    "/checkout",
+    "/payment",
+    "/payment-method",
     "/login",
     "/register",
     "/verify",
@@ -100,6 +143,11 @@ self.addEventListener("fetch", event => {
 
     if (url.origin !== self.location.origin) return;
 
+    if (url.pathname === "/api/public/home-presentation") {
+        event.respondWith(staleWhileRevalidatePresentation(event, request));
+        return;
+    }
+
     if (isNeverCachePath(url.pathname)) {
         event.respondWith(networkOnly(request));
         return;
@@ -111,7 +159,7 @@ self.addEventListener("fetch", event => {
     }
 
     if (isCodeAsset(url.pathname)) {
-        event.respondWith(networkFirstCodeAsset(request));
+        event.respondWith(staleWhileRevalidateCodeAsset(event, request));
         return;
     }
 
@@ -177,7 +225,7 @@ async function handleNavigation(event, request, url) {
         return networkOnlyNavigation(event, request);
     }
 
-    return networkFirstPublicPage(event, request);
+    return staleWhileRevalidatePublicPage(event, request, url);
 }
 
 /**
@@ -185,32 +233,26 @@ async function handleNavigation(event, request, url) {
  * Always request the latest HTML first.
  * Cached HTML is used only when offline.
  */
-async function networkFirstPublicPage(event, request) {
+async function staleWhileRevalidatePublicPage(event, request, url) {
     const cache = await caches.open(PAGE_CACHE);
     const cacheKey = createNormalizedCacheKey(request);
+    const shellFallback = ["/", "/home.html"].includes(url.pathname)
+        ? await caches.match("/home.html")
+        : null;
+    const cached = await cache.match(cacheKey) || shellFallback;
+    const update = updatePublicPage(event, request, cache, cacheKey);
+    if (cached) { event.waitUntil(update); return cached; }
+    return update;
+}
 
+async function updatePublicPage(event, request, cache, cacheKey) {
     try {
         const preloadResponse = await event.preloadResponse;
-
-        if (preloadResponse?.ok) {
-            await cache.put(cacheKey, preloadResponse.clone());
-            return preloadResponse;
-        }
-
-        const response = await fetch(request, {
-            cache: "no-store"
-        });
-
-        if (response.ok && response.type === "basic") {
-            await cache.put(cacheKey, response.clone());
-        }
-
+        const response = preloadResponse?.ok ? preloadResponse : await fetch(request, { cache: "no-cache" });
+        if (response.ok && response.type === "basic") await cache.put(cacheKey, response.clone());
         return response;
     } catch {
-        return (
-            await cache.match(cacheKey) ||
-            await caches.match("/offline.html")
-        );
+        return await cache.match(cacheKey) || await caches.match("/offline.html");
     }
 }
 
@@ -239,30 +281,31 @@ async function networkOnlyNavigation(event, request) {
  * Network-first ensures the latest deployed code is used immediately.
  * Cache is only an offline fallback.
  */
-async function networkFirstCodeAsset(request) {
+async function staleWhileRevalidateCodeAsset(event, request) {
     const cache = await caches.open(CODE_CACHE);
-    const cacheKey = createNormalizedCacheKey(request);
-
-    try {
-        const response = await fetch(request, {
-            cache: "no-store"
-        });
-
-        if (response.ok && response.type === "basic") {
-            await cache.put(cacheKey, response.clone());
-        }
-
+    const url = new URL(request.url);
+    const cacheKey = isVersionedCodeAsset(url) ? request : createNormalizedCacheKey(request);
+    const cached = await cache.match(cacheKey) || await caches.match(createNormalizedCacheKey(request));
+    const update = fetch(request, { cache: "no-cache" }).then(async response => {
+        if (response.ok && response.type === "basic") await cache.put(cacheKey, response.clone());
         return response;
-    } catch {
-        const cached = await cache.match(cacheKey);
+    }).catch(() => null);
+    if (cached) { event.waitUntil(update); return cached; }
+    return await update || new Response("", { status: 503, statusText: "Asset unavailable" });
+}
 
-        if (cached) return cached;
-
-        return new Response("", {
-            status: 503,
-            statusText: "Asset unavailable"
-        });
-    }
+async function staleWhileRevalidatePresentation(event, request) {
+    const cache = await caches.open(PRESENTATION_CACHE);
+    const cached = await cache.match(request);
+    const update = fetch(request, { cache: "no-cache" }).then(async response => {
+        if (response.ok) await cache.put(request, response.clone());
+        return response;
+    }).catch(() => null);
+    if (cached) { event.waitUntil(update); return cached; }
+    return await update || new Response(JSON.stringify({ success: false, code: "HOME_PRESENTATION_UNAVAILABLE" }), {
+        status: 503,
+        headers: { "Content-Type": "application/json" }
+    });
 }
 
 /**
@@ -297,7 +340,8 @@ async function deleteOldAzielCaches() {
         CORE_CACHE,
         PAGE_CACHE,
         CODE_CACHE,
-        MEDIA_CACHE
+        MEDIA_CACHE,
+        PRESENTATION_CACHE
     ]);
 
     const cacheNames = await caches.keys();
@@ -319,6 +363,7 @@ async function clearRuntimeCaches() {
     await Promise.all([
         caches.delete(PAGE_CACHE),
         caches.delete(CODE_CACHE),
-        caches.delete(MEDIA_CACHE)
+        caches.delete(MEDIA_CACHE),
+        caches.delete(PRESENTATION_CACHE)
     ]);
 }

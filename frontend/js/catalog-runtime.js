@@ -133,6 +133,10 @@
             "TH";
 
         const detailCode = productDetailCode();
+        if (!detailCode) {
+            window.AZIEL_STOREFRONT_PERFORMANCE = window.AZIEL_STOREFRONT_PERFORMANCE || {};
+            window.AZIEL_STOREFRONT_PERFORMANCE.fullCatalogRequests = Number(window.AZIEL_STOREFRONT_PERFORMANCE.fullCatalogRequests || 0) + 1;
+        }
         const endpoint = detailCode
             ? `/api/catalog/${encodeURIComponent(detailCode)}?region=${encodeURIComponent(region)}`
             : `/api/catalog?region=${encodeURIComponent(region)}`;

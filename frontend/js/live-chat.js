@@ -25,10 +25,16 @@ const AZIEL_CHAT = {
     isOpen: false
 };
 
-document.addEventListener("DOMContentLoaded", () => {
+function initializeLiveChat() {
     createLiveChatUI();
     initLiveChatSystem();
-});
+}
+
+if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initializeLiveChat, { once: true });
+} else {
+    initializeLiveChat();
+}
 
 function createLiveChatUI() {
     if (document.querySelector(".aziel-support-tab")) return;

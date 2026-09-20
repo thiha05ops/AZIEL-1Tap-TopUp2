@@ -51,6 +51,10 @@ const {
 const { CANONICAL_OPERATIONAL_PRODUCTS, getCanonicalProduct, resolveCanonicalProductRoute } = require("../catalog/canonicalOperationalCatalog");
 const { availabilityReason } = require("../catalog/publicProductReadiness");
 const {
+    getHomePresentation,
+    isProductPresentationVisible
+} = require("../services/homePresentationService");
+const {
     AdminPricingControlCenterError,
     bulkBackfillSupplierCosts,
     previewPackagePricing
@@ -215,10 +219,40 @@ router.get("/catalog", async (req, res) => {
     }
 });
 
+router.get("/public/home-presentation", async (req, res) => {
+    try {
+        const startedAt = process.hrtime.bigint();
+        const presentation = await getHomePresentation({
+            region: req.query.region || req.headers["x-customer-region"] || "TH"
+        });
+        const durationMs = Number(process.hrtime.bigint() - startedAt) / 1e6;
+        const etag = `"home-${presentation.region}-${presentation.revision}"`;
+
+        res.set({
+            ETag: etag,
+            "Cache-Control": "public, max-age=0, must-revalidate, stale-while-revalidate=86400",
+            "Server-Timing": `home-presentation;dur=${durationMs.toFixed(1)}`
+        });
+
+        if (req.headers["if-none-match"] === etag) {
+            return res.status(304).end();
+        }
+
+        return res.json({ success: true, ...presentation });
+    } catch (error) {
+        console.log("Home presentation error:", error?.code || error?.name || "HOME_PRESENTATION_ERROR");
+        return res.status(500).json({
+            success: false,
+            code: "HOME_PRESENTATION_UNAVAILABLE",
+            message: "Home presentation is temporarily unavailable."
+        });
+    }
+});
+
 router.get("/catalog/:productCode/banners", async (req, res) => {
     try {
         const customerMarket = String(req.query.region || req.headers["x-customer-region"] || "TH").trim().toUpperCase();
-        const visible = (await toPublicCatalog({ includeDisabled: false, customerMarket })).some(product=>product.productCode===String(req.params.productCode||"").trim().toLowerCase());
+        const visible = await isProductPresentationVisible(req.params.productCode, { region: customerMarket });
         if(!visible)return res.status(404).json({success:false,code:"PRODUCT_NOT_OFFERED",message:"This product is not currently offered."});
         const result = await listPublicBanners(req.params.productCode);
 

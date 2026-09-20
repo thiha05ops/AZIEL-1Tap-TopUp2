@@ -4,7 +4,7 @@ if (!window.__AZIEL_PWA_FIX_INITIALIZED__) {
     initAzielFooterPolish();
     initAzielPwaRefresh();
     scheduleAzielTrustLogoRender();
-    loadPendingPaymentRecoveryOverlay();
+    schedulePendingPaymentRecoveryOverlay();
     registerAzielServiceWorker();
 
     document.addEventListener("click", e => {
@@ -36,6 +36,19 @@ if (!window.__AZIEL_PWA_FIX_INITIALIZED__) {
 
         window.location.href = href;
     });
+}
+
+function schedulePendingPaymentRecoveryOverlay() {
+    const start = () => {
+        if ("requestIdleCallback" in window) {
+            window.requestIdleCallback(loadPendingPaymentRecoveryOverlay, { timeout: 3000 });
+        } else {
+            window.setTimeout(loadPendingPaymentRecoveryOverlay, 800);
+        }
+    };
+
+    if (document.readyState === "complete") start();
+    else window.addEventListener("load", start, { once: true });
 }
 
 function initAzielFooterPolish() {
@@ -465,12 +478,6 @@ function registerAzielServiceWorker() {
                 }
             );
 
-            /*
-             * Check immediately instead of waiting for the browser's
-             * normal service-worker update interval.
-             */
-            await registration.update().catch(() => { });
-
             if (registration.waiting) {
                 activateWaitingWorker(registration);
             }
@@ -491,16 +498,10 @@ function registerAzielServiceWorker() {
                 });
             });
 
-            /*
-             * Recheck periodically while the admin/storefront tab
-             * remains open.
-             */
-            window.setInterval(() => {
-                registration.update().catch(() => { });
-            }, 15 * 60 * 1000);
-
             document.addEventListener("visibilitychange", () => {
-                if (document.visibilityState === "visible") {
+                const lastCheck = Number(sessionStorage.getItem("aziel.sw.lastUpdateCheck") || 0);
+                if (document.visibilityState === "visible" && Date.now() - lastCheck > 24 * 60 * 60 * 1000) {
+                    sessionStorage.setItem("aziel.sw.lastUpdateCheck", String(Date.now()));
                     registration.update().catch(() => { });
                 }
             });
