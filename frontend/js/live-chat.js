@@ -158,11 +158,12 @@ function createLiveChatUI() {
     });
 }
 
-function initLiveChatSystem() {
+async function initLiveChatSystem() {
     if (AZIEL_CHAT.authorityEnabled !== true || AZIEL_CHAT.initialized) return;
     AZIEL_CHAT.initialized = true;
 
-    if (!window.AZIEL?.getToken?.()) {
+    const authenticatedUser = window.AZIEL?.user || await window.AZIEL?.loadUser?.();
+    if (!authenticatedUser) {
         addChatMessage(
             "bot",
             "Please login to use live chat support.",
@@ -170,6 +171,7 @@ function initLiveChatSystem() {
         );
         return;
     }
+    AZIEL_CHAT.username = authenticatedUser.username;
 
     addChatMessage(
         "bot",
@@ -232,6 +234,7 @@ async function sendLiveChatMessage() {
     try {
         const res = await fetch(apiUrl("/api/live-chat/send"), {
             method: "POST",
+            credentials: "include",
             headers: getLiveChatAuthHeaders({
                 "Content-Type": "application/json"
             }),
@@ -276,6 +279,7 @@ async function loadLiveChatHistory() {
         const res = await fetch(
             apiUrl(`/api/live-chat/user/${encodeURIComponent(AZIEL_CHAT.username)}`),
             {
+                credentials: "include",
                 headers: getLiveChatAuthHeaders()
             }
         );
@@ -319,6 +323,7 @@ async function loadUnreadCount() {
         const res = await fetch(
             apiUrl(`/api/live-chat/user/${encodeURIComponent(AZIEL_CHAT.username)}/unread`),
             {
+                credentials: "include",
                 headers: getLiveChatAuthHeaders()
             }
         );
@@ -340,6 +345,7 @@ async function markUserRead() {
             apiUrl(`/api/live-chat/user/${encodeURIComponent(AZIEL_CHAT.username)}/read`),
             {
                 method: "PUT",
+                credentials: "include",
                 headers: getLiveChatAuthHeaders()
             }
         );

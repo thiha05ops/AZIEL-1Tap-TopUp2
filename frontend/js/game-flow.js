@@ -412,15 +412,10 @@
         const payment = getSelectedPayment();
         const region = getRegion();
         const currency = getCurrency();
-        const user =
-            window.AZIEL?.user ||
-            readStoredUser();
+        const user = window.AZIEL?.user || null;
 
         const username =
-            user?.username ||
-            localStorage.getItem("username") ||
-            sessionStorage.getItem("username") ||
-            "guest";
+            user?.username || "guest";
 
         const accountFields = getAccountFieldDefinitions(flow).map(field => {
             const value = getFieldValue(field.selector);
@@ -484,7 +479,8 @@
             return;
         }
 
-        if (!hasToken()) {
+        const authenticatedUser = window.AZIEL?.user || await window.AZIEL?.loadUser?.();
+        if (!authenticatedUser) {
             storePendingBuy(flow);
             window.location.href = "/login";
             return;
@@ -1078,7 +1074,9 @@
     async function loadOwnedCoupons(flow) {
         const select = document.getElementById("userCouponSelect");
         const pkg = getSelectedPackage();
-        if (!select || !hasToken() || !pkg) return;
+        if (!select || !pkg) return;
+        const authenticatedUser = window.AZIEL?.user || await window.AZIEL?.loadUser?.();
+        if (!authenticatedUser) return;
         try {
             const params = new URLSearchParams({
                 region: pkg.region || getRegion(),
@@ -1306,14 +1304,6 @@
         }, 250);
     }
 
-    function hasToken() {
-        return Boolean(
-            window.AZIEL?.getToken?.() ||
-            localStorage.getItem("token") ||
-            sessionStorage.getItem("token")
-        );
-    }
-
     function getAuthHeader() {
         const token =
             window.AZIEL?.getToken?.() ||
@@ -1322,18 +1312,6 @@
             "";
 
         return token ? { Authorization: `Bearer ${token}` } : {};
-    }
-
-    function readStoredUser() {
-        try {
-            return JSON.parse(
-                localStorage.getItem("azielUser") ||
-                localStorage.getItem("user") ||
-                "null"
-            );
-        } catch {
-            return null;
-        }
     }
 
     function readPendingBuy() {

@@ -259,6 +259,26 @@ function validateGoogleOAuth(result, env) {
     } catch {
         addError(result, "PROD_GOOGLE_CALLBACK_INVALID", "Google callback URL is malformed.", "googleOAuth");
     }
+
+    if (!env.AUTH_ORIGIN) {
+        addError(result, "PROD_AUTH_ORIGIN_MISSING", "AUTH_ORIGIN is required to keep Google OAuth outside the storefront service-worker scope.", "auth");
+    } else {
+        try {
+            const authOrigin = new URL(env.AUTH_ORIGIN);
+            if (authOrigin.protocol !== "https:" || authOrigin.pathname !== "/") {
+                addError(result, "PROD_AUTH_ORIGIN_INVALID", "AUTH_ORIGIN must be an HTTPS origin without a path.", "auth");
+            }
+            if (!env.AUTH_COOKIE_DOMAIN) {
+                addError(result, "PROD_AUTH_COOKIE_DOMAIN_MISSING", "AUTH_COOKIE_DOMAIN is required when AUTH_ORIGIN is configured.", "auth");
+            }
+            const callback = new URL(callbackUrl);
+            if (callback.origin !== authOrigin.origin) {
+                addError(result, "PROD_GOOGLE_CALLBACK_AUTH_ORIGIN_MISMATCH", "GOOGLE_CALLBACK_URL must use AUTH_ORIGIN.", "auth");
+            }
+        } catch {
+            addError(result, "PROD_AUTH_ORIGIN_INVALID", "AUTH_ORIGIN is malformed.", "auth");
+        }
+    }
 }
 
 function validateAdmin(result, env) {

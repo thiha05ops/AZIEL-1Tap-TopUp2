@@ -1,7 +1,7 @@
 const CACHE_PREFIX = "aziel-runtime";
 // Keep the suffix equal to the deterministic CORE_ASSETS content digest. The
 // migration verifier fails if a precached dependency changes without a bump.
-const SHELL_REVISION = "v7-656948a334cd5b35";
+const SHELL_REVISION = "v7-83e2d7e0c339baa8";
 const CORE_CACHE = `${CACHE_PREFIX}-core-${SHELL_REVISION}`;
 const PAGE_CACHE = `${CACHE_PREFIX}-pages-v3-${SHELL_REVISION}`;
 const CODE_CACHE = `${CACHE_PREFIX}-code-${SHELL_REVISION}`;
@@ -92,12 +92,6 @@ const NEVER_CACHE_PREFIXES = [
     "/socket.io/"
 ];
 
-const OAUTH_NAVIGATION_PATHS = new Set([
-    "/api/auth/google",
-    "/api/auth/google/callback",
-    "/auth/google/success"
-]);
-
 const PRIVATE_NAVIGATION_PREFIXES = [
     "/admin",
     "/account",
@@ -181,11 +175,6 @@ self.addEventListener("fetch", event => {
 
     if (url.origin !== self.location.origin) return;
 
-    // OAuth navigations must remain owned by the browser network stack.
-    // Returning a redirect through respondWith() is rejected by iOS Safari
-    // when AZIEL runs as an installed PWA.
-    if (request.mode === "navigate" && isOAuthNavigationPath(url.pathname)) return;
-
     if (url.pathname === "/api/public/home-presentation") {
         event.respondWith(staleWhileRevalidatePresentation(event, request));
         return;
@@ -215,10 +204,6 @@ function isNeverCachePath(pathname) {
     return NEVER_CACHE_PREFIXES.some(prefix =>
         pathname === prefix || pathname.startsWith(prefix)
     );
-}
-
-function isOAuthNavigationPath(pathname) {
-    return OAUTH_NAVIGATION_PATHS.has(pathname);
 }
 
 function isPrivateNavigation(pathname) {

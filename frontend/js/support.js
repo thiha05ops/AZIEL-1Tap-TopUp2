@@ -477,11 +477,7 @@ function renderTicketSkeleton() {
 ================================ */
 
 function getSupportUsername() {
-    return (
-        window.AZIEL?.user?.username ||
-        localStorage.getItem("username") ||
-        localStorage.getItem("azielUsername")
-    );
+    return window.AZIEL?.user?.username || "";
 }
 
 async function safeJson(res) {

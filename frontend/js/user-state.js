@@ -61,6 +61,7 @@ AZIEL.authFetch = async function (url, options = {}) {
 
     const res = await fetch(AZIEL.apiUrl(url), {
         ...options,
+        credentials: "include",
         headers
     });
 
@@ -143,12 +144,6 @@ AZIEL.getDisplayName = function (user = AZIEL.user) {
 AZIEL.loadUser = async function () {
     const token = AZIEL.getToken();
 
-    if (!token) {
-        AZIEL.user = null;
-        window.dispatchEvent(new Event("aziel:userChanged"));
-        return null;
-    }
-
     const cachedUser = (() => {
         try {
             return JSON.parse(
@@ -162,10 +157,9 @@ AZIEL.loadUser = async function () {
     })();
 
     try {
-        const res = await fetch(AZIEL.apiUrl("/api/profile/me"), {
-            headers: {
-                Authorization: `Bearer ${token}`
-            }
+        const res = await fetch(AZIEL.apiUrl("/api/auth/me"), {
+            credentials: "include",
+            headers: token ? { Authorization: `Bearer ${token}` } : {}
         });
 
         const data = await res.json();
@@ -176,6 +170,9 @@ AZIEL.loadUser = async function () {
         }
 
         if (data.success && data.user) {
+            localStorage.removeItem("token");
+            localStorage.removeItem("azielToken");
+            sessionStorage.removeItem("token");
             AZIEL.user = data.user;
 
             localStorage.setItem("username", data.user.username || "");
@@ -189,12 +186,6 @@ AZIEL.loadUser = async function () {
 
             window.dispatchEvent(new Event("aziel:userChanged"));
             return data.user;
-        }
-
-        if (cachedUser) {
-            AZIEL.user = cachedUser;
-            window.dispatchEvent(new Event("aziel:userChanged"));
-            return cachedUser;
         }
 
         AZIEL.user = null;
@@ -281,7 +272,7 @@ AZIEL.applyWalletUpdate = function (data = {}) {
 };
 
 AZIEL.initWalletRealtime = function () {
-    if (AZIEL.walletRealtimeReady || !AZIEL.realtime?.on || !AZIEL.getToken()) return;
+    if (AZIEL.walletRealtimeReady || !AZIEL.realtime?.on || !AZIEL.user) return;
 
     const handler = data => {
         AZIEL.applyWalletUpdate(data);

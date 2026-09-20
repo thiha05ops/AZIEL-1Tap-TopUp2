@@ -53,12 +53,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         return;
     }
 
-    if (!AZIEL.getToken?.()) {
-        window.location.href = "/login";
-        return;
-    }
-
-    await ensureWalletState();
+    if (!(await ensureWalletState())) return;
 
     initQuickAmounts();
     await loadWalletPaymentMethods();
@@ -82,10 +77,11 @@ async function ensureWalletState() {
 
     if (!AZIEL.user) {
         window.location.href = "/login";
-        return;
+        return false;
     }
 
     if (!AZIEL.wallet) await AZIEL.loadWallet?.();
+    return true;
 }
 
 function bindWalletEvents() {

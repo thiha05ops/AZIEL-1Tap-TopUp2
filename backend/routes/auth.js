@@ -6,6 +6,8 @@ const rateLimit = require("express-rate-limit");
 
 const User = require("../models/User");
 const TwoFactorChallenge = require("../models/TwoFactorChallenge");
+const authMiddleware = require("../middleware/authMiddleware");
+const { clearAuthCookie, setAuthCookie } = require("../services/authCookieService");
 const {
     issueUserSession,
     projectUser,
@@ -160,9 +162,10 @@ router.post("/login", async (req, res) => {
             eventTitle: "New sign-in"
         });
 
+        setAuthCookie(res, issued.session.sessionId);
+
         return res.json({
             success: true,
-            token: issued.token,
             message: "Login success",
             user: projectUser(user)
         });
@@ -251,9 +254,10 @@ router.post("/auth/2fa/verify", twoFactorLoginLimiter, async (req, res) => {
             eventTitle: "New sign-in"
         });
 
+        setAuthCookie(res, issued.session.sessionId);
+
         return res.json({
             success: true,
-            token: issued.token,
             message: "Login success",
             user: projectUser(user)
         });
@@ -265,6 +269,25 @@ router.post("/auth/2fa/verify", twoFactorLoginLimiter, async (req, res) => {
             message: "Could not verify two-factor challenge"
         });
     }
+});
+
+router.get("/auth/me", authMiddleware, async (req, res) => {
+    const user = await User.findById(req.user.id).select("-password");
+    if (!user) return res.status(401).json({ success: false, forceLogout: true, message: "Authentication required" });
+    return res.json({ success: true, user: projectUser(user) });
+});
+
+router.post("/auth/logout", async (req, res) => {
+    try {
+        const { authenticateRequest } = require("../middleware/authMiddleware");
+        const auth = await authenticateRequest(req, res);
+        if (auth.session?.sessionId) {
+            const { revokeSession } = require("../services/authSessionService");
+            if (auth.user) await revokeSession(auth.session.sessionId, auth.user, "logout");
+        }
+    } catch (_) { /* An expired or invalid session is already logged out. */ }
+    clearAuthCookie(res);
+    return res.json({ success: true });
 });
 
 module.exports = router;

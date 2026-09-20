@@ -14,6 +14,7 @@ function createSessionMiddleware(options = {}) {
     }
 
     return session({
+        name: "aziel.oauth",
         secret: process.env.SESSION_SECRET || "aziel_secret",
         resave: false,
         saveUninitialized: false,
@@ -26,7 +27,8 @@ function createSessionMiddleware(options = {}) {
             httpOnly: true,
             sameSite: "lax",
             secure: isProduction,
-            maxAge: SESSION_MAX_AGE_MS
+            maxAge: Math.min(SESSION_MAX_AGE_MS, 10 * 60 * 1000),
+            path: "/api/auth/google"
         }
     });
 }

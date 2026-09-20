@@ -777,10 +777,7 @@ async function submitRefundRequest() {
         return;
     }
 
-    const username =
-        window.AZIEL?.user?.username ||
-        localStorage.getItem("username") ||
-        "";
+    const username = window.AZIEL?.user?.username || "";
 
     try {
         if (btn) {

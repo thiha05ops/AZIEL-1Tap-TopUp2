@@ -4,11 +4,15 @@ const crypto = require("crypto");
 const express = require("express");
 const passport = require("../config/passport");
 const { issueUserSession } = require("../services/authSessionService");
-const { service: googleAuthHandoffService } = require("../services/googleAuthHandoffService");
+const { setAuthCookie } = require("../services/authCookieService");
 const { classifyGoogleAuthenticationError, classifyGoogleOAuthError, classifyRequestHost, fingerprint, isGoogleTokenExchangeError, logGoogleOAuthDiagnostic, safeRead } = require("../utils/googleOAuthDiagnostics");
 
 function getFrontendUrl(env = process.env) {
     return (env.FRONTEND_URL || env.CLIENT_URL || "http://127.0.0.1:5500/frontend").replace(/\/$/, "");
+}
+
+function getAuthOrigin(env = process.env) {
+    return String(env.AUTH_ORIGIN || "").replace(/\/$/, "");
 }
 
 function configured(req, res, next, env = process.env) {
@@ -74,10 +78,17 @@ function createSocialAuthRouter(options = {}) {
     const auth = options.passport || passport;
     const logger = options.logger || console;
     const env = options.env || process.env;
-    const handoffService = options.handoffService || googleAuthHandoffService;
     const requireGoogle = (req, res, next) => configured(req, res, next, env);
 
     router.get("/auth/google", requireGoogle, (req, res, next) => {
+        const authOrigin = getAuthOrigin(env);
+        if (authOrigin) {
+            try {
+                if (new URL(authOrigin).host !== req.get("host")) {
+                    return sendBrowserTransition(res, `${authOrigin}/api/auth/google`);
+                }
+            } catch (_) { /* Production validation rejects invalid configuration. */ }
+        }
         const diagnostic = requestDiagnostic(req, env, options.randomBytes);
         logGoogleOAuthDiagnostic(logger, "GOOGLE_OAUTH_START", diagnostic);
         return browserOwnedPassportRedirect(
@@ -118,28 +129,10 @@ function createSocialAuthRouter(options = {}) {
                 return sendBrowserTransition(res, oauthFailureUrl(env));
             }
 
-            try {
-                const handoff = await handoffService.create(issued);
-                const params = new URLSearchParams({ handoff });
-                logGoogleOAuthDiagnostic(logger, "GOOGLE_OAUTH_REDIRECT_ISSUED", { ...diagnostic, destinationOriginClass: "frontend", destinationPathClass: "google_success" });
-                return sendBrowserTransition(res, `${getFrontendUrl(env)}/auth/google/success?${params.toString()}`);
-            } catch (_) {
-                logGoogleOAuthDiagnostic(logger, "GOOGLE_OAUTH_HANDOFF_FAILED", { ...diagnostic, errorCategory: "GOOGLE_HANDOFF_CONSTRUCTION_ERROR", elapsedMs: Date.now() - startedAt }, "warn");
-                logGoogleOAuthDiagnostic(logger, "GOOGLE_OAUTH_REDIRECT_ISSUED", { ...diagnostic, destinationOriginClass: "frontend", destinationPathClass: "login" });
-                return sendBrowserTransition(res, oauthFailureUrl(env));
-            }
+            setAuthCookie(res, issued.session.sessionId, env);
+            logGoogleOAuthDiagnostic(logger, "GOOGLE_OAUTH_REDIRECT_ISSUED", { ...diagnostic, destinationOriginClass: "frontend", destinationPathClass: "home" });
+            return sendBrowserTransition(res, `${getFrontendUrl(env)}/`);
         })(req, res, next);
-    });
-
-    router.post("/auth/google/handoff", async (req, res) => {
-        try {
-            const issued = await handoffService.consume(req.body?.handoff);
-            if (!issued) return res.status(410).json({ success: false, code: "GOOGLE_HANDOFF_INVALID" });
-            res.setHeader("Cache-Control", "no-store");
-            return res.json({ success: true, token: issued.token, user: issued.user });
-        } catch (_) {
-            return res.status(503).json({ success: false, code: "GOOGLE_HANDOFF_UNAVAILABLE" });
-        }
     });
 
     return router;
@@ -148,4 +141,5 @@ function createSocialAuthRouter(options = {}) {
 module.exports = createSocialAuthRouter();
 module.exports.createSocialAuthRouter = createSocialAuthRouter;
 module.exports.getFrontendUrl = getFrontendUrl;
+module.exports.getAuthOrigin = getAuthOrigin;
 module.exports.sendBrowserTransition = sendBrowserTransition;

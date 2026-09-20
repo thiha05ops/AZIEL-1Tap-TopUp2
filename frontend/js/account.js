@@ -44,13 +44,6 @@ function accountApiUrl(path) {
 }
 
 async function initAccount() {
-    const token = window.AZIEL?.getToken?.();
-
-    if (!token) {
-        window.location.href = "/login";
-        return;
-    }
-
     await ensureAZIELState();
 
     currentUser = window.AZIEL?.user || null;
@@ -70,14 +63,14 @@ async function initAccount() {
     await loadSecurityData();
 
     window.addEventListener("aziel:ready", async () => {
-        currentUser = window.AZIEL?.user || currentUser;
+        currentUser = window.AZIEL?.user || null;
         renderAccount();
         await refreshAccountData();
         await loadSecurityData();
     });
 
     window.addEventListener("aziel:userChanged", async () => {
-        currentUser = window.AZIEL?.user || currentUser;
+        currentUser = window.AZIEL?.user || null;
         renderAccount();
         await refreshAccountData();
         await loadSecurityData();
@@ -129,7 +122,7 @@ window.addEventListener("beforeunload", () => {
 });
 
 async function refreshAccountData() {
-    if (!window.AZIEL?.getToken?.()) {
+    if (!window.AZIEL?.user) {
         if (accountRefreshTimer) {
             clearInterval(accountRefreshTimer);
             accountRefreshTimer = null;
@@ -340,7 +333,7 @@ function renderSecurity() {
 }
 
 async function loadSecurityData() {
-    if (!window.AZIEL?.getToken?.()) return;
+    if (!window.AZIEL?.user) return;
 
     securityState.loading = true;
 
@@ -523,11 +516,6 @@ function setProfileBaseline(value) {
 async function saveProfile() {
     const token = window.AZIEL?.getToken?.();
 
-    if (!token) {
-        window.location.href = "/login";
-        return;
-    }
-
     const displayName = normalizeProfileDisplayName(
         document.getElementById("displayName")?.value
     );
@@ -557,9 +545,10 @@ async function saveProfile() {
     try {
         const res = await fetch(accountApiUrl("/api/profile/me"), {
             method: "PUT",
+            credentials: "include",
             headers: {
                 "Content-Type": "application/json",
-                Authorization: `Bearer ${token}`
+                ...(token ? { Authorization: `Bearer ${token}` } : {})
             },
             body: JSON.stringify({ displayName })
         });
@@ -1660,7 +1649,7 @@ async function loadMyCoupons({ force = false } = {}) {
     }
 
     const token = window.AZIEL?.getToken?.();
-    if (!token) return;
+    if (!window.AZIEL?.user) return;
 
     myCouponsState.loading = true;
     myCouponsState.error = "";
@@ -1680,8 +1669,9 @@ async function loadMyCoupons({ force = false } = {}) {
             accountApiUrl(`/api/coupons/mine?${params.toString()}`),
             {
                 method: "GET",
+                credentials: "include",
                 headers: {
-                    Authorization: `Bearer ${token}`,
+                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
                     Accept: "application/json"
                 }
             }

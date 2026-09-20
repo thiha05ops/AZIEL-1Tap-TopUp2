@@ -1,16 +1,24 @@
-document.addEventListener("DOMContentLoaded", () => {
-    const token = localStorage.getItem("token");
-    const username = localStorage.getItem("username");
+async function getHelpAuthenticatedUser() {
+    try {
+        const response = await fetch("/api/auth/me", { credentials: "include" });
+        const data = await response.json();
+        return response.ok && data.success ? data.user : null;
+    } catch (_) {
+        return null;
+    }
+}
+
+document.addEventListener("DOMContentLoaded", async () => {
+    const user = await getHelpAuthenticatedUser();
     const helpLoginBtn = document.getElementById("helpLoginBtn");
 
-    if (token && username && helpLoginBtn) {
-        helpLoginBtn.innerText = username;
+    if (user?.username && helpLoginBtn) {
+        helpLoginBtn.innerText = user.displayName || user.username;
         helpLoginBtn.href = "/account";
     }
 });
 async function loadNotifications() {
-    const username = localStorage.getItem("username");
-    const token = localStorage.getItem("token");
+    const user = await getHelpAuthenticatedUser();
 
     const notiBtn = document.getElementById("notiBtn");
     const notiCount = document.getElementById("notiCount");
@@ -23,14 +31,14 @@ async function loadNotifications() {
         notiDropdown.classList.toggle("show");
     });
 
-    if (!username || !token) {
+    if (!user?.username) {
         notiCount.innerText = "0";
         notiList.innerHTML = "<p>Please login to see notifications.</p>";
         return;
     }
 
     try {
-        const res = await fetch(`/api/history/${username}`);
+        const res = await fetch(`/api/history/${encodeURIComponent(user.username)}`, { credentials: "include" });
         const data = await res.json();
 
         if (!data.success || data.orders.length === 0) {

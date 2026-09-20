@@ -155,12 +155,11 @@ function makeHarness({ legacy = true, failInstall = false, failNetwork = false }
 
     for (const url of [
         "https://aziel.test/api/auth/google?returnTo=%2Faccount",
-        "https://aziel.test/api/auth/google/callback?code=x&state=y",
-        "https://aziel.test/auth/google/success?token=x"
+        "https://aziel.test/api/auth/google/callback?code=x&state=y"
     ]) {
         const result = await fresh.dispatchFetch({ method: "GET", mode: "navigate", url });
-        assert.strictEqual(result.respondWithCalls, 0, `${new URL(url).pathname} navigation must bypass Service Worker respondWith`);
-        assert.strictEqual(result.response, null);
+        assert.strictEqual(result.respondWithCalls, 1, `${new URL(url).pathname} navigation must remain network-only`);
+        assert.strictEqual(await result.response.text(), "NETWORK");
     }
 
     for (const url of [

@@ -136,7 +136,7 @@
     }
 
     function isAuthenticated() {
-        return Boolean(getToken() && window.AZIEL?.user);
+        return Boolean(window.AZIEL?.user);
     }
 
     function isPaymentSheetOpen() {
@@ -612,7 +612,7 @@
     async function fetchRecoverable(options = {}) {
         if (!isEligiblePage()) return null;
         if (state.fetching) return;
-        if (!getToken()) {
+        if (!window.AZIEL?.user) {
             clearState();
             return null;
         }

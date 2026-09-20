@@ -1,24 +1,13 @@
-const { verifyUserToken } = require("../services/authSessionService");
+const { authenticateRequest } = require("./authMiddleware");
 
 const optionalAuthMiddleware = async (req, res, next) => {
-    const authHeader = req.headers.authorization || "";
-
-    if (!authHeader) return next();
-
-    if (!authHeader.startsWith("Bearer ")) {
-        return next();
-    }
-
-    const token = authHeader.slice("Bearer ".length).trim();
-    if (!token) return next();
-
     try {
-        const auth = await verifyUserToken(token, { allowLegacy: true });
+        const auth = await authenticateRequest(req, res);
         req.user = auth.context;
         req.authSession = auth.session;
         req.legacyAuth = auth.legacy;
     } catch (error) {
-        req.optionalAuthInvalid = true;
+        if (req.headers.authorization || req.headers.cookie) req.optionalAuthInvalid = true;
     }
 
     return next();

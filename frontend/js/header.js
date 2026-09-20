@@ -834,7 +834,10 @@ function initHeaderLogout() {
 
     btn.dataset.ready = "true";
 
-    btn.addEventListener("click", () => {
+    btn.addEventListener("click", async () => {
+        try {
+            await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
+        } catch (_) { /* Local state still clears below. */ }
         localStorage.removeItem("token");
         localStorage.removeItem("azielToken");
         localStorage.removeItem("user");

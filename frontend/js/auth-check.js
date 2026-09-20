@@ -1,10 +1,6 @@
 // frontend/js/auth-check.js
 
-document.addEventListener("DOMContentLoaded", () => {
-    const token =
-        window.AZIEL?.getToken?.() ||
-        localStorage.getItem("token") ||
-        sessionStorage.getItem("token");
+document.addEventListener("DOMContentLoaded", async () => {
 
     const protectedPages = [
         "/account",
@@ -18,7 +14,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (!protectedPages.includes(currentPage)) return;
 
-    if (!token) {
+    const user = window.AZIEL?.user || await window.AZIEL?.loadUser?.();
+    if (!user) {
         localStorage.setItem(
             "redirectAfterLogin",
             window.location.href

@@ -24,6 +24,7 @@ function response() {
         type(value) { this.contentType = value; return this; },
         send(value) { this.body = value; return value; },
         json(value) { this.body = value; return value; },
+        cookie(name, value, options) { this.cookieValue = { name, value, options }; return this; },
         redirect(url) { this.redirectUrl = url; return url; }
     };
 }
@@ -129,13 +130,14 @@ async function main() {
     const user = { _id: "USER_SECRET_ID", username: "google-user", displayName: "Google User", email: "private@example.com", region: "TH", role: "user" };
     const stub = passportResult(null, user);
     let sessionCalls = 0;
-    let handoffCalls = 0;
-    const router = createSocialAuthRouter({ passport: stub.passport, issueUserSession: async received => { sessionCalls += 1; assert.strictEqual(received, user); return { token: "JWT_SECRET_VALUE", session: { sessionId: "SESSION_SECRET_ID" }, user }; }, handoffService: { create: async issued => { handoffCalls += 1; assert.strictEqual(issued.token, "JWT_SECRET_VALUE"); return "ONE_TIME_HANDOFF"; }, consume: async () => null }, logger: observed.logger, env: ENV });
+    const router = createSocialAuthRouter({ passport: stub.passport, issueUserSession: async received => { sessionCalls += 1; assert.strictEqual(received, user); return { token: "JWT_SECRET_VALUE", session: { sessionId: "SESSION_SECRET_ID" }, user }; }, logger: observed.logger, env: ENV });
     const req = request("SUCCESS_CODE_SECRET"); const res = response();
     await runRoute(router, "/auth/google/callback", req, res);
     assert.strictEqual(sessionCalls, 1);
-    assert.strictEqual(handoffCalls, 1);
-    assert.strictEqual(transitionDestination(res), "https://azielplay.com/auth/google/success?handoff=ONE_TIME_HANDOFF");
+    assert.strictEqual(transitionDestination(res), "https://azielplay.com/");
+    assert.strictEqual(res.cookieValue.name, "aziel_session");
+    assert.strictEqual(res.cookieValue.options.httpOnly, true);
+    assert.strictEqual(res.cookieValue.options.sameSite, "lax");
     assert(!String(res.body).includes("JWT_SECRET_VALUE"), "JWT must not appear in the callback response or URL");
     const successLogs = JSON.stringify(observed.records);
     for (const secret of ["SUCCESS_CODE_SECRET", "JWT_SECRET_VALUE", "SESSION_SECRET_ID", "USER_SECRET_ID", "private@example.com"]) assert(!successLogs.includes(secret), `diagnostics leaked ${secret}`);
@@ -153,30 +155,18 @@ async function main() {
     assert(!sessionLogs.includes("JWT_SECRET_FAILURE"));
     assert.strictEqual(transitionDestination(sessionRes), "https://azielplay.com/login?oauth=google&error=token_exchange_failed");
 
-    const handoffObserved = captureLogger();
-    const handoffUser = { _id: "HANDOFF_USER_SECRET", get username() { throw new Error("HANDOFF_PROFILE_SECRET"); } };
-    const handoffStub = passportResult(null, handoffUser);
-    const handoffRouter = createSocialAuthRouter({ passport: handoffStub.passport, issueUserSession: async () => ({ token: "HANDOFF_JWT_SECRET", session: { sessionId: "HANDOFF_SESSION_SECRET" }, user: handoffUser }), handoffService: { create: async () => { throw new Error("HANDOFF_PROFILE_SECRET"); }, consume: async () => null }, logger: handoffObserved.logger, env: ENV });
-    const handoffRes = response();
-    await runRoute(handoffRouter, "/auth/google/callback", request(), handoffRes);
-    const handoffLogs = JSON.stringify(handoffObserved.records);
-    assert(handoffLogs.includes("GOOGLE_OAUTH_HANDOFF_FAILED"));
-    assert(!handoffLogs.includes("GOOGLE_OAUTH_TOKEN_EXCHANGE_FAILED"));
-    for (const secret of ["HANDOFF_USER_SECRET", "HANDOFF_PROFILE_SECRET", "HANDOFF_JWT_SECRET", "HANDOFF_SESSION_SECRET"]) assert(!handoffLogs.includes(secret));
-    assert.strictEqual(transitionDestination(handoffRes), "https://azielplay.com/login?oauth=google&error=token_exchange_failed");
-
     const diagnosticObserved = captureLogger();
     const diagnosticStub = passportResult(null, user);
     const diagnosticRouter = createSocialAuthRouter({ passport: diagnosticStub.passport, issueUserSession: async () => ({ token: "SAFE_JWT", session: { sessionId: "SAFE_SESSION" }, user }), handoffService: { create: async () => "SAFE_HANDOFF", consume: async () => null }, logger: diagnosticObserved.logger, env: ENV, randomBytes: () => { throw new Error("crypto unavailable"); } });
     const diagnosticRes = response();
     await runRoute(diagnosticRouter, "/auth/google/callback", request(), diagnosticRes);
-    assert(transitionDestination(diagnosticRes).startsWith("https://azielplay.com/auth/google/success?handoff="), "throwing diagnostic correlation construction must not affect OAuth success");
+    assert.strictEqual(transitionDestination(diagnosticRes), "https://azielplay.com/", "throwing diagnostic correlation construction must not affect OAuth success");
 
     const hostileRequest = request();
     Object.defineProperty(hostileRequest, "query", { get() { throw new Error("HOSTILE_REQUEST_GETTER_SECRET"); } });
     const hostileRequestRes = response();
     await runRoute(diagnosticRouter, "/auth/google/callback", hostileRequest, hostileRequestRes);
-    assert(transitionDestination(hostileRequestRes).startsWith("https://azielplay.com/auth/google/success?handoff="), "throwing request accessors used by diagnostics must not affect OAuth success");
+    assert.strictEqual(transitionDestination(hostileRequestRes), "https://azielplay.com/", "throwing request accessors used by diagnostics must not affect OAuth success");
 
     const root = path.resolve(__dirname, "../..");
     const social = fs.readFileSync(path.join(root, "backend/routes/socialAuth.js"), "utf8");
@@ -189,7 +179,8 @@ async function main() {
     assert(passport.includes("issueUserSession") === false, "Passport strategy must not take over AZIEL session authority");
     assert(login.includes('["token_exchange_failed", "handoff_failed"].includes(oauthParams.get("error"))'));
     assert(login.includes("Google sign-in couldn't be completed. Please try again."));
-    console.log("Google OAuth callback reliability verification passed (server-owned single-use handoff).");
+    assert(!social.includes("handoff"), "Google OAuth must not contain a frontend token handoff");
+    console.log("Google OAuth callback reliability verification passed (server-owned cookie session).");
 }
 
 main().catch(error => { console.error(error); process.exitCode = 1; });

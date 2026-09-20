@@ -28,8 +28,8 @@ function main() {
     ["/api/", "/admin", "/account", "/wallet", "/tracking", "/notifications"].forEach(pathPrefix => {
         assert(sw.includes(`"${pathPrefix}"`), `Service worker must never cache ${pathPrefix}.`);
     });
-    assert(sw.includes("networkFirstPublicPage"), "Public HTML must use network-first caching.");
-    assert(sw.includes("cacheFirstVersionedCodeAsset") && sw.includes("cacheFirstMediaAsset"), "Versioned code and media assets must use safe cache-first strategies.");
+    assert(sw.includes("staleWhileRevalidatePublicPage"), "Public HTML must use the declared revalidation strategy.");
+    assert(sw.includes("staleWhileRevalidateCodeAsset") && sw.includes("cacheFirstMediaAsset"), "Code and media assets must use the declared cache strategies.");
     assert(sw.includes("caches.delete"), "Service worker must clean stale cache versions.");
     assert(offline.includes("noindex, nofollow") && offline.includes("You're offline"), "Offline page must be restrained and not indexed.");
 

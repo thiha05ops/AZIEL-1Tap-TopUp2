@@ -10,6 +10,7 @@ const JWT_SECRET = process.env.JWT_SECRET || "aziel_jwt_secret";
 const JWT_EXPIRES_IN = "15d";
 const SESSION_TTL_MS = 15 * 24 * 60 * 60 * 1000;
 const LAST_SEEN_UPDATE_MS = 60 * 60 * 1000;
+const LEGACY_JWT_UPGRADE_UNTIL = new Date(process.env.LEGACY_JWT_UPGRADE_UNTIL || "2026-12-31T23:59:59.999Z");
 
 function getRequestIp(req) {
     return (
@@ -274,7 +275,7 @@ async function verifyUserToken(token, options = {}) {
         };
     }
 
-    if (options.allowLegacy !== false && decoded.sessionToken) {
+    if (options.allowLegacy !== false && decoded.sessionToken && Date.now() <= LEGACY_JWT_UPGRADE_UNTIL.getTime()) {
         if (
             !user.currentSessionToken ||
             decoded.sessionToken !== user.currentSessionToken
@@ -294,6 +295,21 @@ async function verifyUserToken(token, options = {}) {
     }
 
     throw new Error("Invalid authentication token");
+}
+
+async function verifyUserSessionId(sessionId) {
+    const session = await Session.findOne({ sessionId, revokedAt: null });
+    if (!session || session.expiresAt < new Date()) throw new Error("Session expired");
+    const user = await User.findById(session.userId).select("-password");
+    if (!user) throw new Error("User not found");
+    await touchSession(session);
+    await touchUserActive(user);
+    return {
+        user,
+        session,
+        legacy: false,
+        context: createAuthContext(user, session, { sessionId }, false)
+    };
 }
 
 async function touchSession(session) {
@@ -440,5 +456,6 @@ module.exports = {
     revokeAllUserSessions,
     revokeOtherSessions,
     revokeSession,
+    verifyUserSessionId,
     verifyUserToken
 };

@@ -57,7 +57,7 @@ async function main() {
     await new Promise(resolve => server.once("listening", resolve));
     const port = server.address().port;
     try {
-        for (const route of ["/", "/account", "/games/mlbb", "/products/valorant", "/policies/privacy", "/auth/google/success"]) {
+        for (const route of ["/", "/account", "/games/mlbb", "/products/valorant", "/policies/privacy"]) {
             const response = await request(port, route);
             assert.strictEqual(response.status, 200, `${route} should render directly`);
             assert(/<!DOCTYPE html>/i.test(response.body), `${route} should serve HTML`);
@@ -98,7 +98,7 @@ async function main() {
 
     const oauth = fs.readFileSync(path.join(root, "backend/routes/socialAuth.js"), "utf8");
     assert(oauth.includes("/api/auth/google/callback"));
-    assert(oauth.includes("/auth/google/success") && !oauth.includes("google-success.html"));
+    assert(!oauth.includes("/auth/google/success") && !oauth.includes("handoff"));
     assert(Object.keys(LEGACY_ALIASES).every(route => route.endsWith(".html")));
 
     console.log("Clean storefront route verification passed.");

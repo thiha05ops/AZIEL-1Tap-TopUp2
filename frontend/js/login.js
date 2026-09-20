@@ -6,20 +6,25 @@ function apiUrl(path) {
     }
     return path;
 }
+
+function resolveRedirectAfterLogin(value, origin = window.location.origin) {
+    if (!value) return "/";
+    try {
+        const destination = new URL(String(value), origin);
+        if (destination.origin !== origin) return "/";
+        return `${destination.pathname}${destination.search}${destination.hash}` || "/";
+    } catch (_) {
+        return "/";
+    }
+}
 const authT = (key, fallback, params) => window.AZIEL_LOCALE?.t?.(key, fallback, params) || fallback;
 
 document.addEventListener("DOMContentLoaded", () => {
     let pendingTwoFactorChallengeId = "";
 
-    const token =
-        localStorage.getItem("token") ||
-        sessionStorage.getItem("token");
-
-    if (token) {
-        localStorage.removeItem("token");
-        localStorage.removeItem("isLogin");
-        sessionStorage.removeItem("token");
-    }
+    localStorage.removeItem("token");
+    localStorage.removeItem("azielToken");
+    sessionStorage.removeItem("token");
 
     const form = document.getElementById("loginForm");
     const msg = document.getElementById("msg");
@@ -103,6 +108,7 @@ document.addEventListener("DOMContentLoaded", () => {
         try {
             const res = await fetch(apiUrl("/api/login"), {
                 method: "POST",
+                credentials: "include",
                 headers: {
                     "Content-Type": "application/json"
                 },
@@ -148,6 +154,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const recoveryMode = /[A-Za-z0-9]{8}-[A-Za-z0-9]{8}/.test(twoFactorCode);
             const res = await fetch(apiUrl("/api/auth/2fa/verify"), {
                 method: "POST",
+                credentials: "include",
                 headers: {
                     "Content-Type": "application/json"
                 },
@@ -186,18 +193,13 @@ document.addEventListener("DOMContentLoaded", () => {
         localStorage.setItem("email", data.user.email || "");
         localStorage.setItem("role", data.user.role || "user");
 
-        if (rememberMe && rememberMe.checked) {
-            localStorage.setItem("token", data.token);
-            localStorage.setItem("username", data.user.username);
-        } else {
-            sessionStorage.setItem("token", data.token);
-            sessionStorage.setItem("username", data.user.username);
-        }
+        localStorage.setItem("username", data.user.username);
 
         showMessage(authT("auth.login.success", "Login success. Redirecting..."), "success");
 
-        const redirectUrl =
-            localStorage.getItem("redirectAfterLogin") || "/";
+        const redirectUrl = resolveRedirectAfterLogin(
+            localStorage.getItem("redirectAfterLogin")
+        );
 
         localStorage.removeItem("redirectAfterLogin");
 

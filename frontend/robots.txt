@@ -14,6 +14,5 @@ Disallow: /forgot-password
 Disallow: /reset-password
 Disallow: /verify-email
 Disallow: /verify-otp
-Disallow: /auth/google/success
 
 Sitemap: https://azielplay.com/sitemap.xml

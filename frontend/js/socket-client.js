@@ -80,7 +80,11 @@
 
         const token = getToken(role);
 
-        if (!token) {
+        if (!token && role === "admin") {
+            return null;
+        }
+
+        if (!token && !window.AZIEL?.user) {
             return null;
         }
 
@@ -88,6 +92,7 @@
         state.authFailed = false;
 
         const socket = window.io(socketUrl(), {
+            withCredentials: true,
             auth: {
                 token,
                 role

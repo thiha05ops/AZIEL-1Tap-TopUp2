@@ -313,8 +313,7 @@
             return getState();
         }
 
-        const token = window.AZIEL?.getToken?.() || localStorage.getItem("token") || sessionStorage.getItem("token");
-        if (!token) return getState();
+        if (!window.AZIEL?.user) return getState();
 
         attachRealtime();
         return load();

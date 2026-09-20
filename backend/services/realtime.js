@@ -1,5 +1,6 @@
 const User = require("../models/User");
-const { verifyUserToken } = require("./authSessionService");
+const { verifyUserSessionId, verifyUserToken } = require("./authSessionService");
+const { decodeSessionCookie, AUTH_COOKIE_NAME } = require("./authCookieService");
 const { resolveAdminRequest } = require("./adminAuthService");
 const jwt = require("jsonwebtoken");
 const { recordSuppressedEvent, suppressTestRealtime } = require("../e2e/e2eSafety");
@@ -103,12 +104,31 @@ function getAuthToken(socket) {
     );
 }
 
+function getCookieSessionId(socket) {
+    const header = String(socket.handshake?.headers?.cookie || "");
+    const part = header.split(";").find(item => item.slice(0, item.indexOf("=")).trim() === AUTH_COOKIE_NAME);
+    if (!part) return "";
+    try { return decodeSessionCookie(decodeURIComponent(part.slice(part.indexOf("=") + 1).trim())); } catch (_) { return ""; }
+}
+
 async function authenticateSocket(socket, next) {
     try {
         const token = getAuthToken(socket);
 
         if (!token) {
-            socket.data.authenticated = false;
+            const sessionId = getCookieSessionId(socket);
+            if (!sessionId) {
+                socket.data.authenticated = false;
+                return next();
+            }
+            const auth = await verifyUserSessionId(sessionId);
+            const user = auth.context;
+            socket.data.authenticated = true;
+            socket.data.user = {
+                id: String(user._id), username: user.username, email: user.email,
+                role: user.role || "user", region: user.region || "MM",
+                sessionId: user.sessionId || "", legacyAuth: false
+            };
             return next();
         }
 

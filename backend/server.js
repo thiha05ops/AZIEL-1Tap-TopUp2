@@ -243,7 +243,7 @@ function configureDatabaseApplication(mongoConnection) {
     app.use(express.urlencoded({ extended: true, limit: formBodyLimit }));
     app.use(createSessionMiddleware({ mongoClient: mongoConnection.getClient(), isProduction }));
     app.use(passport.initialize());
-    app.use(passport.session());
+    app.use("/api", require("./middleware/customerCsrfMiddleware"));
     app.set("io", io);
     app.set("realtime", realtime);
 
