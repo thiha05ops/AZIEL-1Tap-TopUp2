@@ -17,10 +17,21 @@ function keyOf(input) {
 
 function makeHarness({ legacy = true, failInstall = false, failNetwork = false } = {}) {
     const stores = new Map();
-    const oldCore = "aziel-runtime-core-v5-storefront-performance";
-    const oldCode = "aziel-runtime-code-v5-storefront-performance";
+    const oldRevision = "v7-83e2d7e0c339baa8";
+    const oldCore = `aziel-runtime-core-${oldRevision}`;
+    const oldPages = `aziel-runtime-pages-v3-${oldRevision}`;
+    const oldCode = `aziel-runtime-code-${oldRevision}`;
     if (legacy) {
-        stores.set(oldCore, new Map([["/home.html", "OLD_HOME"]]));
+        stores.set(oldCore, new Map([["/home.html", {
+            body: "REDIRECTED_OLD_HOME",
+            redirected: true,
+            url: "https://aziel.test/"
+        }]]));
+        stores.set(oldPages, new Map([["/", {
+            body: "REDIRECTED_OLD_HOME",
+            redirected: true,
+            url: "https://aziel.test/"
+        }]]));
         stores.set(oldCode, new Map([["/js/live-chat.js", "OLD_UNGUARDED_LIVE_CHAT"]]));
     }
     stores.set("unrelated-application-cache", new Map([["/keep", "KEEP"]]));
@@ -30,16 +41,30 @@ function makeHarness({ legacy = true, failInstall = false, failNetwork = false }
             if (failInstall) throw new Error("simulated precache failure");
             const store = stores.get(name);
             for (const asset of assets) {
+                assert.notStrictEqual(keyOf(asset), "/home.html", "redirecting legacy Home alias must never be precached");
                 const diskPath = path.join(root, "frontend", asset.replace(/^\//, ""));
                 store.set(keyOf(asset), fs.existsSync(diskPath) ? read(`frontend/${asset.replace(/^\//, "")}`) : asset);
             }
         },
         async match(request) {
             const value = stores.get(name)?.get(keyOf(request));
-            return value === undefined ? undefined : new Response(value, { status: 200 });
+            if (value === undefined) return undefined;
+            const stored = typeof value === "object" ? value : { body: value };
+            const response = new Response(stored.body, { status: 200 });
+            if (stored.redirected) {
+                Object.defineProperties(response, {
+                    redirected: { value: true },
+                    url: { value: stored.url }
+                });
+            }
+            return response;
         },
         async put(request, response) {
-            stores.get(name).set(keyOf(request), await response.clone().text());
+            stores.get(name).set(keyOf(request), {
+                body: await response.clone().text(),
+                redirected: response.redirected,
+                url: response.url
+            });
         }
     });
 
@@ -48,7 +73,7 @@ function makeHarness({ legacy = true, failInstall = false, failNetwork = false }
     let skipped = 0;
     const navigations = [];
     const windowClients = [
-        { url: "https://aziel.test/home.html", navigate: async url => navigations.push(url) },
+        { url: "https://aziel.test/", navigate: async url => navigations.push(url) },
         { url: "https://aziel.test/payment.html", navigate: async url => navigations.push(url) }
     ];
     const context = {
@@ -126,27 +151,36 @@ function makeHarness({ legacy = true, failInstall = false, failNetwork = false }
         digest.update(fs.readFileSync(path.join(root, "frontend", asset.replace(/^\//, ""))));
         digest.update("\0");
     });
-    const expectedRevision = `v7-${digest.digest("hex").slice(0, 16)}`;
+    const expectedRevision = `v8-${digest.digest("hex").slice(0, 16)}`;
     assert(swSource.includes(`const SHELL_REVISION = "${expectedRevision}"`), "precache content changed without a shell revision bump");
     assert(swSource.includes('"/js/live-chat.js"') && swSource.includes('"/css/support/live-chat.css"'));
     assert(swSource.indexOf("cache.addAll(CORE_ASSETS)") < swSource.indexOf("self.skipWaiting()"));
 
     const upgrade = makeHarness({ legacy: true });
+    const contaminatedEntry = upgrade.stores.get("aziel-runtime-core-v7-83e2d7e0c339baa8").get("/home.html");
+    assert.strictEqual(contaminatedEntry.redirected, true);
+    assert.strictEqual(contaminatedEntry.url, "https://aziel.test/");
+    const contaminatedNavigation = await upgrade.dispatchFetch({ method: "GET", mode: "navigate", url: "https://aziel.test/" });
+    assert.strictEqual(contaminatedNavigation.respondWithCalls, 0, "even contaminated legacy caches must not own navigation");
+    assert.strictEqual(contaminatedNavigation.response, null);
     await upgrade.dispatch("install");
     assert.strictEqual(upgrade.counts().skipped, 1, "successful atomic precache must allow activation");
     await upgrade.dispatch("activate");
     assert.strictEqual(upgrade.counts().claimed, 1, "new worker must claim existing clients");
-    assert(!upgrade.stores.has("aziel-runtime-core-v5-storefront-performance"));
-    assert(!upgrade.stores.has("aziel-runtime-code-v5-storefront-performance"));
+    assert(!upgrade.stores.has("aziel-runtime-core-v7-83e2d7e0c339baa8"));
+    assert(!upgrade.stores.has("aziel-runtime-pages-v3-v7-83e2d7e0c339baa8"));
+    assert(!upgrade.stores.has("aziel-runtime-code-v7-83e2d7e0c339baa8"));
     assert(upgrade.stores.has("unrelated-application-cache"), "migration must not delete unrelated caches");
-    assert.deepStrictEqual(upgrade.navigations, ["https://aziel.test/home.html"], "legacy migration must refresh only safe public clients once");
+    assert.deepStrictEqual(upgrade.navigations, ["https://aziel.test/"], "legacy migration must refresh each safe public client once");
+    await upgrade.dispatch("activate");
+    assert.deepStrictEqual(upgrade.navigations, ["https://aziel.test/"], "repeated activation must not create a refresh loop");
 
     const liveChatResponse = await upgrade.dispatch("fetch", {
         request: new Request("https://aziel.test/js/live-chat.js?v=20260920-storefront-performance-v1")
     });
     assert.strictEqual(await liveChatResponse.text(), currentLiveChat, "upgraded worker must serve current guarded Live Chat");
     const newCoreName = [...upgrade.stores.keys()].find(name => name.includes(`core-${expectedRevision}`));
-    assert(upgrade.stores.get(newCoreName).has("/home.html"), "offline Home shell must survive migration");
+    assert(!upgrade.stores.get(newCoreName).has("/home.html"), "redirecting legacy Home alias must not survive migration");
 
     const fresh = makeHarness({ legacy: false });
     await fresh.dispatch("install");
@@ -154,6 +188,9 @@ function makeHarness({ legacy = true, failInstall = false, failNetwork = false }
     assert.deepStrictEqual(fresh.navigations, [], "fresh install must not reload a client");
 
     for (const url of [
+        "https://aziel.test/",
+        "https://aziel.test/login",
+        "https://aziel.test/products/afk-journey",
         "https://aziel.test/api/auth/google?returnTo=%2Faccount",
         "https://aziel.test/api/auth/google/callback?code=x&state=y"
     ]) {
@@ -172,32 +209,18 @@ function makeHarness({ legacy = true, failInstall = false, failNetwork = false }
     }
 
     assert(
-        swSource.indexOf('request.mode === "navigate" && isOAuthNavigationPath(url.pathname)') < swSource.indexOf("if (isNeverCachePath(url.pathname))"),
-        "OAuth navigation bypass must precede the generic API network-only branch"
+        swSource.indexOf('if (request.mode === "navigate") return;') < swSource.indexOf("if (isNeverCachePath(url.pathname))"),
+        "browser-owned navigation bypass must precede generic API handling"
     );
 
-    for (const url of [
-        "https://aziel.test/api/auth/login",
-        "https://aziel.test/login",
-        "https://aziel.test/products/afk-journey"
-    ]) {
-        const result = await fresh.dispatchFetch({ method: "GET", mode: "navigate", url });
-        assert.strictEqual(result.respondWithCalls, 1, `${new URL(url).pathname} navigation must not receive the OAuth bypass`);
-    }
-
-    const storefrontNavigation = await fresh.dispatchFetch({ method: "GET", mode: "navigate", url: "https://aziel.test/" });
-    assert.strictEqual(storefrontNavigation.respondWithCalls, 1, "ordinary storefront navigation must retain Service Worker handling");
-    assert((await storefrontNavigation.response.text()).includes("<!DOCTYPE html>"));
-
-    const offline = makeHarness({ legacy: false, failNetwork: true });
-    await offline.dispatch("install");
-    const offlineNavigation = await offline.dispatchFetch({ method: "GET", mode: "navigate", url: "https://aziel.test/explore" });
-    assert.strictEqual(offlineNavigation.respondWithCalls, 1);
-    assert((await offlineNavigation.response.text()).includes("You're offline"), "ordinary offline navigation must retain the offline shell");
+    const codeAsset = await fresh.dispatchFetch({ method: "GET", mode: "cors", url: "https://aziel.test/js/live-chat.js?v=1" });
+    assert.strictEqual(codeAsset.respondWithCalls, 1, "static code assets must remain Service Worker managed");
+    const mediaAsset = await fresh.dispatchFetch({ method: "GET", mode: "cors", url: "https://aziel.test/assets/brand/icon-192.png" });
+    assert.strictEqual(mediaAsset.respondWithCalls, 1, "static media assets must remain Service Worker managed");
 
     const failed = makeHarness({ legacy: true, failInstall: true });
     await assert.rejects(failed.dispatch("install"), /simulated precache failure/);
-    assert(failed.stores.has("aziel-runtime-core-v5-storefront-performance"), "failed install must preserve the active shell");
+    assert(failed.stores.has("aziel-runtime-core-v7-83e2d7e0c339baa8"), "failed install must preserve the active shell");
 
     const pwaRuntime = read("frontend/js/pwa-fix.js");
     assert(pwaRuntime.includes("await registration.update().catch"), "installed apps must explicitly check for a new worker");

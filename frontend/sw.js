@@ -1,7 +1,7 @@
 const CACHE_PREFIX = "aziel-runtime";
 // Keep the suffix equal to the deterministic CORE_ASSETS content digest. The
 // migration verifier fails if a precached dependency changes without a bump.
-const SHELL_REVISION = "v7-83e2d7e0c339baa8";
+const SHELL_REVISION = "v8-a53a013005e22a4d";
 const CORE_CACHE = `${CACHE_PREFIX}-core-${SHELL_REVISION}`;
 const PAGE_CACHE = `${CACHE_PREFIX}-pages-v3-${SHELL_REVISION}`;
 const CODE_CACHE = `${CACHE_PREFIX}-code-${SHELL_REVISION}`;
@@ -10,7 +10,6 @@ const PRESENTATION_CACHE = `${CACHE_PREFIX}-presentation-v1`;
 
 const CORE_ASSETS = [
     "/offline.html",
-    "/home.html",
     "/manifest.json",
     "/css/theme/aziel-design-system.css",
     "/css/core/motion.css",
@@ -92,28 +91,6 @@ const NEVER_CACHE_PREFIXES = [
     "/socket.io/"
 ];
 
-const OAUTH_NAVIGATION_PATHS = new Set([
-    "/api/auth/google",
-    "/api/auth/google/callback"
-]);
-
-const PRIVATE_NAVIGATION_PREFIXES = [
-    "/admin",
-    "/account",
-    "/wallet",
-    "/tracking",
-    "/notifications",
-    "/support",
-    "/checkout",
-    "/payment",
-    "/payment-method",
-    "/login",
-    "/register",
-    "/verify",
-    "/reset",
-    "/forgot"
-];
-
 self.addEventListener("install", event => {
     event.waitUntil(
         caches
@@ -180,10 +157,11 @@ self.addEventListener("fetch", event => {
 
     if (url.origin !== self.location.origin) return;
 
-    // OAuth navigations must remain owned by the browser network stack.
-    // iOS installed PWAs can reject redirected navigation responses returned
-    // through ServiceWorker.respondWith(). API fetches still remain network-only.
-    if (request.mode === "navigate" && isOAuthNavigationPath(url.pathname)) return;
+    // Top-level HTML navigations must remain owned by the browser network
+    // stack. This general rule supersedes the former OAUTH_NAVIGATION_PATHS-only
+    // bypass: redirect-followed Responses returned through respondWith() can be
+    // rejected by WebKit and can strand already-installed storefront clients.
+    if (request.mode === "navigate") return;
 
     if (url.pathname === "/api/public/home-presentation") {
         event.respondWith(staleWhileRevalidatePresentation(event, request));
@@ -192,11 +170,6 @@ self.addEventListener("fetch", event => {
 
     if (isNeverCachePath(url.pathname)) {
         event.respondWith(networkOnly(request));
-        return;
-    }
-
-    if (request.mode === "navigate") {
-        event.respondWith(handleNavigation(event, request, url));
         return;
     }
 
@@ -212,16 +185,6 @@ self.addEventListener("fetch", event => {
 
 function isNeverCachePath(pathname) {
     return NEVER_CACHE_PREFIXES.some(prefix =>
-        pathname === prefix || pathname.startsWith(prefix)
-    );
-}
-
-function isOAuthNavigationPath(pathname) {
-    return OAUTH_NAVIGATION_PATHS.has(pathname);
-}
-
-function isPrivateNavigation(pathname) {
-    return PRIVATE_NAVIGATION_PREFIXES.some(prefix =>
         pathname === prefix || pathname.startsWith(prefix)
     );
 }
@@ -260,66 +223,6 @@ function createNormalizedCacheKey(request) {
         method: "GET",
         credentials: "same-origin"
     });
-}
-
-async function handleNavigation(event, request, url) {
-    if (isPrivateNavigation(url.pathname)) {
-        return networkOnlyNavigation(event, request);
-    }
-
-    if (!isPublicHtml(url.pathname)) {
-        return networkOnlyNavigation(event, request);
-    }
-
-    return staleWhileRevalidatePublicPage(event, request, url);
-}
-
-/**
- * Public pages:
- * Always request the latest HTML first.
- * Cached HTML is used only when offline.
- */
-async function staleWhileRevalidatePublicPage(event, request, url) {
-    const cache = await caches.open(PAGE_CACHE);
-    const cacheKey = createNormalizedCacheKey(request);
-    const shellFallback = url.pathname === "/"
-        ? await caches.match("/home.html")
-        : null;
-    const cached = await cache.match(cacheKey) || shellFallback;
-    const update = updatePublicPage(event, request, cache, cacheKey);
-    if (cached) { event.waitUntil(update); return cached; }
-    return update;
-}
-
-async function updatePublicPage(event, request, cache, cacheKey) {
-    try {
-        const preloadResponse = await event.preloadResponse;
-        const response = preloadResponse?.ok ? preloadResponse : await fetch(request, { cache: "no-cache" });
-        if (response.ok && response.type === "basic") await cache.put(cacheKey, response.clone());
-        return response;
-    } catch {
-        return await cache.match(cacheKey) || await caches.match("/offline.html");
-    }
-}
-
-/**
- * Admin, account, wallet and authentication pages:
- * Never cache their HTML.
- */
-async function networkOnlyNavigation(event, request) {
-    try {
-        const preloadResponse = await event.preloadResponse;
-
-        if (preloadResponse) {
-            return preloadResponse;
-        }
-
-        return await fetch(request, {
-            cache: "no-store"
-        });
-    } catch {
-        return caches.match("/offline.html");
-    }
 }
 
 /**

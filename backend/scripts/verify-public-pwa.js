@@ -24,14 +24,12 @@ function main() {
     assert(runtime.includes("window.isSecureContext"), "Service worker registration must require a safe context.");
     assert(runtime.includes("aziel:pwaUpdateReady"), "Runtime must expose a restrained update-ready event.");
 
-    assert(sw.includes("NEVER_CACHE_PREFIXES") && sw.includes("PRIVATE_NAVIGATION_PREFIXES"), "Service worker must declare API and private-navigation exclusions.");
-    assert(sw.includes('"/api/auth/google"') && sw.includes('"/api/auth/google/callback"'), "Service worker must declare active OAuth navigation bypasses.");
+    assert(sw.includes("NEVER_CACHE_PREFIXES"), "Service worker must declare API exclusions.");
     assert(!sw.includes('"/auth/google/success"'), "Service worker must not restore obsolete Google token transport.");
-    assert(sw.indexOf('request.mode === "navigate" && isOAuthNavigationPath(url.pathname)') < sw.indexOf("if (isNeverCachePath(url.pathname))"), "OAuth navigation bypass must precede API network-only handling.");
-    ["/api/", "/admin", "/account", "/wallet", "/tracking", "/notifications"].forEach(pathPrefix => {
-        assert(sw.includes(`"${pathPrefix}"`), `Service worker must never cache ${pathPrefix}.`);
-    });
-    assert(sw.includes("staleWhileRevalidatePublicPage"), "Public HTML must use the declared revalidation strategy.");
+    assert(sw.includes('if (request.mode === "navigate") return;'), "All top-level navigation must remain browser-owned.");
+    assert(sw.indexOf('if (request.mode === "navigate") return;') < sw.indexOf("if (isNeverCachePath(url.pathname))"), "Navigation bypass must precede API and static handling.");
+    assert(sw.includes('"/api/"'), "Service worker must keep non-navigation API requests network-only.");
+    assert(!sw.includes('caches.match("/home.html")'), "Navigation must not fall back to the redirecting Home alias.");
     assert(sw.includes("staleWhileRevalidateCodeAsset") && sw.includes("cacheFirstMediaAsset"), "Code and media assets must use the declared cache strategies.");
     assert(sw.includes("caches.delete"), "Service worker must clean stale cache versions.");
     assert(offline.includes("noindex, nofollow") && offline.includes("You're offline"), "Offline page must be restrained and not indexed.");

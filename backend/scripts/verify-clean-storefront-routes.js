@@ -96,6 +96,15 @@ async function main() {
     assert(manifest.shortcuts.every(shortcut => !shortcut.url.includes(".html")));
     assert.strictEqual(manifest.id, "/home.html", "installed-PWA identity must remain stable during route migration");
 
+    const sw = fs.readFileSync(path.join(root, "frontend/sw.js"), "utf8");
+    const coreBlock = sw.slice(sw.indexOf("const CORE_ASSETS"), sw.indexOf("];", sw.indexOf("const CORE_ASSETS")) + 2);
+    const coreAssets = new Set([...coreBlock.matchAll(/"(\/[^"?]+)(?:\?[^\"]*)?"/g)].map(match => match[1]));
+    Object.keys(LEGACY_ALIASES).forEach(alias => {
+        assert(!coreAssets.has(alias), `redirecting legacy alias must not be precached: ${alias}`);
+    });
+    assert(!sw.includes('caches.match("/home.html")'), "redirecting Home alias must not be used as a navigation fallback");
+    assert(sw.includes('if (request.mode === "navigate") return;'), "top-level clean-route navigation must remain browser-owned");
+
     const oauth = fs.readFileSync(path.join(root, "backend/routes/socialAuth.js"), "utf8");
     assert(oauth.includes("/api/auth/google/callback"));
     assert(!oauth.includes("/auth/google/success") && !oauth.includes("handoff"));
