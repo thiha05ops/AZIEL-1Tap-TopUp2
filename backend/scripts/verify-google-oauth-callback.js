@@ -3,6 +3,7 @@
 const assert = require("assert");
 const fs = require("fs");
 const path = require("path");
+const vm = require("vm");
 const { createSocialAuthRouter } = require("../routes/socialAuth");
 
 const ENV = { GOOGLE_CLIENT_ID: "configured", GOOGLE_CLIENT_SECRET: "configured", GOOGLE_CALLBACK_URL: "https://azielplay.com/api/auth/google/callback", FRONTEND_URL: "https://azielplay.com" };
@@ -340,6 +341,7 @@ async function main() {
     const social = fs.readFileSync(path.join(root, "backend/routes/socialAuth.js"), "utf8");
     const passport = fs.readFileSync(path.join(root, "backend/config/passport.js"), "utf8");
     const login = fs.readFileSync(path.join(root, "frontend/js/login.js"), "utf8");
+    const loginHtml = fs.readFileSync(path.join(root, "frontend/login.html"), "utf8");
     assert.strictEqual((social.match(/router\.get\("\/auth\/google\/callback"/g) || []).length, 1);
     assert(social.includes('auth.authenticate("google", { session: false }, async (error, user, info)'));
     assert(passport.includes("passReqToCallback: true"));
@@ -347,6 +349,73 @@ async function main() {
     assert(passport.includes("issueUserSession") === false, "Passport strategy must not take over AZIEL session authority");
     assert(login.includes('["token_exchange_failed", "handoff_failed"].includes(oauthParams.get("error"))'));
     assert(login.includes("Google sign-in couldn't be completed. Please try again."));
+    assert(loginHtml.includes('<button type="button" data-google-oauth-url="/api/auth/google" id="googleLoginBtn"'), "Google OAuth control must not have native anchor or submit navigation");
+    assert(!loginHtml.includes('<a href="/api/auth/google"'), "Google OAuth must have only one frontend navigation owner");
+
+    const launcherListeners = new Map();
+    const launcherControl = {
+        dataset: { googleOauthUrl: "/api/auth/google" },
+        disabled: false,
+        attributes: new Map(),
+        addEventListener(type, listener) {
+            const listeners = launcherListeners.get(type) || [];
+            listeners.push(listener);
+            launcherListeners.set(type, listeners);
+        },
+        setAttribute(name, value) { this.attributes.set(name, value); },
+        removeAttribute(name) { this.attributes.delete(name); }
+    };
+    const launcherDocument = {
+        addEventListener() {},
+        getElementById(id) { return id === "googleLoginBtn" ? launcherControl : null; }
+    };
+    const launchedUrls = [];
+    const launcherContext = vm.createContext({
+        console,
+        URL,
+        URLSearchParams,
+        document: launcherDocument,
+        window: {
+            AZIEL_LOCALE: null,
+            location: { origin: "https://azielplay.com", assign(url) { launchedUrls.push(url); } }
+        }
+    });
+    vm.runInContext(login, launcherContext, { filename: "frontend/js/login.js" });
+    launcherContext.initGoogleOAuthLauncher(launcherDocument, launcherContext.window.location);
+    launcherContext.initGoogleOAuthLauncher(launcherDocument, launcherContext.window.location);
+    assert.strictEqual(launcherListeners.get("click").length, 1, "reinitialization must not bind the OAuth launcher twice");
+
+    const event = () => ({ prevented: 0, stopped: 0, preventDefault() { this.prevented += 1; }, stopImmediatePropagation() { this.stopped += 1; } });
+    const click = launcherListeners.get("click")[0];
+    click(event());
+    assert.deepStrictEqual(launchedUrls, ["/api/auth/google"], "one Google action must create exactly one navigation");
+    click(event());
+    click(event());
+    assert.deepStrictEqual(launchedUrls, ["/api/auth/google"], "rapid repeated clicks must remain single-flight");
+    assert.strictEqual(launcherListeners.has("submit"), false, "OAuth control must not bind a competing submit launch");
+    for (const submit of launcherListeners.get("submit") || []) submit(event());
+    assert.deepStrictEqual(launchedUrls, ["/api/auth/google"], "click plus submit must not create a second OAuth start");
+    assert.strictEqual(launcherListeners.has("touchend"), false, "OAuth control must not bind a competing touch launch");
+    assert.strictEqual(launcherListeners.has("pointerup"), false, "OAuth control must not bind a competing pointer launch");
+    assert.strictEqual(launcherControl.disabled, true, "OAuth control must disable immediately after launch");
+
+    const failedLauncherListeners = new Map();
+    const failedLauncherControl = {
+        dataset: { googleOauthUrl: "/api/auth/google" },
+        disabled: false,
+        attributes: new Map(),
+        addEventListener(type, listener) { failedLauncherListeners.set(type, [listener]); },
+        setAttribute(name, value) { this.attributes.set(name, value); },
+        removeAttribute(name) { this.attributes.delete(name); }
+    };
+    launcherContext.initGoogleOAuthLauncher(
+        { getElementById() { return failedLauncherControl; } },
+        { assign() { throw new Error("navigation unavailable"); } }
+    );
+    failedLauncherListeners.get("click")[0](event());
+    assert.strictEqual(failedLauncherControl.disabled, false, "synchronous navigation failure must unlock the OAuth control");
+    assert.strictEqual(failedLauncherControl.attributes.has("aria-disabled"), false);
+    assert.strictEqual(failedLauncherControl.attributes.has("aria-busy"), false);
     assert(!social.includes("handoff"), "Google OAuth must not contain a frontend token handoff");
     console.log("Google OAuth callback reliability verification passed (server-owned cookie session).");
 }

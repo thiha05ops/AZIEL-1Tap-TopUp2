@@ -19,6 +19,36 @@ function resolveRedirectAfterLogin(value, origin = window.location.origin) {
 }
 const authT = (key, fallback, params) => window.AZIEL_LOCALE?.t?.(key, fallback, params) || fallback;
 
+function initGoogleOAuthLauncher(documentRef = document, locationRef = window.location) {
+    const control = documentRef.getElementById("googleLoginBtn");
+    if (!control || control.dataset.oauthLauncherReady === "true") return control;
+
+    control.dataset.oauthLauncherReady = "true";
+    let launchPending = false;
+
+    control.addEventListener("click", event => {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        if (launchPending) return;
+
+        launchPending = true;
+        control.disabled = true;
+        control.setAttribute("aria-disabled", "true");
+        control.setAttribute("aria-busy", "true");
+
+        try {
+            locationRef.assign(control.dataset.googleOauthUrl || "/api/auth/google");
+        } catch (_) {
+            launchPending = false;
+            control.disabled = false;
+            control.removeAttribute("aria-disabled");
+            control.removeAttribute("aria-busy");
+        }
+    });
+
+    return control;
+}
+
 document.addEventListener("DOMContentLoaded", () => {
     let pendingTwoFactorChallengeId = "";
 
@@ -29,6 +59,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const form = document.getElementById("loginForm");
     const msg = document.getElementById("msg");
     const btn = document.getElementById("loginBtn");
+    initGoogleOAuthLauncher();
 
     const usernameInput = document.getElementById("username");
     const passwordInput = document.getElementById("password");

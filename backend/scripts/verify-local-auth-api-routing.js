@@ -19,9 +19,10 @@ function resolve(location, requestPath) {
 
 assert.strictEqual(resolve({ protocol: "http:", hostname: "localhost", port: "5500" }, "/api/login"), "http://localhost:3000/api/login");
 assert.strictEqual(resolve({ protocol: "https:", hostname: "shop.aziel.com", port: "" }, "/api/auth/2fa/verify"), "/api/auth/2fa/verify");
-assert(loginHtml.includes('href="/api/auth/google"'), "Google login must use native same-origin anchor navigation.");
-assert(!source.includes('apiUrl("/api/auth/google")') && !source.includes("googleLoginBtn"), "login.js must not own Google navigation.");
+assert(loginHtml.includes('type="button" data-google-oauth-url="/api/auth/google"'), "Google login must use a non-submit control with one guarded destination.");
+assert(!loginHtml.includes('href="/api/auth/google"'), "Google login must not retain a competing native anchor navigation.");
+assert(source.includes("initGoogleOAuthLauncher") && source.includes('locationRef.assign(control.dataset.googleOauthUrl || "/api/auth/google")'), "login.js must own one guarded Google navigation.");
 assert(source.includes('fetch(apiUrl("/api/login")'), "Password login must use apiUrl.");
 assert(source.includes('fetch(apiUrl("/api/auth/2fa/verify")'), "2FA verification must use apiUrl.");
 
-console.log(JSON.stringify({ result: "PASS", localFrontendPort: 5500, localBackendPort: 3000, googleUsesNativeAnchor: true, passwordUsesLocalApiBase: true, twoFactorUsesLocalApiBase: true, productionSameOriginPreserved: true }, null, 2));
+console.log(JSON.stringify({ result: "PASS", localFrontendPort: 5500, localBackendPort: 3000, googleUsesSingleFlightLauncher: true, passwordUsesLocalApiBase: true, twoFactorUsesLocalApiBase: true, productionSameOriginPreserved: true }, null, 2));
