@@ -2817,3 +2817,26 @@ body.dark .az-profile-dropdown .dropdown-divider {
         pointer-events: none;
     }
 }
+
+/* AZIEL MOBILE DRAWER — stable Safari/PWA viewport geometry */
+@media (max-width: 900px) {
+    html body .az-header > .az-nav {
+        top: 0 !important;
+        bottom: auto !important;
+        height: 100svh !important;
+        min-height: 100svh !important;
+        max-height: 100svh !important;
+        padding-bottom: 24px !important;
+    }
+
+    .az-mobile-drawer-head {
+        position: relative !important;
+        top: auto !important;
+        flex: 0 0 auto !important;
+    }
+
+    .az-mobile-drawer-social {
+        margin-top: auto !important;
+        padding-bottom: 8px !important;
+    }
+}
