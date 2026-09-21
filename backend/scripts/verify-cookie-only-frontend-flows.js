@@ -134,10 +134,72 @@ async function verifyServerRejectionWinsOverCache() {
     context.fetch = async () => ({ status: 401, json: async () => ({ success: false, forceLogout: true }) });
     context.window.fetch = context.fetch;
     vm.runInContext(read("frontend/js/user-state.js"), context, { filename: "user-state.js" });
-    context.window.AZIEL.handleAuthFailure = () => { context.window.AZIEL.clearAuthState(); };
     const user = await context.window.AZIEL.loadUser();
     assert.strictEqual(user, null);
     assert.strictEqual(context.window.AZIEL.user, null);
+    assert.strictEqual(context.location.href, "https://azielplay.com/", "passive identity rejection must remain on the public page");
+    assert.strictEqual(context.localStorage.getItem("user"), null, "server rejection must clear cached identity");
+    assert.strictEqual(context.localStorage.getItem("azielUser"), null, "server rejection must clear alternate cached identity");
+}
+
+async function verifyAuthenticatedIdentityProbe() {
+    const { context } = baseContext();
+    const authenticatedUser = { username: "cookie-user", displayName: "Cookie User", role: "user" };
+    context.AZIEL = context.window.AZIEL = {};
+    context.fetch = async url => {
+        assert.strictEqual(String(url), "/api/auth/me");
+        return { status: 200, json: async () => ({ success: true, user: authenticatedUser }) };
+    };
+    context.window.fetch = context.fetch;
+    vm.runInContext(read("frontend/js/user-state.js"), context, { filename: "user-state.js" });
+    const user = await context.window.AZIEL.loadUser();
+    assert.strictEqual(user.username, "cookie-user");
+    assert.strictEqual(context.window.AZIEL.user.username, "cookie-user");
+    assert.strictEqual(context.window.AZIEL.identityResolved, true);
+    assert.strictEqual(context.location.href, "https://azielplay.com/");
+}
+
+async function verifyPublicBootstrapRemainsGuestSafe() {
+    const { context, listeners } = baseContext();
+    let identityRequests = 0;
+    context.AZIEL = context.window.AZIEL = {};
+    context.fetch = async url => {
+        if (String(url) === "/api/auth/me") identityRequests += 1;
+        return { status: 401, json: async () => ({ success: false, forceLogout: true, message: "Authentication required" }) };
+    };
+    context.window.fetch = context.fetch;
+    vm.runInContext(read("frontend/js/user-state.js"), context, { filename: "user-state.js" });
+    await listeners.DOMContentLoaded[0]();
+    assert.strictEqual(identityRequests, 1, "guest bootstrap must not repeat the identity probe from loadWallet");
+    assert.strictEqual(context.window.AZIEL.user, null);
+    assert.strictEqual(context.location.href, "https://azielplay.com/", "public bootstrap must not navigate to login");
+}
+
+async function verifyProtectedAuthFailureStillRedirects() {
+    const { context } = baseContext({ localStorage: storage({ user: JSON.stringify({ username: "expired-user" }) }) });
+    context.AZIEL = context.window.AZIEL = {};
+    context.fetch = async () => ({
+        status: 401,
+        clone() { return this; },
+        json: async () => ({ success: false, message: "Session expired" })
+    });
+    context.window.fetch = context.fetch;
+    vm.runInContext(read("frontend/js/user-state.js"), context, { filename: "user-state.js" });
+    await context.window.AZIEL.authFetch("/api/security/overview");
+    assert.strictEqual(context.window.AZIEL.user, null);
+    assert.strictEqual(context.localStorage.getItem("user"), null);
+    assert.strictEqual(context.location.href, "/login", "protected authFetch rejection must retain login handling");
+}
+
+async function verifyProtectedPageGuard() {
+    const { context, listeners } = baseContext();
+    context.location.pathname = "/account";
+    context.location.href = "https://azielplay.com/account";
+    context.window.AZIEL = context.AZIEL = { user: null, async loadUser() { return null; } };
+    vm.runInContext(read("frontend/js/auth-check.js"), context, { filename: "auth-check.js" });
+    await listeners.DOMContentLoaded[0]();
+    assert.strictEqual(context.location.href, "/login");
+    assert.strictEqual(context.localStorage.getItem("redirectAfterLogin"), "https://azielplay.com/account");
 }
 
 function verifyRedirectSafety() {
@@ -157,6 +219,10 @@ function verifyRedirectSafety() {
     await verifyLiveChat();
     await verifyAccount();
     await verifyServerRejectionWinsOverCache();
+    await verifyAuthenticatedIdentityProbe();
+    await verifyPublicBootstrapRemainsGuestSafe();
+    await verifyProtectedAuthFailureStillRedirects();
+    await verifyProtectedPageGuard();
     verifyRedirectSafety();
     console.log("Cookie-only frontend authentication flows passed.");
 })().catch(error => { console.error(error); process.exitCode = 1; });

@@ -14,6 +14,7 @@ AZIEL.apiUrl = function (path) {
 AZIEL.user = null;
 AZIEL.wallet = null;
 AZIEL.walletRealtimeReady = false;
+AZIEL.identityResolved = false;
 
 // TOKEN
 AZIEL.getToken = function () {
@@ -165,7 +166,8 @@ AZIEL.loadUser = async function () {
         const data = await res.json();
 
         if (res.status === 401 || data.forceLogout) {
-            AZIEL.handleAuthFailure(data.message);
+            AZIEL.clearAuthState();
+            AZIEL.identityResolved = true;
             return null;
         }
 
@@ -174,6 +176,7 @@ AZIEL.loadUser = async function () {
             localStorage.removeItem("azielToken");
             sessionStorage.removeItem("token");
             AZIEL.user = data.user;
+            AZIEL.identityResolved = true;
 
             localStorage.setItem("username", data.user.username || "");
             localStorage.setItem("displayName", AZIEL.getDisplayName(data.user));
@@ -189,6 +192,7 @@ AZIEL.loadUser = async function () {
         }
 
         AZIEL.user = null;
+        AZIEL.identityResolved = true;
         window.dispatchEvent(new Event("aziel:userChanged"));
         return null;
 
@@ -197,11 +201,13 @@ AZIEL.loadUser = async function () {
 
         if (cachedUser) {
             AZIEL.user = cachedUser;
+            AZIEL.identityResolved = true;
             window.dispatchEvent(new Event("aziel:userChanged"));
             return cachedUser;
         }
 
         AZIEL.user = null;
+        AZIEL.identityResolved = true;
         window.dispatchEvent(new Event("aziel:userChanged"));
         return null;
     }
@@ -209,7 +215,7 @@ AZIEL.loadUser = async function () {
 
 // WALLET
 AZIEL.loadWallet = async function () {
-    const user = AZIEL.user || await AZIEL.loadUser();
+    const user = AZIEL.user || (AZIEL.identityResolved ? null : await AZIEL.loadUser());
     const currency = AZIEL.getShopCurrency();
 
     if (!user?.username) {
