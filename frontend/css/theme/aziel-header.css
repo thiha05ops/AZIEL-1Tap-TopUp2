@@ -2380,7 +2380,7 @@ body.dark .az-profile-dropdown .dropdown-divider {
         justify-content: space-between;
         gap: 12px;
         margin: 0 -14px 8px;
-        padding: max(8px, env(safe-area-inset-top)) 18px 8px;
+        padding: 8px 18px 8px;
         border-bottom: 1px solid var(--border);
         background: var(--surface-strong);
     }
@@ -2519,7 +2519,7 @@ body.dark .az-profile-dropdown .dropdown-divider {
         order: 100;
         width: 100%;
         margin-top: auto;
-        padding: 18px 12px max(8px, env(safe-area-inset-bottom));
+        padding: 18px 12px 8px;
         border-top: 1px solid var(--border);
     }
 
@@ -2726,7 +2726,7 @@ body.dark .az-profile-dropdown .dropdown-divider {
 }
 
 /* AZIEL MOBILE DRAWER HEADER — final compact alignment */
-@media (max-width: 768px) {
+@media (max-width: 900px) {
     .az-mobile-drawer-head {
         height: 72px !important;
         min-height: 72px !important;
@@ -2768,7 +2768,7 @@ body.dark .az-profile-dropdown .dropdown-divider {
 }
 
 /* AZIEL MOBILE DRAWER — lower primary content, keep social footer fixed */
-@media (max-width: 768px) {
+@media (max-width: 900px) {
     .az-mobile-drawer-head .az-mobile-drawer-brand {
         transform: translateX(26px) translateY(22px) !important;
     }
@@ -2787,7 +2787,7 @@ body.dark .az-profile-dropdown .dropdown-divider {
 }
 
 /* AZIEL MOBILE DRAWER — lower divider + primary menu only */
-@media (max-width: 768px) {
+@media (max-width: 900px) {
     .az-mobile-drawer-head {
         height: 80px !important;
         min-height: 80px !important;
@@ -2800,7 +2800,7 @@ body.dark .az-profile-dropdown .dropdown-divider {
 }
 
 /* AZIEL MOBILE DRAWER — divider only 8px lower */
-@media (max-width: 768px) {
+@media (max-width: 900px) {
     .az-mobile-drawer-head {
         position: relative !important;
         border-bottom: 0 !important;
