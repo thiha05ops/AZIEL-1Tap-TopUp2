@@ -4,6 +4,7 @@ const crypto = require("crypto");
 
 const AUTH_COOKIE_NAME = process.env.AUTH_COOKIE_NAME || "aziel_session";
 const AUTH_COOKIE_MAX_AGE_MS = Number(process.env.AUTH_COOKIE_MAX_AGE_MS || 15 * 24 * 60 * 60 * 1000);
+const LEGACY_PRODUCTION_COOKIE_DOMAIN = ".azielplay.com";
 
 function secret(env = process.env) {
     return env.AUTH_COOKIE_SECRET || env.SESSION_SECRET || env.JWT_SECRET || "aziel_secret";
@@ -59,8 +60,13 @@ function clearOptions(env = process.env, domain) {
 }
 
 function clearLegacyDomainCookie(res, env = process.env) {
-    const domain = String(env.AUTH_COOKIE_DOMAIN || "").trim();
-    if (domain) res.clearCookie(AUTH_COOKIE_NAME, clearOptions(env, domain));
+    const domains = new Set();
+    if (env.NODE_ENV === "production") domains.add(LEGACY_PRODUCTION_COOKIE_DOMAIN);
+    const configuredDomain = String(env.AUTH_COOKIE_DOMAIN || "").trim();
+    if (configuredDomain) domains.add(configuredDomain);
+    for (const domain of domains) {
+        res.clearCookie(AUTH_COOKIE_NAME, clearOptions(env, domain));
+    }
 }
 
 function setAuthCookie(res, sessionId, env = process.env) {
@@ -80,6 +86,7 @@ function readSessionId(req, env = process.env) {
 module.exports = {
     AUTH_COOKIE_MAX_AGE_MS,
     AUTH_COOKIE_NAME,
+    LEGACY_PRODUCTION_COOKIE_DOMAIN,
     clearAuthCookie,
     clearLegacyDomainCookie,
     cookieOptions,

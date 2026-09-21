@@ -5,8 +5,9 @@ const fs = require("fs");
 const path = require("path");
 const vm = require("vm");
 const { createSocialAuthRouter } = require("../routes/socialAuth");
+const { readSessionId } = require("../services/authCookieService");
 
-const ENV = { GOOGLE_CLIENT_ID: "configured", GOOGLE_CLIENT_SECRET: "configured", GOOGLE_CALLBACK_URL: "https://azielplay.com/api/auth/google/callback", FRONTEND_URL: "https://azielplay.com" };
+const ENV = { NODE_ENV: "production", AUTH_COOKIE_SECRET: "test-secret-with-enough-entropy", GOOGLE_CLIENT_ID: "configured", GOOGLE_CLIENT_SECRET: "configured", GOOGLE_CALLBACK_URL: "https://azielplay.com/api/auth/google/callback", FRONTEND_URL: "https://azielplay.com" };
 const GOOGLE_AUTHORIZATION_URL = "https://accounts.google.com/o/oauth2/v2/auth?client_id=configured&redirect_uri=https%3A%2F%2Fazielplay.com%2Fapi%2Fauth%2Fgoogle%2Fcallback&state=OPAQUE_STATE_VALUE&scope=profile%20email";
 
 function captureLogger(throwing = false) {
@@ -22,15 +23,52 @@ function response() {
         headers: {},
         committedStatuses: [],
         redirectUrl: "",
+        cookieOperations: [],
         setHeader(name, value) { this.headers[name.toLowerCase()] = value; },
         status(value) { this.statusCode = value; return this; },
         type(value) { this.contentType = value; this.setHeader("Content-Type", value); return this; },
         send(value) { this.body = value; this.end(); return value; },
         end() { this.committedStatuses.push(this.statusCode); return this; },
         json(value) { this.body = value; return value; },
-        cookie(name, value, options) { this.cookieValue = { name, value, options }; return this; },
+        appendCookieHeader(value) {
+            const current = this.headers["set-cookie"];
+            this.headers["set-cookie"] = current === undefined ? [value] : (Array.isArray(current) ? [...current, value] : [current, value]);
+        },
+        cookie(name, value, options) {
+            this.cookieValue = { name, value, options };
+            this.cookieOperations.push({ action: "set", name, value, options });
+            this.appendCookieHeader(`${name}=${value}; Path=${options.path || "/"}${options.domain ? `; Domain=${options.domain}` : ""}`);
+            return this;
+        },
+        clearCookie(name, options) {
+            this.cookieOperations.push({ action: "clear", name, value: "", options });
+            this.appendCookieHeader(`${name}=; Path=${options.path || "/"}${options.domain ? `; Domain=${options.domain}` : ""}; Expires=Thu, 01 Jan 1970 00:00:00 GMT`);
+            return this;
+        },
         redirect(url) { this.redirectUrl = url; return url; }
     };
+}
+
+function applyCustomerCookieOperations(jar, operations, responseHost = "azielplay.com") {
+    for (const operation of operations.filter(item => item.name === "aziel_session")) {
+        const domain = operation.options.domain || responseHost;
+        const hostOnly = !operation.options.domain;
+        const index = jar.findIndex(item => item.name === operation.name && item.domain === domain && item.hostOnly === hostOnly && item.path === (operation.options.path || "/"));
+        if (operation.action === "clear") {
+            if (index >= 0) jar.splice(index, 1);
+            continue;
+        }
+        const cookie = { name: operation.name, value: operation.value, domain, hostOnly, path: operation.options.path || "/" };
+        if (index >= 0) jar[index] = cookie;
+        else jar.push(cookie);
+    }
+}
+
+function cookieHeaderFor(jar, host, requestPath) {
+    return jar
+        .filter(cookie => (cookie.hostOnly ? cookie.domain === host : host === cookie.domain.replace(/^\./, "") || host.endsWith(cookie.domain)) && requestPath.startsWith(cookie.path))
+        .map(cookie => `${cookie.name}=${cookie.value}`)
+        .join("; ");
 }
 
 function transitionDestination(res) {
@@ -300,13 +338,40 @@ async function main() {
     let sessionCalls = 0;
     const router = createSocialAuthRouter({ passport: stub.passport, issueUserSession: async received => { sessionCalls += 1; assert.strictEqual(received, user); return { token: "JWT_SECRET_VALUE", session: { sessionId: "SESSION_SECRET_ID" }, user }; }, logger: observed.logger, env: ENV });
     const req = request("SUCCESS_CODE_SECRET"); const res = response();
+    res.setHeader("Set-Cookie", ["aziel.oauth=OAUTH_COOKIE; Path=/api/auth/google; HttpOnly; Secure; SameSite=Lax"]);
     await runRoute(router, "/auth/google/callback", req, res);
     assert.strictEqual(sessionCalls, 1);
     assert.strictEqual(transitionDestination(res), "https://azielplay.com/");
     assert.strictEqual(res.cookieValue.name, "aziel_session");
     assert.strictEqual(res.cookieValue.options.httpOnly, true);
     assert.strictEqual(res.cookieValue.options.sameSite, "lax");
+    assert.strictEqual(res.cookieValue.options.secure, true);
+    assert.strictEqual(res.cookieValue.options.path, "/");
     assert.strictEqual(res.cookieValue.options.domain, undefined, "Google callback must issue a host-only customer cookie");
+    assert.deepStrictEqual(res.cookieOperations.map(item => [item.action, item.options.domain]), [["clear", ".azielplay.com"], ["set", undefined]], "callback must expire the legacy domain cookie before issuing the canonical host-only cookie");
+    assert.strictEqual(res.headers["set-cookie"].length, 3, "OAuth and both customer-cookie headers must be preserved");
+    assert(res.headers["set-cookie"][0].startsWith("aziel.oauth="), "existing OAuth Set-Cookie must not be overwritten");
+
+    const cookieJar = [{ name: "aziel_session", value: "OLD", domain: ".azielplay.com", hostOnly: false, path: "/" }];
+    applyCustomerCookieOperations(cookieJar, res.cookieOperations);
+    assert(!cookieJar.some(cookie => cookie.name === "aziel_session" && cookie.domain === ".azielplay.com"), "legacy domain cookie must be removed from the browser jar");
+    const canonicalCookie = cookieJar.find(cookie => cookie.name === "aziel_session");
+    assert(canonicalCookie?.hostOnly, "the replacement customer cookie must be host-only");
+    const homeCookieHeader = cookieHeaderFor(cookieJar, "azielplay.com", "/");
+    assert.strictEqual(homeCookieHeader, `aziel_session=${canonicalCookie.value}`, "the next home request must send only the canonical cookie");
+    const meCookieHeader = cookieHeaderFor(cookieJar, "azielplay.com", "/api/auth/me");
+    assert.strictEqual(meCookieHeader, homeCookieHeader, "/api/auth/me must receive the canonical cookie");
+    const selectedSessionId = readSessionId({ headers: { cookie: meCookieHeader } }, ENV);
+    assert.strictEqual(selectedSessionId, "SESSION_SECRET_ID", "canonical cookie signature must verify and select the newly created session");
+    const now = Date.now();
+    const sessions = new Map([["SESSION_SECRET_ID", { sessionId: "SESSION_SECRET_ID", userId: user._id, revokedAt: null, expiresAt: new Date(now + 60_000) }]]);
+    const users = new Map([[user._id, user]]);
+    const selectedSession = sessions.get(selectedSessionId);
+    assert(selectedSession && !selectedSession.revokedAt && selectedSession.expiresAt.getTime() > now, "selected session must be live, unrevoked, and unexpired");
+    const selectedUser = users.get(selectedSession.userId);
+    assert.strictEqual(selectedUser, user, "selected session must resolve its user");
+    const authMeStatus = selectedUser ? 200 : 401;
+    assert.strictEqual(authMeStatus, 200, "/api/auth/me must authenticate on the first request after callback");
     assert(!String(res.body).includes("JWT_SECRET_VALUE"), "JWT must not appear in the callback response or URL");
     const successLogs = JSON.stringify(observed.records);
     for (const secret of ["SUCCESS_CODE_SECRET", "JWT_SECRET_VALUE", "SESSION_SECRET_ID", "USER_SECRET_ID", "private@example.com"]) assert(!successLogs.includes(secret), `diagnostics leaked ${secret}`);

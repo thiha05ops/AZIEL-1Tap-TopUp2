@@ -5,6 +5,7 @@ const fs = require("fs");
 const path = require("path");
 const {
     AUTH_COOKIE_NAME,
+    LEGACY_PRODUCTION_COOKIE_DOMAIN,
     clearAuthCookie,
     cookieOptions,
     decodeSessionCookie,
@@ -40,15 +41,23 @@ function main() {
         clearCookie(name, options) { cookieCalls.push({ action: "clear", name, options }); },
         cookie(name, value, options) { cookieCalls.push({ action: "set", name, value, options }); }
     };
-    const legacyProduction = { ...production, AUTH_COOKIE_DOMAIN: ".azielplay.com" };
-    setAuthCookie(cookieResponse, "session-id", legacyProduction);
+    assert.strictEqual(LEGACY_PRODUCTION_COOKIE_DOMAIN, ".azielplay.com");
+    setAuthCookie(cookieResponse, "session-id", production);
     assert.strictEqual(cookieCalls[0].action, "clear");
-    assert.strictEqual(cookieCalls[0].options.domain, ".azielplay.com");
+    assert.strictEqual(cookieCalls[0].options.domain, ".azielplay.com", "production must retire the known legacy domain cookie without AUTH_COOKIE_DOMAIN");
     assert.strictEqual(cookieCalls[1].action, "set");
     assert.strictEqual(cookieCalls[1].options.domain, undefined);
+    assert.deepStrictEqual(cookieCalls[1].options, {
+        httpOnly: true, secure: true, sameSite: "lax", path: "/", maxAge: 15 * 24 * 60 * 60 * 1000
+    });
+    assert.strictEqual(decodeSessionCookie(cookieCalls[1].value, production), "session-id");
     cookieCalls.length = 0;
-    clearAuthCookie(cookieResponse, legacyProduction);
+    clearAuthCookie(cookieResponse, production);
     assert.deepStrictEqual(cookieCalls.map(call => [call.action, call.options.domain]), [["clear", undefined], ["clear", ".azielplay.com"]]);
+
+    cookieCalls.length = 0;
+    setAuthCookie(cookieResponse, "session-id", { ...production, AUTH_COOKIE_DOMAIN: ".azielplay.com" });
+    assert.deepStrictEqual(cookieCalls.map(call => [call.action, call.options.domain]), [["clear", ".azielplay.com"], ["set", undefined]], "matching configured and known legacy domains must not emit duplicate expirations");
 
     assert.strictEqual(csrfResult({ cookie: "aziel_session=x", origin: "https://azielplay.com" }).next, true);
     assert.strictEqual(csrfResult({ cookie: "aziel_session=x", origin: "https://evil.example" }).status, 403);
