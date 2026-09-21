@@ -836,8 +836,10 @@ function initHeaderLogout() {
 
     btn.addEventListener("click", async () => {
         try {
-            await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
-        } catch (_) { /* Local state still clears below. */ }
+            const response = await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
+            const result = await response.json();
+            if (!response.ok || !result.success) return;
+        } catch (_) { return; }
         localStorage.removeItem("token");
         localStorage.removeItem("azielToken");
         localStorage.removeItem("user");
@@ -849,7 +851,7 @@ function initHeaderLogout() {
 
         window.dispatchEvent(new Event("aziel:userChanged"));
 
-        window.location.href = "/login";
+        window.location.href = "/";
     });
 }
 

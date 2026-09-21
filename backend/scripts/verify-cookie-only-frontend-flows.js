@@ -213,6 +213,21 @@ function verifyRedirectSafety() {
     assert.strictEqual(resolve(""), "/");
 }
 
+function verifySuccessfulLogoutReturnsHome() {
+    const header = read("frontend/js/header.js");
+    const account = read("frontend/account.html");
+    const handler = header.match(/function initHeaderLogout\(\) \{[\s\S]*?\n\}/)?.[0] || "";
+    const requestIndex = handler.indexOf('fetch("/api/auth/logout"');
+    const successIndex = handler.indexOf("!response.ok || !result.success");
+    const clearIndex = handler.indexOf('localStorage.removeItem("user")');
+    const homeIndex = handler.indexOf('window.location.href = "/"');
+    assert(requestIndex >= 0 && successIndex > requestIndex, "logout must await and validate the server response");
+    assert(clearIndex > successIndex && homeIndex > clearIndex, "successful logout must clear current frontend identity before navigating home");
+    assert(!handler.includes('window.location.href = "/login"'), "successful customer logout must not navigate to login");
+    assert(!account.includes('onclick="logout()"'), "account logout must use the canonical async header handler");
+    assert(!account.includes('src="js/logout.js"'), "account must not load the competing immediate legacy logout handler");
+}
+
 (async () => {
     await verifyWallet();
     await verifyGameFlow();
@@ -224,5 +239,6 @@ function verifyRedirectSafety() {
     await verifyProtectedAuthFailureStillRedirects();
     await verifyProtectedPageGuard();
     verifyRedirectSafety();
+    verifySuccessfulLogoutReturnsHome();
     console.log("Cookie-only frontend authentication flows passed.");
 })().catch(error => { console.error(error); process.exitCode = 1; });
