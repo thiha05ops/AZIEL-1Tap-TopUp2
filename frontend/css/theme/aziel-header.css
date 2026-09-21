@@ -2817,31 +2817,3 @@ body.dark .az-profile-dropdown .dropdown-divider {
         pointer-events: none;
     }
 }
-
-/* AZIEL MOBILE DRAWER — single viewport + safe-area authority */
-@media (max-width: 900px) {
-    html body .az-header > .az-nav {
-        inset: 0 auto 0 0 !important;
-        height: auto !important;
-        min-height: 0 !important;
-        max-height: none !important;
-        padding-bottom: env(safe-area-inset-bottom) !important;
-    }
-
-    .az-mobile-drawer-head {
-        box-sizing: content-box !important;
-        padding-top: calc(12px + env(safe-area-inset-top)) !important;
-    }
-
-    .az-mobile-drawer-social {
-        flex: 0 0 auto !important;
-        margin-top: auto !important;
-        padding-bottom: 8px !important;
-    }
-
-    body.az-mobile-drawer-open .az-header > .az-mobile-drawer-backdrop {
-        inset: 0 !important;
-        width: auto !important;
-        height: auto !important;
-    }
-}

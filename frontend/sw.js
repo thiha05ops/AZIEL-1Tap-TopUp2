@@ -1,7 +1,7 @@
 const CACHE_PREFIX = "aziel-runtime";
 // Keep the suffix equal to the deterministic CORE_ASSETS content digest. The
 // migration verifier fails if a precached dependency changes without a bump.
-const SHELL_REVISION = "v8-22cb552d11eeba95";
+const SHELL_REVISION = "v8-d52339e9fc8db024";
 const CORE_CACHE = `${CACHE_PREFIX}-core-${SHELL_REVISION}`;
 const PAGE_CACHE = `${CACHE_PREFIX}-pages-v3-${SHELL_REVISION}`;
 const CODE_CACHE = `${CACHE_PREFIX}-code-${SHELL_REVISION}`;
