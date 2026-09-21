@@ -2818,25 +2818,30 @@ body.dark .az-profile-dropdown .dropdown-divider {
     }
 }
 
-/* AZIEL MOBILE DRAWER — stable Safari/PWA viewport geometry */
+/* AZIEL MOBILE DRAWER — single viewport + safe-area authority */
 @media (max-width: 900px) {
     html body .az-header > .az-nav {
-        top: 0 !important;
-        bottom: auto !important;
-        height: 100svh !important;
-        min-height: 100svh !important;
-        max-height: 100svh !important;
-        padding-bottom: 24px !important;
+        inset: 0 auto 0 0 !important;
+        height: auto !important;
+        min-height: 0 !important;
+        max-height: none !important;
+        padding-bottom: env(safe-area-inset-bottom) !important;
     }
 
     .az-mobile-drawer-head {
-        position: relative !important;
-        top: auto !important;
-        flex: 0 0 auto !important;
+        box-sizing: content-box !important;
+        padding-top: calc(12px + env(safe-area-inset-top)) !important;
     }
 
     .az-mobile-drawer-social {
+        flex: 0 0 auto !important;
         margin-top: auto !important;
         padding-bottom: 8px !important;
+    }
+
+    body.az-mobile-drawer-open .az-header > .az-mobile-drawer-backdrop {
+        inset: 0 !important;
+        width: auto !important;
+        height: auto !important;
     }
 }
