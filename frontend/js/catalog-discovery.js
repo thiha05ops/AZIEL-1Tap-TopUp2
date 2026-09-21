@@ -13,7 +13,7 @@
     }
 
     function pageName() {
-        return window.location.pathname.split("/").pop() || "/";
+        return String(window.location.pathname || "/").replace(/\/$/, "") || "/";
     }
 
     function escapeHtml(value = "") {

@@ -262,6 +262,7 @@
         const currency = CURRENCIES[preference.currency];
         const compact = `${region.flag} ${region.compact} · ${lang.compact} · ${region.symbol}`;
         const long = `${region.flag} ${region.name} · ${lang.name} · ${currency.code}`;
+        const mobile = `${region.flag} ${region.name} · ${lang.compact} · ${region.symbol}`;
 
         document.querySelectorAll("[data-preference-flag]").forEach(el => {
             el.textContent = region.flag;
@@ -270,7 +271,7 @@
             el.textContent = `${region.compact} · ${lang.compact} · ${region.symbol}`;
         });
         document.querySelectorAll("[data-mobile-preference-summary]").forEach(el => {
-            el.textContent = long;
+            el.textContent = mobile;
         });
         const preferenceLabel = window.AZIEL_LOCALE?.t?.("preferences.title", "Region & Preferences") || "Region & Preferences";
         document.getElementById("storefrontPreferenceBtn")?.setAttribute("aria-label", `${preferenceLabel}: ${compact}`);

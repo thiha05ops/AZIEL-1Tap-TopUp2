@@ -156,8 +156,8 @@ function closeMobileMenu(header, { restoreFocus = false } = {}) {
 }
 
 function initHeader() {
-    renderHeader();
     renderHeaderNav();
+    renderHeader();
     initProfileDropdown();
     initHeaderSearchTrigger();
     initHeaderCartCount();
@@ -184,6 +184,8 @@ function renderHeader() {
     const wallet = window.AZIEL?.wallet || null;
 
     const isThailand = region === "TH";
+    const language = window.AZIEL_I18N?.getLang?.() || "en";
+    const languageLabel = { en: "EN", my: "MY", th: "TH" }[language] || String(language).toUpperCase();
 
     preferenceFlags.forEach(node => {
         node.textContent = isThailand ? "🇹🇭" : "🇲🇲";
@@ -195,8 +197,8 @@ function renderHeader() {
 
     mobilePreferenceSummaries.forEach(node => {
         node.textContent = isThailand
-            ? "🇹🇭 Thailand · English · THB"
-            : "🇲🇲 Myanmar · English · MMK";
+            ? `🇹🇭 Thailand · ${languageLabel} · THB`
+            : `🇲🇲 Myanmar · ${languageLabel} · Ks`;
     });
 
     document.querySelectorAll("[data-mobile-region-flag]").forEach(node => {
@@ -209,7 +211,10 @@ function renderHeader() {
         node.textContent = isThailand ? "฿" : "Ks";
     });
     document.querySelectorAll("[data-mobile-currency-name]").forEach(node => {
-        node.textContent = isThailand ? "THB" : "MMK";
+        node.textContent = isThailand ? "THB" : "Ks";
+    });
+    document.querySelectorAll("[data-mobile-language-label]").forEach(node => {
+        node.textContent = languageLabel;
     });
 
     if (!user) {
@@ -398,6 +403,29 @@ function renderHeaderNav() {
     nav.dataset.rendered = "true";
 
     const header = nav.closest(".az-header");
+    if (header && !header.querySelector(":scope > .az-mobile-market-utility")) {
+        const utility = document.createElement("button");
+        utility.id = "mobilePreferenceBtn";
+        utility.type = "button";
+        utility.className = "az-mobile-market-utility";
+        utility.setAttribute("aria-label", "Region and preferences");
+        utility.setAttribute("aria-haspopup", "dialog");
+        utility.setAttribute("aria-expanded", "false");
+        utility.setAttribute("aria-controls", "azPreferencePanel");
+        utility.innerHTML = `
+            <span class="az-mobile-market-region">
+                <span data-mobile-region-flag>🇲🇲</span>
+                <span data-mobile-region-name>Myanmar</span>
+            </span>
+            <span class="az-mobile-market-preference">
+                <span data-mobile-language-label>EN</span>
+                <span aria-hidden="true">·</span>
+                <span data-mobile-currency-name>MMK</span>
+                <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
+            </span>
+        `;
+        header.insertBefore(utility, header.firstChild);
+    }
     if (header && !header.querySelector(":scope > .az-mobile-drawer-backdrop")) {
         const backdrop = document.createElement("button");
         backdrop.type = "button";
@@ -409,9 +437,9 @@ function renderHeaderNav() {
 
     nav.innerHTML = `
         <div class="az-mobile-drawer-head">
-            <div class="az-mobile-drawer-brand" aria-hidden="true">
+            <a class="az-mobile-drawer-brand" href="/" aria-label="AZIEL Home">
                 <img src="/assets/brand/aziel-logo-primary.svg" alt="AZIEL">
-            </div>
+            </a>
             <button class="az-mobile-drawer-close" type="button" aria-label="Close menu">
                 <i class="fa-solid fa-xmark" aria-hidden="true"></i>
             </button>
@@ -449,21 +477,6 @@ function renderHeaderNav() {
             </div>
         </div>
 
-        <button id="mobilePreferenceBtn" class="az-mobile-preference-row az-mobile-preference-footer" type="button" aria-label="Region and preferences" aria-haspopup="dialog" aria-expanded="false" aria-controls="azPreferencePanel">
-            <span class="az-mobile-pref-item">
-                <span data-mobile-region-flag>🇲🇲</span>
-                <span data-mobile-region-name>Myanmar</span>
-            </span>
-            <span class="az-mobile-pref-item">
-                <i class="fa-solid fa-globe" aria-hidden="true"></i>
-                <span>English</span>
-            </span>
-            <span class="az-mobile-pref-item">
-                <span class="az-mobile-currency-symbol" data-mobile-currency-symbol>Ks</span>
-                <span data-mobile-currency-name>MMK</span>
-            </span>
-        </button>
-
         <a class="az-mobile-drawer-link" href="/orders">
             <i class="fa-solid fa-receipt az-mobile-nav-icon" aria-hidden="true"></i>
             <span data-i18n="nav_orders">Orders</span>
@@ -472,6 +485,16 @@ function renderHeaderNav() {
             <i class="fa-regular fa-circle-question az-mobile-nav-icon" aria-hidden="true"></i>
             <span data-i18n="nav_support">Support</span>
         </a>
+
+        <div class="az-mobile-drawer-social" aria-label="AZIEL social links">
+            <span data-i18n="followUs">Follow Us</span>
+            <div>
+                <a href="https://www.facebook.com/share/1DhL7dQ16a/?mibextid=wwXIfr" target="_blank" rel="noopener noreferrer" aria-label="AZIEL on Facebook"><i class="fa-brands fa-facebook-f" aria-hidden="true"></i></a>
+                <a href="https://t.me/aziel1tap" target="_blank" rel="noopener noreferrer" aria-label="AZIEL on Telegram"><i class="fa-brands fa-telegram" aria-hidden="true"></i></a>
+                <a href="https://youtube.com/@aziel1tapshop" target="_blank" rel="noopener noreferrer" aria-label="AZIEL on YouTube"><i class="fa-brands fa-youtube" aria-hidden="true"></i></a>
+                <a href="https://discord.gg/txTGuTK76" target="_blank" rel="noopener noreferrer" aria-label="AZIEL on Discord"><i class="fa-brands fa-discord" aria-hidden="true"></i></a>
+            </div>
+        </div>
     `;
 
     markActiveHeaderLinks();
@@ -867,19 +890,14 @@ function initCanonicalHeaderScroll() {
     mount.dataset.scrollController = "canonical";
 
     const mobileQuery = window.matchMedia("(max-width: 900px)");
-    const TOP_VISIBLE_Y = 0;
-    const HIDE_AFTER_Y = 96;
-    const SHOW_AFTER = 8;
+    const COLLAPSE_AFTER_Y = 72;
+    const RESTORE_AT_Y = 8;
 
     let eventY = Math.max(0, window.scrollY || 0);
-    let previousY = eventY;
-    let upwardDelta = 0;
-    let hidden = false;
     let ticking = false;
 
     const forceVisible = () => {
-        hidden = false;
-        upwardDelta = 0;
+        mount.classList.remove("az-utility-collapsed");
         mount.classList.add("az-header-visible");
         mount.classList.remove("az-header-hidden");
         mount.classList.add("az-nav-visible");
@@ -887,18 +905,17 @@ function initCanonicalHeaderScroll() {
         header.classList.remove("nav-hidden");
     };
 
-    const hideHeader = () => {
+    const collapseUtility = () => {
         if (!mobileQuery.matches) {
             forceVisible();
             return;
         }
 
-        hidden = true;
-        upwardDelta = 0;
-        mount.classList.add("az-header-hidden");
-        mount.classList.remove("az-header-visible");
-        mount.classList.add("az-nav-hidden");
-        mount.classList.remove("az-nav-visible");
+        mount.classList.add("az-utility-collapsed");
+        mount.classList.add("az-header-visible");
+        mount.classList.remove("az-header-hidden");
+        mount.classList.add("az-nav-visible");
+        mount.classList.remove("az-nav-hidden");
         header.classList.remove("nav-hidden");
     };
 
@@ -914,23 +931,12 @@ function initCanonicalHeaderScroll() {
         header.classList.toggle("scrolled", currentY > 12);
         header.classList.remove("nav-hidden");
 
-        if (!mobileQuery.matches || currentY <= TOP_VISIBLE_Y || hasOpenHeaderSurface()) {
+        if (!mobileQuery.matches || currentY <= RESTORE_AT_Y || hasOpenHeaderSurface()) {
             forceVisible();
-            previousY = currentY;
             return;
         }
 
-        if (!hidden && currentY > HIDE_AFTER_Y && currentY > previousY) {
-            hideHeader();
-            previousY = currentY;
-            return;
-        }
-
-        if (hidden && upwardDelta >= SHOW_AFTER) {
-            forceVisible();
-        }
-
-        previousY = currentY;
+        if (currentY > COLLAPSE_AFTER_Y) collapseUtility();
     };
 
     const scheduleHeaderUpdate = () => {
@@ -944,28 +950,15 @@ function initCanonicalHeaderScroll() {
     };
 
     forceVisible();
+    updateHeaderScrollState();
 
     window.addEventListener("scroll", () => {
-        const currentY = Math.max(0, window.scrollY || 0);
-        const eventDelta = currentY - eventY;
-        eventY = currentY;
-
-        if (eventDelta < 0) {
-            upwardDelta += Math.abs(eventDelta);
-            if (hidden && upwardDelta >= SHOW_AFTER) {
-                forceVisible();
-                return;
-            }
-        } else if (eventDelta > 0) {
-            upwardDelta = 0;
-        }
-
+        eventY = Math.max(0, window.scrollY || 0);
         scheduleHeaderUpdate();
     }, { passive: true });
 
     window.addEventListener("resize", () => {
         eventY = Math.max(0, window.scrollY || 0);
-        previousY = eventY;
         forceVisible();
     });
 
@@ -981,8 +974,6 @@ function initCanonicalHeaderScroll() {
 
     window.addEventListener("aziel:headerSurfaceChanged", event => {
         eventY = Math.max(0, window.scrollY || 0);
-        previousY = eventY;
-        upwardDelta = 0;
 
         if (event.detail?.open || hasOpenHeaderSurface()) {
             forceVisible();

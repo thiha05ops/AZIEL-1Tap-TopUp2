@@ -195,6 +195,19 @@ function getTrackingAuthHeaders(extra = {}) {
     return window.AZIEL?.authHeaders?.(extra) || extra;
 }
 
+function trackingIdentityKey() {
+    const user = window.AZIEL?.user;
+    return String(user?.id || user?._id || user?.username || "");
+}
+
+async function resolveTrackingIdentity() {
+    if (!window.AZIEL) return null;
+    if (!window.AZIEL.identityResolved && typeof window.AZIEL.loadUser === "function") {
+        await window.AZIEL.loadUser();
+    }
+    return window.AZIEL.user || null;
+}
+
 document.addEventListener("DOMContentLoaded", () => {
     const params = new URLSearchParams(window.location.search);
     const orderIdFromUrl = params.get("orderId");
@@ -230,7 +243,7 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 window.addEventListener("aziel:userChanged", () => {
-    const authKey = getTrackingAuthHeaders().Authorization || "";
+    const authKey = trackingIdentityKey();
     if (authKey !== recentOrdersAuthKey) loadRecentOrders();
 });
 
@@ -1315,10 +1328,11 @@ async function loadRecentOrders() {
     if (!box) return;
 
     const requestSequence = ++recentOrdersRequestSequence;
-    const authHeaders = getTrackingAuthHeaders();
-    recentOrdersAuthKey = authHeaders.Authorization || "";
+    const user = await resolveTrackingIdentity();
+    if (requestSequence !== recentOrdersRequestSequence) return;
+    recentOrdersAuthKey = trackingIdentityKey();
 
-    if (!recentOrdersAuthKey) {
+    if (!user) {
         renderRecentOrdersTerminal(box, requestSequence, `
             <p class="empty-orders">
                 ${t("loginRequired", "Login required.")}
@@ -1329,12 +1343,9 @@ async function loadRecentOrders() {
 
     try {
         await ensureTrackingCatalog();
-        const res = await fetch(
-            trackingApiUrl("/api/order/user/me"),
-            {
-                headers: authHeaders
-            }
-        );
+        const res = window.AZIEL?.authFetch
+            ? await window.AZIEL.authFetch("/api/order/user/me")
+            : await fetch(trackingApiUrl("/api/order/user/me"), { credentials: "include" });
 
         if (!res.ok) throw new Error(`Recent orders request failed with ${res.status}.`);
         const data = await res.json();
