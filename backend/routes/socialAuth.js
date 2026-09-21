@@ -5,6 +5,7 @@ const express = require("express");
 const passport = require("../config/passport");
 const { issueUserSession } = require("../services/authSessionService");
 const { setAuthCookie } = require("../services/authCookieService");
+const { googleOAuthCallbackReplayService } = require("../services/googleOAuthCallbackReplayService");
 const { classifyGoogleAuthenticationError, classifyGoogleOAuthError, classifyGooglePassportFailure, classifyRequestHost, fingerprint, isGoogleTokenExchangeError, logGoogleOAuthDiagnostic, safeRead } = require("../utils/googleOAuthDiagnostics");
 
 function getFrontendUrl(env = process.env) {
@@ -170,6 +171,7 @@ function createSocialAuthRouter(options = {}) {
     const auth = options.passport || passport;
     const logger = options.logger || console;
     const env = options.env || process.env;
+    const callbackReplay = options.callbackReplay || googleOAuthCallbackReplayService;
     const requireGoogle = (req, res, next) => configured(req, res, next, env);
 
     router.get("/auth/google", requireGoogle, (req, res, next) => {
@@ -191,22 +193,46 @@ function createSocialAuthRouter(options = {}) {
         );
     });
 
-    router.get("/auth/google/callback", requireGoogle, (req, res, next) => {
+    router.get("/auth/google/callback", requireGoogle, async (req, res, next) => {
         const startedAt = Date.now();
         const diagnostic = callbackDiagnostic(req, env, options.randomBytes);
         try { req.googleOAuthDiagnostic = diagnostic; } catch (_) { /* Diagnostic attachment only. */ }
         logGoogleOAuthDiagnostic(logger, "GOOGLE_OAUTH_CALLBACK_RECEIVED", diagnostic);
 
-        return auth.authenticate("google", { session: false }, async (error, user, info) => {
-            if (error || !user) {
-                const tokenFailure = Boolean(error) && isGoogleTokenExchangeError(error);
-                const errorCategory = tokenFailure ? classifyGoogleOAuthError(error) : classifyGoogleAuthenticationError(error);
-                const stateMatchResult = !error && !user ? classifyGooglePassportFailure(info) : undefined;
-                const event = tokenFailure ? "GOOGLE_OAUTH_TOKEN_EXCHANGE_FAILED" : "GOOGLE_OAUTH_AUTHENTICATION_FAILED";
-                logGoogleOAuthDiagnostic(logger, event, { ...diagnostic, errorCategory, stateMatchResult, providerHttpStatus: tokenFailure ? providerStatus(error) : undefined, elapsedMs: Date.now() - startedAt }, "warn");
+        let callbackClaim;
+        try {
+            callbackClaim = await callbackReplay.claim({
+                code: safeRead(safeRead(req, "query"), "code"),
+                state: safeRead(safeRead(req, "query"), "state"),
+                expressSessionId: safeRead(req, "sessionID")
+            });
+            if (!callbackClaim.owner) {
+                const replayResult = await callbackReplay.waitForResult(callbackClaim);
+                if (replayResult.status === "completed" && replayResult.sessionId) {
+                    setAuthCookie(res, replayResult.sessionId, env);
+                    logGoogleOAuthDiagnostic(logger, "GOOGLE_OAUTH_REDIRECT_ISSUED", { ...diagnostic, destinationOriginClass: "frontend", destinationPathClass: "home" });
+                    return sendBrowserTransition(res, `${getFrontendUrl(env)}/`);
+                }
                 logGoogleOAuthDiagnostic(logger, "GOOGLE_OAUTH_REDIRECT_ISSUED", { ...diagnostic, destinationOriginClass: "frontend", destinationPathClass: "login" });
                 return sendBrowserTransition(res, oauthFailureUrl(env));
             }
+        } catch (error) {
+            return next(error);
+        }
+
+        const finishFailure = async (error, user, info) => {
+            await callbackReplay.fail(callbackClaim);
+            const tokenFailure = Boolean(error) && isGoogleTokenExchangeError(error);
+            const errorCategory = tokenFailure ? classifyGoogleOAuthError(error) : classifyGoogleAuthenticationError(error);
+            const stateMatchResult = !error && !user ? classifyGooglePassportFailure(info) : undefined;
+            const event = tokenFailure ? "GOOGLE_OAUTH_TOKEN_EXCHANGE_FAILED" : "GOOGLE_OAUTH_AUTHENTICATION_FAILED";
+            logGoogleOAuthDiagnostic(logger, event, { ...diagnostic, errorCategory, stateMatchResult, providerHttpStatus: tokenFailure ? providerStatus(error) : undefined, elapsedMs: Date.now() - startedAt }, "warn");
+            logGoogleOAuthDiagnostic(logger, "GOOGLE_OAUTH_REDIRECT_ISSUED", { ...diagnostic, destinationOriginClass: "frontend", destinationPathClass: "login" });
+            return sendBrowserTransition(res, oauthFailureUrl(env));
+        };
+
+        const handleAuthenticated = async (error, user, info) => {
+            if (error || !user) return finishFailure(error, user, info);
 
             req.user = user;
             const sessionOptions = { provider: "google", eventType: "google.login", eventTitle: "Google sign-in" };
@@ -217,15 +243,30 @@ function createSocialAuthRouter(options = {}) {
                     : await issueUserSession(req.user, req, sessionOptions);
                 logGoogleOAuthDiagnostic(logger, "GOOGLE_OAUTH_SESSION_ESTABLISHED", { ...diagnostic, userTag: fingerprint(user._id), sessionTag: fingerprint(issued.session?.sessionId), elapsedMs: Date.now() - startedAt });
             } catch (_) {
+                await callbackReplay.fail(callbackClaim);
                 logGoogleOAuthDiagnostic(logger, "GOOGLE_OAUTH_SESSION_FAILED", { ...diagnostic, errorCategory: "GOOGLE_SESSION_ISSUANCE_ERROR", elapsedMs: Date.now() - startedAt }, "warn");
                 logGoogleOAuthDiagnostic(logger, "GOOGLE_OAUTH_REDIRECT_ISSUED", { ...diagnostic, destinationOriginClass: "frontend", destinationPathClass: "login" });
                 return sendBrowserTransition(res, oauthFailureUrl(env));
             }
 
+            await callbackReplay.complete(callbackClaim, issued.session.sessionId);
             setAuthCookie(res, issued.session.sessionId, env);
             logGoogleOAuthDiagnostic(logger, "GOOGLE_OAUTH_REDIRECT_ISSUED", { ...diagnostic, destinationOriginClass: "frontend", destinationPathClass: "home" });
             return sendBrowserTransition(res, `${getFrontendUrl(env)}/`);
-        })(req, res, next);
+        };
+
+        const propagateFailure = async error => {
+            try { await callbackReplay.fail(callbackClaim); } catch (_) { /* A processing claim safely blocks another exchange. */ }
+            return next(error);
+        };
+
+        try {
+            return auth.authenticate("google", { session: false }, (error, user, info) =>
+                handleAuthenticated(error, user, info).catch(propagateFailure)
+            )(req, res, nextError => propagateFailure(nextError));
+        } catch (error) {
+            return propagateFailure(error);
+        }
     });
 
     return router;

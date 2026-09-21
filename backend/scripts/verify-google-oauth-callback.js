@@ -4,11 +4,50 @@ const assert = require("assert");
 const fs = require("fs");
 const path = require("path");
 const vm = require("vm");
-const { createSocialAuthRouter } = require("../routes/socialAuth");
+const { createSocialAuthRouter: createRouter } = require("../routes/socialAuth");
 const { readSessionId } = require("../services/authCookieService");
+const { createGoogleOAuthCallbackReplayService } = require("../services/googleOAuthCallbackReplayService");
 
 const ENV = { NODE_ENV: "production", AUTH_COOKIE_SECRET: "test-secret-with-enough-entropy", GOOGLE_CLIENT_ID: "configured", GOOGLE_CLIENT_SECRET: "configured", GOOGLE_CALLBACK_URL: "https://azielplay.com/api/auth/google/callback", FRONTEND_URL: "https://azielplay.com" };
 const GOOGLE_AUTHORIZATION_URL = "https://accounts.google.com/o/oauth2/v2/auth?client_id=configured&redirect_uri=https%3A%2F%2Fazielplay.com%2Fapi%2Fauth%2Fgoogle%2Fcallback&state=OPAQUE_STATE_VALUE&scope=profile%20email";
+const unmanagedCallbackReplay = {
+    claim: async () => ({ owner: true, unmanaged: true }),
+    complete: async (claim, sessionId) => ({ status: "completed", sessionId }),
+    fail: async () => undefined,
+    waitForResult: async () => ({ status: "failed" })
+};
+
+function createSocialAuthRouter(options = {}) {
+    return createRouter({ callbackReplay: unmanagedCallbackReplay, ...options });
+}
+
+function memoryReplayService() {
+    const records = new Map();
+    const repository = {
+        async create(document) {
+            if (records.has(document.callbackKey)) throw Object.assign(new Error("duplicate"), { code: 11000 });
+            records.set(document.callbackKey, { ...document });
+            return records.get(document.callbackKey);
+        },
+        async find(callbackKey) {
+            const record = records.get(callbackKey);
+            return record && { ...record };
+        },
+        async complete(callbackKey, bindingKey, sessionId) {
+            const record = records.get(callbackKey);
+            if (!record || record.bindingKey !== bindingKey || record.status !== "processing") return null;
+            Object.assign(record, { status: "completed", sessionId });
+            return { ...record };
+        },
+        async fail(callbackKey, bindingKey) {
+            const record = records.get(callbackKey);
+            if (!record || record.bindingKey !== bindingKey || record.status !== "processing") return null;
+            record.status = "failed";
+            return { ...record };
+        }
+    };
+    return createGoogleOAuthCallbackReplayService({ repository, env: ENV, waitIntervalMs: 1, waitTimeoutMs: 1000 });
+}
 
 function captureLogger(throwing = false) {
     const records = [];
@@ -378,6 +417,64 @@ async function main() {
     assert(successLogs.includes("GOOGLE_OAUTH_SESSION_ESTABLISHED"));
     assert(successLogs.includes("GOOGLE_OAUTH_REDIRECT_ISSUED"));
 
+    const replayService = memoryReplayService();
+    let releaseProvider;
+    let markProviderStarted;
+    const providerGate = new Promise(resolve => { releaseProvider = resolve; });
+    const providerStarted = new Promise(resolve => { markProviderStarted = resolve; });
+    let providerExchanges = 0;
+    let replaySessionCalls = 0;
+    const replayPassport = {
+        authenticate(name, options, callback) {
+            return async () => {
+                providerExchanges += 1;
+                markProviderStarted();
+                await providerGate;
+                return callback(null, user, {});
+            };
+        }
+    };
+    const replayRouter = createSocialAuthRouter({
+        passport: replayPassport,
+        callbackReplay: replayService,
+        issueUserSession: async () => {
+            replaySessionCalls += 1;
+            return { session: { sessionId: "REPLAY_SAFE_SESSION" }, user };
+        },
+        logger: captureLogger().logger,
+        env: ENV
+    });
+    const concurrentFirst = response();
+    const concurrentSecond = response();
+    const firstRun = runRoute(replayRouter, "/auth/google/callback", request("SAME_AUTHORIZATION_CODE"), concurrentFirst);
+    const secondRun = runRoute(replayRouter, "/auth/google/callback", request("SAME_AUTHORIZATION_CODE"), concurrentSecond);
+    await providerStarted;
+    assert.strictEqual(providerExchanges, 1, "concurrent identical callbacks must exchange the provider code at most once");
+    releaseProvider();
+    await Promise.all([firstRun, secondRun]);
+    assert.strictEqual(providerExchanges, 1);
+    assert.strictEqual(replaySessionCalls, 1, "concurrent identical callbacks must create exactly one AZIEL session");
+    assert.strictEqual(transitionDestination(concurrentFirst), "https://azielplay.com/");
+    assert.strictEqual(transitionDestination(concurrentSecond), "https://azielplay.com/");
+    assert.strictEqual(readSessionId({ headers: { cookie: `aziel_session=${concurrentFirst.cookieValue.value}` } }, ENV), "REPLAY_SAFE_SESSION");
+    assert.strictEqual(readSessionId({ headers: { cookie: `aziel_session=${concurrentSecond.cookieValue.value}` } }, ENV), "REPLAY_SAFE_SESSION", "duplicate response must reuse the successful authoritative session");
+
+    const sequentialReplay = response();
+    await runRoute(replayRouter, "/auth/google/callback", request("SAME_AUTHORIZATION_CODE"), sequentialReplay);
+    assert.strictEqual(providerExchanges, 1, "sequential replay must not exchange an already-processed authorization code");
+    assert.strictEqual(replaySessionCalls, 1, "sequential replay must not create another customer session");
+    assert.strictEqual(transitionDestination(sequentialReplay), "https://azielplay.com/");
+    assert.strictEqual(readSessionId({ headers: { cookie: `aziel_session=${sequentialReplay.cookieValue.value}` } }, ENV), "REPLAY_SAFE_SESSION", "sequential replay must preserve the successful session");
+
+    const mismatchedReplayRequest = request("SAME_AUTHORIZATION_CODE");
+    mismatchedReplayRequest.query.state = "DIFFERENT_STATE";
+    const mismatchedReplayErrors = [];
+    const mismatchedReplayResponse = response();
+    await runRoute(replayRouter, "/auth/google/callback", mismatchedReplayRequest, mismatchedReplayResponse, error => mismatchedReplayErrors.push(error));
+    assert.strictEqual(mismatchedReplayErrors[0]?.code, "GOOGLE_OAUTH_CALLBACK_REPLAY_BINDING_MISMATCH", "a replay must remain bound to the original OAuth state and express session");
+    assert.strictEqual(providerExchanges, 1, "binding mismatch must never reach the provider exchange");
+    assert.deepStrictEqual(mismatchedReplayResponse.committedStatuses, []);
+
     const sessionObserved = captureLogger();
     const sessionStub = passportResult(null, user);
     const sessionRouter = createSocialAuthRouter({ passport: sessionStub.passport, issueUserSession: async () => { throw new Error("JWT_SECRET_FAILURE"); }, handoffService: { create: async () => "unused", consume: async () => null }, logger: sessionObserved.logger, env: ENV });
@@ -404,11 +501,14 @@ async function main() {
 
     const root = path.resolve(__dirname, "../..");
     const social = fs.readFileSync(path.join(root, "backend/routes/socialAuth.js"), "utf8");
+    const server = fs.readFileSync(path.join(root, "backend/server.js"), "utf8");
     const passport = fs.readFileSync(path.join(root, "backend/config/passport.js"), "utf8");
     const login = fs.readFileSync(path.join(root, "frontend/js/login.js"), "utf8");
     const loginHtml = fs.readFileSync(path.join(root, "frontend/login.html"), "utf8");
     assert.strictEqual((social.match(/router\.get\("\/auth\/google\/callback"/g) || []).length, 1);
-    assert(social.includes('auth.authenticate("google", { session: false }, async (error, user, info)'));
+    assert.strictEqual((server.match(/require\("\.\/routes\/socialAuth"\)/g) || []).length, 1, "the Google callback router must have one application mount");
+    assert(social.includes('auth.authenticate("google", { session: false }, (error, user, info)'));
+    assert(social.includes("handleAuthenticated(error, user, info).catch(propagateFailure)"), "async callback finalization errors must propagate through Express");
     assert(passport.includes("passReqToCallback: true"));
     assert(passport.includes("state: true"), "Google OAuth must retain server-side state validation");
     assert(passport.includes("issueUserSession") === false, "Passport strategy must not take over AZIEL session authority");
