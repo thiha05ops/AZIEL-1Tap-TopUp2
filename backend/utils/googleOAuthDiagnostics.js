@@ -6,7 +6,10 @@ const SAFE_FIELDS = new Set([
     "correlationId", "requestHostClass", "requestProtocol", "callbackOriginClass",
     "callbackPathClass", "codePresent", "statePresent", "codeFingerprint",
     "errorCategory", "providerHttpStatus", "elapsedMs", "profileTag", "userTag",
-    "sessionTag", "created", "linked", "destinationOriginClass", "destinationPathClass"
+    "sessionTag", "created", "linked", "destinationOriginClass", "destinationPathClass",
+    "oauthCookiePresent", "expressSessionIdPresent", "expressSessionTag",
+    "oauthStatePresentInSession", "stateMatchResult", "sessionSaveStarted",
+    "sessionSaveCompleted", "sessionSaveFailed", "sessionSaveElapsedMs"
 ]);
 
 function fingerprint(value) {
@@ -31,8 +34,12 @@ function safeFields(fields = {}) {
         const output = {};
         for (const [key, value] of Object.entries(fields || {})) {
             if (!SAFE_FIELDS.has(key) || value === undefined || value === null || value === "") continue;
-            if (["codePresent", "statePresent", "created", "linked"].includes(key)) output[key] = value === true;
-            else if (["providerHttpStatus", "elapsedMs"].includes(key)) {
+            if ([
+                "codePresent", "statePresent", "created", "linked", "oauthCookiePresent",
+                "expressSessionIdPresent", "oauthStatePresentInSession", "sessionSaveStarted",
+                "sessionSaveCompleted", "sessionSaveFailed"
+            ].includes(key)) output[key] = value === true;
+            else if (["providerHttpStatus", "elapsedMs", "sessionSaveElapsedMs"].includes(key)) {
                 const number = Number(value);
                 if (Number.isFinite(number)) output[key] = number;
             } else output[key] = safeToken(value);
@@ -91,4 +98,13 @@ function classifyGoogleAuthenticationError(error) {
     } catch (_) { return "GOOGLE_AUTH_UNKNOWN_ERROR"; }
 }
 
-module.exports = Object.freeze({ classifyGoogleAuthenticationError, classifyGoogleOAuthError, classifyRequestHost, fingerprint, isGoogleTokenExchangeError, logGoogleOAuthDiagnostic, safeFields, safeRead });
+function classifyGooglePassportFailure(info) {
+    try {
+        const message = safeToken(safeRead(info, "message"), 160).toLowerCase();
+        if (message.includes("unable_to_verify_authorization_request_state")) return "missing_session_state";
+        if (message.includes("invalid_authorization_request_state")) return "state_mismatch";
+        return "other_passport_failure";
+    } catch (_) { return "other_passport_failure"; }
+}
+
+module.exports = Object.freeze({ classifyGoogleAuthenticationError, classifyGoogleOAuthError, classifyGooglePassportFailure, classifyRequestHost, fingerprint, isGoogleTokenExchangeError, logGoogleOAuthDiagnostic, safeFields, safeRead });

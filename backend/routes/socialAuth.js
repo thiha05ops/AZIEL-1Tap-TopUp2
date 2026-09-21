@@ -5,7 +5,7 @@ const express = require("express");
 const passport = require("../config/passport");
 const { issueUserSession } = require("../services/authSessionService");
 const { setAuthCookie } = require("../services/authCookieService");
-const { classifyGoogleAuthenticationError, classifyGoogleOAuthError, classifyRequestHost, fingerprint, isGoogleTokenExchangeError, logGoogleOAuthDiagnostic, safeRead } = require("../utils/googleOAuthDiagnostics");
+const { classifyGoogleAuthenticationError, classifyGoogleOAuthError, classifyGooglePassportFailure, classifyRequestHost, fingerprint, isGoogleTokenExchangeError, logGoogleOAuthDiagnostic, safeRead } = require("../utils/googleOAuthDiagnostics");
 
 function getFrontendUrl(env = process.env) {
     return (env.FRONTEND_URL || env.CLIENT_URL || "http://127.0.0.1:5500/frontend").replace(/\/$/, "");
@@ -35,8 +35,25 @@ function callbackDiagnostic(req, env, randomBytes) {
     try {
         const query = safeRead(req, "query");
         const code = safeRead(query, "code");
-        return { ...requestDiagnostic(req, env, randomBytes), codePresent: Boolean(code), statePresent: Boolean(safeRead(query, "state")), codeFingerprint: fingerprint(code) };
+        return { ...requestDiagnostic(req, env, randomBytes), ...sessionDiagnostic(req), codePresent: Boolean(code), statePresent: Boolean(safeRead(query, "state")), codeFingerprint: fingerprint(code) };
     } catch (_) { return requestDiagnostic(req, env, randomBytes); }
+}
+
+function sessionDiagnostic(req) {
+    try {
+        const cookieHeader = String(safeRead(safeRead(req, "headers"), "cookie") || "");
+        const sessionId = safeRead(req, "sessionID");
+        const sessionValue = safeRead(req, "session");
+        const oauthStatePresentInSession = Object.values(sessionValue || {}).some(value =>
+            value && typeof value === "object" && Boolean(safeRead(value, "state"))
+        );
+        return {
+            oauthCookiePresent: cookieHeader.split(";").some(part => part.trim().startsWith("aziel.oauth=")),
+            expressSessionIdPresent: Boolean(sessionId),
+            expressSessionTag: fingerprint(sessionId),
+            oauthStatePresentInSession
+        };
+    } catch (_) { return {}; }
 }
 
 function providerStatus(error) {
@@ -57,7 +74,7 @@ function sendBrowserTransition(res, destination) {
     return res.status(200).type("html").send(`<!doctype html><html><head><meta charset="utf-8"><meta name="referrer" content="no-referrer"><title>Continue</title></head><body><script>window.location.replace(${safeDestination});</script></body></html>`);
 }
 
-function browserOwnedPassportRedirect(authenticate, req, res, next) {
+function browserOwnedPassportRedirect(authenticate, req, res, next, options = {}) {
     const ownsSetHeader = Object.prototype.hasOwnProperty.call(res, "setHeader");
     const ownsEnd = Object.prototype.hasOwnProperty.call(res, "end");
     const originalSetHeader = res.setHeader;
@@ -65,6 +82,7 @@ function browserOwnedPassportRedirect(authenticate, req, res, next) {
     const originalStatusCode = res.statusCode;
     let location = "";
     let restored = false;
+    let completionClaimed = false;
 
     function restore() {
         if (restored) return;
@@ -88,9 +106,33 @@ function browserOwnedPassportRedirect(authenticate, req, res, next) {
     res.end = function finishPassportResponse(...args) {
         const status = res.statusCode;
         restore();
+        if (completionClaimed) return res;
         if (location && status >= 300 && status < 400) {
             res.statusCode = originalStatusCode;
-            return sendBrowserTransition(res, location);
+            completionClaimed = true;
+            const startedAt = Date.now();
+            options.onSessionSave?.("started", { ...sessionDiagnostic(req), sessionSaveStarted: true });
+            if (!req.session || typeof req.session.save !== "function") {
+                const error = new Error("GOOGLE_OAUTH_SESSION_SAVE_UNAVAILABLE");
+                options.onSessionSave?.("failed", { ...sessionDiagnostic(req), sessionSaveStarted: true, sessionSaveFailed: true, sessionSaveElapsedMs: Date.now() - startedAt });
+                return next(error);
+            }
+            let sessionSaveSettled = false;
+            return req.session.save(error => {
+                if (sessionSaveSettled) return undefined;
+                sessionSaveSettled = true;
+                if (error) {
+                    options.onSessionSave?.("failed", { ...sessionDiagnostic(req), sessionSaveStarted: true, sessionSaveFailed: true, sessionSaveElapsedMs: Date.now() - startedAt });
+                    return next(error);
+                }
+                options.onSessionSave?.("completed", { ...sessionDiagnostic(req), sessionSaveStarted: true, sessionSaveCompleted: true, sessionSaveElapsedMs: Date.now() - startedAt });
+                return sendBrowserTransition(res, location);
+            });
+        }
+        if (status >= 300 && status < 400 && !location) {
+            completionClaimed = true;
+            res.statusCode = originalStatusCode;
+            return next(new Error("GOOGLE_OAUTH_REDIRECT_LOCATION_MISSING"));
         }
         return originalEnd.apply(res, args);
     };
@@ -99,12 +141,17 @@ function browserOwnedPassportRedirect(authenticate, req, res, next) {
         const result = authenticate(req, res, error => {
             restore();
             res.statusCode = originalStatusCode;
-            return next(error);
+            if (completionClaimed) return undefined;
+            const nextResult = next(error);
+            completionClaimed = true;
+            return nextResult;
         });
         if (result && typeof result.then === "function") {
             return result.catch(error => {
                 restore();
                 res.statusCode = originalStatusCode;
+                if (completionClaimed) return undefined;
+                completionClaimed = true;
                 return next(error);
             });
         }
@@ -112,6 +159,8 @@ function browserOwnedPassportRedirect(authenticate, req, res, next) {
     } catch (error) {
         restore();
         res.statusCode = originalStatusCode;
+        if (completionClaimed) return undefined;
+        completionClaimed = true;
         throw error;
     }
 }
@@ -130,7 +179,15 @@ function createSocialAuthRouter(options = {}) {
             auth.authenticate("google", { scope: ["profile", "email"], prompt: "consent select_account", session: false, state: true }),
             req,
             res,
-            next
+            next,
+            {
+                onSessionSave(stage, fields) {
+                    const event = stage === "started"
+                        ? "GOOGLE_OAUTH_STATE_SAVE_STARTED"
+                        : (stage === "completed" ? "GOOGLE_OAUTH_STATE_SAVE_COMPLETED" : "GOOGLE_OAUTH_STATE_SAVE_FAILED");
+                    logGoogleOAuthDiagnostic(logger, event, { ...diagnostic, ...fields }, stage === "failed" ? "warn" : "info");
+                }
+            }
         );
     });
 
@@ -140,12 +197,13 @@ function createSocialAuthRouter(options = {}) {
         try { req.googleOAuthDiagnostic = diagnostic; } catch (_) { /* Diagnostic attachment only. */ }
         logGoogleOAuthDiagnostic(logger, "GOOGLE_OAUTH_CALLBACK_RECEIVED", diagnostic);
 
-        return auth.authenticate("google", { session: false }, async (error, user) => {
+        return auth.authenticate("google", { session: false }, async (error, user, info) => {
             if (error || !user) {
                 const tokenFailure = Boolean(error) && isGoogleTokenExchangeError(error);
                 const errorCategory = tokenFailure ? classifyGoogleOAuthError(error) : classifyGoogleAuthenticationError(error);
+                const stateMatchResult = !error && !user ? classifyGooglePassportFailure(info) : undefined;
                 const event = tokenFailure ? "GOOGLE_OAUTH_TOKEN_EXCHANGE_FAILED" : "GOOGLE_OAUTH_AUTHENTICATION_FAILED";
-                logGoogleOAuthDiagnostic(logger, event, { ...diagnostic, errorCategory, providerHttpStatus: tokenFailure ? providerStatus(error) : undefined, elapsedMs: Date.now() - startedAt }, "warn");
+                logGoogleOAuthDiagnostic(logger, event, { ...diagnostic, errorCategory, stateMatchResult, providerHttpStatus: tokenFailure ? providerStatus(error) : undefined, elapsedMs: Date.now() - startedAt }, "warn");
                 logGoogleOAuthDiagnostic(logger, "GOOGLE_OAUTH_REDIRECT_ISSUED", { ...diagnostic, destinationOriginClass: "frontend", destinationPathClass: "login" });
                 return sendBrowserTransition(res, oauthFailureUrl(env));
             }

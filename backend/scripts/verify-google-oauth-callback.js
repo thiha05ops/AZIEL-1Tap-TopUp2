@@ -37,8 +37,16 @@ function transitionDestination(res) {
     return match ? JSON.parse(match[1]) : "";
 }
 
-function request(code = "AUTHORIZATION_CODE_SECRET") {
-    return { query: { code, state: "STATE_SECRET" }, headers: { host: "azielplay.com" }, protocol: "https", connection: {}, socket: {} };
+function request(code = "AUTHORIZATION_CODE_SECRET", session = { save(callback) { callback(); } }) {
+    return {
+        query: { code, state: "STATE_SECRET" },
+        headers: { host: "azielplay.com", cookie: "aziel.oauth=SIGNED_COOKIE_SECRET" },
+        protocol: "https",
+        connection: {},
+        socket: {},
+        sessionID: "EXPRESS_SESSION_SECRET_ID",
+        session
+    };
 }
 
 async function runRoute(router, routePath, req, res, onError) {
@@ -60,7 +68,7 @@ async function runRoute(router, routePath, req, res, onError) {
     await dispatch(0);
 }
 
-function passportResult(error, user) {
+function passportResult(error, user, info = {}) {
     const calls = [];
     return {
         calls,
@@ -68,7 +76,7 @@ function passportResult(error, user) {
             authenticate(name, options, callback) {
                 calls.push({ name, options, hasCallback: typeof callback === "function" });
                 return async (req, res) => {
-                    if (callback) return callback(error, user, {});
+                    if (callback) return callback(error, user, info);
                     res.statusCode = 302;
                     res.setHeader("Location", GOOGLE_AUTHORIZATION_URL);
                     res.setHeader("Content-Length", "0");
@@ -87,9 +95,9 @@ function internalTokenError(code) {
     return Object.assign(new Error("Failed to obtain access token"), { name: "InternalOAuthError", oauthError: { code } });
 }
 
-async function failureCase(error, expectedEvent, expectedCategory, loggerOverride, routerOptions = {}) {
+async function failureCase(error, expectedEvent, expectedCategory, loggerOverride, routerOptions = {}, info = {}) {
     const observed = loggerOverride || captureLogger();
-    const stub = passportResult(error, null);
+    const stub = passportResult(error, null, info);
     let sessionCalls = 0;
     const router = createSocialAuthRouter({ passport: stub.passport, issueUserSession: async () => { sessionCalls += 1; }, handoffService: { create: async () => "unused", consume: async () => null }, logger: observed.logger, env: ENV, ...routerOptions });
     const req = request(); const res = response();
@@ -132,6 +140,79 @@ async function main() {
     assert.strictEqual(startRes.setHeader, originalStartSetHeader, "successful transition must restore setHeader");
     assert.strictEqual(startRes.end, originalStartEnd, "successful transition must restore end");
 
+    let releaseDelayedSave;
+    let delayedSaveCalls = 0;
+    const delayedSession = {
+        oauth2: { state: "RAW_OAUTH_STATE_MUST_NOT_LOG" },
+        save(callback) {
+            delayedSaveCalls += 1;
+            releaseDelayedSave = callback;
+        }
+    };
+    const delayedObserved = captureLogger();
+    const delayedRouter = createSocialAuthRouter({ passport: passportResult(null, null).passport, logger: delayedObserved.logger, env: ENV });
+    const delayedRes = response();
+    const delayedErrors = [];
+    const delayedRun = runRoute(delayedRouter, "/auth/google", request("AUTHORIZATION_CODE_SECRET", delayedSession), delayedRes, error => delayedErrors.push(error));
+    await Promise.resolve();
+    assert.strictEqual(delayedSaveCalls, 1, "OAuth start must explicitly save the state session exactly once");
+    assert.strictEqual(delayedRes.body, null, "transition HTML must not exist while session persistence is pending");
+    assert.deepStrictEqual(delayedRes.committedStatuses, [], "no response may be committed before session persistence");
+    releaseDelayedSave();
+    await delayedRun;
+    assert.strictEqual(transitionDestination(delayedRes), GOOGLE_AUTHORIZATION_URL, "exact Passport destination must be emitted after persistence");
+    assert.deepStrictEqual(delayedRes.committedStatuses, [200], "transition must be emitted exactly once after persistence");
+    assert.deepStrictEqual(delayedErrors, []);
+    const delayedLogs = JSON.stringify(delayedObserved.records);
+    assert(delayedLogs.includes("GOOGLE_OAUTH_STATE_SAVE_STARTED"));
+    assert(delayedLogs.includes("GOOGLE_OAUTH_STATE_SAVE_COMPLETED"));
+    for (const secret of ["RAW_OAUTH_STATE_MUST_NOT_LOG", "SIGNED_COOKIE_SECRET", "EXPRESS_SESSION_SECRET_ID"]) {
+        assert(!delayedLogs.includes(secret), `state-save diagnostics leaked ${secret}`);
+    }
+
+    const saveFailure = new Error("MONGO_SAVE_SECRET_FAILURE");
+    const failedSaveObserved = captureLogger();
+    const failedSaveRouter = createSocialAuthRouter({ passport: passportResult(null, null).passport, logger: failedSaveObserved.logger, env: ENV });
+    const failedSaveRes = response();
+    const failedSaveErrors = [];
+    await runRoute(failedSaveRouter, "/auth/google", request("AUTHORIZATION_CODE_SECRET", {
+        oauth2: { state: "RAW_FAILED_STATE" },
+        save(callback) { callback(saveFailure); }
+    }), failedSaveRes, error => failedSaveErrors.push(error));
+    assert.deepStrictEqual(failedSaveErrors, [saveFailure], "session save failure must propagate exactly once");
+    assert.strictEqual(failedSaveRes.body, null, "session save failure must not expose Google transition HTML");
+    assert.deepStrictEqual(failedSaveRes.committedStatuses, []);
+    const failedSaveLogs = JSON.stringify(failedSaveObserved.records);
+    assert(failedSaveLogs.includes("GOOGLE_OAUTH_STATE_SAVE_FAILED"));
+    assert(!failedSaveLogs.includes("MONGO_SAVE_SECRET_FAILURE"));
+    assert(!failedSaveLogs.includes("RAW_FAILED_STATE"));
+
+    let duplicateSaveCallback;
+    const duplicatePassport = {
+        authenticate() {
+            return (req, res) => {
+                res.statusCode = 302;
+                res.setHeader("Location", GOOGLE_AUTHORIZATION_URL);
+                const finish = res.end;
+                finish();
+                finish();
+                return Promise.reject(new Error("LATE_PASSPORT_REJECTION"));
+            };
+        }
+    };
+    const duplicateRouter = createSocialAuthRouter({ passport: duplicatePassport, logger: captureLogger().logger, env: ENV });
+    const duplicateRes = response();
+    const duplicateErrors = [];
+    const duplicateRun = runRoute(duplicateRouter, "/auth/google", request("AUTHORIZATION_CODE_SECRET", {
+        save(callback) { duplicateSaveCallback = callback; }
+    }), duplicateRes, error => duplicateErrors.push(error));
+    await Promise.resolve();
+    duplicateSaveCallback();
+    duplicateSaveCallback(new Error("LATE_SAVE_FAILURE"));
+    await duplicateRun;
+    assert.deepStrictEqual(duplicateRes.committedStatuses, [200], "duplicate completions must emit one transition only");
+    assert.deepStrictEqual(duplicateErrors, [], "late errors must not run next after a successful transition");
+
     for (const mode of ["next", "throw"]) {
         const failure = new Error(`start-${mode}`);
         const failurePassport = {
@@ -145,10 +226,14 @@ async function main() {
         const failureRes = response();
         const originalSetHeader = failureRes.setHeader;
         const originalEnd = failureRes.end;
-        await assert.rejects(runRoute(failureRouter, "/auth/google", request(), failureRes), failure);
+        let failureSaveCalls = 0;
+        await assert.rejects(runRoute(failureRouter, "/auth/google", request("AUTHORIZATION_CODE_SECRET", {
+            save(callback) { failureSaveCalls += 1; callback(); }
+        }), failureRes), failure);
         assert.strictEqual(failureRes.setHeader, originalSetHeader, `${mode} path must restore setHeader`);
         assert.strictEqual(failureRes.end, originalEnd, `${mode} path must restore end`);
         assert.strictEqual(failureRes.statusCode, 200, `${mode} path must restore statusCode`);
+        assert.strictEqual(failureSaveCalls, 0, `${mode} Passport failure must not save or transition`);
     }
 
     const rejectedError = new Error("start-reject");
@@ -187,6 +272,20 @@ async function main() {
 
     const noUserLogs = await failureCase(null, "GOOGLE_OAUTH_AUTHENTICATION_FAILED", "GOOGLE_AUTH_UNKNOWN_ERROR");
     assert(!JSON.stringify(noUserLogs).includes("GOOGLE_OAUTH_TOKEN_EXCHANGE_FAILED"));
+
+    const missingStateInfo = { message: "Unable to verify authorization request state.", rawState: "RAW_MISSING_STATE_SECRET" };
+    const missingStateLogs = JSON.stringify(await failureCase(null, "GOOGLE_OAUTH_AUTHENTICATION_FAILED", "GOOGLE_AUTH_UNKNOWN_ERROR", undefined, {}, missingStateInfo));
+    assert(missingStateLogs.includes('"stateMatchResult":"missing_session_state"'));
+    for (const secret of ["RAW_MISSING_STATE_SECRET", "AUTHORIZATION_CODE_SECRET", "SIGNED_COOKIE_SECRET", "EXPRESS_SESSION_SECRET_ID"]) {
+        assert(!missingStateLogs.includes(secret), `missing-state diagnostics leaked ${secret}`);
+    }
+
+    const mismatchedStateInfo = { message: "Invalid authorization request state.", rawState: "RAW_MISMATCHED_STATE_SECRET" };
+    const mismatchedStateLogs = JSON.stringify(await failureCase(null, "GOOGLE_OAUTH_AUTHENTICATION_FAILED", "GOOGLE_AUTH_UNKNOWN_ERROR", undefined, {}, mismatchedStateInfo));
+    assert(mismatchedStateLogs.includes('"stateMatchResult":"state_mismatch"'));
+    for (const secret of ["RAW_MISMATCHED_STATE_SECRET", "AUTHORIZATION_CODE_SECRET", "SIGNED_COOKIE_SECRET", "EXPRESS_SESSION_SECRET_ID"]) {
+        assert(!mismatchedStateLogs.includes(secret), `mismatched-state diagnostics leaked ${secret}`);
+    }
 
     const first = await failureCase(tokenError("invalid_grant"), "GOOGLE_OAUTH_TOKEN_EXCHANGE_FAILED", "GOOGLE_TOKEN_INVALID_GRANT");
     const second = await failureCase(tokenError("invalid_grant"), "GOOGLE_OAUTH_TOKEN_EXCHANGE_FAILED", "GOOGLE_TOKEN_INVALID_GRANT");
@@ -242,7 +341,7 @@ async function main() {
     const passport = fs.readFileSync(path.join(root, "backend/config/passport.js"), "utf8");
     const login = fs.readFileSync(path.join(root, "frontend/js/login.js"), "utf8");
     assert.strictEqual((social.match(/router\.get\("\/auth\/google\/callback"/g) || []).length, 1);
-    assert(social.includes('auth.authenticate("google", { session: false }, async (error, user)'));
+    assert(social.includes('auth.authenticate("google", { session: false }, async (error, user, info)'));
     assert(passport.includes("passReqToCallback: true"));
     assert(passport.includes("state: true"), "Google OAuth must retain server-side state validation");
     assert(passport.includes("issueUserSession") === false, "Passport strategy must not take over AZIEL session authority");
