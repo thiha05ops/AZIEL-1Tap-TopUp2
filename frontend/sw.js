@@ -1,7 +1,7 @@
 const CACHE_PREFIX = "aziel-runtime";
 // Keep the suffix equal to the deterministic CORE_ASSETS content digest. The
 // migration verifier fails if a precached dependency changes without a bump.
-const SHELL_REVISION = "v8-a53a013005e22a4d";
+const SHELL_REVISION = "v8-a2179c6215a47819";
 const CORE_CACHE = `${CACHE_PREFIX}-core-${SHELL_REVISION}`;
 const PAGE_CACHE = `${CACHE_PREFIX}-pages-v3-${SHELL_REVISION}`;
 const CODE_CACHE = `${CACHE_PREFIX}-code-${SHELL_REVISION}`;
@@ -234,13 +234,25 @@ async function staleWhileRevalidateCodeAsset(event, request) {
     const cache = await caches.open(CODE_CACHE);
     const url = new URL(request.url);
     const cacheKey = isVersionedCodeAsset(url) ? request : createNormalizedCacheKey(request);
-    const cached = await cache.match(cacheKey) || await caches.match(createNormalizedCacheKey(request));
-    const update = fetch(request, { cache: "no-cache" }).then(async response => {
-        if (response.ok && response.type === "basic") await cache.put(cacheKey, response.clone());
+
+    try {
+        const response = await fetch(request, { cache: "no-cache" });
+
+        if (response.ok && response.type === "basic") {
+            await cache.put(cacheKey, response.clone());
+        }
+
         return response;
-    }).catch(() => null);
-    if (cached) { event.waitUntil(update); return cached; }
-    return await update || new Response("", { status: 503, statusText: "Asset unavailable" });
+    } catch {
+        const cached =
+            await cache.match(cacheKey) ||
+            await caches.match(createNormalizedCacheKey(request));
+
+        return cached || new Response("", {
+            status: 503,
+            statusText: "Asset unavailable"
+        });
+    }
 }
 
 async function staleWhileRevalidatePresentation(event, request) {
