@@ -2139,10 +2139,69 @@ body.dark .az-profile-dropdown .dropdown-divider {
 @media (max-width: 900px) {
     html body .az-header {
         min-height: calc(60px + env(safe-area-inset-top)) !important;
-        grid-template-columns: 44px minmax(0, 1fr) 44px !important;
-        grid-template-areas: "menu search profile" !important;
+        grid-template-columns: 44px minmax(92px, 1fr) 44px 44px !important;
+        grid-template-areas:
+            "utility utility utility utility"
+            "menu logo search profile" !important;
         column-gap: 8px !important;
-        padding: calc(env(safe-area-inset-top) + 8px) 12px 8px !important;
+        row-gap: 0 !important;
+        padding: env(safe-area-inset-top) 12px 8px !important;
+    }
+
+    html body .az-header > .az-mobile-market-utility {
+        grid-area: utility !important;
+        display: flex !important;
+        width: 100% !important;
+        max-height: 34px;
+        min-height: 34px;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        overflow: hidden;
+        padding: 0 6px;
+        border: 0;
+        background: transparent;
+        color: var(--text-secondary);
+        font: inherit;
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: .01em;
+        opacity: 1;
+        cursor: pointer;
+        transition: max-height .2s ease, min-height .2s ease, opacity .16s ease;
+    }
+
+    html body .az-header > .az-mobile-market-utility .az-mobile-market-region,
+    html body .az-header > .az-mobile-market-utility .az-mobile-market-preference {
+        display: inline-flex;
+        align-items: center;
+        min-width: 0;
+    }
+
+    html body .az-header > .az-mobile-market-utility .az-mobile-market-region {
+        gap: 6px;
+        color: var(--text);
+        font-weight: 600;
+    }
+
+    html body .az-header > .az-mobile-market-utility .az-mobile-market-preference {
+        gap: 5px;
+        color: var(--text-secondary);
+        font-weight: 600;
+        white-space: nowrap;
+    }
+
+    html body .az-header > .az-mobile-market-utility i {
+        margin-left: 2px;
+        font-size: 9px;
+        color: var(--text-muted);
+    }
+
+    html body #azHeaderMount.az-utility-collapsed .az-header > .az-mobile-market-utility {
+        max-height: 0;
+        min-height: 0;
+        opacity: 0;
+        pointer-events: none;
     }
 
     html body .az-header .az-mobile-menu-btn {
@@ -2153,7 +2212,11 @@ body.dark .az-profile-dropdown .dropdown-divider {
     }
 
     html body .az-header > .az-logo {
-        display: none !important;
+        grid-area: logo !important;
+        display: flex !important;
+        width: 104px !important;
+        height: 44px !important;
+        justify-self: center !important;
     }
 
     html body .az-header > .az-header-right {
@@ -2162,30 +2225,21 @@ body.dark .az-profile-dropdown .dropdown-divider {
 
     html body .az-header .az-search-trigger {
         grid-area: search !important;
-        display: flex !important;
-        width: 100% !important;
-        min-width: 0 !important;
+        display: grid !important;
+        width: 44px !important;
+        min-width: 44px !important;
         height: 44px !important;
-        padding: 0 13px !important;
-        justify-content: space-between !important;
-        gap: 10px !important;
-        border: 1px solid var(--border) !important;
-        border-radius: 10px !important;
-        background: var(--input-bg) !important;
+        padding: 0 !important;
+        place-items: center !important;
+        border: 0 !important;
+        background: transparent !important;
         color: var(--text-muted) !important;
         box-shadow: none !important;
         text-align: left !important;
     }
 
     .az-search-trigger-placeholder {
-        display: block;
-        min-width: 0;
-        overflow: hidden;
-        font-size: 13px;
-        font-weight: 500;
-        line-height: 1;
-        white-space: nowrap;
-        text-overflow: ellipsis;
+        display: none !important;
     }
 
     html body .az-header .az-search-trigger i {
@@ -2419,7 +2473,7 @@ body.dark .az-profile-dropdown .dropdown-divider {
     }
 
     .az-header > .az-nav > .az-nav-home {
-        order: 10;
+        display: none !important;
     }
 
     .az-header > .az-nav > #gamesNavDropdown {
@@ -2441,11 +2495,6 @@ body.dark .az-profile-dropdown .dropdown-divider {
         order: 50;
     }
 
-    .az-header > .az-nav > #mobilePreferenceBtn {
-        order: 100;
-        margin-top: auto !important;
-    }
-
     .az-header > .az-nav > a.az-nav-link,
     .az-header > .az-nav > a.az-mobile-drawer-link,
     .az-header > .az-nav > .az-nav-dropdown > .az-nav-drop-btn {
@@ -2460,6 +2509,48 @@ body.dark .az-profile-dropdown .dropdown-divider {
         font-size: 14px !important;
         font-weight: 600 !important;
         line-height: 1.2 !important;
+    }
+
+    .az-header > .az-nav > a.az-nav-home {
+        display: none !important;
+    }
+
+    .az-mobile-drawer-social {
+        order: 100;
+        width: 100%;
+        margin-top: auto;
+        padding: 18px 12px max(8px, env(safe-area-inset-bottom));
+        border-top: 1px solid var(--border);
+    }
+
+    .az-mobile-drawer-social > span {
+        display: block;
+        margin-bottom: 10px;
+        color: var(--text-muted);
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: .06em;
+        text-transform: uppercase;
+    }
+
+    .az-mobile-drawer-social > div {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .az-mobile-drawer-social a {
+        display: inline-grid !important;
+        width: 34px !important;
+        height: 34px !important;
+        min-height: 34px !important;
+        padding: 0 !important;
+        place-items: center;
+        border: 1px solid var(--border) !important;
+        border-radius: 50% !important;
+        color: var(--text-secondary) !important;
+        background: transparent !important;
+        font-size: 13px !important;
     }
 
     .az-mobile-nav-icon {
@@ -2523,6 +2614,14 @@ body.dark .az-profile-dropdown .dropdown-divider {
 
 /* Mobile-only elements must never alter desktop navigation layout. */
 @media (min-width: 901px) {
+    .az-mobile-market-utility {
+        display: none !important;
+    }
+
+    .az-mobile-drawer-social {
+        display: none !important;
+    }
+
     .az-mobile-nav-icon {
         display: none !important;
     }
@@ -2559,5 +2658,111 @@ body.dark .az-profile-dropdown .dropdown-divider {
     body.az-mobile-drawer-open .az-header > .az-nav {
         z-index: 99999 !important;
         pointer-events: auto !important;
+    }
+}
+
+/* Mobile market utility — visual role separation */
+@media (max-width: 900px) {
+    html body .az-header > .az-mobile-market-utility .az-mobile-market-region {
+        position: relative;
+        padding-right: 16px;
+    }
+
+    html body .az-header > .az-mobile-market-utility .az-mobile-market-region::after {
+        content: "";
+        position: absolute;
+        right: 0;
+        top: 50%;
+        width: 1px;
+        height: 14px;
+        transform: translateY(-50%);
+        background: var(--border);
+        opacity: .7;
+    }
+
+    html body .az-header > .az-mobile-market-utility .az-mobile-market-preference {
+        padding-left: 10px;
+    }
+}
+
+/* Mobile market utility — final compact commerce treatment */
+@media (max-width: 900px) {
+    html body .az-header > .az-mobile-market-utility {
+        min-height: 40px;
+        height: 40px;
+        padding-left: 16px;
+        padding-right: 16px;
+        background: var(--surface, #fff);
+        border-bottom: 1px solid var(--border, rgba(15, 23, 42, .08));
+        box-sizing: border-box;
+    }
+
+    html body .az-header > .az-mobile-market-utility .az-mobile-market-region {
+        padding-right: 0;
+        font-size: 12px;
+        font-weight: 600;
+        line-height: 1;
+    }
+
+    html body .az-header > .az-mobile-market-utility .az-mobile-market-region::after {
+        content: none;
+        display: none;
+    }
+
+    html body .az-header > .az-mobile-market-utility .az-mobile-market-region img,
+    html body .az-header > .az-mobile-market-utility .az-mobile-market-region .flag,
+    html body .az-header > .az-mobile-market-utility .az-mobile-market-region [class*="flag"] {
+        width: 18px;
+        height: auto;
+        flex: 0 0 auto;
+    }
+
+    html body .az-header > .az-mobile-market-utility .az-mobile-market-preference {
+        padding-left: 0;
+        font-size: 12px;
+        font-weight: 600;
+        line-height: 1;
+    }
+}
+
+/* AZIEL MOBILE DRAWER HEADER — final compact alignment */
+@media (max-width: 768px) {
+    .az-mobile-drawer-head {
+        height: 72px !important;
+        min-height: 72px !important;
+        box-sizing: border-box !important;
+
+        margin: 0 -14px 8px !important;
+        padding: 12px 14px 8px !important;
+
+        align-items: center !important;
+
+        border-bottom: 1px solid var(--border) !important;
+        background: var(--surface-strong) !important;
+    }
+
+    .az-mobile-drawer-head .az-mobile-drawer-brand {
+        height: 44px !important;
+        min-height: 44px !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        align-items: center !important;
+        transform: translateX(26px) translateY(4px) !important;
+    }
+
+    .az-mobile-drawer-head .az-mobile-drawer-brand img {
+        width: 116px !important;
+        max-width: 116px !important;
+        height: 36px !important;
+        object-fit: contain !important;
+        object-position: left center !important;
+    }
+
+    .az-mobile-drawer-close {
+        width: 44px !important;
+        height: 44px !important;
+        flex: 0 0 44px !important;
+        margin: 0 !important;
+        transform: translateY(4px) !important;
     }
 }
