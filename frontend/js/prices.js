@@ -53,7 +53,14 @@ function getShopSymbol(currency) {
 }
 
 function formatPackagePrice(amount, currency) {
-  return `${Number(amount || 0).toLocaleString()} ${getShopSymbol(currency)}`;
+  const value = Number(amount || 0).toLocaleString();
+  const symbol = getShopSymbol(currency);
+
+  if (currency === "THB" || symbol === "฿") {
+    return `฿${value}`;
+  }
+
+  return `${value} ${symbol}`;
 }
 
 function getCurrentGameKey() {
@@ -113,28 +120,37 @@ function rememberDefaultPackageIcon(icon, preview) {
 function setPackagePreviewIcon(icon, src, fallbackSrc = "") {
   if (!icon) return;
 
-  const fallback = fallbackSrc || icon.dataset.defaultSrc || getPreviewPlaceholderIcon(icon);
-  if (fallback) icon.dataset.fallbackSrc = fallback;
+  const media = icon.closest(".mobile-pack-icon");
+  const source = String(src || "").trim();
+  const fallback = String(fallbackSrc || "").trim();
 
-  icon.onerror = function handlePackagePreviewIconError() {
-    const safeSrc = this.dataset.fallbackSrc || this.dataset.defaultSrc || "";
-
-    if (safeSrc && this.getAttribute("src") !== safeSrc) {
-      this.src = safeSrc;
-      return;
-    }
-
-    this.onerror = null;
+  const hideIcon = () => {
+    icon.onerror = null;
+    icon.removeAttribute("src");
+    icon.hidden = true;
+    if (media) media.hidden = true;
   };
 
-  if (src) {
-    icon.src = src;
+  if (!source) {
+    hideIcon();
     return;
   }
 
-  if (fallback) {
-    icon.src = fallback;
-  }
+  icon.hidden = false;
+  if (media) media.hidden = false;
+
+  icon.onerror = function handlePackagePreviewIconError() {
+    const currentSrc = this.getAttribute("src") || "";
+
+    if (fallback && currentSrc !== fallback) {
+      this.src = fallback;
+      return;
+    }
+
+    hideIcon();
+  };
+
+  icon.src = source;
 }
 
 function emitPackageEvent(name, detail = {}) {
@@ -658,7 +674,7 @@ function renderSelectedPackagePreview(pkg = selectedPackage) {
   }
 
   if (preview) preview.classList.add("selected", "has-package");
-  setPackagePreviewIcon(icon, pkg.icon || defaultIcon, pkg.fallbackIcon || defaultIcon);
+  setPackagePreviewIcon(icon, pkg.icon, pkg.fallbackIcon);
   if (title) {
     window.AZIEL_MOTION?.swapText(title, pkg.name) ||
       (title.textContent = pkg.name);
