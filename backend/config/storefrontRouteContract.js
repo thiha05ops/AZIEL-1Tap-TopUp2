@@ -33,6 +33,8 @@ const PAGE_ROUTES = Object.freeze([
     ["/checkout", "checkout.html", "commerce"],
     ["/payment-method", "payment-method.html", "commerce"],
     ["/payment", "payment.html", "commerce"],
+    ["/payments/dinger/success", "payments/dinger-success.html", "payment-result"],
+    ["/payments/dinger/fail", "payments/dinger-fail.html", "payment-result"],
     ["/policies/privacy", "policies/privacy.html", "legal"],
     ["/policies/terms", "policies/terms.html", "legal"],
     ["/policies/payment", "policies/payment.html", "legal"],

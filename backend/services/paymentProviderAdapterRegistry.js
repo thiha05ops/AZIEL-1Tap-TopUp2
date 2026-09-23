@@ -1,4 +1,31 @@
 const PROVIDER_ADAPTERS = Object.freeze({
+    dinger: Object.freeze({
+        name: "dinger",
+        displayName: "Dinger Myanmar Payments",
+        supportedRails: [],
+        supportedCurrencies: ["MMK"],
+        checkoutModes: ["QR", "REDIRECT"],
+        cardNetworks: [],
+        refundCapability: false,
+        partialRefundCapability: false,
+        webhookRequired: true,
+        customerAvailable: false,
+        contractReadiness: Object.freeze({
+            configuration: "REQUIRED",
+            tokenContract: "CONFIRMED",
+            rsaRequestEncryption: "CONFIRMED",
+            payRequestTransport: "CONFIRMED",
+            qrPayResponseSchema: "CONFIRMED",
+            stagingRedirectContract: "CONFIRMED",
+            payResponseSignatureVerification: "UNCONFIRMED",
+            callbackAesDecryption: "CONFIRMED",
+            callbackChecksumAuthentication: "UNCONFIRMED",
+            callbackRoute: "DIAGNOSTIC_ONLY_DISABLED_DEFAULT",
+            liveContract: "UNCONFIRMED",
+            customerExposure: "DISABLED"
+        }),
+        methods: Object.freeze(["createPayment", "handleProviderEvent", "healthCheck"])
+    }),
     thunder_truewallet: Object.freeze({
         name: "thunder_truewallet",
         displayName: "Thunder Verified TrueMoney Wallet",
@@ -64,6 +91,8 @@ function listProviderAdapters() {
         refundCapability: adapter.refundCapability,
         partialRefundCapability: adapter.partialRefundCapability,
         webhookRequired: adapter.webhookRequired,
+        customerAvailable: adapter.customerAvailable === true,
+        contractReadiness: adapter.contractReadiness || {},
         methods: adapter.methods
     }));
 }

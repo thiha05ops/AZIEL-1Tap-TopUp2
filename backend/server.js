@@ -15,6 +15,7 @@ const mongoose = require("mongoose");
 const { normalizeRouteProductCode, resolveCanonicalProductRoute } = require("./catalog/canonicalOperationalCatalog");
 const { LEGACY_ALIASES, PAGE_ROUTES, PRODUCT_RENDERERS, frontendFile, preserveQuery } = require("./config/storefrontRouteContract");
 const { getCatalogProductDetail } = require("./services/catalogService");
+const { createDingerDiagnosticCallbackRouter } = require("./routes/dingerDiagnosticCallback");
 
 dotenv.config({ path: path.join(__dirname, "../.env") });
 const configurationLoadedAt = performance.now();
@@ -198,6 +199,7 @@ function configureBaseApplication(options = {}) {
         etag: true, lastModified: true, setHeaders: setFrontendCacheHeaders
     }));
     app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+    app.use("/api/webhooks/dinger", createDingerDiagnosticCallbackRouter());
     startup.staticReady = true;
     recordStartupMilestone("static_middleware_ready", staticStartedAt);
 

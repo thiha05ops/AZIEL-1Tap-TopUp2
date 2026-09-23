@@ -4,6 +4,12 @@
   "description": "AZIEL 1Tap TopUp Shop",
   "main": "backend/server.js",
   "scripts": {
+    "verify:dinger-crypto": "node backend/scripts/verify-dinger-crypto.js",
+    "verify:dinger-provider-adapter": "node backend/scripts/verify-dinger-provider-adapter.js",
+    "verify:dinger-api-client": "node backend/scripts/verify-dinger-api-client.js",
+    "verify:dinger-callback-contract": "node backend/scripts/verify-dinger-callback-contract.js",
+    "verify:dinger-production-probe": "node backend/scripts/verify-dinger-production-probe.js",
+    "probe:dinger-production": "node backend/scripts/probe-dinger-production.js",
     "verify:thunder-truewallet-payment-phase2": "node backend/scripts/verify-thunder-truewallet-payment-phase2.js",
     "verify:thunder-truewallet-payment": "node backend/scripts/verify-thunder-truewallet-payment.js",
     "verify:supplier-catalog-ingestion-orchestrator": "node backend/scripts/verify-supplier-catalog-ingestion-orchestrator.js",
