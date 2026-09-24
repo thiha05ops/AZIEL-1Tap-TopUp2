@@ -364,6 +364,7 @@ function toSafePaymentView({ order = {}, attempt = {}, paymentResult = null, adm
             encodedAmount: qr.encodedAmount || "",
             encodedReference: qr.encodedReference || ""
         } : null,
+        redirect: source.redirect || attempt.redirect || null,
         paymentInstructions: instructions ? clonePlain(instructions) : null,
         expiresAt: source.expiresAt || attempt.expiresAt || null,
         receiptEvidence: receiptView(attempt),

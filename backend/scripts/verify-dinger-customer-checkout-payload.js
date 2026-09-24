@@ -7,6 +7,7 @@ const { resolveDingerCustomer } = require("../services/commerce/customerManualPa
 const { createDingerAdapter } = require("../services/commerce/providers/dingerAdapter");
 const { normalizePayPayload } = require("../services/dinger/dingerApiClient");
 const { normalizeDingerMyanmarPhone } = require("../services/dinger/dingerCustomerPhone");
+const { createManualPaymentApplicationService } = require("../services/commerce/manualPaymentApplicationService");
 
 (async () => {
     let lookupUserId = "";
@@ -91,6 +92,21 @@ const { normalizeDingerMyanmarPhone } = require("../services/dinger/dingerCustom
     assert.strictEqual(submitted.methodName, "PIN");
     assert.strictEqual(submitted.totalAmount, 500);
     assert.strictEqual(JSON.parse(submitted.items)[0].amount, 500);
+
+    const hostedUrl = "https://portal.dinger.asia/gateway/redirect?transactionNo=MOCK-TRX&formToken=MOCK-FORM&merchantOrderId=paymentAttempt-1";
+    const safeView = createManualPaymentApplicationService({
+        paymentOrchestrator: { handleProviderEvent: async () => ({}) }
+    }).toSafePaymentView({
+        paymentResult: {
+            attemptId: "paymentAttempt-1",
+            paymentStatus: "pending",
+            provider: "DINGER",
+            amount: 500,
+            currency: "MMK",
+            redirect: { type: "DINGER_FORM_CHECKOUT", method: "GET", url: hostedUrl }
+        }
+    });
+    assert.deepStrictEqual(safeView.redirect, { type: "DINGER_FORM_CHECKOUT", method: "GET", url: hostedUrl }, "validated Dinger hosted redirect must survive the customer-safe projection");
 
     await assert.rejects(resolveDingerCustomer({ owner: { userId: "customer-2" }, user: { id: "customer-2" } }, {
         findCustomerById: async () => ({ phone: "" })
