@@ -2,6 +2,7 @@
 
 const crypto = require("crypto");
 const PaymentMethod = require("../../models/PaymentMethod");
+const User = require("../../models/User");
 const { paymentMethodCapabilityState } = require("../paymentProviderRegistry");
 const { findOwnedQuote } = require("./pricingQuoteRepository");
 const { checkoutFromQuote } = require("./checkoutApplicationService");
@@ -19,6 +20,17 @@ const upper = value => text(value).toUpperCase();
 const publicId = prefix => `${prefix}-${Date.now()}-${crypto.randomBytes(5).toString("hex")}`;
 function ownerFromContext(context = {}) { const userId = text(context.user?.id || context.user?._id || context.user?.userId); const sessionId = text(context.sessionId); if (userId) return { userId, sessionId: "" }; if (sessionId) return { userId: "", sessionId }; throw new CustomerManualPaymentCheckoutError(ERROR_CODES.INVALID_INPUT, "Authenticated customer is required.", 401); }
 function repositoryOwner(owner) { return owner.userId ? { type: "USER", userId: owner.userId } : { type: "SESSION", sessionId: owner.sessionId }; }
+
+async function resolveDingerCustomer({ owner, user }, dependencies = {}) {
+    const contextualPhone = text(user?.phone || user?.mobile || user?.phoneNumber);
+    const contextualName = text(user?.fullName || user?.name || user?.username);
+    if (contextualPhone) return { phone: contextualPhone, name: contextualName || "AZIEL Customer" };
+    const findCustomer = dependencies.findCustomerById || (userId => User.findById(userId).select("phone username").lean());
+    const stored = owner.userId ? await findCustomer(owner.userId) : null;
+    const phone = text(stored?.phone);
+    if (!phone) throw new CustomerManualPaymentCheckoutError(ERROR_CODES.INVALID_INPUT, "A verified customer phone number is required for Dinger payment.", 422);
+    return { phone, name: contextualName || text(stored?.username) || "AZIEL Customer" };
+}
 
 async function loadManualPaymentMethod({ key, region, user }, dependencies = {}) {
     const methodKey = lower(key), market = upper(region);
@@ -68,13 +80,14 @@ async function startCustomerManualPaymentCheckout(input = {}, context = {}, depe
     const method = await loadManualPaymentMethod({ key: methodKey, region, user: context.user }, dependencies);
     const trueWallet = method.key === "truewallet";
     const dinger = isDingerMethod(method);
+    const dingerCustomer = dinger ? await resolveDingerCustomer({ owner, user: context.user }, dependencies) : null;
     if (trueWallet && upper(quote.commercialSnapshot?.currency) !== "THB") throw new CustomerManualPaymentCheckoutError(ERROR_CODES.PAYMENT_METHOD_UNAVAILABLE, "TrueMoney Wallet is available only for THB orders.", 422);
     let redemption = null, checkoutResult = null;
     try {
         checkoutResult = await (dependencies.checkoutFromQuote || checkoutFromQuote)({
             quoteId, owner, idempotencyKey: `checkout:${seed}`,
             paymentSelection: { paymentMethodId: method.key, paymentChannel: dinger ? method.paymentChannel : trueWallet ? "TRUE_MONEY_WALLET" : "MANUAL_ADMIN" },
-            customerInput: { gameAccount: { userId: input.userId || "", zoneId: input.zoneId || "", accountFields: Array.isArray(input.accountFields) ? input.accountFields : [] }, customFields: { username: input.username || "", gameKey: input.gameKey || input.productCode || "", customerPhone: text(context.user?.phone || context.user?.mobile || context.user?.phoneNumber), customerName: text(context.user?.fullName || context.user?.name || context.user?.username) } },
+            customerInput: { gameAccount: { userId: input.userId || "", zoneId: input.zoneId || "", accountFields: Array.isArray(input.accountFields) ? input.accountFields : [] }, contact: dingerCustomer ? { phone: dingerCustomer.phone } : {}, customFields: { username: input.username || "", gameKey: input.gameKey || input.productCode || "", customerPhone: dingerCustomer?.phone || "", customerName: dingerCustomer?.name || text(context.user?.fullName || context.user?.name || context.user?.username) } },
             requestMetadata: { source: "customer-storefront" }
         }, {
             validateOperationalPackageState: async ({ quote: lockedQuote }) => { const route = await (dependencies.resolveCheckoutRouteSnapshot || resolveCheckoutRouteSnapshot)({ productCode: lockedQuote.packageSnapshot?.gameCode, packageCode: lockedQuote.packageSnapshot?.packageCode, region: lockedQuote.commercialSnapshot?.region }); return route.ready ? { allowed: true, supplierRouteSnapshot: route.routeSnapshot } : { allowed: false, reasonCode: route.blockers?.[0] || "PRIMARY_SUPPLIER_NOT_READY" }; },
@@ -94,4 +107,4 @@ async function startCustomerManualPaymentCheckout(input = {}, context = {}, depe
     }
 }
 
-module.exports = Object.freeze({ startCustomerManualPaymentCheckout, loadManualPaymentMethod, sessionFrom, CustomerManualPaymentCheckoutError, ERROR_CODES });
+module.exports = Object.freeze({ startCustomerManualPaymentCheckout, loadManualPaymentMethod, resolveDingerCustomer, sessionFrom, CustomerManualPaymentCheckoutError, ERROR_CODES });
