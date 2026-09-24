@@ -12,6 +12,8 @@ const PROVIDERS = Object.freeze({
     ayapay: { key: "ayapay", label: "AYA Pay", region: "MM", logo: "/assets/payment/ayapay.png" },
     mmqr: { key: "mmqr", label: "MMQR", region: "MM", logo: "/assets/payment/payment-neutral.svg" },
     manual_bank: { key: "manual_bank", label: "Manual Bank Transfer", region: "MM", logo: "/assets/payment/bank-neutral.svg" },
+    dinger_ayapay_qr: { key: "dinger_ayapay_qr", label: "AYA Pay QR", region: "MM", logo: "/assets/payment/ayapay.png" },
+    dinger_wavepay_pin: { key: "dinger_wavepay_pin", label: "Wave Pay PIN", region: "MM", logo: "/assets/payment/wavepay.png" },
     wallet: { key: "wallet", label: "AZIEL Wallet", region: "GLOBAL", logo: "/assets/brand/aziel-icon.svg" }
 });
 
@@ -50,7 +52,7 @@ const PROVIDERS_BY_REGION_TYPE = Object.freeze({
         wallet: ["wallet"]
     },
     MM: {
-        auto: [],
+        auto: ["dinger_ayapay_qr", "dinger_wavepay_pin"],
         deeplink: ["kbzpay", "wavepay", "ayapay", "manual_bank"],
         manual: ["kbzpay", "wavepay", "ayapay", "mmqr", "manual_bank"],
         wallet: ["wallet"]
@@ -204,6 +206,11 @@ function paymentMethodReadiness(method = {}) {
     }
 
     if (configurationKind === PAYMENT_CONFIGURATION_KINDS.AUTOMATIC_PROVIDER) {
+        if (["dinger_ayapay_qr", "dinger_wavepay_pin"].includes(String(method.key || "").toLowerCase())) {
+            const { dingerTechnicalReadiness } = require("./dinger/dingerPaymentPolicy");
+            const readiness = dingerTechnicalReadiness(method);
+            missing.push(...readiness.missing);
+        }
         return { ready: missing.length === 0, missing };
     }
 

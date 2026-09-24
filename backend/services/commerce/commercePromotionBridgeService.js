@@ -19,6 +19,9 @@ const {
     releaseUserCoupon,
     reserveUserCoupon
 } = require("../userCouponService");
+const orderRepository = require("./orderRepository");
+const CommerceOrder = require("../../models/CommerceOrder");
+const PaymentAttempt = require("../../models/PaymentAttempt");
 
 function text(value) {
     return String(value || "").trim();
@@ -300,13 +303,14 @@ async function reserveCommercePromotion({ order, user, expiresAt = null } = {}) 
     return redemptionSnapshot(redemption);
 }
 
-async function consumeCommercePromotion(order) {
+async function consumeCommercePromotion(order, options = {}) {
     const userCouponId = selectedUserCouponId(order);
     if (userCouponId) {
         const consumed = await consumeUserCoupon({
             userCouponId,
             orderId: order.orderId || order.promotionRedemptionSnapshot?.orderId || "",
-            reservationToken: order.promotionRedemptionSnapshot?.reservationToken || order.orderId || ""
+            reservationToken: order.promotionRedemptionSnapshot?.reservationToken || order.orderId || "",
+            paymentAttemptId: options.paymentAttemptId || ""
         });
         return userCouponRedemptionSnapshot(consumed, order) || order.promotionRedemptionSnapshot || null;
     }
@@ -314,6 +318,73 @@ async function consumeCommercePromotion(order) {
     if (!redemptionId) return null;
     const redemption = await consumePromoRedemption(redemptionId, order.orderId || "");
     return redemptionSnapshot(redemption) || order.promotionRedemptionSnapshot || null;
+}
+
+async function reconcileCommercePromotionForPayment({ order, attempt = {}, toStatus = "", repository = orderRepository, now = new Date() } = {}) {
+    const status = upper(toStatus || attempt.status);
+    const hasPromotion = Boolean(selectedUserCouponId(order) || selectedPromotionCode(order));
+    if (!order?.orderId || !hasPromotion || !["PAID", "FAILED", "CANCELLED", "EXPIRED"].includes(status)) {
+        return { required: false, status: "NOT_REQUIRED" };
+    }
+    try {
+        const snapshot = status === "PAID"
+            ? await consumeCommercePromotion(order, { paymentAttemptId: attempt.attemptId || "" })
+            : await releaseCommercePromotion(order);
+        if (snapshot && typeof repository.setPromotionRedemptionSnapshot === "function") {
+            await repository.setPromotionRedemptionSnapshot({ orderId: order.orderId, promotionRedemptionSnapshot: snapshot, changedAt: now });
+        }
+        const reconciliation = {
+            required: true,
+            status: "SUCCEEDED",
+            paymentStatus: status,
+            paymentAttemptId: attempt.attemptId || "",
+            reconciledAt: now,
+            retryable: false,
+            errorCode: ""
+        };
+        if (typeof repository.setCouponReconciliation === "function") {
+            await repository.setCouponReconciliation({ orderId: order.orderId, couponReconciliation: reconciliation, changedAt: now });
+        }
+        return reconciliation;
+    } catch (error) {
+        const reconciliation = {
+            required: true,
+            status: "FAILED",
+            paymentStatus: status,
+            paymentAttemptId: attempt.attemptId || "",
+            reconciledAt: now,
+            retryable: true,
+            errorCode: error.code || error.name || "COUPON_RECONCILIATION_FAILED"
+        };
+        if (typeof repository.setCouponReconciliation === "function") {
+            await repository.setCouponReconciliation({ orderId: order.orderId, couponReconciliation: reconciliation, changedAt: now }).catch(() => null);
+        }
+        if (typeof repository.appendOperationalReference === "function") {
+            await repository.appendOperationalReference({
+                orderId: order.orderId, changedAt: now,
+                reference: { type: "coupon_reconciliation_failed", ...reconciliation }
+            }).catch(() => null);
+        }
+        return reconciliation;
+    }
+}
+
+async function reconcilePendingCouponPayments({ limit = 100, now = new Date() } = {}) {
+    const orders = await CommerceOrder.find({
+        $or: [
+            { "couponReconciliation.status": "FAILED", "couponReconciliation.retryable": true },
+            { paymentStatus: "paid", "promotionRedemptionSnapshot.status": "RESERVED" }
+        ]
+    }).sort({ updatedAt: 1 }).limit(Math.max(1, Math.min(500, Number(limit || 100)))).lean();
+    let succeeded = 0;
+    let failed = 0;
+    for (const order of orders) {
+        const attempt = await PaymentAttempt.findOne({ orderId: order.orderId }).sort({ updatedAt: -1 }).lean();
+        const result = await reconcileCommercePromotionForPayment({ order, attempt: attempt || {}, toStatus: attempt?.status || String(order.paymentStatus || "").toUpperCase(), now });
+        if (result.status === "SUCCEEDED") succeeded += 1;
+        else if (result.status === "FAILED") failed += 1;
+    }
+    return { scanned: orders.length, succeeded, failed };
 }
 
 async function releaseCommercePromotion(order) {
@@ -337,5 +408,7 @@ module.exports = Object.freeze({
     reserveCommercePromotion,
     consumeCommercePromotion,
     releaseCommercePromotion,
+    reconcileCommercePromotionForPayment,
+    reconcilePendingCouponPayments,
     redemptionSnapshot
 });

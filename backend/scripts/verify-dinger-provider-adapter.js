@@ -36,8 +36,8 @@ const methods = Object.keys(DINGER_METHOD_CONTRACTS);
     assert.throws(() => registry.validateProvider({ providerId: "DINGER", currency: "THB", paymentMethod: "dinger_ayapay_qr" }), error => error.code === "PAYMENT_PROVIDER_CONFIGURATION_INVALID");
     methods.forEach(method => assert.strictEqual(registry.resolveProvider({ paymentMethod: method }).providerId, "DINGER"));
 
-    assert.deepStrictEqual(DINGER_METHOD_CONTRACTS.dinger_ayapay_pin, { providerName: "AYA Pay", methodName: "PIN", presentation: "WALLET_NOTIFICATION", responseContract: "UNCONFIRMED" });
-    assert.deepStrictEqual(DINGER_METHOD_CONTRACTS.dinger_kbzpay_pwa, { providerName: "KBZ Pay", methodName: "PWA", presentation: "APP_DIRECT", responseContract: "UNCONFIRMED" });
+    assert.strictEqual(DINGER_METHOD_CONTRACTS.dinger_ayapay_pin, undefined);
+    assert.strictEqual(DINGER_METHOD_CONTRACTS.dinger_kbzpay_pwa, undefined);
     assert.deepStrictEqual(DINGER_METHOD_CONTRACTS.dinger_wavepay_pin, { providerName: "Wave Pay", methodName: "PIN", presentation: "REDIRECT", responseContract: "WAVE_FORM_REDIRECT" });
 
     const result = await adapter.createPayment({
@@ -65,14 +65,17 @@ const methods = Object.keys(DINGER_METHOD_CONTRACTS);
     });
     const qrResult = await qrAdapter.createPayment({ intent: { amount: 1000, currency: "MMK", paymentMethodId: "dinger_ayapay_qr", customer: { phone: "09", name: "Test" }, items: [] }, attempt: { attemptId: "ATT-QR-1" } });
     assert.strictEqual(qrResult.providerTransactionId, "QR-TRX-1");
-    assert.deepStrictEqual(qrResult.qr, { type: "DINGER_QR", mode: "provider_generated", payload: "CONFIRMED-QR-PAYLOAD" });
-    assert.strictEqual(qrResult.safeMetadata.payResponseSignatureVerified, undefined, "adapter output must not claim response signature verification");
+    assert.strictEqual(qrResult.qr.type, "DINGER_QR");
+    assert.strictEqual(qrResult.qr.mode, "provider_generated");
+    assert.strictEqual(qrResult.qr.payload, "CONFIRMED-QR-PAYLOAD");
+    assert(/^data:image\/png;base64,/.test(qrResult.qr.image), "provider QR payload must be rendered locally without a network request");
+    assert.strictEqual(qrResult.safeMetadata.payResponseSignatureVerified, false, "adapter output must explicitly decline response signature verification");
 
     const unconfirmed = createDingerAdapter({ configuration: { enabled: true }, apiClient: { createPayment: async () => ({ undocumented: true }) } });
     await assert.rejects(() => unconfirmed.createPayment({ intent: { amount: 1000, currency: "MMK", paymentMethodId: "dinger_ayapay_qr", customer: { phone: "09", name: "Test" } }, attempt: { attemptId: "ATT-2" } }), error => error.code === "PAYMENT_PROVIDER_RESPONSE_INVALID" && error.stage === "contract");
-    await assert.rejects(() => unconfirmed.createPayment({ intent: { amount: 1000, currency: "MMK", paymentMethodId: "dinger_kbzpay_qr", customer: { phone: "09", name: "Test" } }, attempt: { attemptId: "ATT-3" } }), error => error.code === "PAYMENT_PROVIDER_RESPONSE_INVALID" && error.stage === "contract");
+    await assert.rejects(() => unconfirmed.createPayment({ intent: { amount: 1000, currency: "MMK", paymentMethodId: "dinger_kbzpay_qr", customer: { phone: "09", name: "Test" } }, attempt: { attemptId: "ATT-3" } }), error => error.code === "PAYMENT_PROVIDER_CONFIGURATION_INVALID" && error.stage === "method");
     const invalidQr = response => createDingerAdapter({ configuration: { enabled: true, environment: "STAGING" }, apiClient: { createPayment: async () => response } });
-    const qrContext = { intent: { amount: 1000, currency: "MMK", paymentMethodId: "dinger_kbzpay_qr", customer: { phone: "09", name: "Test" }, items: [] }, attempt: { attemptId: "ATT-QR-ERR" } };
+    const qrContext = { intent: { amount: 1000, currency: "MMK", paymentMethodId: "dinger_ayapay_qr", customer: { phone: "09", name: "Test" }, items: [] }, attempt: { attemptId: "ATT-QR-ERR" } };
     const baseQrResponse = { code: "000", message: "Request Success", time: "20260916 120000", response: { amount: 1000, merchOrderId: "ATT-QR-ERR", transactionNum: "TRX", qrCode: "QR", sign: "unverified", signType: "SHA256" } };
     await assert.rejects(() => invalidQr({ ...baseQrResponse, response: { ...baseQrResponse.response, amount: 1001 } }).createPayment(qrContext), error => error.code === "PAYMENT_PROVIDER_RESPONSE_INVALID");
     await assert.rejects(() => invalidQr({ ...baseQrResponse, response: { ...baseQrResponse.response, merchOrderId: "OTHER" } }).createPayment(qrContext), error => error.code === "PAYMENT_PROVIDER_RESPONSE_INVALID");
@@ -81,6 +84,54 @@ const methods = Object.keys(DINGER_METHOD_CONTRACTS);
     await assert.rejects(() => invalidQr({ ...baseQrResponse, code: "001" }).createPayment(qrContext), error => error.code === "PAYMENT_PROVIDER_RESPONSE_INVALID");
     await assert.rejects(() => adapter.createPayment({ intent: { amount: 499, currency: "MMK", paymentMethodId: "dinger_wavepay_pin" }, attempt: { attemptId: "ATT-4" } }), error => error.code === "PAYMENT_PROVIDER_CONFIGURATION_INVALID" && error.stage === "amount");
     await assert.rejects(() => adapter.createPayment({ intent: { amount: 500.5, currency: "MMK", paymentMethodId: "dinger_wavepay_pin" }, attempt: { attemptId: "ATT-5" } }), error => error.code === "PAYMENT_PROVIDER_CONFIGURATION_INVALID" && error.stage === "amount");
+
+
+    // DINGER_EXACT_AMOUNT_REGRESSION
+    for (const amount of [1237, 9999, 12345, 25780]) {
+        for (const paymentMethodId of ["dinger_wavepay_pin", "dinger_ayapay_qr"]) {
+            let providerCalls = 0;
+            let submittedAmount = null;
+
+            const exactAmountAdapter = createDingerAdapter({
+                configuration: { enabled: true, environment: "STAGING" },
+                apiClient: {
+                    async createPayment(payload) {
+                        providerCalls += 1;
+                        submittedAmount = payload.totalAmount;
+                        return {
+                            code: "000",
+                            message: "Request Success",
+                            time: "20260924 120000",
+                            response: {
+                                amount: payload.totalAmount,
+                                merchOrderId: payload.orderId,
+                                formToken: "TEST-FORM-TOKEN",
+                                transactionNum: "TEST-TRX-" + amount,
+                                qrCode: "TEST-QR-PAYLOAD",
+                                sign: "test-only",
+                                signType: "SHA256"
+                            }
+                        };
+                    }
+                }
+            });
+
+            const result = await exactAmountAdapter.createPayment({
+                intent: {
+                    amount,
+                    currency: "MMK",
+                    paymentMethodId,
+                    customer: { phone: "0912345678", name: "Test Customer" },
+                    items: [{ name: "Test Package", amount }]
+                },
+                attempt: { attemptId: "TEST-ATT-" + paymentMethodId + "-" + amount }
+            });
+
+            assert.strictEqual(submittedAmount, amount);
+            assert.strictEqual(providerCalls, 1);
+            assert.strictEqual(result.status, "PENDING");
+        }
+    }
 
     console.log("Dinger provider adapter foundation verification passed.");
 })().catch(error => { console.error(error); process.exit(1); });

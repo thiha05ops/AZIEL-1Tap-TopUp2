@@ -138,6 +138,7 @@ module.exports = Object.freeze({
     decryptAesEcbPkcs7,
     calculateSha256,
     verifySha256,
+    dingerRsaPublicKey,
     encryptRsaRequestBase64,
     encryptDingerPayPayloadBase64,
     DINGER_RSA_SEGMENT_BYTES,

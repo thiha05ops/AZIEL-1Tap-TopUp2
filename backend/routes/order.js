@@ -59,6 +59,10 @@ const {
 } = require("../services/paginationService");
 const { getActivePendingOrderPolicy } = require("../services/pendingOrderPolicy");
 const { normalizePaymentKey } = require("../services/manualPaymentAttemptService");
+const {
+    legacyPayableCreationDecision,
+    rejectLegacyDingerPayable
+} = require("../services/dinger/dingerLegacyPayableBoundary");
 const { getOrderFulfillmentSummary } = require("../services/fulfillmentService");
 const {
     AdminOrderCommandError,
@@ -89,6 +93,18 @@ function commerceCoreDisabledLegacyPayableResponse(res, legacyFlow) {
         legacyFlow,
         commerceAuthority: "CommerceOrder + PaymentAttempt"
     });
+}
+
+function legacyPayableCreationGuard(legacyFlow) {
+    return (req, res, next) => {
+        const decision = legacyPayableCreationDecision({
+            enabled: process.env.AZIEL_ALLOW_LEGACY_PAYABLE_CREATION === "true",
+            payload: req.body
+        });
+        if (decision.reason === "legacy_disabled") return commerceCoreDisabledLegacyPayableResponse(res, legacyFlow);
+        if (decision.reason === "dinger_forbidden") return rejectLegacyDingerPayable(res);
+        return next();
+    };
 }
 
 function getCurrencyKey(currency) {
@@ -1405,11 +1421,7 @@ router.post("/admin/orders/:id/refund", adminMiddleware, requireAdminPermission(
 });
 
 // LEGACY / MANUAL ORDER CREATE
-router.post("/orders", authMiddleware, orderCreateLimiter, upload.single("paymentSlip"), async (req, res) => {
-    if (process.env.AZIEL_ALLOW_LEGACY_PAYABLE_CREATION !== "true") {
-        return commerceCoreDisabledLegacyPayableResponse(res, "legacy_orders_create");
-    }
-
+router.post("/orders", authMiddleware, orderCreateLimiter, upload.single("paymentSlip"), legacyPayableCreationGuard("legacy_orders_create"), async (req, res) => {
     let evidence = null;
     let evidencePersisted = false;
     let reservedRedemption = null;

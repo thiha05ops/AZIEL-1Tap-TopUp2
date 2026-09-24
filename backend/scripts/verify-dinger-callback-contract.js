@@ -123,7 +123,8 @@ async function withRouter(env, logger, callback) {
     const root = path.resolve(__dirname, "../..");
     const serverSource = fs.readFileSync(path.join(root, "backend/server.js"), "utf8");
     const routeSource = fs.readFileSync(path.join(root, "backend/routes/dingerDiagnosticCallback.js"), "utf8");
-    assert(serverSource.includes('app.use("/api/webhooks/dinger", createDingerDiagnosticCallbackRouter())'), "diagnostic callback route must be mounted at the approved path");
+    assert(serverSource.includes('app.use("/api/webhooks/dinger", dingerCallbackRouter)'), "selected Dinger callback route must be mounted at the approved path");
+    assert(serverSource.includes("createDingerDiagnosticCallbackRouter") && serverSource.includes("createDingerSettlementCallbackRouter"), "diagnostic must remain the default while settlement is explicit opt-in");
     assert(!/CommerceOrder|PaymentAttempt|paymentOrchestrator|wallet|fulfillment|supplier/i.test(routeSource), "diagnostic callback must remain isolated from financial and fulfillment services");
     const successPage = fs.readFileSync(path.join(root, "frontend/payments/dinger-success.html"), "utf8");
     const failPage = fs.readFileSync(path.join(root, "frontend/payments/dinger-fail.html"), "utf8");
@@ -134,8 +135,8 @@ async function withRouter(env, logger, callback) {
     assert.strictEqual(inspectDingerEnvironment({}).enabled, false, "Dinger must remain disabled by default");
     const descriptor = getProviderAdapter("dinger");
     assert.strictEqual(descriptor.customerAvailable, false);
-    assert.strictEqual(descriptor.contractReadiness.callbackChecksumAuthentication, "UNCONFIRMED");
-    assert.strictEqual(descriptor.contractReadiness.callbackRoute, "DIAGNOSTIC_ONLY_DISABLED_DEFAULT");
+    assert.strictEqual(descriptor.contractReadiness.callbackChecksumAuthentication, "CONFIRMED");
+    assert.strictEqual(descriptor.contractReadiness.callbackRoute, "SETTLEMENT_EXPLICIT_OPT_IN_DIAGNOSTIC_DEFAULT");
     assert.strictEqual(descriptor.contractReadiness.customerExposure, "DISABLED");
 
     console.log("Dinger callback crypto, result contract, and disabled-exposure verification passed.");

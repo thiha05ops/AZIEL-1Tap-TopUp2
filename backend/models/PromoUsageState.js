@@ -16,6 +16,14 @@ const promoUsageStateSchema = new mongoose.Schema(
         reservedCount: {
             type: Number,
             default: 0
+        },
+        claimedCount: {
+            type: Number,
+            default: 0
+        },
+        expiredCount: {
+            type: Number,
+            default: 0
         }
     },
     { timestamps: true }

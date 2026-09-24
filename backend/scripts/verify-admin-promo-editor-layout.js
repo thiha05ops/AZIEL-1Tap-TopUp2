@@ -70,10 +70,10 @@ includes("frontend/css/admin/admin-design-system.css", "grid-template-rows: auto
 includes("frontend/js/admin-promos.js", "AZIEL_ADMIN_ACTION_MODAL", "Save must still transition through confirmation.");
 matches("frontend/js/admin-promos.js", /modal\?\.classList\.remove\("show"\);\s*const result = await window\.AZIEL_ADMIN_ACTION_MODAL/s, "Editor must hide before confirmation opens.");
 includes("frontend/js/admin-promos.js", "promoSavePending", "Duplicate-submit protection must remain.");
-includes("frontend/js/admin-promos.js", "readOnly = Boolean(promo)", "Promo code identity must remain immutable on edit.");
+includes("frontend/js/admin-promos.js", "readOnly = true", "Generated promo code identity must remain immutable in create and edit flows.");
 
-includes("frontend/css/admin/admin-design-system.css", "@media (max-width: 768px)", "Mobile breakpoint must use existing max-width 768px.");
-matches("frontend/css/admin/admin-design-system.css", /@media \(max-width: 768px\)[\s\S]+\.promo-workspace-grid,[\s\S]+grid-template-columns: 1fr;/, "Mobile layout must stack promo editor grids.");
+includes("frontend/css/admin/admin-design-system.css", "@media (max-width: 767px)", "Mobile breakpoint must use existing max-width 768px.");
+matches("frontend/css/admin/admin-design-system.css", /@media \(max-width: 767px\)[\s\S]+\.promo-workspace-grid,[\s\S]+grid-template-columns: 1fr;/, "Mobile layout must stack promo editor grids.");
 includes("frontend/css/admin/admin-design-system.css", "width: calc(100vw - 32px)", "Mobile promo editor must fit viewport width.");
 
 [

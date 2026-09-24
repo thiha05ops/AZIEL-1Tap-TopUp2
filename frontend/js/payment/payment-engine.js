@@ -159,6 +159,18 @@
         window.location.href = `/payment?orderId=${encodeURIComponent(orderId)}`;
     }
 
+    function isDingerSelection(selectedPayment = {}, orderData = {}) {
+        const key = String(selectedPayment.key || orderData.paymentMethod || "").toLowerCase();
+        return ["dinger_ayapay_qr", "dinger_wavepay_pin"].includes(key) || String(selectedPayment.provider || "").toUpperCase() === "DINGER";
+    }
+
+    function confirmedDingerHostedUrl(value) {
+        try {
+            const url = new URL(String(value || ""));
+            return url.protocol === "https:" && url.hostname === "portal.dinger.asia" && url.pathname === "/gateway/redirect" ? url.toString() : "";
+        } catch (_) { return ""; }
+    }
+
     async function start(orderData) {
         const selectedPayment = window.selectedPaymentData || {};
         const type =
@@ -170,6 +182,23 @@
         if (useBlockingLoader) PaymentUtils.showLoading();
 
         try {
+            if (isDingerSelection(selectedPayment, orderData)) {
+                const session = await createCommerceManualPaymentCheckout(orderData);
+                session.selectedPaymentMethod = selectedPayment;
+                const hosted = confirmedDingerHostedUrl(session.redirect?.url);
+                if (String(selectedPayment.key || orderData.paymentMethod).toLowerCase() === "dinger_wavepay_pin") {
+                    if (!hosted) throw createPaymentError({ code: "DINGER_REDIRECT_CONTRACT_UNAVAILABLE", message: "Wave Pay hosted checkout is not available." });
+                    window.location.assign(hosted);
+                    return { success: true, navigating: true, paymentType: "auto" };
+                }
+                const attemptOrder = { ...orderData, orderId: session.orderId || session.commerceOrderId, commerceOrderId: session.commerceOrderId || session.orderId, commercePaymentAttemptId: session.attemptId };
+                if (orderData.pagePresentation === true) {
+                    stagePaymentPage(session, attemptOrder, selectedPayment, "auto");
+                    return { success: true, navigating: true, paymentType: "auto" };
+                }
+                PaymentManual.show(attemptOrder, session);
+                return { success: true, navigating: false, paymentType: "auto" };
+            }
             if (type === "wallet" || selectedPayment.key === "wallet") {
                 const walletResult = await PaymentWallet.pay(orderData);
                 if (!walletResult?.success) return { success: false, navigating: false };

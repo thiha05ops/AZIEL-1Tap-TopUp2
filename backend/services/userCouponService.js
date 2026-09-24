@@ -3,6 +3,8 @@ const mongoose = require("mongoose");
 const PromoCode = require("../models/PromoCode");
 const PromoUsageState = require("../models/PromoUsageState");
 const UserCoupon = require("../models/UserCoupon");
+const CouponLifecycleEvent = require("../models/CouponLifecycleEvent");
+const CommerceOrder = require("../models/CommerceOrder");
 const {
     DISCOUNT_TYPES,
     ELIGIBILITY_MODES,
@@ -57,23 +59,27 @@ function nowDate(now = new Date()) {
 function campaignState(promo = {}, now = new Date()) {
     const at = nowDate(now);
     if (!promo || promo.archivedAt) return "ARCHIVED";
+    const operationalStatus = text(promo.operationalStatus).toUpperCase();
+    if (operationalStatus === "DRAFT") return "DRAFT";
+    if (operationalStatus === "PAUSED") return "PAUSED";
+    if (operationalStatus === "ENDED") return "ENDED";
     if (promo.enabled !== true) return "DISABLED";
     if (promo.startsAt && new Date(promo.startsAt) > at) return "SCHEDULED";
-    if (promo.endsAt && new Date(promo.endsAt) < at) return "EXPIRED";
+    if (promo.endsAt && new Date(promo.endsAt) <= at) return "ENDED";
     return "ACTIVE";
 }
 
 function assertCampaignClaimable(promo, now = new Date()) {
     const state = campaignState(promo, now);
     if (state !== "ACTIVE") {
-        throw new UserCouponError(`CAMPAIGN_${state}`, "This coupon is not available to claim.", state === "EXPIRED" ? 410 : 409);
+        throw new UserCouponError(`CAMPAIGN_${state}`, "This coupon is not available to claim.", state === "ENDED" ? 410 : 409);
     }
 }
 
 function assertCampaignUsable(promo, now = new Date()) {
     const state = campaignState(promo, now);
     if (state !== "ACTIVE") {
-        throw new UserCouponError(`CAMPAIGN_${state}`, "This coupon is not currently usable.", state === "EXPIRED" ? 410 : 409);
+        throw new UserCouponError(`CAMPAIGN_${state}`, "This coupon is not currently usable.", state === "ENDED" ? 410 : 409);
     }
 }
 
@@ -111,9 +117,33 @@ async function withCouponTransaction(callback, options = {}) {
 async function ensureUsageState(promo, session) {
     await PromoUsageState.updateOne(
         { code: promo.code },
-        { $setOnInsert: { code: promo.code, consumedCount: 0, reservedCount: 0 } },
+        { $setOnInsert: { code: promo.code, consumedCount: 0, reservedCount: 0, claimedCount: 0, expiredCount: 0 } },
         { upsert: true, session: session || undefined }
     );
+}
+
+async function recordLifecycleEvent(input = {}, session = null) {
+    const eventKey = text(input.eventKey);
+    if (!eventKey) throw new UserCouponError("COUPON_EVENT_KEY_REQUIRED", "Coupon lifecycle event identity is required.");
+    await CouponLifecycleEvent.updateOne(
+        { eventKey },
+        { $setOnInsert: { ...input, eventKey, occurredAt: input.occurredAt || new Date() } },
+        { upsert: true, session: session || undefined, runValidators: true }
+    );
+}
+
+async function incrementClaimedWithinCapacity(promo, session) {
+    await ensureUsageState(promo, session);
+    const claimLimit = Number(promo.claimLimit || 0);
+    const query = { code: promo.code };
+    if (claimLimit > 0) query.claimedCount = { $lt: claimLimit };
+    const updated = await PromoUsageState.findOneAndUpdate(
+        query,
+        { $inc: { claimedCount: 1 } },
+        { returnDocument: "after", session: session || undefined }
+    );
+    if (!updated) throw new UserCouponError("COUPON_CLAIM_LIMIT_REACHED", "This coupon campaign has no claims remaining.", 409);
+    return updated;
 }
 
 async function incrementReservedWithinCapacity(promo, session) {
@@ -158,6 +188,42 @@ async function moveReservedToConsumedUsage(code, session) {
     return updated;
 }
 
+async function expireAvailableUserCoupon(coupon, { now = new Date(), source = "ENTITLEMENT_EXPIRY", reason = "ENTITLEMENT_EXPIRED", mongoSession = null, session = null } = {}) {
+    if (!coupon?._id) return { expired: false, idempotent: true };
+    const at = nowDate(now);
+    return withCouponTransaction(async txSession => {
+        const transition = await UserCoupon.findOneAndUpdate(
+            {
+                _id: coupon._id,
+                status: USER_COUPON_STATUS.AVAILABLE,
+                expiresAt: { $ne: null, $lte: at }
+            },
+            { $set: { status: USER_COUPON_STATUS.EXPIRED } },
+            { returnDocument: "after", runValidators: true, session: txSession || undefined }
+        );
+        if (!transition) return { expired: false, idempotent: true };
+        await ensureUsageState({ code: transition.promoCode }, txSession);
+        const counter = await PromoUsageState.updateOne(
+            { code: transition.promoCode },
+            { $inc: { expiredCount: 1 } },
+            { session: txSession || undefined }
+        );
+        if (!counter.modifiedCount) throw new UserCouponError("COUPON_USAGE_COUNTER_CONFLICT", "Coupon expiry counter could not be reconciled.", 409);
+        await recordLifecycleEvent({
+            eventKey: `expire:${transition._id}`,
+            eventType: "EXPIRED",
+            promoCodeId: transition.promoCodeId,
+            promoCode: transition.promoCode,
+            userCouponId: transition._id,
+            userId: transition.userId,
+            source,
+            reason,
+            occurredAt: at
+        }, txSession);
+        return { expired: true, idempotent: false, coupon: transition };
+    }, { mongoSession: mongoSession || session });
+}
+
 function buildCampaignSnapshot(promo = {}) {
     return {
         promoCodeId: String(promo._id || ""),
@@ -199,7 +265,7 @@ function benefitLabel(promo = {}, region = "") {
     return amount > 0 ? `${amount.toLocaleString("en-US")} ${currency} OFF` : "Coupon";
 }
 
-function projectCampaign(promo = {}, { coupon = null, region = "", now = new Date(), includeCode = false } = {}) {
+function projectCampaign(promo = {}, { coupon = null, region = "", now = new Date(), includeCode = false, usage = null } = {}) {
     const state = campaignState(promo, now);
     const couponStatus = coupon ? projectedCouponStatus(coupon, promo, now) : "";
     return {
@@ -210,6 +276,11 @@ function projectCampaign(promo = {}, { coupon = null, region = "", now = new Dat
         benefitLabel: benefitLabel(promo, region),
         minimumOrderAmount: Number(promo.minimumOrderAmounts?.[normalizeRegion(region || "MM")] || 0),
         maximumDiscountAmount: Number(promo.maximumDiscountAmounts?.[normalizeRegion(region || "MM")] || 0),
+        claimLimit: Number(promo.claimLimit || 0),
+        claimedCount: Number(usage?.claimedCount || 0),
+        claimUsagePercent: Number(promo.claimLimit || 0) > 0
+            ? Math.min(100, Math.round((Number(usage?.claimedCount || 0) / Number(promo.claimLimit)) * 100))
+            : null,
         regions: Array.isArray(promo.regions) ? promo.regions : [],
         eligibilityMode: promo.eligibilityMode || "ALL",
         eligibleProductCodes: promo.eligibleProductCodes || [],
@@ -219,7 +290,7 @@ function projectCampaign(promo = {}, { coupon = null, region = "", now = new Dat
         state,
         claimState: couponStatus
             ? (couponStatus === USER_COUPON_STATUS.AVAILABLE ? "CLAIMED" : couponStatus)
-            : (state === "ACTIVE" ? "CLAIM" : state),
+            : (state === "ACTIVE" && (Number(promo.claimLimit || 0) === 0 || Number(usage?.claimedCount || 0) < Number(promo.claimLimit || 0)) ? "CLAIM" : (state === "ACTIVE" ? "QUOTA_EXHAUSTED" : state)),
         userCouponId: coupon ? String(coupon._id || "") : ""
     };
 }
@@ -339,26 +410,35 @@ async function claimCoupon({ campaignId, user, now = new Date() } = {}) {
     assertCampaignClaimable(promo, at);
     const expiresAt = effectiveExpiry(promo, at);
     const snapshot = buildCampaignSnapshot(promo);
+    const existing = await UserCoupon.findOne({ userId, promoCodeId: promo._id });
+    if (existing) return { coupon: couponSummary(existing, promo, { now: at }), campaign: projectCampaign(promo, { coupon: existing, now: at }) };
     try {
-        const coupon = await UserCoupon.findOneAndUpdate(
-            { userId, promoCodeId: promo._id },
-            {
-                $setOnInsert: {
-                    userId,
-                    promoCodeId: promo._id,
-                    promoCode: promo.code,
-                    status: USER_COUPON_STATUS.AVAILABLE,
-                    claimedAt: at,
-                    expiresAt,
-                    snapshot
-                }
-            },
-            { upsert: true, returnDocument: "after", runValidators: true }
-        );
-        return { coupon: couponSummary(coupon, promo, { now: at }), campaign: projectCampaign(promo, { coupon, now: at }) };
+        return await withCouponTransaction(async session => {
+            const inTransaction = await withSession(UserCoupon.findOne({ userId, promoCodeId: promo._id }), session);
+            if (inTransaction) return { coupon: couponSummary(inTransaction, promo, { now: at }), campaign: projectCampaign(promo, { coupon: inTransaction, now: at }) };
+            await incrementClaimedWithinCapacity(promo, session);
+            const coupon = await UserCoupon.findOneAndUpdate(
+                { userId, promoCodeId: promo._id },
+                { $setOnInsert: { userId, promoCodeId: promo._id, promoCode: promo.code, status: USER_COUPON_STATUS.AVAILABLE, claimedAt: at, expiresAt, snapshot } },
+                { upsert: true, returnDocument: "after", runValidators: true, session }
+            );
+            await recordLifecycleEvent({
+                eventKey: `claim:${coupon._id}`,
+                eventType: "CLAIMED",
+                promoCodeId: promo._id,
+                promoCode: promo.code,
+                userCouponId: coupon._id,
+                userId,
+                source: "CUSTOMER_CLAIM",
+                occurredAt: at,
+                snapshot
+            }, session);
+            return { coupon: couponSummary(coupon, promo, { now: at }), campaign: projectCampaign(promo, { coupon, now: at }) };
+        });
     } catch (error) {
         if (error?.code !== 11000) throw error;
         const coupon = await UserCoupon.findOne({ userId, promoCodeId: promo._id });
+        if (!coupon) throw error;
         return { coupon: couponSummary(coupon, promo, { now: at }), campaign: projectCampaign(promo, { coupon, now: at }) };
     }
 }
@@ -367,6 +447,8 @@ async function listAvailableCoupons({ user = null, region = "MM", now = new Date
     const at = nowDate(now);
     const normalizedRegion = normalizeRegion(region || "MM");
     const promos = await PromoCode.find({ archivedAt: null, regions: normalizedRegion }).sort({ updatedAt: -1, code: 1 }).lean();
+    const usageStates = await PromoUsageState.find({ code: { $in: promos.map(promo => promo.code) } }).lean();
+    const usageByCode = new Map(usageStates.map(state => [state.code, state]));
     const userIdRaw = text(user?.id || user?._id || user?.userId);
     let couponsByPromo = new Map();
     if (userIdRaw && mongoose.Types.ObjectId.isValid(userIdRaw)) {
@@ -379,7 +461,8 @@ async function listAvailableCoupons({ user = null, region = "MM", now = new Date
         coupons: promos.map(promo => projectCampaign(promo, {
             coupon: couponsByPromo.get(String(promo._id)),
             region: normalizedRegion,
-            now: at
+            now: at,
+            usage: usageByCode.get(promo.code)
         }))
     };
 }
@@ -467,12 +550,17 @@ async function loadPromotionContextForUserCoupon({ userCouponId, user, catalog, 
 async function reserveUserCoupon({ userCouponId, user, quote, orderId = "", reservationToken = "", expiresAt = null, now = new Date(), mongoSession = null, session = null } = {}) {
     const at = nowDate(now);
     const { coupon, promo } = await loadCouponForUser(userCouponId, user);
-    assertCampaignUsable(promo, at);
     const expiry = coupon.expiresAt || effectiveExpiry(promo, at);
     if (entitlementExpired(coupon, promo, at)) {
-        await UserCoupon.updateOne({ _id: coupon._id, status: { $ne: USER_COUPON_STATUS.USED } }, { $set: { status: USER_COUPON_STATUS.EXPIRED } });
+        await expireAvailableUserCoupon(coupon, {
+            now: at,
+            source: "RESERVATION_ATTEMPT",
+            reason: "COUPON_ALREADY_EXPIRED",
+            mongoSession: mongoSession || session
+        });
         throw new UserCouponError("COUPON_EXPIRED", "Selected coupon has expired.", 410);
     }
+    assertCampaignUsable(promo, at);
     const commercial = quote?.commercialSnapshot || {};
     const packageSnapshot = quote?.packageSnapshot || {};
     const context = {
@@ -515,6 +603,14 @@ async function reserveUserCoupon({ userCouponId, user, quote, orderId = "", rese
             { returnDocument: "after", runValidators: true, session: txSession || undefined }
         );
         if (!reserved) throw new UserCouponError("COUPON_RESERVATION_UNAVAILABLE", "Selected coupon is already reserved or unavailable.", 409);
+        await recordLifecycleEvent({
+            eventKey: `reserve:${reserved._id}:${token}`,
+            eventType: "RESERVED", promoCodeId: reserved.promoCodeId, promoCode: reserved.promoCode,
+            userCouponId: reserved._id, userId: reserved.userId, quoteId: quote?.quoteId || "", orderId: orderId || "",
+            originalAmount: Number(commercial.originalPrice || 0), discountAmount: Number(commercial.discountAmount || 0),
+            finalAmount: Number(commercial.quotedTotalAmount || 0), currency: commercial.currency || "",
+            source: "CHECKOUT", occurredAt: at, snapshot: quote?.couponSnapshot || {}
+        }, txSession);
         return { coupon: couponSummary(reserved, promo, { region: context.region, now: at }), idempotent: false };
     }, { mongoSession: mongoSession || session });
 }
@@ -551,11 +647,20 @@ async function releaseUserCoupon({ userCouponId, user = null, reservationToken =
         );
         if (!released) return { released: false, idempotent: true };
         await decrementReservedUsage(released.promoCode, txSession);
+        await recordLifecycleEvent({
+            eventKey: `release:${released._id}:${token}`,
+            eventType: nextStatus === USER_COUPON_STATUS.EXPIRED ? "EXPIRED" : "RELEASED",
+            promoCodeId: released.promoCodeId, promoCode: released.promoCode, userCouponId: released._id, userId: released.userId,
+            orderId: text(orderId), source: "PAYMENT_TERMINAL", reason: nextStatus, occurredAt: at
+        }, txSession);
+        if (nextStatus === USER_COUPON_STATUS.EXPIRED) {
+            await PromoUsageState.updateOne({ code: released.promoCode }, { $inc: { expiredCount: 1 } }, { session: txSession || undefined });
+        }
         return { released: true, status: nextStatus, coupon: couponSummary(released, promo, { now: at }) };
     }, { mongoSession: mongoSession || session });
 }
 
-async function consumeUserCoupon({ userCouponId, orderId = "", reservationToken = "", now = new Date(), mongoSession = null, session = null } = {}) {
+async function consumeUserCoupon({ userCouponId, orderId = "", reservationToken = "", paymentAttemptId = "", now = new Date(), mongoSession = null, session = null } = {}) {
     const at = nowDate(now);
     const couponId = objectId(userCouponId, "userCouponId");
     const token = text(reservationToken || orderId);
@@ -578,19 +683,41 @@ async function consumeUserCoupon({ userCouponId, orderId = "", reservationToken 
         );
         if (!coupon) throw new UserCouponError("COUPON_CONSUMPTION_UNAVAILABLE", "Coupon cannot be consumed for this order.", 409);
         await moveReservedToConsumedUsage(coupon.promoCode, txSession);
+        await recordLifecycleEvent({
+            eventKey: `consume:${coupon._id}`,
+            eventType: "CONSUMED", promoCodeId: coupon.promoCodeId, promoCode: coupon.promoCode,
+            userCouponId: coupon._id, userId: coupon.userId, orderId: order, paymentAttemptId: text(paymentAttemptId), source: "PAYMENT_PAID", occurredAt: at
+        }, txSession);
         return { consumed: true, idempotent: false, coupon: couponSummary(coupon, null, { now: at }) };
     }, { mongoSession: mongoSession || session });
 }
 
 async function cleanupExpiredUserCoupons({ now = new Date() } = {}) {
     const at = nowDate(now);
-    const available = await UserCoupon.updateMany(
-        { status: USER_COUPON_STATUS.AVAILABLE, expiresAt: { $ne: null, $lte: at } },
-        { $set: { status: USER_COUPON_STATUS.EXPIRED } }
-    );
+    const expiredAvailable = await UserCoupon.find({ status: USER_COUPON_STATUS.AVAILABLE, expiresAt: { $ne: null, $lte: at } });
+    let expiredAvailableCount = 0;
+    for (const coupon of expiredAvailable) {
+        // eslint-disable-next-line no-await-in-loop
+        const result = await expireAvailableUserCoupon(coupon, { now: at, source: "ENTITLEMENT_CLEANUP" });
+        if (result.expired) expiredAvailableCount += 1;
+    }
     const staleReserved = await UserCoupon.find({ status: USER_COUPON_STATUS.RESERVED, reservationExpiresAt: { $ne: null, $lte: at } });
     let released = 0;
+    let reconciledPaid = 0;
     for (const coupon of staleReserved) {
+        if (coupon.reservedOrderId) {
+            const paidOrder = await CommerceOrder.findOne({ orderId: coupon.reservedOrderId, paymentStatus: "paid" }).select("orderId").lean();
+            if (paidOrder) {
+                await consumeUserCoupon({
+                    userCouponId: coupon._id,
+                    orderId: coupon.reservedOrderId,
+                    reservationToken: coupon.reservationToken,
+                    now: at
+                });
+                reconciledPaid += 1;
+                continue;
+            }
+        }
         const promo = await PromoCode.findOne({ _id: coupon.promoCodeId });
         const nextStatus = entitlementExpired(coupon, promo, at) ? USER_COUPON_STATUS.EXPIRED : USER_COUPON_STATUS.AVAILABLE;
         const wonCleanup = await withCouponTransaction(async txSession => {
@@ -601,13 +728,23 @@ async function cleanupExpiredUserCoupons({ now = new Date() } = {}) {
             );
             if (transition.modifiedCount <= 0) return false;
             await decrementReservedUsage(coupon.promoCode, txSession);
+            await recordLifecycleEvent({
+                eventKey: `cleanup:${coupon._id}:${String(coupon.reservationToken || coupon.reservedOrderId || "stale")}`,
+                eventType: nextStatus === USER_COUPON_STATUS.EXPIRED ? "EXPIRED" : "RELEASED",
+                promoCodeId: coupon.promoCodeId, promoCode: coupon.promoCode, userCouponId: coupon._id, userId: coupon.userId,
+                quoteId: coupon.reservedQuoteId || "", orderId: coupon.reservedOrderId || "", source: "RESERVATION_CLEANUP",
+                reason: "RESERVATION_EXPIRED", occurredAt: at
+            }, txSession);
+            if (nextStatus === USER_COUPON_STATUS.EXPIRED) {
+                await PromoUsageState.updateOne({ code: coupon.promoCode }, { $inc: { expiredCount: 1 } }, { session: txSession || undefined });
+            }
             return true;
         });
         if (wonCleanup) {
             released += 1;
         }
     }
-    return { expiredAvailable: available.modifiedCount || 0, releasedReservations: released };
+    return { expiredAvailable: expiredAvailableCount, releasedReservations: released, reconciledPaid };
 }
 
 function generateCouponCode() {
@@ -632,6 +769,7 @@ module.exports = Object.freeze({
     claimCoupon,
     cleanupExpiredUserCoupons,
     consumeUserCoupon,
+    expireAvailableUserCoupon,
     couponSummary,
     generateUniqueCouponCode,
     listAvailableCoupons,

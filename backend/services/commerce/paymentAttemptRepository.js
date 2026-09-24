@@ -838,6 +838,7 @@ async function setProviderReference(input = {}, options = {}) {
             safeMetadata: safeMetadata(input.safeMetadata),
             paymentInstructions: clonePlain(input.paymentInstructions || null),
             qr: clonePlain(input.qr || null),
+            redirect: clonePlain(input.redirect || null),
             expiresAt,
             updatedAt: input.changedAt ? new Date(input.changedAt) : new Date()
         };

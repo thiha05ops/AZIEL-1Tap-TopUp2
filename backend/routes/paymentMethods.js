@@ -27,6 +27,14 @@ const {
     validProvidersFor
 } = require("../services/paymentProviderRegistry");
 const authMiddleware = require("../middleware/authMiddleware");
+const optionalAuthMiddleware = require("../middleware/optionalAuthMiddleware");
+const {
+    DINGER_ACTIVATION_STATES,
+    DINGER_METHODS,
+    isDingerMethod,
+    dingerAccessDecision,
+    dingerTechnicalReadiness
+} = require("../services/dinger/dingerPaymentPolicy");
 const {
     createPromptPayQr,
     maskPromptPayRecipient
@@ -56,7 +64,9 @@ const CANONICAL_PROVIDER_BY_KEY = Object.freeze({
     wavepay: "wavepay",
     ayapay: "ayapay",
     mmqr: "mmqr",
-    manual_bank: "manual_bank"
+    manual_bank: "manual_bank",
+    dinger_ayapay_qr: "dinger_ayapay_qr",
+    dinger_wavepay_pin: "dinger_wavepay_pin"
 });
 
 const CHECKLIST_ACTIONS = new Set([
@@ -133,6 +143,20 @@ const defaultPromptPayBankLaunchers = Object.freeze([
 ]);
 
 const defaultMethods = [
+    {
+        method: "AYA Pay QR (Dinger)", key: "dinger_ayapay_qr", region: "MM", enabled: false,
+        paymentType: "auto", provider: "dinger_ayapay_qr", paymentChannel: "DINGER_AYA_PAY_QR",
+        qrMode: "provider_generated", receiptUploadEnabled: false, slipRequired: false,
+        confirmationMode: "provider_webhook", autoVerificationSupported: true, webhookSupported: true,
+        dingerActivationState: "DISABLED", badgeText: "DINGER", shortDescription: "Pay with AYA Pay QR", sortOrder: 30
+    },
+    {
+        method: "Wave Pay PIN (Dinger)", key: "dinger_wavepay_pin", region: "MM", enabled: false,
+        paymentType: "auto", provider: "dinger_wavepay_pin", paymentChannel: "DINGER_WAVE_PAY_PIN",
+        qrMode: "none", receiptUploadEnabled: false, slipRequired: false,
+        confirmationMode: "provider_webhook", autoVerificationSupported: true, webhookSupported: true,
+        dingerActivationState: "DISABLED", badgeText: "DINGER", shortDescription: "Pay with Wave Pay PIN", sortOrder: 31
+    },
     {
         method: "KBZPay",
         key: "kbzpay",
@@ -561,6 +585,8 @@ function normalizePaymentMethodKey(value = "") {
         .replace(/[^a-z0-9]/g, "");
     if (compact === "thunderpromptpay") return "thunder_promptpay";
     if (["truemoney", "truemoneywallet", "thundertruewallet"].includes(compact)) return "truewallet";
+    if (compact === "dingerayapayqr") return "dinger_ayapay_qr";
+    if (compact === "dingerwavepaypin") return "dinger_wavepay_pin";
     return compact;
 }
 
@@ -1005,7 +1031,7 @@ function canonicalDisplayValue(method = {}, value = "") {
     return foreignIdentity ? "" : text;
 }
 
-function formatMethod(method) {
+function formatMethod(method, options = {}) {
     const obj = toPaymentMethodObject(method);
     const provider = normalizeProviderKey(obj.provider || obj.key || "");
     const configurationKind = paymentConfigurationKind(obj);
@@ -1019,6 +1045,7 @@ function formatMethod(method) {
     const qrImage = configurationKind === PAYMENT_CONFIGURATION_KINDS.MANUAL_QR && !isDynamicPromptPayQr ? configuredQrImage : null;
     const displaySource = Object.assign({}, obj, { provider });
     const capabilityState = paymentMethodCapabilityState(displaySource);
+    const dingerDecision = isDingerMethod(obj) ? dingerAccessDecision(obj, options.user || {}) : null;
     const providerReady = true;
     const readiness = {
         ready: capabilityState.publicReady && providerReady,
@@ -1057,12 +1084,23 @@ function formatMethod(method) {
         provider,
         logoUrl: safePublicAssetUrl(obj.logoUrl) || getPaymentLogo(displaySource),
         trustDisplay,
-        publicReady: readiness.ready,
-        customerVisible: capabilityState.customerVisible && providerReady,
-        unavailableReason: providerReady ? capabilityState.unavailableReason : "Automatic PromptPay is not configured",
+        publicReady: dingerDecision ? dingerDecision.readiness?.initiationReady === true : readiness.ready,
+        customerVisible: dingerDecision ? dingerDecision.allowed === true : capabilityState.customerVisible && providerReady,
+        unavailableReason: dingerDecision ? (dingerDecision.allowed ? "" : dingerDecision.reason) : providerReady ? capabilityState.unavailableReason : "Automatic PromptPay is not configured",
         applicableSections: capabilityState.applicableSections,
         missingConfiguration: readiness.missing,
         ...capabilityProjection(obj)
+    };
+}
+
+function applyDingerPublicAccess(formatted = {}, source = {}, user = {}) {
+    if (!isDingerMethod(source)) return formatted;
+    const decision = dingerAccessDecision(source, user);
+    return {
+        ...formatted,
+        publicReady: decision.readiness?.initiationReady === true,
+        customerVisible: decision.allowed === true,
+        unavailableReason: decision.allowed ? "" : decision.reason
     };
 }
 
@@ -1128,7 +1166,15 @@ function formatAdminMethod(method) {
         providerOptions: validProvidersFor(obj.region, obj.paymentType).map(item => ({
             key: item.key,
             label: item.label
-        }))
+        })),
+        ...(isDingerMethod(obj) ? {
+            dingerActivationState: obj.dingerActivationState || "DISABLED",
+            dingerProductionTestApproved: obj.dingerProductionTestApproved === true,
+            dingerGoLiveApproved: obj.dingerGoLiveApproved === true,
+            dingerAuthorizedTestUserIds: Array.isArray(obj.dingerAuthorizedTestUserIds) ? obj.dingerAuthorizedTestUserIds : [],
+            dingerLastTestOutcome: obj.dingerLastTestOutcome || { status: "NOT_RUN", testedAt: null, note: "" },
+            dingerReadiness: dingerTechnicalReadiness(obj)
+        } : {})
     };
 }
 
@@ -1142,7 +1188,7 @@ function safePublicAssetUrl(value = "") {
 }
 
 // GET /api/payment-methods
-router.get("/payment-methods", async (req, res) => {
+router.get("/payment-methods", optionalAuthMiddleware, async (req, res) => {
     try {
         // Do not seed or mutate payment methods during a public GET request.
         // await seedPaymentMethods();
@@ -1157,11 +1203,17 @@ router.get("/payment-methods", async (req, res) => {
             .find(filter)
             .sort({ region: 1, sortOrder: 1, method: 1 });
 
+        res.setHeader("Cache-Control", "private, no-store, max-age=0");
+        res.setHeader("Vary", "Authorization, Cookie");
+        const retiredMyanmarManualKeys = new Set(["ayapay", "wavepay", "kbzpay", "mmqr", "manual_bank"]);
+        const eligibleMethods = methods
+            .filter(method => !isLegacyThailandBankMethod(method))
+            .filter(method => !(String(method.region || "").toUpperCase() === "MM" && retiredMyanmarManualKeys.has(String(method.key || "").toLowerCase())));
         return res.json({
             success: true,
-            methods: methods
-                .filter(method => !isLegacyThailandBankMethod(method))
+            methods: eligibleMethods
                 .map(formatMethod)
+                .map((method, index) => applyDingerPublicAccess(method, eligibleMethods[index], req.user))
                 .filter(method => method.customerVisible === true)
         });
     } catch (error) {
@@ -1756,6 +1808,24 @@ router.post("/admin/payment-methods", adminMiddleware, requireAdminPermission(PE
         });
 
         applyPaymentMethodPatch(method, req.body);
+        if (isDingerMethod(method)) {
+            const contract = DINGER_METHODS[method.key];
+            method.enabled = false;
+            method.dingerActivationState = DINGER_ACTIVATION_STATES.DISABLED;
+            method.dingerProductionTestApproved = false;
+            method.dingerGoLiveApproved = false;
+            method.dingerAuthorizedTestUserIds = [];
+            method.region = "MM";
+            method.paymentType = "auto";
+            method.provider = method.key;
+            method.paymentChannel = method.key === "dinger_ayapay_qr" ? "DINGER_AYA_PAY_QR" : "DINGER_WAVE_PAY_PIN";
+            method.qrMode = contract.presentation === "QR" ? "provider_generated" : "none";
+            method.receiptUploadEnabled = false;
+            method.slipRequired = false;
+            method.confirmationMode = "provider_webhook";
+            method.autoVerificationSupported = true;
+            method.webhookSupported = true;
+        }
         await validatePaymentMethodConfiguration(method);
         await method.save();
 
@@ -1809,6 +1879,12 @@ router.put("/admin/payment-methods/:id", adminMiddleware, requireAdminPermission
             });
         }
 
+        if (isDingerMethod(method) && [
+            "enabled", "dingerActivationState", "dingerProductionTestApproved", "dingerGoLiveApproved", "dingerAuthorizedTestUserIds"
+        ].some(field => Object.prototype.hasOwnProperty.call(req.body || {}, field))) {
+            return res.status(409).json({ success: false, code: "DINGER_ACTIVATION_ROUTE_REQUIRED", message: "Use the Dinger activation control for activation and access changes." });
+        }
+
         applyPaymentMethodPatch(method, req.body);
         await validatePaymentMethodConfiguration(method);
 
@@ -1842,6 +1918,50 @@ router.put("/admin/payment-methods/:id", adminMiddleware, requireAdminPermission
             success: false,
             message: "Server error"
         });
+    }
+});
+
+router.put("/admin/payment-methods/:id/dinger-activation", adminMiddleware, requireAdminPermission(PERMISSIONS.PAYMENT_METHODS_MANAGE), async (req, res) => {
+    try {
+        const method = await PaymentMethod.findById(req.params.id);
+        if (!method || !isDingerMethod(method)) return res.status(404).json({ success: false, code: "DINGER_METHOD_NOT_FOUND", message: "Dinger payment method not found." });
+        const state = String(req.body?.activationState || "").trim().toUpperCase();
+        if (!Object.values(DINGER_ACTIVATION_STATES).includes(state)) return res.status(400).json({ success: false, code: "DINGER_ACTIVATION_INVALID", message: "Dinger activation state is invalid." });
+        const authorizedIds = Array.isArray(req.body?.authorizedTestUserIds)
+            ? [...new Set(req.body.authorizedTestUserIds.map(value => String(value || "").trim()).filter(value => /^[A-Za-z0-9._:-]{1,120}$/.test(value)))].slice(0, 25)
+            : (method.dingerAuthorizedTestUserIds || []);
+        const testApproved = req.body?.productionTestApproved === true;
+        const goLiveApproved = req.body?.goLiveApproved === true;
+        const candidate = {
+            ...method.toObject(),
+            enabled: state !== DINGER_ACTIVATION_STATES.DISABLED,
+            dingerActivationState: state,
+            dingerProductionTestApproved: testApproved,
+            dingerGoLiveApproved: goLiveApproved,
+            dingerAuthorizedTestUserIds: authorizedIds
+        };
+        const readiness = dingerTechnicalReadiness(candidate);
+        if (state === DINGER_ACTIVATION_STATES.TEST_ONLY && (!testApproved || authorizedIds.length === 0 || !readiness.initiationReady)) {
+            return res.status(409).json({ success: false, code: "DINGER_TEST_ONLY_NOT_READY", message: "Dinger TEST_ONLY requires production-test approval, an authorized user, and confirmed initiation readiness.", missing: readiness.missing });
+        }
+        if (state === DINGER_ACTIVATION_STATES.PUBLIC && (!goLiveApproved || !readiness.publicReady)) {
+            return res.status(409).json({ success: false, code: "DINGER_PUBLIC_NOT_READY", message: "Dinger PUBLIC activation requires explicit GO LIVE approval and complete technical readiness.", missing: readiness.missing });
+        }
+        method.enabled = candidate.enabled;
+        method.dingerActivationState = state;
+        method.dingerProductionTestApproved = testApproved;
+        method.dingerGoLiveApproved = goLiveApproved;
+        method.dingerAuthorizedTestUserIds = authorizedIds;
+        await method.save();
+        await writeAdminAudit({
+            actor: req.admin, req, action: ADMIN_AUDIT_ACTIONS.PAYMENT_METHOD_UPDATED,
+            resourceType: "PaymentMethod", resourceId: String(method._id),
+            metadata: { key: method.key, region: method.region, dingerActivationState: state, authorizedTestUserCount: authorizedIds.length, productionTestApproved: testApproved, goLiveApproved }
+        }).catch(error => console.log("Admin audit failed:", error.message));
+        return res.json({ success: true, message: "Dinger activation updated", method: formatAdminMethod(method) });
+    } catch (error) {
+        console.log("Dinger activation update error:", error?.code || error?.name || "UNKNOWN");
+        return res.status(500).json({ success: false, code: "DINGER_ACTIVATION_UPDATE_FAILED", message: "Dinger activation could not be updated." });
     }
 });
 

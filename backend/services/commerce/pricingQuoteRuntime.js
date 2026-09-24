@@ -36,6 +36,7 @@ const ERROR_CODES = Object.freeze({
     PROMOTION_RESOLUTION_FAILED: "PROMOTION_RESOLUTION_FAILED",
     PROMOTION_CURRENCY_MISMATCH: "PROMOTION_CURRENCY_MISMATCH",
     INVALID_PROMOTION_RESULT: "INVALID_PROMOTION_RESULT",
+    PROMOTION_FINANCIAL_FLOOR_VIOLATION: "PROMOTION_FINANCIAL_FLOOR_VIOLATION",
     INVALID_FINAL_AMOUNT: "INVALID_FINAL_AMOUNT",
     QUOTE_AMOUNT_OVERFLOW: "QUOTE_AMOUNT_OVERFLOW",
     INVALID_INTEGRITY_PAYLOAD: "INVALID_INTEGRITY_PAYLOAD",
@@ -413,6 +414,38 @@ function validatePromotionResult(result, currency) {
     }
 }
 
+function validatePostPromotionFinancialFloor({ pricingResult, pricingInput, promotionResult, finalUnitPrice, currency }) {
+    if (!promotionResult?.selectedPromotion) return;
+    const policy = isPlainObject(pricingInput.policy) ? pricingInput.policy : {};
+    const costConfigured = pricingInput.context?.supplierCostSnapshot?.configured === true;
+    const hasExplicitFloor = Number(policy.minimumProfitAmount || 0) > 0 || Number(policy.minimumProfitMarginPercent || 0) > 0;
+    if (!costConfigured && !hasExplicitFloor) return;
+    const totalCost = normalizeAmount(pricingResult.totalCost || 0, "pricingResult.totalCost");
+    const minimumProfitAmount = normalizeAmount(policy.minimumProfitAmount || 0, "policy.minimumProfitAmount");
+    const minimumMarginPercent = normalizeAmount(policy.minimumProfitMarginPercent || 0, "policy.minimumProfitMarginPercent");
+    const amountFloor = totalCost + minimumProfitAmount;
+    const marginFloor = minimumMarginPercent > 0 && minimumMarginPercent < 100
+        ? totalCost / (1 - minimumMarginPercent / 100)
+        : (minimumMarginPercent >= 100 && totalCost > 0 ? Number.POSITIVE_INFINITY : totalCost);
+    const requiredMinimum = Math.max(totalCost, amountFloor, marginFloor);
+    const tolerance = currency === "THB" ? 0 : 1e-6;
+    if (!Number.isFinite(requiredMinimum) || finalUnitPrice + tolerance < requiredMinimum) {
+        throw new PricingQuoteRuntimeError(
+            ERROR_CODES.PROMOTION_FINANCIAL_FLOOR_VIOLATION,
+            "Coupon discount would violate the authoritative financial floor.",
+            {
+                reasonCode: "COUPON_FINANCIAL_FLOOR_VIOLATION",
+                currency,
+                candidateFinalPrice: finalUnitPrice,
+                totalCost,
+                minimumProfitAmount,
+                minimumProfitMarginPercent: minimumMarginPercent,
+                requiredMinimum
+            }
+        );
+    }
+}
+
 function buildPricingSnapshot(pricingInput, pricingResult, priceVersion) {
     const inputSummary = summarizePricingInput(pricingInput);
     const configuredSupplierCost = inputSummary.context?.supplierCostSnapshot?.configured === true;
@@ -566,6 +599,7 @@ function createPricingQuote(input) {
     const quotedUnitPrice = wholeBahtSettlement
         ? finalizePublishedCustomerAmount(promotionFinalPrice, currency)
         : promotionFinalPrice;
+    validatePostPromotionFinancialFloor({ pricingResult, pricingInput, promotionResult, finalUnitPrice: quotedUnitPrice, currency });
     const discountAmount = promotionResult
         ? (wholeBahtSettlement
             ? Math.max(0, originalPrice - quotedUnitPrice)

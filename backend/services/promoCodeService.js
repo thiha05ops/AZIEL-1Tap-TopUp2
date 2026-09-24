@@ -2,6 +2,10 @@ const crypto = require("crypto");
 const PromoCode = require("../models/PromoCode");
 const PromoUsageState = require("../models/PromoUsageState");
 const PromoRedemption = require("../models/PromoRedemption");
+const PromoUserUsageState = require("../models/PromoUserUsageState");
+const mongoose = require("mongoose");
+const UserCoupon = require("../models/UserCoupon");
+const CouponLifecycleEvent = require("../models/CouponLifecycleEvent");
 const { CatalogError, normalizePackageCode, normalizeProductCode, normalizeRegion, resolveOrderCatalog } = require("./catalogService");
 
 const DISCOUNT_TYPES = Object.freeze({
@@ -69,9 +73,13 @@ function amountMap(input = {}) {
 
 function activeWindowState(promo, now = new Date()) {
     if (promo.archivedAt) return "ARCHIVED";
+    const operationalStatus = String(promo.operationalStatus || "").trim().toUpperCase();
+    if (operationalStatus === "DRAFT") return "DRAFT";
+    if (operationalStatus === "PAUSED") return "PAUSED";
+    if (operationalStatus === "ENDED") return "ENDED";
     if (!promo.enabled) return "DISABLED";
     if (promo.startsAt && promo.startsAt > now) return "SCHEDULED";
-    if (promo.endsAt && promo.endsAt < now) return "EXPIRED";
+    if (promo.endsAt && promo.endsAt <= now) return "ENDED";
     return "ACTIVE";
 }
 
@@ -124,14 +132,20 @@ function projectPromo(promo, usageState = null) {
         eligibleProductCodes: promo.eligibleProductCodes || [],
         eligiblePackages: promo.eligiblePackages || [],
         usageLimit: Number(promo.usageLimit || 0),
+        claimLimit: Number(promo.claimLimit || 0),
         perUserLimit: Number(promo.perUserLimit || 0),
         startsAt: promo.startsAt,
         endsAt: promo.endsAt,
         enabled: Boolean(promo.enabled),
+        operationalStatus: promo.operationalStatus || "",
+        stackingPolicy: promo.stackingPolicy || "SAFE_STACKING",
         archivedAt: promo.archivedAt,
         state: activeWindowState(promo),
         consumedCount: Number(usage.consumedCount || 0),
         reservedCount: Number(usage.reservedCount || 0),
+        claimedCount: Number(usage.claimedCount || 0),
+        expiredCount: Number(usage.expiredCount || 0),
+        availableCount: Math.max(0, Number(usage.claimedCount || 0) - Number(usage.reservedCount || 0) - Number(usage.consumedCount || 0) - Number(usage.expiredCount || 0)),
         createdAt: promo.createdAt,
         updatedAt: promo.updatedAt
     };
@@ -209,10 +223,15 @@ function sanitizePromoPayload(payload = {}, existing = null, actor = "admin") {
         eligibleProductCodes: eligibilityMode === ELIGIBILITY_MODES.PRODUCTS ? eligibleProductCodes : [],
         eligiblePackages: eligibilityMode === ELIGIBILITY_MODES.PACKAGES ? eligiblePackages : [],
         usageLimit: Math.floor(positiveNumber(payload.usageLimit)),
+        claimLimit: Math.floor(positiveNumber(payload.claimLimit)),
         perUserLimit: Math.floor(positiveNumber(payload.perUserLimit)),
         startsAt,
         endsAt,
         enabled: Boolean(payload.enabled),
+        operationalStatus: ["DRAFT", "ACTIVE", "PAUSED", "ENDED"].includes(String(payload.operationalStatus || "").toUpperCase())
+            ? String(payload.operationalStatus).toUpperCase()
+            : (existing?.operationalStatus || (payload.enabled ? "ACTIVE" : "DRAFT")),
+        stackingPolicy: "SAFE_STACKING",
         updatedBy: actor
     };
 }
@@ -224,6 +243,29 @@ async function listAdminPromos() {
     ]);
     const usageByCode = new Map(states.map(state => [state.code, state]));
     return promos.map(promo => projectPromo(promo, usageByCode.get(promo.code)));
+}
+
+async function getAdminPromoDetail(id) {
+    const promo = await PromoCode.findOne({ _id: id });
+    if (!promo) throw new PromoError("PROMO_NOT_FOUND", "Coupon campaign not found.", 404);
+    const [usage, statusCounts, events] = await Promise.all([
+        PromoUsageState.findOne({ code: promo.code }).lean(),
+        UserCoupon.aggregate([
+            { $match: { promoCodeId: promo._id } },
+            { $group: { _id: "$status", count: { $sum: 1 } } }
+        ]),
+        CouponLifecycleEvent.find({ promoCodeId: promo._id }).sort({ occurredAt: -1 }).limit(100).lean()
+    ]);
+    return {
+        promo: projectPromo(promo, usage),
+        couponCounts: Object.fromEntries(statusCounts.map(item => [item._id, item.count])),
+        events: events.map(event => ({
+            id: String(event._id), eventType: event.eventType, userCouponId: String(event.userCouponId), userId: String(event.userId),
+            quoteId: event.quoteId, orderId: event.orderId, paymentAttemptId: event.paymentAttemptId,
+            originalAmount: event.originalAmount, discountAmount: event.discountAmount, finalAmount: event.finalAmount,
+            currency: event.currency, source: event.source, reason: event.reason, occurredAt: event.occurredAt
+        }))
+    };
 }
 
 async function createPromo(payload = {}, actor = "admin") {
@@ -251,7 +293,7 @@ async function createPromo(payload = {}, actor = "admin") {
 
     await PromoUsageState.updateOne(
         { code },
-        { $setOnInsert: { code, consumedCount: 0, reservedCount: 0 } },
+        { $setOnInsert: { code, consumedCount: 0, reservedCount: 0, claimedCount: 0, expiredCount: 0 } },
         { upsert: true }
     );
 
@@ -269,9 +311,14 @@ async function updatePromo(id, payload = {}, actor = "admin") {
         throw new PromoError("PROMO_NAME_REQUIRED", "Promo name is required.");
     }
 
+    const usage = await PromoUsageState.findOne({ code: promo.code }).lean();
+    if (Number(usage?.claimedCount || 0) > 0) {
+        const locked = ["discountType", "percentageValue", "fixedAmounts", "maximumDiscountAmounts", "minimumOrderAmounts", "regions", "eligibilityMode", "eligibleProductCodes", "eligiblePackages", "claimLimit", "usageLimit", "perUserLimit"];
+        const changed = locked.some(field => JSON.stringify(promo[field] ?? null) !== JSON.stringify(clean[field] ?? null));
+        if (changed) throw new PromoError("PROMO_TERMS_LOCKED_AFTER_CLAIM", "Coupon financial and eligibility terms cannot change after the first claim.", 409);
+    }
     Object.assign(promo, clean);
     await promo.save();
-    const usage = await PromoUsageState.findOne({ code: promo.code }).lean();
     return projectPromo(promo, usage);
 }
 
@@ -421,25 +468,18 @@ async function releaseExpiredReservationsForCode(code) {
         code,
         status: "RESERVED",
         expiresAt: { $ne: null, $lte: new Date() }
-    }).select("_id");
+    }).select("_id userId username");
 
     if (!expired.length) return 0;
 
-    const ids = expired.map(item => item._id);
-    await PromoRedemption.updateMany(
-        { _id: { $in: ids }, status: "RESERVED" },
-        {
-            $set: {
-                status: "RELEASED",
-                releasedAt: new Date()
-            }
-        }
-    );
-    await PromoUsageState.updateOne(
-        { code },
-        { $inc: { reservedCount: -expired.length } }
-    );
-    return expired.length;
+    let releasedCount = 0;
+    for (const candidate of expired) {
+        // Reuse the same atomic lifecycle boundary as explicit cancellation.
+        // eslint-disable-next-line no-await-in-loop
+        const released = await releasePromoRedemption(candidate._id);
+        if (released?.status === "RELEASED" && released.$locals?.lifecycleIdempotent !== true) releasedCount += 1;
+    }
+    return releasedCount;
 }
 
 async function resolvePurchasePricing({ payload = {}, user = null, verifyUserLimit = false } = {}) {
@@ -489,44 +529,24 @@ async function reservePromoUse({ pricing, user, orderId = "", manualPaymentAttem
     );
     await releaseExpiredReservationsForCode(code);
 
-    if (promo.perUserLimit > 0 && user?.username) {
-        const usedByUser = await PromoRedemption.countDocuments({
-            code,
-            username: user.username,
-            status: { $in: ["RESERVED", "CONSUMED"] },
-            $or: [
-                { status: "CONSUMED" },
-                { expiresAt: null },
-                { expiresAt: { $gt: new Date() } }
-            ]
-        });
-        if (usedByUser >= promo.perUserLimit) {
-            throw new PromoError("PROMO_USER_LIMIT_REACHED", "You have already used this promo code.");
-        }
-    }
-
-    const filter = { code };
-    if (promo.usageLimit > 0) {
-        filter.$expr = {
-            $lt: [
-                { $add: ["$consumedCount", "$reservedCount"] },
-                Number(promo.usageLimit)
-            ]
-        };
-    }
-
-    const state = await PromoUsageState.findOneAndUpdate(
-        filter,
-        { $inc: { reservedCount: 1 } },
-        { returnDocument: "after" }
-    );
-
-    if (!state) {
-        throw new PromoError("PROMO_USAGE_LIMIT_REACHED", "This promo code has reached its usage limit.");
-    }
-
+    const session = await mongoose.startSession();
     try {
-        return await PromoRedemption.create({
+        let redemption;
+        await session.withTransaction(async () => {
+            const userKey = String(user?._id || user?.id || user?.username || "").trim();
+            if (promo.perUserLimit > 0 && userKey) {
+                await PromoUserUsageState.updateOne({ code, userKey }, { $setOnInsert: { code, userKey, reservedCount: 0, consumedCount: 0 } }, { upsert: true, session });
+                const userState = await PromoUserUsageState.findOneAndUpdate(
+                    { code, userKey, $expr: { $lt: [{ $add: ["$consumedCount", "$reservedCount"] }, Number(promo.perUserLimit)] } },
+                    { $inc: { reservedCount: 1 } }, { returnDocument: "after", session }
+                );
+                if (!userState) throw new PromoError("PROMO_USER_LIMIT_REACHED", "You have already used this promo code.");
+            }
+            const filter = { code };
+            if (promo.usageLimit > 0) filter.$expr = { $lt: [{ $add: ["$consumedCount", "$reservedCount"] }, Number(promo.usageLimit)] };
+            const state = await PromoUsageState.findOneAndUpdate(filter, { $inc: { reservedCount: 1 } }, { returnDocument: "after", session });
+            if (!state) throw new PromoError("PROMO_USAGE_LIMIT_REACHED", "This promo code has reached its usage limit.");
+            const created = await PromoRedemption.create([{
             promoCodeId: promo._id,
             code,
             userId: user?._id || user?.id || null,
@@ -540,56 +560,92 @@ async function reservePromoUse({ pricing, user, orderId = "", manualPaymentAttem
             finalAmount: pricing.finalAmount,
             expiresAt,
             snapshot: pricing.promoSnapshot
+            }], { session });
+            redemption = created[0];
         });
-    } catch (error) {
-        await PromoUsageState.updateOne({ code }, { $inc: { reservedCount: -1 } });
-        throw error;
+        return redemption;
+    } finally {
+        await session.endSession();
     }
 }
 
-async function consumePromoRedemption(redemptionId, orderId = "") {
-    if (!redemptionId) return null;
-
-    const redemption = await PromoRedemption.findOneAndUpdate(
-        { _id: redemptionId, status: "RESERVED" },
-        {
-            $set: {
-                status: "CONSUMED",
-                consumedAt: new Date(),
-                orderId: orderId || undefined
-            }
-        },
-        { returnDocument: "after" }
-    );
-
-    if (!redemption) return null;
-    await PromoUsageState.updateOne(
-        { code: redemption.code },
-        { $inc: { reservedCount: -1, consumedCount: 1 } }
-    );
-    return redemption;
+async function withPromoRedemptionTransaction(callback, suppliedSession = null) {
+    if (suppliedSession) return callback(suppliedSession);
+    const session = await mongoose.startSession();
+    try {
+        let result;
+        await session.withTransaction(async () => { result = await callback(session); });
+        return result;
+    } finally {
+        await session.endSession();
+    }
 }
 
-async function releasePromoRedemption(redemptionId) {
+async function updateLegacyUserUsage(redemption, update, session) {
+    const userKey = String(redemption.userId || redemption.username || "").trim();
+    if (!userKey) return;
+    const exists = await PromoUserUsageState.findOne({ code: redemption.code, userKey }).session(session);
+    if (!exists) return;
+    const updated = await PromoUserUsageState.updateOne(
+        { code: redemption.code, userKey, reservedCount: { $gt: 0 } },
+        update,
+        { session }
+    );
+    if (!updated.modifiedCount) throw new PromoError("PROMO_USER_USAGE_COUNTER_CONFLICT", "Promo user usage counter could not be reconciled.", 409);
+}
+
+async function consumePromoRedemption(redemptionId, orderId = "", options = {}) {
     if (!redemptionId) return null;
+    return withPromoRedemptionTransaction(async session => {
+        const consumedQuery = { _id: redemptionId, status: "CONSUMED" };
+        if (orderId) consumedQuery.orderId = orderId;
+        const alreadyConsumed = await PromoRedemption.findOne(consumedQuery).session(session);
+        if (alreadyConsumed) {
+            alreadyConsumed.$locals.lifecycleIdempotent = true;
+            return alreadyConsumed;
+        }
+        const redemption = await PromoRedemption.findOneAndUpdate(
+            { _id: redemptionId, status: "RESERVED" },
+            { $set: { status: "CONSUMED", consumedAt: new Date(), orderId: orderId || undefined } },
+            { returnDocument: "after", session }
+        );
+        if (!redemption) return null;
+        redemption.$locals.lifecycleIdempotent = false;
+        const global = await PromoUsageState.updateOne(
+            { code: redemption.code, reservedCount: { $gt: 0 } },
+            { $inc: { reservedCount: -1, consumedCount: 1 } },
+            { session }
+        );
+        if (!global.modifiedCount) throw new PromoError("PROMO_USAGE_COUNTER_CONFLICT", "Promo usage counter could not be reconciled.", 409);
+        await updateLegacyUserUsage(redemption, { $inc: { reservedCount: -1, consumedCount: 1 } }, session);
+        return redemption;
+    }, options.session || null);
+}
 
-    const redemption = await PromoRedemption.findOneAndUpdate(
-        { _id: redemptionId, status: "RESERVED" },
-        {
-            $set: {
-                status: "RELEASED",
-                releasedAt: new Date()
-            }
-        },
-        { returnDocument: "after" }
-    );
-
-    if (!redemption) return null;
-    await PromoUsageState.updateOne(
-        { code: redemption.code },
-        { $inc: { reservedCount: -1 } }
-    );
-    return redemption;
+async function releasePromoRedemption(redemptionId, options = {}) {
+    if (!redemptionId) return null;
+    return withPromoRedemptionTransaction(async session => {
+        const alreadyReleased = await PromoRedemption.findOne({ _id: redemptionId, status: "RELEASED" }).session(session);
+        if (alreadyReleased) {
+            alreadyReleased.$locals.lifecycleIdempotent = true;
+            return alreadyReleased;
+        }
+        const redemption = await PromoRedemption.findOneAndUpdate(
+            { _id: redemptionId, status: "RESERVED" },
+            { $set: { status: "RELEASED", releasedAt: new Date() } },
+            { returnDocument: "after", session }
+        );
+        if (!redemption) return null;
+        redemption.$locals.lifecycleIdempotent = false;
+        const global = await PromoUsageState.updateOne(
+            { code: redemption.code, reservedCount: { $gt: 0 } },
+            { $inc: { reservedCount: -1 } },
+            { session }
+        );
+        if (!global.modifiedCount) throw new PromoError("PROMO_USAGE_COUNTER_CONFLICT", "Promo usage counter could not be reconciled.", 409);
+        await updateLegacyUserUsage(redemption, { $inc: { reservedCount: -1 } }, session);
+        return redemption;
+    }, options.session || null);
 }
 
 module.exports = {
@@ -600,6 +656,7 @@ module.exports = {
     buildPromoSnapshot,
     consumePromoRedemption,
     createPromo,
+    getAdminPromoDetail,
     listAdminPromos,
     normalizeCode,
     normalizeOptionalCode,

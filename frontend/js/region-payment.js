@@ -40,7 +40,7 @@ async function loadDynamicPaymentMethods(region) {
                 ? `${location.protocol}//${location.hostname === "127.0.0.1" ? "127.0.0.1" : "localhost"}:3000`
                 : "";
 
-        const res = await fetch(`${API_BASE}/api/payment-methods?region=${region}`);
+        const res = await fetch(`${API_BASE}/api/payment-methods?region=${region}`, { headers: window.AZIEL?.authHeaders?.({ Accept: "application/json" }) || { Accept: "application/json" }, credentials: "same-origin", cache: "no-store" });
         const data = await res.json();
 
         const rawMethods = Array.isArray(data.methods) ? data.methods : [];

@@ -16,6 +16,7 @@ const { normalizeRouteProductCode, resolveCanonicalProductRoute } = require("./c
 const { LEGACY_ALIASES, PAGE_ROUTES, PRODUCT_RENDERERS, frontendFile, preserveQuery } = require("./config/storefrontRouteContract");
 const { getCatalogProductDetail } = require("./services/catalogService");
 const { createDingerDiagnosticCallbackRouter } = require("./routes/dingerDiagnosticCallback");
+const { createDingerSettlementCallbackRouter } = require("./routes/dingerSettlementCallback");
 
 dotenv.config({ path: path.join(__dirname, "../.env") });
 const configurationLoadedAt = performance.now();
@@ -199,7 +200,10 @@ function configureBaseApplication(options = {}) {
         etag: true, lastModified: true, setHeaders: setFrontendCacheHeaders
     }));
     app.use("/uploads", express.static(path.join(__dirname, "uploads")));
-    app.use("/api/webhooks/dinger", createDingerDiagnosticCallbackRouter());
+    const dingerCallbackRouter = String(process.env.DINGER_LIVE_CALLBACK_SETTLEMENT_ENABLED || "").trim().toLowerCase() === "true"
+        ? createDingerSettlementCallbackRouter()
+        : createDingerDiagnosticCallbackRouter();
+    app.use("/api/webhooks/dinger", dingerCallbackRouter);
     startup.staticReady = true;
     recordStartupMilestone("static_middleware_ready", staticStartedAt);
 
@@ -302,6 +306,18 @@ function startBackgroundWorkers() {
     backgroundWorkersStarted = true;
     require("./services/supplierCatalog/supplierCatalogIngestionScheduler").scheduler.start();
     supplierCatalogSchedulerStarted = true;
+    const couponCleanup = async () => {
+        try {
+            await require("./services/commerce/commercePromotionBridgeService").reconcilePendingCouponPayments();
+            await require("./services/userCouponService").cleanupExpiredUserCoupons();
+        } catch (error) {
+            console.error("Coupon reconciliation cleanup failed:", error?.code || error?.name || "UNKNOWN");
+        }
+    };
+    couponCleanup();
+    const couponCleanupTimer = setInterval(couponCleanup, Math.max(60_000, Number(process.env.COUPON_CLEANUP_INTERVAL_MS || 5 * 60 * 1000)));
+    couponCleanupTimer.unref?.();
+    backgroundTimers.add(couponCleanupTimer);
     if (require("./services/suppliers/wonddAdapter").hasAnyAutoFulfillmentEnabled()) {
         const processor = require("./services/suppliers/wonddFulfillmentProcessor").processor;
         processor.recoverDue().catch(() => null);

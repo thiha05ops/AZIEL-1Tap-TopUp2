@@ -1,5 +1,7 @@
 "use strict";
 
+const QRCode = require("qrcode");
+
 const {
     createProviderAdapter,
     ProviderAdapterError,
@@ -7,17 +9,16 @@ const {
     CAPABILITIES
 } = require("../providerAdapter");
 const { isSuccessCode, parseDingerTimestamp } = require("../../dinger/dingerApiClient");
+const { paymentStatusForDingerTransaction } = require("../../dinger/dingerCallbackContract");
 
 const PROVIDER_ID = "DINGER";
 const METHOD_CONTRACTS = Object.freeze({
     dinger_ayapay_qr: Object.freeze({ providerName: "AYA Pay", methodName: "QR", presentation: "QR", responseContract: "QR_PAY_RESPONSE" }),
-    dinger_ayapay_pin: Object.freeze({ providerName: "AYA Pay", methodName: "PIN", presentation: "WALLET_NOTIFICATION", responseContract: "UNCONFIRMED" }),
-    dinger_kbzpay_qr: Object.freeze({ providerName: "KBZ Pay", methodName: "QR", presentation: "QR", responseContract: "QR_PAY_RESPONSE" }),
-    dinger_kbzpay_pwa: Object.freeze({ providerName: "KBZ Pay", methodName: "PWA", presentation: "APP_DIRECT", responseContract: "UNCONFIRMED" }),
     dinger_wavepay_pin: Object.freeze({ providerName: "Wave Pay", methodName: "PIN", presentation: "REDIRECT", responseContract: "WAVE_FORM_REDIRECT" })
 });
 
 const STAGING_FORM_CHECKOUT_URL = "https://staging.dinger.asia/gateway/formCheckout";
+const PRODUCTION_WAVE_REDIRECT_URL = "https://portal.dinger.asia/gateway/redirect";
 
 function text(value) { return String(value || "").trim(); }
 function adapterError(code, message, stage) {
@@ -32,8 +33,13 @@ function normalizeDingerPayResponse(response, context = {}) {
     if (!response || typeof response !== "object" || Array.isArray(response) || !response.response || typeof response.response !== "object") {
         throw adapterError(ERROR_CODES.PAYMENT_PROVIDER_RESPONSE_INVALID, "Dinger redirect response is invalid.", "contract");
     }
-    if (text(context.configuration?.environment || "STAGING").toUpperCase() !== "STAGING") {
-        throw adapterError(ERROR_CODES.PAYMENT_PROVIDER_RESPONSE_INVALID, "Dinger live redirect contract is not confirmed.", "contract");
+    const environment = text(context.configuration?.environment || "STAGING").toUpperCase();
+    const live = environment === "LIVE";
+    if (live && method.responseContract === "QR_PAY_RESPONSE" && context.configuration?.ayaQrResponseContractConfirmed !== true) {
+        throw adapterError(ERROR_CODES.PAYMENT_PROVIDER_RESPONSE_INVALID, "Dinger live AYA QR response contract is not confirmed.", "contract");
+    }
+    if (live && method.responseContract === "WAVE_FORM_REDIRECT" && context.configuration?.waveRedirectContractConfirmed !== true) {
+        throw adapterError(ERROR_CODES.PAYMENT_PROVIDER_RESPONSE_INVALID, "Dinger live Wave redirect contract is not confirmed.", "contract");
     }
     const payload = response.response;
     if (!isSuccessCode(response.code)) {
@@ -42,16 +48,17 @@ function normalizeDingerPayResponse(response, context = {}) {
     let responseTime;
     try { responseTime = parseDingerTimestamp(response.time, "pay.time").raw; }
     catch (_) { throw adapterError(ERROR_CODES.PAYMENT_PROVIDER_RESPONSE_INVALID, "Dinger Pay API response time is invalid.", "contract"); }
-    const amount = Number(payload.amount);
+    const amountPresent = payload.amount !== undefined && payload.amount !== null && text(payload.amount) !== "";
+    const amount = amountPresent ? Number(payload.amount) : null;
     const merchantOrderId = text(payload.merchOrderId);
     const formToken = text(payload.formToken);
     const transactionNo = text(payload.transactionNum);
-    if (!Number.isSafeInteger(amount) || amount !== Number(context.intent?.amount)) {
+    if ((method.responseContract === "QR_PAY_RESPONSE" || amountPresent) && (!Number.isSafeInteger(amount) || amount !== Number(context.intent?.amount))) {
         throw adapterError(ERROR_CODES.PAYMENT_PROVIDER_RESPONSE_INVALID, "Dinger redirect response amount does not match the payment intent.", "contract");
     }
     const hasEnvelope = Object.prototype.hasOwnProperty.call(response, "code") && Object.prototype.hasOwnProperty.call(response, "message") && Object.prototype.hasOwnProperty.call(response, "time");
     const hasSignatureFields = Boolean(text(payload.sign)) && Boolean(text(payload.signType));
-    if (!hasEnvelope || !hasSignatureFields || !merchantOrderId || merchantOrderId !== text(context.merchantOrderId) || !transactionNo) {
+    if (!hasEnvelope || (method.responseContract === "QR_PAY_RESPONSE" && !hasSignatureFields) || !merchantOrderId || merchantOrderId !== text(context.merchantOrderId) || !transactionNo) {
         throw adapterError(ERROR_CODES.PAYMENT_PROVIDER_RESPONSE_INVALID, "Dinger redirect response binding is invalid.", "contract");
     }
     if (method.responseContract === "QR_PAY_RESPONSE") {
@@ -67,7 +74,14 @@ function normalizeDingerPayResponse(response, context = {}) {
         };
     }
     if (!formToken) throw adapterError(ERROR_CODES.PAYMENT_PROVIDER_RESPONSE_INVALID, "Dinger redirect response is missing formToken.", "contract");
-    const url = new URL(STAGING_FORM_CHECKOUT_URL);
+    const configuredFormUrl = live ? text(context.configuration?.waveFormUrl) : STAGING_FORM_CHECKOUT_URL;
+    let url;
+    try { url = new URL(configuredFormUrl); } catch (_) {
+        throw adapterError(ERROR_CODES.PAYMENT_PROVIDER_RESPONSE_INVALID, "Dinger hosted-form URL is not configured from a confirmed contract.", "contract");
+    }
+    if (url.protocol !== "https:" || url.search || (live && url.toString() !== PRODUCTION_WAVE_REDIRECT_URL)) {
+        throw adapterError(ERROR_CODES.PAYMENT_PROVIDER_RESPONSE_INVALID, "Dinger hosted-form URL configuration is invalid.", "contract");
+    }
     url.searchParams.set("transactionNo", transactionNo);
     url.searchParams.set("formToken", formToken);
     url.searchParams.set("merchantOrderId", merchantOrderId);
@@ -122,8 +136,12 @@ function createDingerAdapter(options = {}) {
         if (!normalized || typeof normalized !== "object") {
             throw adapterError(ERROR_CODES.PAYMENT_PROVIDER_RESPONSE_INVALID, "Dinger Pay API response is unsupported.", "contract");
         }
+        const qr = normalized.qr?.payload
+            ? { ...normalized.qr, image: await QRCode.toDataURL(normalized.qr.payload, { errorCorrectionLevel: "M", margin: 2, width: 360 }) }
+            : normalized.qr;
         return {
             ...normalized,
+            qr,
             provider: PROVIDER_ID,
             providerReference: text(normalized.providerReference || merchantOrderId),
             providerTransactionId: text(normalized.providerTransactionId || normalized.providerReference || merchantOrderId),
@@ -136,13 +154,39 @@ function createDingerAdapter(options = {}) {
                 presentation: method.presentation,
                 responseContract: method.responseContract,
                 responseTime: text(normalized.safeMetadata?.responseTime),
-                signType: text(normalized.safeMetadata?.signType)
+                signType: text(normalized.safeMetadata?.signType),
+                payResponseSignatureVerified: normalized.safeMetadata?.payResponseSignatureVerified === true
             }
         };
     }
 
-    async function handleProviderEvent() {
-        throw adapterError(ERROR_CODES.PAYMENT_PROVIDER_EVENT_INVALID, "Dinger callback verification is not available in Phase 1.", "callback");
+    async function handleProviderEvent({ providerEvent = {}, attempt = {}, intent = {}, trustedOperational } = {}) {
+        const methodId = text(attempt.paymentMethodId || attempt.paymentMethod || intent.paymentMethodId).toLowerCase();
+        const method = METHOD_CONTRACTS[methodId];
+        const providerMatches = text(providerEvent.provider).toUpperCase() === PROVIDER_ID;
+        const referenceMatches = text(providerEvent.providerReference) === text(attempt.providerReference);
+        const amountMatches = Number(providerEvent.amount) === Number(attempt.amount ?? intent.amount);
+        const currencyMatches = text(providerEvent.currency).toUpperCase() === "MMK" && text(attempt.currency || intent.currency).toUpperCase() === "MMK";
+        const methodMatches = method && text(providerEvent.providerName).toLowerCase() === text(method.providerName).toLowerCase() && text(providerEvent.methodName).toUpperCase() === text(method.methodName).toUpperCase();
+        const transactionId = text(providerEvent.providerTransactionId);
+        const transactionMatches = !text(attempt.providerTransactionId) || transactionId === text(attempt.providerTransactionId);
+        if (trustedOperational !== true || !providerMatches || !referenceMatches || !amountMatches || !currencyMatches || !methodMatches || !transactionId || !transactionMatches) {
+            throw adapterError(ERROR_CODES.PAYMENT_PROVIDER_EVENT_INVALID, "Dinger callback does not match the payment attempt.", "callback");
+        }
+        const rawStatus = text(providerEvent.rawProviderStatus || providerEvent.transactionStatus).toUpperCase();
+        return {
+            provider: PROVIDER_ID,
+            providerReference: text(attempt.providerReference),
+            providerTransactionId: transactionId,
+            providerEventId: text(providerEvent.providerEventId),
+            eventType: `DINGER_${rawStatus}`,
+            status: paymentStatusForDingerTransaction(rawStatus),
+            rawProviderStatus: rawStatus,
+            amount: Number(providerEvent.amount),
+            currency: "MMK",
+            occurredAt: providerEvent.occurredAt,
+            safeMetadata: { verificationMethod: "DINGER_AES256_SHA256_CALLBACK", transactionStatus: rawStatus }
+        };
     }
 
     return createProviderAdapter({
@@ -162,5 +206,6 @@ module.exports = Object.freeze({
     DINGER_PROVIDER_ID: PROVIDER_ID,
     DINGER_METHOD_CONTRACTS: METHOD_CONTRACTS,
     DINGER_STAGING_FORM_CHECKOUT_URL: STAGING_FORM_CHECKOUT_URL,
+    DINGER_PRODUCTION_WAVE_REDIRECT_URL: PRODUCTION_WAVE_REDIRECT_URL,
     normalizeDingerPayResponse
 });

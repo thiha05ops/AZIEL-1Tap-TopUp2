@@ -3,6 +3,7 @@
 const { createPayableSubjectRegistry, UnsupportedPayableSubjectError, SUBJECT_TYPES } = require("./payableSubjectRegistry");
 const { createCommerceOrderPayableSubjectAdapter } = require("./commerceOrderPayableSubjectAdapter");
 const { createWalletTopupPayableSubjectAdapter } = require("./walletTopupPayableSubjectAdapter");
+const { reconcileCommercePromotionForPayment } = require("./commercePromotionBridgeService");
 
 const PAYMENT_ORCHESTRATOR_VERSION = "2.6.1";
 const MAX_ID_LENGTH = 200;
@@ -358,6 +359,7 @@ function createPaymentOrchestrator(dependencies = {}) {
         paidFulfillmentFailureRecorder: dependencies.paidFulfillmentFailureRecorder || null,
         paidSettlementHandler: dependencies.paidSettlementHandler || null,
         walletTopupSettlementHandler: dependencies.walletTopupSettlementHandler || null,
+        couponReconciliationHandler: dependencies.couponReconciliationHandler || reconcileCommercePromotionForPayment,
         allowLatePaymentReconciliation: dependencies.allowLatePaymentReconciliation === true
     };
     assertProviderFunction(deps.providerResolver, "providerResolver");
@@ -492,6 +494,31 @@ function createPaymentOrchestrator(dependencies = {}) {
         }
     }
 
+    async function runPostCommitCouponReconciliation(applied = {}) {
+        const status = normalizeState(applied.attempt?.status);
+        if (![PAYMENT_STATES.PAID, PAYMENT_STATES.FAILED, PAYMENT_STATES.CANCELLED, PAYMENT_STATES.EXPIRED].includes(status)) return null;
+        const subjectType = normalizeString(applied.attempt?.subjectType || (applied.attempt?.orderId ? SUBJECT_TYPES.COMMERCE_ORDER : "")).toUpperCase();
+        if (subjectType !== SUBJECT_TYPES.COMMERCE_ORDER || typeof deps.couponReconciliationHandler !== "function") return null;
+        try {
+            const orderId = normalizeString(applied.order?.orderId || applied.attempt?.orderId);
+            let committedOrder = applied.order;
+            if (orderId) ({ subject: committedOrder } = await loadOperationalSubject({ subjectReference: { subjectType, subjectId: orderId, orderId } }));
+            return await deps.couponReconciliationHandler({ order: committedOrder, attempt: applied.attempt, toStatus: status, now: deps.clock() });
+        } catch (error) {
+            deps.logger.error?.("Coupon payment reconciliation dispatch failed.", {
+                orderId: applied.order?.orderId || applied.attempt?.orderId || "",
+                status,
+                errorCode: error?.code || error?.name || "UNKNOWN"
+            });
+            return { required: true, status: "FAILED", retryable: true, errorCode: error?.code || error?.name || "COUPON_RECONCILIATION_DISPATCH_FAILED" };
+        }
+    }
+
+    async function runPostCommitTerminalEffects(applied = {}) {
+        await runPostCommitCouponReconciliation(applied);
+        return runPostCommitPaidEffects(applied);
+    }
+
     function buildIntent(order, input = {}, subjectAdapter = commerceOrderAdapter, subjectReference = null) {
         const reference = subjectReference || normalizeSubjectReference({ orderId: order.orderId });
         const amount = subjectAdapter.getAuthoritativeAmount(order);
@@ -525,6 +552,15 @@ function createPaymentOrchestrator(dependencies = {}) {
             providerType,
             confirmationMode: normalizeString(payment.confirmationMode || payment.metadata?.confirmationMode || ""),
             paymentSnapshot: payment,
+            customer: {
+                phone: normalizeString(order.customer?.contact?.phone || order.fulfilment?.input?.customFields?.customerPhone),
+                name: normalizeString(order.fulfilment?.input?.customFields?.customerName || order.customer?.notes || "AZIEL Customer")
+            },
+            items: [{
+                name: normalizeString(order.product?.packageName || order.product?.productName || order.product?.packageCode || "AZIEL top-up"),
+                amount,
+                quantity: Number(order.commercial?.quantity || order.product?.quantity || 1)
+            }],
             idempotencyKey: normalizeString(input.idempotencyKey),
             traceId: normalizeString(input.traceId || input.requestMetadata?.traceId),
             clientIp: normalizeString(input.clientIp || input.requestMetadata?.clientIp)
@@ -668,6 +704,7 @@ function createPaymentOrchestrator(dependencies = {}) {
                         providerTransactionId: providerResult.providerTransactionId,
                         rawProviderStatus: providerResult.rawProviderStatus,
                         qr: providerResult.qr,
+                        redirect: providerResult.redirect,
                         expiresAt: providerResult.expiresAt,
                         paymentInstructions: providerResult.paymentInstructions,
                         safeMetadata: providerResult.safeMetadata,
@@ -701,7 +738,7 @@ function createPaymentOrchestrator(dependencies = {}) {
                     order: applied.order
                 };
             });
-            await runPostCommitPaidEffects(applied);
+            await runPostCommitTerminalEffects(applied);
             return buildPublicResult({ attempt: applied.attempt, order: applied.order, outcome: "created" });
         } catch (error) {
             if (typeof deps.paymentAttemptPort.recordFailure === "function") {
@@ -808,7 +845,7 @@ function createPaymentOrchestrator(dependencies = {}) {
             }
             return applyPaymentStatus({ order, subjectAdapter, attempt: refreshedAttempt, toStatus: result.status, reason: "Payment refreshed", transactionContext });
         });
-        await runPostCommitPaidEffects(applied);
+        await runPostCommitTerminalEffects(applied);
         return buildPublicResult({ attempt: applied.attempt, order: applied.order, outcome: "refreshed" });
     }
 
@@ -830,6 +867,7 @@ function createPaymentOrchestrator(dependencies = {}) {
             reason: "Payment cancelled",
             transactionContext
         }));
+        await runPostCommitTerminalEffects(applied);
         return buildPublicResult({ attempt: applied.attempt, order: applied.order, outcome: "cancelled" });
     }
 
@@ -851,6 +889,7 @@ function createPaymentOrchestrator(dependencies = {}) {
             reason: "Payment expired",
             transactionContext
         }));
+        await runPostCommitTerminalEffects(applied);
         return buildPublicResult({ attempt: applied.attempt, order: applied.order, outcome: "expired" });
     }
 
@@ -931,7 +970,7 @@ function createPaymentOrchestrator(dependencies = {}) {
                 });
             }
             if (result.status === PAYMENT_STATES.PAID) {
-                await runPostCommitPaidEffects({ attempt, order });
+                await runPostCommitTerminalEffects({ attempt, order });
             }
             return buildPublicResult({ attempt, order, idempotent: true, outcome: "event_no_change" });
         }
@@ -974,7 +1013,7 @@ function createPaymentOrchestrator(dependencies = {}) {
                 transactionContext
             });
         });
-        await runPostCommitPaidEffects(applied);
+        await runPostCommitTerminalEffects(applied);
         return buildPublicResult({ attempt: applied.attempt, order: applied.order, outcome: "provider_event_applied" });
     }
 

@@ -494,6 +494,19 @@ async function setPromotionRedemptionSnapshot(input = {}, options = {}) {
     }
 }
 
+async function setCouponReconciliation(input = {}, options = {}) {
+    const orderId = assertId(input.orderId, "orderId", ERROR_CODES.INVALID_ORDER_ID);
+    const changedAt = input.changedAt ? new Date(input.changedAt) : new Date();
+    const opts = normalizeOptions(options);
+    const updated = await execQuery(opts.model.findOneAndUpdate(
+        { orderId },
+        { $set: { couponReconciliation: structuredClone(input.couponReconciliation || {}), updatedAt: changedAt } },
+        { returnDocument: "after", runValidators: true }
+    ), opts);
+    if (!updated) throw new OrderRepositoryError(ERROR_CODES.ORDER_NOT_FOUND, "Order not found.", { stage: "update" });
+    return plainRecord(updated);
+}
+
 function classifyPersistenceError(error, payload = {}) {
     if (error?.code === 11000) {
         const keyPattern = error.keyPattern || {};
@@ -539,6 +552,7 @@ module.exports = Object.freeze({
     updateFulfilmentStatus,
     appendOperationalReference,
     setPromotionRedemptionSnapshot,
+    setCouponReconciliation,
     OrderRepositoryError,
     ERROR_CODES,
     ORDER_TRANSITIONS,

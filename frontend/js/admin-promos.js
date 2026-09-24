@@ -81,12 +81,12 @@ function renderAdminPromos() {
             </div>
             <div class="promo-row-status">
                 <b class="admin-status-pill ${promoStateClass(promo.state)}">${adminT(String(promo.state || "").toLowerCase(), promo.state || "")}</b>
-                <small>${Number(promo.consumedCount || 0)} ${adminT("used", "used")} · ${Number(promo.reservedCount || 0)} ${adminT("reserved", "reserved")}</small>
+                <small>${Number(promo.claimedCount || 0)}/${Number(promo.claimLimit || 0) || "∞"} claimed · ${Number(promo.availableCount || 0)} available · ${Number(promo.reservedCount || 0)} reserved · ${Number(promo.consumedCount || 0)} used · ${Number(promo.expiredCount || 0)} expired</small>
             </div>
             <div class="catalog-package-actions">
                 <button class="admin-secondary-btn" type="button" data-edit-promo="${escapePromoHtml(promo.id)}">${adminT("edit", "Edit")}</button>
                 <button class="admin-secondary-btn ${promo.enabled ? "danger" : ""}" type="button" data-toggle-promo="${escapePromoHtml(promo.id)}">
-                    ${adminT(promo.enabled ? "disable" : "enable", promo.enabled ? "Disable" : "Enable")}
+                    ${promo.state === "PAUSED" ? "Resume" : "Pause"}
                 </button>
                 <button class="admin-icon-btn danger" type="button" data-remove-promo="${escapePromoHtml(promo.id)}">${adminT("remove", "Remove")}</button>
             </div>
@@ -138,6 +138,7 @@ async function openPromoEditor(promo = null) {
     modal.querySelector("#promoMinMM").value = promo?.minimumOrderAmounts?.MM || "";
     modal.querySelector("#promoMinTH").value = promo?.minimumOrderAmounts?.TH || "";
     modal.querySelector("#promoUsageLimit").value = promo?.usageLimit || "";
+    modal.querySelector("#promoClaimLimit").value = promo?.claimLimit || "";
     modal.querySelector("#promoPerUserLimit").value = promo?.perUserLimit || "";
     modal.querySelector("#promoStarts").value = toPromoDatetimeValue(promo?.startsAt);
     modal.querySelector("#promoEnds").value = toPromoDatetimeValue(promo?.endsAt);
@@ -156,8 +157,9 @@ async function openPromoEditor(promo = null) {
     modal.querySelector("#promoRegionTH").onchange = () => syncPromoEditorMode(modal);
     modal.querySelector("#promoPackageSearch").oninput = () => filterPromoPackages(modal);
     modal.querySelector("#promoCancel").onclick = () => modal.classList.remove("show");
-    modal.querySelector("#promoSave").onclick = () => savePromo(promo);
-    modal.querySelector("#promoSave").textContent = promo ? adminT("save_changes", "Save Changes") : adminT("create_promo_code", "Create Coupon Campaign");
+    modal.querySelector("#promoSave").onclick = () => savePromo(promo, promo?.operationalStatus || (promo?.enabled ? "ACTIVE" : "DRAFT"));
+    modal.querySelector("#promoPublish").onclick = () => savePromo(promo, "ACTIVE");
+    modal.querySelector("#promoSave").textContent = promo ? adminT("save_changes", "Save Changes") : "Save Draft";
     modal.classList.add("show");
 }
 
@@ -204,6 +206,7 @@ function ensurePromoEditorModal() {
                         <h4>${adminT("limits_schedule", "Limits & Schedule")}</h4>
                         <div class="promo-field-grid">
                             <label>${adminT("usage_limit", "Usage Limit")}<input id="promoUsageLimit" type="number" min="0"></label>
+                            <label>Claim Quota<input id="promoClaimLimit" type="number" min="0"></label>
                             <label>${adminT("per_user_limit", "Per User Limit")}<input id="promoPerUserLimit" type="number" min="0"></label>
                             <label>${adminT("starts_at", "Starts At")}<input id="promoStarts" type="datetime-local"></label>
                             <label>${adminT("ends_at", "Ends At")}<input id="promoEnds" type="datetime-local"></label>
@@ -254,6 +257,7 @@ function ensurePromoEditorModal() {
                 <div class="admin-action-modal-actions">
                     <button id="promoCancel" type="button">${adminT("cancel", "Cancel")}</button>
                     <button id="promoSave" type="button">${adminT("create_promo_code", "Create Coupon Campaign")}</button>
+                    <button id="promoPublish" type="button">Publish</button>
                 </div>
             </footer>
         </div>
@@ -361,12 +365,12 @@ function filterPromoPackages(modal) {
     });
 }
 
-async function savePromo(existing = null) {
+async function savePromo(existing = null, desiredStatus = "DRAFT") {
     if (promoSavePending) return;
     const modal = document.getElementById("promoEditorModal");
     const saveBtn = modal?.querySelector("#promoSave");
     const errorEl = modal?.querySelector("#promoEditorError");
-    const payload = readPromoPayload(modal, existing);
+    const payload = { ...readPromoPayload(modal, existing), operationalStatus: desiredStatus, enabled: desiredStatus === "ACTIVE" };
 
     modal?.classList.remove("show");
     const result = await window.AZIEL_ADMIN_ACTION_MODAL?.open?.({
@@ -434,6 +438,7 @@ function readPromoPayload(modal, existing = null) {
             }))
             : [],
         usageLimit: numberValue("#promoUsageLimit"),
+        claimLimit: numberValue("#promoClaimLimit"),
         perUserLimit: numberValue("#promoPerUserLimit"),
         startsAt: fromPromoDatetimeValue(modal.querySelector("#promoStarts")?.value),
         endsAt: fromPromoDatetimeValue(modal.querySelector("#promoEnds")?.value),
@@ -445,7 +450,8 @@ async function togglePromo(promo) {
     if (!promo) return;
     const payload = {
         ...promo,
-        enabled: !promo.enabled
+        enabled: true,
+        operationalStatus: promo.state === "PAUSED" ? "ACTIVE" : "PAUSED"
     };
     const data = await adminFetch(`/api/admin/promos/${encodeURIComponent(promo.id)}`, {
         method: "PUT",

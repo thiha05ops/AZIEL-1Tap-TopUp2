@@ -28,6 +28,8 @@ const ADMIN_PAYMENT_PROVIDERS = Object.freeze({
     ayapay: { key: "ayapay", label: "AYA Pay", region: "MM" },
     mmqr: { key: "mmqr", label: "MMQR", region: "MM" },
     manual_bank: { key: "manual_bank", label: "Manual Bank Transfer", region: "MM" },
+    dinger_ayapay_qr: { key: "dinger_ayapay_qr", label: "AYA Pay QR (Dinger)", region: "MM" },
+    dinger_wavepay_pin: { key: "dinger_wavepay_pin", label: "Wave Pay PIN (Dinger)", region: "MM" },
     wallet: { key: "wallet", label: "AZIEL Wallet", region: "GLOBAL" }
 });
 
@@ -39,7 +41,7 @@ const ADMIN_PROVIDER_BY_REGION_TYPE = Object.freeze({
         wallet: ["wallet"]
     },
     MM: {
-        auto: [],
+        auto: ["dinger_ayapay_qr", "dinger_wavepay_pin"],
         deeplink: ["kbzpay", "wavepay", "ayapay", "manual_bank"],
         manual: ["kbzpay", "wavepay", "ayapay", "mmqr", "manual_bank"],
         wallet: ["wallet"]
@@ -812,6 +814,9 @@ function renderOperatorCustomerDisplay(method = {}) {
 }
 
 function renderOperatorAvailability(method = {}) {
+    if (["dinger_ayapay_qr", "dinger_wavepay_pin"].includes(String(method.key || "").toLowerCase())) {
+        return renderDingerActivation(method);
+    }
     const status = operatorPaymentStatus(method);
     const blocked = status.key === "needs_setup";
     return `<section class="payment-operator-section"><h5>Availability</h5>
@@ -819,6 +824,23 @@ function renderOperatorAvailability(method = {}) {
         ${paymentOperatorField("Supported market", "Payment method market identity", `<input class="pm-region-label" type="text" value="${escapeAdminHTML(getRegionLabel(method.region))}" readonly><input class="pm-region" type="hidden" value="${escapeAdminHTML(method.region)}">`)}
         ${paymentOperatorField("Maintenance message", "Optional warning or delay note shown to customers", `<textarea class="pm-message">${escapeAdminHTML(method.maintenanceMessage || "")}</textarea>`)}
         ${paymentOperatorField("Availability schedule", "Optional operator-managed availability note", `<input class="pm-availability-schedule" type="text" value="${escapeAdminHTML(method.availabilitySchedule || "")}">`)}
+    </section>`;
+}
+
+function renderDingerActivation(method = {}) {
+    const state = method.dingerActivationState || "DISABLED";
+    const readiness = method.dingerReadiness || { missing: [] };
+    const userIds = Array.isArray(method.dingerAuthorizedTestUserIds) ? method.dingerAuthorizedTestUserIds.join("\n") : "";
+    const last = method.dingerLastTestOutcome || {};
+    return `<section class="payment-operator-section payment-dinger-activation"><h5>Dinger Production</h5>
+        <p class="payment-section-help">Activation is independent per method. TEST_ONLY is restricted server-side to authenticated user IDs. Browser redirects never confirm payment.</p>
+        ${paymentOperatorField("Activation", "DISABLED blocks new attempts; pending attempts remain reconcilable", `<select class="pm-dinger-activation"><option value="DISABLED" ${state === "DISABLED" ? "selected" : ""}>Disabled</option><option value="TEST_ONLY" ${state === "TEST_ONLY" ? "selected" : ""}>Test only</option><option value="PUBLIC" ${state === "PUBLIC" ? "selected" : ""}>Public</option></select>`)}
+        ${paymentOperatorField("Authorized test user IDs", "One authenticated AZIEL user ID per line; email and request-supplied IDs are not accepted", `<textarea class="pm-dinger-test-users">${escapeAdminHTML(userIds)}</textarea>`)}
+        <label><input class="pm-dinger-test-approved" type="checkbox" ${method.dingerProductionTestApproved ? "checked" : ""}> Controlled production testing approved</label>
+        <label><input class="pm-dinger-go-live-approved" type="checkbox" ${method.dingerGoLiveApproved ? "checked" : ""}> Merchant GO LIVE approval recorded</label>
+        <p>Technical readiness: ${readiness.missing?.length ? `Blocked — ${escapeAdminHTML(readiness.missing.join(", "))}` : "Ready"}</p>
+        <p>Recent test: ${escapeAdminHTML(last.status || "NOT_RUN")}${last.testedAt ? ` · ${escapeAdminHTML(new Date(last.testedAt).toLocaleString())}` : ""}</p>
+        <button class="admin-primary-btn" type="button" data-action="save-dinger-activation" data-id="${escapeAdminHTML(method._id)}">Apply Dinger activation</button>
     </section>`;
 }
 
@@ -840,7 +862,7 @@ function renderOperatorAdvanced(method = {}) {
 
 function renderOperatorPaymentEditor(method = {}) {
     const legacyBank = isLegacyThailandBankAdminMethod(method);
-    return `${renderOperatorStatus(method)}${renderOperatorSetup(method)}${renderOperatorCustomerDisplay(method)}${renderOperatorAvailability(method)}${renderOperatorAdvanced(method)}<div class="payment-editor-savebar"><button class="admin-secondary-btn" type="button" data-action="cancel-payment-editor">Cancel</button><button class="save-payment-btn" type="button" data-action="save-payment-method" data-id="${escapeAdminHTML(method._id)}" ${legacyBank ? "disabled" : ""}>${legacyBank ? "Managed under PromptPay" : "Save changes"}</button></div>`;
+    return `${renderOperatorStatus(method)}${renderOperatorSetup(method)}${renderOperatorCustomerDisplay(method)}${renderOperatorAvailability(method)}${renderOperatorAdvanced(method)}<div class="payment-editor-savebar"><button class="admin-secondary-btn" type="button" data-action="cancel-payment-editor">Cancel</button><button class="save-payment-btn" type="button" data-action="save-payment-method" data-id="${escapeAdminHTML(method._id)}" ${legacyBank ? "disabled" : ""}>${legacyBank ? "Managed under PromptPay" : "Save display changes"}</button></div>`;
 }
 
 function renderAdminPaymentMethods(methods) {
@@ -866,7 +888,7 @@ function renderAdminPaymentMethods(methods) {
             <header class="payment-operator-header"><div><h2>Payments</h2><p>Manage how customers pay in each market.</p></div><div><button class="admin-secondary-btn" type="button" data-action="open-payment-infrastructure">Infrastructure</button><button class="admin-primary-btn payment-operator-add-btn" type="button" data-action="add-payment-method"><span class="payment-add-full">+ Add payment method</span><span class="payment-add-short">+ Add</span></button></div></header>
             <div class="payment-operator-region" role="tablist" aria-label="Payment region"><button class="${region === "TH" ? "active" : ""}" data-operator-region="TH">Thailand</button><button class="${region === "MM" ? "active" : ""}" data-operator-region="MM">Myanmar</button></div>
             <div class="payment-operator-filters" aria-label="Payment status filters">${[["all", "All"], ["ready", "Ready"], ["needs_setup", "Needs setup"], ["disabled", "Disabled"]].map(([key, label]) => `<button class="${adminPaymentStatusFilter === key ? "active" : ""}" data-payment-status-filter="${key}">${label}</button>`).join("")}</div>
-            <div class="payment-operator-layout"><section class="payment-operator-list"><div class="payment-operator-columns"><span>Payment method</span><span>Type</span><span>Status</span><span>Enabled</span><span></span></div>${filtered.map(method => { const status = operatorPaymentStatus(method); const type = operatorPaymentType(method); const id = String(method._id); const draft = adminPaymentEnabledDrafts.get(id); const enabled = draft === undefined ? method.enabled === true : draft; const blocked = status.key === "needs_setup"; return `<div class="payment-operator-row ${id === adminSelectedPaymentMethodId ? "is-selected" : ""}" data-payment-row="${escapeAdminHTML(id)}" tabindex="0"><div class="payment-operator-method"><img src="${escapeAdminHTML(method.logoUrl || getAdminPaymentLogo(method))}" alt=""><span><strong>${escapeAdminHTML(method.method || method.key)}</strong><small>${escapeAdminHTML(getRegionLabel(method.region))}</small></span></div><div class="payment-operator-type"><strong>${escapeAdminHTML(type.label)}</strong><small>${escapeAdminHTML(type.description)}</small></div><span class="payment-operator-status is-${status.key}">${escapeAdminHTML(status.label)}</span><label class="payment-operator-toggle${draft !== undefined ? " has-draft" : ""}" title="${blocked ? "Complete setup before enabling" : "Enabled state is saved with Save changes"}"><input type="checkbox" role="switch" aria-label="${escapeAdminHTML(`Enable ${method.method || method.key}`)}" aria-checked="${enabled ? "true" : "false"}" data-payment-row-toggle="${escapeAdminHTML(id)}" ${enabled ? "checked" : ""} ${blocked ? "disabled" : ""}><span class="payment-operator-switch-track" aria-hidden="true"><span class="payment-operator-switch-thumb"></span></span><small class="payment-operator-toggle-state">${draft !== undefined ? "Unsaved" : ""}</small></label><button class="payment-operator-more" data-payment-row-menu="${escapeAdminHTML(id)}" aria-label="More actions">•••</button></div>`; }).join("") || `<div class="admin-list-empty">No payment methods match this filter.</div>`}</section>
+            <div class="payment-operator-layout"><section class="payment-operator-list"><div class="payment-operator-columns"><span>Payment method</span><span>Type</span><span>Status</span><span>Enabled</span><span></span></div>${filtered.map(method => { const status = operatorPaymentStatus(method); const type = operatorPaymentType(method); const id = String(method._id); const draft = adminPaymentEnabledDrafts.get(id); const enabled = draft === undefined ? method.enabled === true : draft; const dinger = ["dinger_ayapay_qr", "dinger_wavepay_pin"].includes(String(method.key || "").toLowerCase()); const blocked = status.key === "needs_setup" || dinger; return `<div class="payment-operator-row ${id === adminSelectedPaymentMethodId ? "is-selected" : ""}" data-payment-row="${escapeAdminHTML(id)}" tabindex="0"><div class="payment-operator-method"><img src="${escapeAdminHTML(method.logoUrl || getAdminPaymentLogo(method))}" alt=""><span><strong>${escapeAdminHTML(method.method || method.key)}</strong><small>${escapeAdminHTML(getRegionLabel(method.region))}</small></span></div><div class="payment-operator-type"><strong>${escapeAdminHTML(type.label)}</strong><small>${escapeAdminHTML(type.description)}</small></div><span class="payment-operator-status is-${status.key}">${escapeAdminHTML(status.label)}</span><label class="payment-operator-toggle${draft !== undefined ? " has-draft" : ""}" title="${dinger ? "Use the Dinger activation control" : blocked ? "Complete setup before enabling" : "Enabled state is saved with Save changes"}"><input type="checkbox" role="switch" aria-label="${escapeAdminHTML(`Enable ${method.method || method.key}`)}" aria-checked="${enabled ? "true" : "false"}" data-payment-row-toggle="${escapeAdminHTML(id)}" ${enabled ? "checked" : ""} ${blocked ? "disabled" : ""}><span class="payment-operator-switch-track" aria-hidden="true"><span class="payment-operator-switch-thumb"></span></span><small class="payment-operator-toggle-state">${draft !== undefined ? "Unsaved" : ""}</small></label><button class="payment-operator-more" data-payment-row-menu="${escapeAdminHTML(id)}" aria-label="More actions">•••</button></div>`; }).join("") || `<div class="admin-list-empty">No payment methods match this filter.</div>`}</section>
             ${selected && adminPaymentEditorOpen ? `<aside class="payment-operator-editor"><div class="payment-operator-editor-head"><img src="${escapeAdminHTML(selectedLogo)}" alt=""><div><h3>${escapeAdminHTML(selected.method)}</h3><p>${escapeAdminHTML(getRegionLabel(selected.region))} · ${escapeAdminHTML(selectedStatus.label)}</p></div><button data-action="close-payment-editor" aria-label="Close editor">×</button></div><div class="payment-method-card payment-operator-editor-root" data-id="${escapeAdminHTML(selected._id)}" data-key="${escapeAdminHTML(selected.key)}" data-region="${escapeAdminHTML(selected.region)}" data-configuration-kind="${escapeAdminHTML(selected.configurationKind || "MANUAL_QR")}" data-legacy-thai-bank="${isLegacyThailandBankAdminMethod(selected) ? "true" : "false"}">${renderOperatorPaymentEditor({...selected, enabled: selectedDraft === undefined ? selected.enabled : selectedDraft})}</div></aside>` : ""}
             </div>
         </div>`;
@@ -901,6 +923,8 @@ function bindPaymentOperatorActions() {
             return void renderAdminPaymentMethods(adminPaymentMethods);
         }
         if (event.target.closest('[data-action="open-payment-infrastructure"]')) return void showPaymentInfrastructureSurface();
+        const dingerActivation = event.target.closest('[data-action="save-dinger-activation"]');
+        if (dingerActivation) return void saveDingerActivation(dingerActivation.dataset.id);
         if (event.target.closest('[data-action="close-payment-editor"], [data-action="cancel-payment-editor"]')) {
             adminPaymentEditorOpen = false;
             adminPaymentEnabledDrafts.delete(adminSelectedPaymentMethodId);
@@ -2573,6 +2597,31 @@ async function saveAdminPaymentMethod(id) {
     }
 }
 
+async function saveDingerActivation(id) {
+    const card = document.querySelector(`.payment-method-card[data-id="${CSS.escape(id)}"]`);
+    if (!card) return;
+    const authorizedTestUserIds = String(card.querySelector(".pm-dinger-test-users")?.value || "")
+        .split(/\r?\n|,/).map(value => value.trim()).filter(Boolean);
+    try {
+        const data = await adminFetch(`/api/admin/payment-methods/${encodeURIComponent(id)}/dinger-activation`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                activationState: card.querySelector(".pm-dinger-activation")?.value || "DISABLED",
+                productionTestApproved: card.querySelector(".pm-dinger-test-approved")?.checked === true,
+                goLiveApproved: card.querySelector(".pm-dinger-go-live-approved")?.checked === true,
+                authorizedTestUserIds
+            })
+        });
+        if (!data?.success) return void showAdminToast?.(data?.message || "Dinger activation failed", "error");
+        showAdminToast?.("Dinger activation updated", "success");
+        await loadAdminPaymentMethods();
+    } catch (error) {
+        console.log("Dinger activation error:", error?.code || error?.name || "UNKNOWN");
+        showAdminToast?.("Dinger activation failed", "error");
+    }
+}
+
 function collectAdminPaymentFormState(card) {
     const key = card?.dataset.key || "";
     const method = card?.querySelector(".pm-method")?.value || "";
@@ -2768,6 +2817,8 @@ function getMethodChoices(region) {
             { key: "wallet", label: "AZIEL Wallet", paymentType: "wallet" }
         ],
         MM: [
+            { key: "dinger_ayapay_qr", label: "AYA Pay QR (Dinger)", method: "AYA Pay QR (Dinger)", paymentType: "auto", provider: "dinger_ayapay_qr", paymentChannel: "DINGER_AYA_PAY_QR", qrMode: "provider_generated", confirmationMode: "provider_webhook", slipRequired: false, receiptUploadEnabled: false, autoVerificationSupported: true, webhookSupported: true },
+            { key: "dinger_wavepay_pin", label: "Wave Pay PIN (Dinger)", method: "Wave Pay PIN (Dinger)", paymentType: "auto", provider: "dinger_wavepay_pin", paymentChannel: "DINGER_WAVE_PAY_PIN", qrMode: "none", confirmationMode: "provider_webhook", slipRequired: false, receiptUploadEnabled: false, autoVerificationSupported: true, webhookSupported: true },
             { key: "kbzpay", label: "KBZPay", paymentType: "manual" },
             { key: "wavepay", label: "WavePay", paymentType: "manual" },
             { key: "ayapay", label: "AYA Pay", paymentType: "manual" },

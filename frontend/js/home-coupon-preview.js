@@ -108,7 +108,12 @@
         const campaignId = escapeHtml(coupon.campaignId || "");
         const name = escapeHtml(coupon.name || "AZIEL Promotion");
         const discount = escapeHtml(coupon.benefitLabel || "Coupon");
-        const claimed = String(coupon.claimState || "").toUpperCase() === "CLAIMED";
+        const claimState = String(coupon.claimState || "").toUpperCase();
+        const claimed = claimState === "CLAIMED";
+        const claimable = claimState === "CLAIM";
+        const buttonLabel = claimed ? "CLAIMED" : claimable ? "CLAIM" : claimState.replaceAll("_", " ");
+        const validity = coupon.expiresAt ? `Valid until ${new Date(coupon.expiresAt).toLocaleDateString()}` : "No expiry";
+        const quota = coupon.claimUsagePercent == null ? "" : ` · ${coupon.claimUsagePercent}% claimed`;
 
         return `
             <article class="home-coupon-card" data-coupon-campaign="${campaignId}">
@@ -121,16 +126,17 @@
                         class="home-coupon-claim"
                         type="button"
                         data-claim-coupon="${campaignId}"
-                        ${claimed ? "disabled data-claimed=\"true\"" : ""}
+                        ${claimable ? "" : `disabled ${claimed ? "data-claimed=\"true\"" : ""}`}
                         aria-label="Claim ${name}"
                     >
-                        ${claimed ? "CLAIMED" : "CLAIM"}
+                        ${escapeHtml(buttonLabel)}
                     </button>
                 </div>
 
                 <p class="home-coupon-name" title="${name}">
                     ${name}
                 </p>
+                <small>${escapeHtml(validity + quota)}</small>
             </article>
         `;
     }

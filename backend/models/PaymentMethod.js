@@ -24,6 +24,20 @@ const paymentMethodSchema = new mongoose.Schema(
             default: true
         },
 
+        dingerActivationState: {
+            type: String,
+            enum: ["DISABLED", "TEST_ONLY", "PUBLIC"],
+            default: "DISABLED"
+        },
+        dingerProductionTestApproved: { type: Boolean, default: false },
+        dingerGoLiveApproved: { type: Boolean, default: false },
+        dingerAuthorizedTestUserIds: { type: [String], default: [] },
+        dingerLastTestOutcome: {
+            status: { type: String, enum: ["NOT_RUN", "PENDING", "PASS", "FAIL", ""], default: "NOT_RUN" },
+            testedAt: { type: Date, default: null },
+            note: { type: String, default: "" }
+        },
+
         accountName: {
             type: String,
             default: ""

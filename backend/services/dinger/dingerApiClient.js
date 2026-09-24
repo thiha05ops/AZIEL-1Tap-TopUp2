@@ -181,7 +181,9 @@ function createDingerApiClient(options = {}) {
     async function getToken() {
         if (configuration.enabled !== true) throw new DingerApiError("DINGER_DISABLED", "Dinger is disabled.", { stage: "configuration" });
         if (typeof parseTokenResponse !== "function") throw contractError("token");
-        const tokenUrl = text(configuration.tokenUrl) || `${text(configuration.baseUrl).replace(/\/+$/, "")}/api/token`;
+        const live = text(configuration.environment).toUpperCase() === "LIVE";
+        const tokenUrl = text(configuration.tokenUrl) || (!live ? `${text(configuration.baseUrl).replace(/\/+$/, "")}/api/token` : "");
+        if (!tokenUrl) throw new DingerApiError("DINGER_TOKEN_URL_UNCONFIRMED", "Dinger production token URL is not configured.", { stage: "configuration" });
         const url = new URL(tokenUrl);
         url.searchParams.set("projectName", text(configuration.projectName));
         url.searchParams.set("apiKey", text(configuration.apiKey));
@@ -206,7 +208,9 @@ function createDingerApiClient(options = {}) {
         if (!text(encryptedPayload)) throw new DingerApiError("DINGER_ENCRYPTION_FAILED", "Dinger encrypted payload is unavailable.", { stage: "pay" });
         const form = new FormData();
         form.append("payload", text(encryptedPayload));
-        const payUrl = text(configuration.payUrl) || `${text(configuration.baseUrl).replace(/\/+$/, "")}/api/pay`;
+        const live = text(configuration.environment).toUpperCase() === "LIVE";
+        const payUrl = text(configuration.payUrl) || (!live ? `${text(configuration.baseUrl).replace(/\/+$/, "")}/api/pay` : "");
+        if (!payUrl) throw new DingerApiError("DINGER_PAY_URL_UNCONFIRMED", "Dinger production Pay URL is not configured.", { stage: "configuration" });
         const response = await request(payUrl, {
             method: "POST",
             headers: { Authorization: `Bearer ${token.paymentToken}`, Accept: "application/json" },

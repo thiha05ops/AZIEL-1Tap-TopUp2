@@ -91,5 +91,9 @@ const promoRedemptionSchema = new mongoose.Schema(
 promoRedemptionSchema.index({ code: 1, username: 1, status: 1, expiresAt: 1 });
 promoRedemptionSchema.index({ manualPaymentAttemptId: 1, status: 1 });
 promoRedemptionSchema.index({ orderId: 1, status: 1 });
+promoRedemptionSchema.index(
+    { code: 1, orderId: 1 },
+    { unique: true, partialFilterExpression: { orderId: { $exists: true, $gt: "" } } }
+);
 
 module.exports = mongoose.model("PromoRedemption", promoRedemptionSchema);

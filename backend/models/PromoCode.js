@@ -84,6 +84,11 @@ const promoCodeSchema = new mongoose.Schema(
             type: Number,
             default: 0
         },
+        claimLimit: {
+            type: Number,
+            default: 0,
+            min: 0
+        },
         perUserLimit: {
             type: Number,
             default: 0
@@ -99,6 +104,16 @@ const promoCodeSchema = new mongoose.Schema(
         enabled: {
             type: Boolean,
             default: false
+        },
+        operationalStatus: {
+            type: String,
+            enum: ["DRAFT", "ACTIVE", "PAUSED", "ENDED"],
+            default: undefined
+        },
+        stackingPolicy: {
+            type: String,
+            enum: ["SAFE_STACKING"],
+            default: "SAFE_STACKING"
         },
         archivedAt: {
             type: Date,
@@ -119,6 +134,7 @@ const promoCodeSchema = new mongoose.Schema(
 );
 
 promoCodeSchema.index({ enabled: 1, archivedAt: 1, startsAt: 1, endsAt: 1 });
+promoCodeSchema.index({ operationalStatus: 1, archivedAt: 1, startsAt: 1, endsAt: 1 });
 promoCodeSchema.index({ regions: 1, eligibilityMode: 1 });
 
 module.exports = mongoose.model("PromoCode", promoCodeSchema);

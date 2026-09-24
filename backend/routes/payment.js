@@ -52,6 +52,10 @@ const {
 } = require("../services/pendingPaymentRecoveryService");
 const { formatPaymentDisplayName } = require("../services/paymentDisplayNameService");
 const {
+    legacyPayableCreationDecision,
+    rejectLegacyDingerPayable
+} = require("../services/dinger/dingerLegacyPayableBoundary");
+const {
     OmisePaymentError,
     assertChargeMatchesRecord,
     retrieveVerifiedCharge
@@ -90,6 +94,18 @@ function commerceCoreDisabledLegacyPayableResponse(res, legacyFlow) {
         legacyFlow,
         commerceAuthority: "CommerceOrder + PaymentAttempt"
     });
+}
+
+function legacyPayableCreationGuard(legacyFlow) {
+    return (req, res, next) => {
+        const decision = legacyPayableCreationDecision({
+            enabled: process.env.AZIEL_ALLOW_LEGACY_PAYABLE_CREATION === "true",
+            payload: req.body
+        });
+        if (decision.reason === "legacy_disabled") return commerceCoreDisabledLegacyPayableResponse(res, legacyFlow);
+        if (decision.reason === "dinger_forbidden") return rejectLegacyDingerPayable(res);
+        return next();
+    };
 }
 
 function settlePaymentRecoveryNotification(input = {}) {
@@ -1247,11 +1263,7 @@ router.post("/payment/manual/attempt/:attemptId/slip", authMiddleware, upload.si
 });
 
 // GAME PAYMENT CREATE
-router.post("/payment/create", authMiddleware, activeOrderCreateLimiter, async (req, res) => {
-    if (process.env.AZIEL_ALLOW_LEGACY_PAYABLE_CREATION !== "true") {
-        return commerceCoreDisabledLegacyPayableResponse(res, "legacy_order_payment_create");
-    }
-
+router.post("/payment/create", authMiddleware, activeOrderCreateLimiter, legacyPayableCreationGuard("legacy_order_payment_create"), async (req, res) => {
     let reservedRedemption = null;
     try {
         devLog("PAYMENT CREATE BODY =", req.body);

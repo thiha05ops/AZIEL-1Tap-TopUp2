@@ -1,5 +1,7 @@
 "use strict";
 
+const { dingerRsaPublicKey } = require("./dingerCryptoService");
+
 const ENVIRONMENT = Object.freeze({ STAGING: "STAGING", LIVE: "LIVE" });
 const ENV_NAMES = Object.freeze([
     "DINGER_ENVIRONMENT", "DINGER_STAGING_BASE_URL", "DINGER_LIVE_BASE_URL",
@@ -7,7 +9,12 @@ const ENV_NAMES = Object.freeze([
     "DINGER_STAGING_PUBLIC_KEY", "DINGER_STAGING_CALLBACK_KEY", "DINGER_STAGING_CALLBACK_URL",
     "DINGER_LIVE_PROJECT_NAME", "DINGER_LIVE_API_KEY", "DINGER_LIVE_MERCHANT_NAME",
     "DINGER_LIVE_PUBLIC_KEY", "DINGER_LIVE_CALLBACK_KEY", "DINGER_LIVE_CALLBACK_URL",
-    "DINGER_TOKEN_TIMEOUT_MS", "DINGER_PAY_TIMEOUT_MS", "DINGER_ENABLED"
+    "DINGER_TOKEN_TIMEOUT_MS", "DINGER_PAY_TIMEOUT_MS", "DINGER_TOKEN_TIMESTAMP_UTC_OFFSET_MINUTES", "DINGER_ENABLED",
+    "DINGER_LIVE_TOKEN_URL", "DINGER_LIVE_PAY_URL", "DINGER_LIVE_WAVE_FORM_URL",
+    "DINGER_LIVE_PAY_REQUEST_CONTRACT_CONFIRMED", "DINGER_LIVE_AYA_QR_RESPONSE_CONTRACT_CONFIRMED",
+    "DINGER_LIVE_WAVE_REDIRECT_CONTRACT_CONFIRMED", "DINGER_LIVE_CALLBACK_VERIFICATION_CONTRACT_CONFIRMED",
+    "DINGER_LIVE_PUBLIC_KEY_IDENTITY_CONFIRMED", "DINGER_LIVE_PAY_RESPONSE_SIGNATURE_CONTRACT_CONFIRMED",
+    "DINGER_LIVE_CALLBACK_SETTLEMENT_ENABLED"
 ]);
 
 class DingerConfigurationError extends Error {
@@ -30,7 +37,12 @@ function validHttpsUrl(value) {
     try { return new URL(value).protocol === "https:"; } catch (_) { return false; }
 }
 function validPublicKey(value) {
-    return /^-----BEGIN PUBLIC KEY-----[\s\S]+-----END PUBLIC KEY-----$/.test(text(value));
+    try { dingerRsaPublicKey(value); return true; } catch (_) { return false; }
+}
+
+function integer(value, fallback) {
+    const parsed = Number(value);
+    return Number.isSafeInteger(parsed) ? parsed : fallback;
 }
 
 function scopedValue(env, environment, name) {
@@ -43,8 +55,11 @@ function inspectDingerEnvironment(env = process.env) {
     const selectedBaseUrl = environment === ENVIRONMENT.LIVE
         ? text(env.DINGER_LIVE_BASE_URL)
         : text(env.DINGER_STAGING_BASE_URL);
+    const live = environment === ENVIRONMENT.LIVE;
     const required = {
         baseUrl: validHttpsUrl(selectedBaseUrl),
+        tokenUrl: !live || validHttpsUrl(scopedValue(env, environment, "TOKEN_URL")),
+        payUrl: !live || validHttpsUrl(scopedValue(env, environment, "PAY_URL")),
         projectName: Boolean(scopedValue(env, environment, "PROJECT_NAME")),
         apiKey: Boolean(scopedValue(env, environment, "API_KEY")),
         merchantName: Boolean(scopedValue(env, environment, "MERCHANT_NAME")),
@@ -87,10 +102,18 @@ function loadDingerConfiguration(env = process.env) {
         publicKey: scopedValue(env, readiness.environment, "PUBLIC_KEY"),
         callbackKey: scopedValue(env, readiness.environment, "CALLBACK_KEY"),
         callbackUrl: scopedValue(env, readiness.environment, "CALLBACK_URL"),
+        tokenUrl: scopedValue(env, readiness.environment, "TOKEN_URL"),
+        payUrl: scopedValue(env, readiness.environment, "PAY_URL"),
+        waveFormUrl: scopedValue(env, readiness.environment, "WAVE_FORM_URL"),
+        tokenTimestampUtcOffsetMinutes: integer(env.DINGER_TOKEN_TIMESTAMP_UTC_OFFSET_MINUTES, 390),
         tokenTimeoutMs: timeout(env.DINGER_TOKEN_TIMEOUT_MS, 10000),
         payTimeoutMs: timeout(env.DINGER_PAY_TIMEOUT_MS, 15000),
         requestEncryptionVerified: true,
-        callbackChecksumVerified: false
+        payRequestContractConfirmed: enabled(env.DINGER_LIVE_PAY_REQUEST_CONTRACT_CONFIRMED),
+        ayaQrResponseContractConfirmed: enabled(env.DINGER_LIVE_AYA_QR_RESPONSE_CONTRACT_CONFIRMED),
+        waveRedirectContractConfirmed: enabled(env.DINGER_LIVE_WAVE_REDIRECT_CONTRACT_CONFIRMED),
+        callbackChecksumVerified: enabled(env.DINGER_LIVE_CALLBACK_VERIFICATION_CONTRACT_CONFIRMED),
+        callbackSettlementEnabled: enabled(env.DINGER_LIVE_CALLBACK_SETTLEMENT_ENABLED)
     });
 }
 

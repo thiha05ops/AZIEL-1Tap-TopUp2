@@ -3,6 +3,14 @@
 const { parseDingerTimestamp } = require("./dingerApiClient");
 
 const TRANSACTION_STATUSES = Object.freeze(["SUCCESS", "ERROR", "CANCELLED", "TIMEOUT", "DECLINED", "SYSTEM_ERROR"]);
+const PAYMENT_STATUS_BY_TRANSACTION_STATUS = Object.freeze({
+    SUCCESS: "PAID",
+    ERROR: "FAILED",
+    CANCELLED: "CANCELLED",
+    TIMEOUT: "EXPIRED",
+    DECLINED: "FAILED",
+    SYSTEM_ERROR: "FAILED"
+});
 
 class DingerCallbackContractError extends Error {
     constructor(code, message, options = {}) {
@@ -52,4 +60,10 @@ function parseDingerCallbackResult(input) {
     });
 }
 
-module.exports = Object.freeze({ TRANSACTION_STATUSES, DingerCallbackContractError, parseDingerCallbackResult });
+function paymentStatusForDingerTransaction(value) {
+    const status = text(value).toUpperCase();
+    if (!PAYMENT_STATUS_BY_TRANSACTION_STATUS[status]) throw invalid("transactionStatus", "Dinger callback transactionStatus is unsupported.");
+    return PAYMENT_STATUS_BY_TRANSACTION_STATUS[status];
+}
+
+module.exports = Object.freeze({ TRANSACTION_STATUSES, PAYMENT_STATUS_BY_TRANSACTION_STATUS, DingerCallbackContractError, parseDingerCallbackResult, paymentStatusForDingerTransaction });

@@ -77,6 +77,31 @@ function safeProviderEnvironmentStatus(env = {}) {
 function envStatusFromProcess(providerCode = "", environment = "TEST") {
     const code = String(providerCode || "").toUpperCase();
     const prefix = environment === "LIVE" ? "LIVE" : "TEST";
+    if (code === "DINGER") {
+        const selectedEnvironment = String(process.env.DINGER_ENVIRONMENT || "STAGING").trim().toUpperCase();
+        const requestedEnvironment = environment === "LIVE" ? "LIVE" : "STAGING";
+        const credentialPrefix = `DINGER_${requestedEnvironment}_`;
+        const baseUrl = requestedEnvironment === "LIVE" ? process.env.DINGER_LIVE_BASE_URL : process.env.DINGER_STAGING_BASE_URL;
+        const validHttps = value => {
+            try { return new URL(String(value || "")).protocol === "https:"; } catch (_) { return false; }
+        };
+        const explicitlyEnabled = String(process.env.DINGER_ENABLED || "").trim().toLowerCase() === "true";
+        const selected = selectedEnvironment === requestedEnvironment;
+        const credentialsConfigured = Boolean(process.env[`${credentialPrefix}PROJECT_NAME`] && process.env[`${credentialPrefix}API_KEY`] && process.env[`${credentialPrefix}MERCHANT_NAME`]);
+        const publicKeyConfigured = /^-----BEGIN PUBLIC KEY-----[\s\S]+-----END PUBLIC KEY-----$/.test(String(process.env[`${credentialPrefix}PUBLIC_KEY`] || "").trim());
+        const keysConfigured = publicKeyConfigured && Boolean(process.env[`${credentialPrefix}CALLBACK_KEY`]);
+        const endpointsConfigured = validHttps(baseUrl) && validHttps(process.env[`${credentialPrefix}CALLBACK_URL`]);
+        const configured = selected && credentialsConfigured && keysConfigured && endpointsConfigured;
+        return {
+            environment: requestedEnvironment,
+            enabled: explicitlyEnabled && configured,
+            publicKeyConfigured,
+            secretKeyConfigured: Boolean(process.env[`${credentialPrefix}API_KEY`]),
+            webhookSecretConfigured: Boolean(process.env[`${credentialPrefix}CALLBACK_KEY`]),
+            merchantIdentifierConfigured: Boolean(process.env[`${credentialPrefix}PROJECT_NAME`] && process.env[`${credentialPrefix}MERCHANT_NAME`]),
+            healthState: explicitlyEnabled && configured ? STATUS.DEGRADED : STATUS.NOT_CONFIGURED
+        };
+    }
     if (code === "THUNDER_PROMPTPAY" || code === "THUNDER") {
         const configured = Boolean(process.env.THUNDER_API_KEY);
         return { environment, enabled: configured, publicKeyConfigured: true, secretKeyConfigured: configured, webhookSecretConfigured: false, merchantIdentifierConfigured: true, healthState: configured ? STATUS.READY : STATUS.NOT_CONFIGURED };
@@ -119,6 +144,13 @@ function providerReadiness(provider = {}) {
         (!webhookRequired || env.webhookSecretConfigured)
     );
     if (!readyEnvironment) missing.push("verified environment credentials");
+    if (String(provider.providerCode || "").toUpperCase() === "DINGER") {
+        missing.push("pay response signature verification");
+        missing.push("callback checksum authentication");
+        missing.push("callback route");
+        missing.push("live provider contract");
+        missing.push("customer exposure approval");
+    }
     return {
         status: missing.length ? STATUS.NOT_CONFIGURED : STATUS.READY,
         missing,
@@ -294,16 +326,28 @@ async function getPaymentInfrastructureSnapshot(methods = []) {
     const providerConfigs = await PaymentProviderConfig.find({}).lean().catch(() => []);
     const providers = providerConfigs.length
         ? providerConfigs.map(projectProvider)
-        : [{
-            providerCode: "omise",
-            displayName: "OPN / Omise",
-            legalRegions: ["TH"],
-            supportedCurrencies: ["THB"],
-            supportedRails: ["AUTO_PROMPTPAY", "AUTO_CARD"],
-            adapterName: "omise",
-            enabled: false,
-            environments: [envStatusFromProcess("OMISE", "TEST"), envStatusFromProcess("OMISE", "LIVE")]
-        }].map(projectProvider);
+        : [
+            {
+                providerCode: "omise",
+                displayName: "OPN / Omise",
+                legalRegions: ["TH"],
+                supportedCurrencies: ["THB"],
+                supportedRails: ["AUTO_PROMPTPAY", "AUTO_CARD"],
+                adapterName: "omise",
+                enabled: false,
+                environments: [envStatusFromProcess("OMISE", "TEST"), envStatusFromProcess("OMISE", "LIVE")]
+            },
+            {
+                providerCode: "DINGER",
+                displayName: "Dinger Myanmar Payments",
+                legalRegions: ["MM"],
+                supportedCurrencies: ["MMK"],
+                supportedRails: [],
+                adapterName: "dinger",
+                enabled: false,
+                environments: [envStatusFromProcess("DINGER", "TEST"), envStatusFromProcess("DINGER", "LIVE")]
+            }
+        ].map(projectProvider);
     const regions = railsByRegion(methods);
     regions.forEach(region => {
         region.providers = providers.filter(provider =>

@@ -191,10 +191,13 @@
 
     async function fetchPublicPaymentMethods(region = currentRegion(), options = {}) {
         const targetRegion = String(region || "MM").toUpperCase();
+        const headers = window.AZIEL?.authHeaders?.({ Accept: "application/json" }) || { Accept: "application/json" };
+        // Discovery can be user-specific for Dinger TEST_ONLY. Never reuse it across identities.
         if (options.refresh) cache.delete(targetRegion);
         if (!cache.has(targetRegion)) {
             cache.set(targetRegion, fetch(`${getApiBase()}/api/payment-methods?region=${encodeURIComponent(targetRegion)}`, {
-                headers: { Accept: "application/json" },
+                headers,
+                credentials: "same-origin",
                 cache: "no-store"
             })
                 .then(async response => {
@@ -209,7 +212,9 @@
                     throw error;
                 }));
         }
-        return cache.get(targetRegion);
+        const result = await cache.get(targetRegion);
+        cache.delete(targetRegion);
+        return result;
     }
 
     function translate(key, fallback = "") {

@@ -63,6 +63,7 @@
         };
         const confirmationMode = String(paymentSession.confirmationMode || payment.confirmationMode || "");
         const provider = String(paymentSession.provider || payment.provider || "").toUpperCase();
+        const dinger = provider === "DINGER" || ["dinger_ayapay_qr", "dinger_wavepay_pin"].includes(String(paymentSession.paymentMethod || payment.key || "").toLowerCase());
         const trueWallet = confirmationMode === "thunder_truewallet_slip" || provider === "THUNDER_TRUEWALLET";
         const thunderVerified = trueWallet || confirmationMode === "thunder_slip" || provider === "THUNDER_PROMPTPAY";
 
@@ -104,7 +105,7 @@
         window.PaymentCheckoutSheet.show({
             ...payment,
             methodCode: paymentSession.paymentMethod || payment.key || orderData.paymentMethod,
-            methodName: trueWallet ? paymentText("payment.truewallet.title", "TrueMoney Wallet") : thunderVerified ? paymentText("payment.thunder.title", "PromptPay Transfer") : window.AZIEL_PAYMENT_DISPLAY?.from?.(
+            methodName: dinger ? (paymentSession.paymentName || payment.method || "Dinger Payment") : trueWallet ? paymentText("payment.truewallet.title", "TrueMoney Wallet") : thunderVerified ? paymentText("payment.thunder.title", "PromptPay Transfer") : window.AZIEL_PAYMENT_DISPLAY?.from?.(
                 paymentSession.paymentName || payment.method || orderData.paymentMethod,
                 paymentSession.paymentName || payment.method || orderData.paymentMethod || "Payment"
             ) || paymentSession.paymentName || payment.method || orderData.paymentMethod || "Payment",
@@ -122,7 +123,7 @@
             qrMode: paymentSession.qrMode || payment.qrMode || "",
             expiresAt: paymentSession.expiresAt || payment.expiresAt || "",
             dynamicQr: paymentSession.dynamicQr || payment.dynamicQr || null,
-            instructions: trueWallet ? paymentText("payment.truewallet.instructions", "Transfer the exact amount to this TrueMoney Wallet number, then upload the TrueMoney transfer slip.") : thunderVerified ? paymentText("payment.thunder.instructions", "Pay the fixed amount, then upload the slip for automatic verification.") : "Transfer the exact amount, then upload the payment receipt.",
+            instructions: dinger ? "Complete payment using the provider-generated instructions. AZIEL will wait for a verified provider callback; this page does not confirm payment." : trueWallet ? paymentText("payment.truewallet.instructions", "Transfer the exact amount to this TrueMoney Wallet number, then upload the TrueMoney transfer slip.") : thunderVerified ? paymentText("payment.thunder.instructions", "Pay the fixed amount, then upload the slip for automatic verification.") : "Transfer the exact amount, then upload the payment receipt.",
             requiresSlip,
             enableSaveQr: paymentSession.enableSaveQr === true || payment.enableSaveQr === true,
             enableOpenApp: paymentSession.enableOpenApp === true || payment.enableOpenApp === true,

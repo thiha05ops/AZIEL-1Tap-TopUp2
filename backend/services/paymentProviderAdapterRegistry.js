@@ -2,7 +2,7 @@ const PROVIDER_ADAPTERS = Object.freeze({
     dinger: Object.freeze({
         name: "dinger",
         displayName: "Dinger Myanmar Payments",
-        supportedRails: [],
+        supportedRails: ["DINGER_AYA_PAY_QR", "DINGER_WAVE_PAY_PIN"],
         supportedCurrencies: ["MMK"],
         checkoutModes: ["QR", "REDIRECT"],
         cardNetworks: [],
@@ -15,13 +15,14 @@ const PROVIDER_ADAPTERS = Object.freeze({
             tokenContract: "CONFIRMED",
             rsaRequestEncryption: "CONFIRMED",
             payRequestTransport: "CONFIRMED",
-            qrPayResponseSchema: "CONFIRMED",
+            qrPayResponseSchema: "UNCONFIRMED",
             stagingRedirectContract: "CONFIRMED",
+            productionWaveRedirectContract: "CONFIRMED",
             payResponseSignatureVerification: "UNCONFIRMED",
             callbackAesDecryption: "CONFIRMED",
-            callbackChecksumAuthentication: "UNCONFIRMED",
-            callbackRoute: "DIAGNOSTIC_ONLY_DISABLED_DEFAULT",
-            liveContract: "UNCONFIRMED",
+            callbackChecksumAuthentication: "CONFIRMED",
+            callbackRoute: "SETTLEMENT_EXPLICIT_OPT_IN_DIAGNOSTIC_DEFAULT",
+            liveContract: "PARTIAL",
             customerExposure: "DISABLED"
         }),
         methods: Object.freeze(["createPayment", "handleProviderEvent", "healthCheck"])

@@ -1,4 +1,5 @@
 const express = require("express");
+const rateLimit = require("express-rate-limit");
 const router = express.Router();
 
 const authMiddleware = require("../middleware/authMiddleware");
@@ -50,7 +51,9 @@ router.get("/coupons/available", optionalAuthMiddleware, async (req, res) => {
     }
 });
 
-router.post("/coupons/:campaignId/claim", authMiddleware, async (req, res) => {
+const claimLimiter = rateLimit({ windowMs: 60 * 1000, limit: 12, standardHeaders: true, legacyHeaders: false });
+
+router.post("/coupons/:campaignId/claim", claimLimiter, authMiddleware, async (req, res) => {
     try {
         const result = await claimCoupon({
             campaignId: req.params.campaignId,

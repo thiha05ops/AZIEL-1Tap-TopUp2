@@ -13,6 +13,8 @@ const mongoose = require("mongoose");
 const PromoCode = require("../models/PromoCode");
 const PromoUsageState = require("../models/PromoUsageState");
 const UserCoupon = require("../models/UserCoupon");
+const CouponLifecycleEvent = require("../models/CouponLifecycleEvent");
+const CommerceOrder = require("../models/CommerceOrder");
 const {
     claimCoupon,
     cleanupExpiredUserCoupons,
@@ -203,6 +205,7 @@ function match(record, query = {}) {
         if (expected && typeof expected === "object" && !Array.isArray(expected) && !(expected instanceof Date) && !expected._bsontype) {
             if (Object.prototype.hasOwnProperty.call(expected, "$ne")) return !sameId(actual, expected.$ne);
             if (Object.prototype.hasOwnProperty.call(expected, "$gt")) return new Date(actual).getTime() > new Date(expected.$gt).getTime();
+            if (Object.prototype.hasOwnProperty.call(expected, "$lt")) return Number(actual || 0) < Number(expected.$lt);
             if (Object.prototype.hasOwnProperty.call(expected, "$lte")) return new Date(actual).getTime() <= new Date(expected.$lte).getTime();
             if (Object.prototype.hasOwnProperty.call(expected, "$in")) return expected.$in.some(item => sameId(item, actual));
         }
@@ -229,22 +232,25 @@ async function runExecutableLifecycleVerifier() {
         couponFindOneAndUpdate: UserCoupon.findOneAndUpdate,
         couponUpdateOne: UserCoupon.updateOne,
         couponUpdateMany: UserCoupon.updateMany,
-        couponFind: UserCoupon.find
+        couponFind: UserCoupon.find,
+        lifecycleUpdateOne: CouponLifecycleEvent.updateOne,
+        orderFindOne: CommerceOrder.findOne
     };
-    const state = { promos: new Map(), usage: new Map(), coupons: new Map(), failUsage: false };
+    const state = { promos: new Map(), usage: new Map(), coupons: new Map(), events: new Map(), failUsage: false };
+    let transactionTail = Promise.resolve();
     const user = { id: "64f200000000000000000001" };
     const now = new Date("2026-09-08T00:00:00Z");
-    function reset(usageLimit = 0) {
-        state.promos.clear(); state.usage.clear(); state.coupons.clear(); state.failUsage = false;
+    function reset(usageLimit = 0, claimLimit = 0) {
+        state.promos.clear(); state.usage.clear(); state.coupons.clear(); state.events.clear(); state.failUsage = false;
         const promo = {
             _id: oid("64f100000000000000000001"), code: "AZC-RUNTIME", name: "Runtime coupon",
             enabled: true, archivedAt: null, discountType: "FIXED", fixedAmounts: { TH: 5, MM: 500 },
             maximumDiscountAmounts: {}, minimumOrderAmounts: {}, regions: ["TH", "MM"], eligibilityMode: "ALL",
-            eligibleProductCodes: [], eligiblePackages: [], usageLimit,
+            eligibleProductCodes: [], eligiblePackages: [], usageLimit, claimLimit,
             startsAt: new Date("2026-09-01T00:00:00Z"), endsAt: new Date("2026-12-31T00:00:00Z")
         };
         state.promos.set(String(promo._id), promo);
-        state.usage.set(promo.code, { code: promo.code, consumedCount: 0, reservedCount: 0 });
+        state.usage.set(promo.code, { code: promo.code, consumedCount: 0, reservedCount: 0, claimedCount: 0, expiredCount: 0 });
         return promo;
     }
     function addCoupon(id, promo = state.promos.values().next().value) {
@@ -268,11 +274,17 @@ async function runExecutableLifecycleVerifier() {
     try {
         mongoose.startSession = async () => ({
             async withTransaction(callback) {
+                const previous = transactionTail;
+                let unlock;
+                transactionTail = new Promise(resolve => { unlock = resolve; });
+                await previous;
                 const before = { usage: clone([...state.usage.entries()]), coupons: clone([...state.coupons.entries()]) };
                 try { return await callback(); } catch (error) {
                     state.usage = new Map(before.usage);
                     state.coupons = new Map(before.coupons);
                     throw error;
+                } finally {
+                    unlock();
                 }
             },
             async endSession() {}
@@ -301,6 +313,11 @@ async function runExecutableLifecycleVerifier() {
             for (const record of state.coupons.values()) if (match(record, query)) { apply(record, update); modifiedCount += 1; }
             return { modifiedCount };
         };
+        CouponLifecycleEvent.updateOne = async (query, update) => {
+            if (!state.events.has(query.eventKey)) state.events.set(query.eventKey, clone(update.$setOnInsert));
+            return { matchedCount: state.events.has(query.eventKey) ? 1 : 0, modifiedCount: 0, upsertedCount: 1 };
+        };
+        CommerceOrder.findOne = () => ({ select() { return this; }, lean() { return queryResult(null); } });
         PromoUsageState.updateOne = async (query, update) => {
             if (state.failUsage) { state.failUsage = false; throw new Error("injected usage counter failure"); }
             let record = state.usage.get(query.code);
@@ -324,6 +341,25 @@ async function runExecutableLifecycleVerifier() {
         const duplicate = await claimCoupon({ campaignId: promo._id, user, now });
         assert.strictEqual(claimed.coupon.userCouponId, duplicate.coupon.userCouponId, "Duplicate claim must return existing entitlement.");
         assert.strictEqual(state.coupons.size, 1, "Duplicate claim must not create another UserCoupon.");
+
+        const concurrentPromo = reset(0, 1);
+        const firstUser = { id: "64f200000000000000000011" };
+        const secondUser = { id: "64f200000000000000000012" };
+        const claimResults = await Promise.allSettled([
+            claimCoupon({ campaignId: concurrentPromo._id, user: firstUser, now }),
+            claimCoupon({ campaignId: concurrentPromo._id, user: secondUser, now })
+        ]);
+        assert.strictEqual(claimResults.filter(result => result.status === "fulfilled").length, 1, "Last claim-quota slot must have exactly one winner.");
+        assert.strictEqual(claimResults.find(result => result.status === "rejected")?.reason?.code, "COUPON_CLAIM_LIMIT_REACHED", "Claim-quota loser must fail explicitly.");
+        assert.strictEqual(state.usage.get(concurrentPromo.code).claimedCount, 1, "Claim quota counter must remain exact under concurrency.");
+
+        const sameUserPromo = reset(0, 5);
+        const sameUserResults = await Promise.all([
+            claimCoupon({ campaignId: sameUserPromo._id, user, now }),
+            claimCoupon({ campaignId: sameUserPromo._id, user, now })
+        ]);
+        assert.strictEqual(sameUserResults[0].coupon.userCouponId, sameUserResults[1].coupon.userCouponId, "Concurrent same-user claims must return one entitlement.");
+        assert.strictEqual(state.usage.get(sameUserPromo.code).claimedCount, 1, "Concurrent same-user claims must consume one claim slot.");
 
         await reserveUserCoupon({ userCouponId: claimed.coupon.userCouponId, user, quote: sampleQuote(), orderId: "O-1", reservationToken: "T-1", now });
         const reserveRetry = await reserveUserCoupon({ userCouponId: claimed.coupon.userCouponId, user, quote: sampleQuote(), orderId: "O-1", reservationToken: "T-1", now });
@@ -360,6 +396,18 @@ async function runExecutableLifecycleVerifier() {
         assert.strictEqual(cleanup.releasedReservations, 1, "Cleanup must count only a won RESERVED transition.");
         assert.strictEqual(state.usage.get(cleanupPromo.code).reservedCount, 0, "Cleanup must decrement reservedCount only after winning the transition.");
 
+        const expiredPromo = reset();
+        const expired = addCoupon("64f300000000000000000035", expiredPromo);
+        expired.expiresAt = new Date("2026-09-07T23:59:00Z");
+        const expiryAttempts = await Promise.allSettled([
+            reserveUserCoupon({ userCouponId: expired._id, user, quote: sampleQuote(), orderId: "EXP-1", reservationToken: "EXP-1", now }),
+            reserveUserCoupon({ userCouponId: expired._id, user, quote: sampleQuote(), orderId: "EXP-2", reservationToken: "EXP-2", now })
+        ]);
+        assert.strictEqual(expiryAttempts.filter(result => result.status === "rejected").length, 2, "Expired coupon reservation attempts must reject.");
+        assert.strictEqual(state.coupons.get(String(expired._id)).status, USER_COUPON_STATUS.EXPIRED, "Expired coupon must transition once.");
+        assert.strictEqual(state.usage.get(expiredPromo.code).expiredCount, 1, "Concurrent expiry attempts must increment expiredCount once.");
+        assert.strictEqual([...state.events.values()].filter(event => event.eventType === "EXPIRED").length, 1, "Concurrent expiry attempts must write one EXPIRED event.");
+
         const rollbackPromo = reset();
         const rollback = addCoupon("64f300000000000000000040", rollbackPromo);
         state.failUsage = true;
@@ -376,6 +424,8 @@ async function runExecutableLifecycleVerifier() {
         UserCoupon.updateOne = original.couponUpdateOne;
         UserCoupon.updateMany = original.couponUpdateMany;
         UserCoupon.find = original.couponFind;
+        CouponLifecycleEvent.updateOne = original.lifecycleUpdateOne;
+        CommerceOrder.findOne = original.orderFindOne;
     }
 }
 

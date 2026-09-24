@@ -9,6 +9,7 @@ const {
     PromoError,
     archivePromo,
     createPromo,
+    getAdminPromoDetail,
     listAdminPromos,
     updatePromo
 } = require("../services/promoCodeService");
@@ -37,6 +38,14 @@ router.get("/admin/promos", adminMiddleware, requireAdminPermission(PERMISSIONS.
     try {
         const promos = await listAdminPromos();
         return res.json({ success: true, promos });
+    } catch (error) {
+        return sendPromoError(res, error);
+    }
+});
+
+router.get("/admin/promos/:id", adminMiddleware, requireAdminPermission(PERMISSIONS.PROMOS_READ), async (req, res) => {
+    try {
+        return res.json({ success: true, ...(await getAdminPromoDetail(req.params.id)) });
     } catch (error) {
         return sendPromoError(res, error);
     }
