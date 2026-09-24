@@ -42,20 +42,30 @@
         if (!draft?.review?.quoteId) return;
         submitting = true;
         update();
-        const pricing = draft.review.pricing || {};
-        await window.AZIEL_PAYMENT.start({
-            ...draft.order,
-            checkoutKey: draft.order.orderId,
-            amount: pricing.quotedTotalAmount,
-            currency: pricing.currency,
-            reviewQuoteId: draft.review.quoteId,
-            paymentMethod: payment.key,
-            paymentType: payment.paymentType || "manual",
-            provider: payment.provider || "manual",
-            pagePresentation: true
-        });
-        submitting = false;
-        update();
+        let failureMessage = "";
+        try {
+            const customerPhone = await window.AZIEL_DINGER_CHECKOUT_PHONE?.phoneFor?.(payment) || "";
+            const pricing = draft.review.pricing || {};
+            await window.AZIEL_PAYMENT.start({
+                ...draft.order,
+                checkoutKey: draft.order.orderId,
+                amount: pricing.quotedTotalAmount,
+                currency: pricing.currency,
+                reviewQuoteId: draft.review.quoteId,
+                paymentMethod: payment.key,
+                paymentType: payment.paymentType || "manual",
+                provider: payment.provider || "manual",
+                ...(customerPhone ? { customerPhone } : {}),
+                pagePresentation: true
+            });
+        } catch (error) {
+            failureMessage = error?.message || t("payment.failed", "Payment could not be started.");
+        } finally {
+            submitting = false;
+            update();
+            const feedback = document.getElementById("methodFeedback");
+            if (feedback && failureMessage) feedback.textContent = failureMessage;
+        }
     }
 
     document.addEventListener("DOMContentLoaded", () => {

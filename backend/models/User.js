@@ -81,6 +81,16 @@ const userSchema = new mongoose.Schema(
             default: ""
         },
 
+        phoneVerifiedAt: {
+            type: Date,
+            default: null
+        },
+
+        phoneVerificationMethod: {
+            type: String,
+            default: ""
+        },
+
         region: {
             type: String,
             default: "MM"

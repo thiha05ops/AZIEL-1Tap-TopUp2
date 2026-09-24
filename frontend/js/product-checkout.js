@@ -361,6 +361,7 @@
         button.disabled = true;
         try {
             validateReviewForHandoff(authoritativeReview);
+            const customerPhone = await window.AZIEL_DINGER_CHECKOUT_PHONE?.phoneFor?.(payment) || "";
             sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ ...draft, review: authoritativeReview }));
             const pricing = authoritativeReview.pricing || {};
             const result = await window.AZIEL_PAYMENT.start({
@@ -372,6 +373,7 @@
                 paymentMethod: payment.key,
                 paymentType: payment.paymentType || "manual",
                 provider: payment.provider || "manual",
+                ...(customerPhone ? { customerPhone } : {}),
                 pagePresentation: true
             });
             paymentCommitted = result?.success === true && result?.navigating === true;

@@ -83,7 +83,12 @@ router.put(
             }
 
             if (phone !== undefined) {
-                user.phone = String(phone).trim();
+                const nextPhone = String(phone).trim();
+                if (nextPhone !== String(user.phone || "").trim()) {
+                    user.phone = nextPhone;
+                    user.phoneVerifiedAt = null;
+                    user.phoneVerificationMethod = "";
+                }
             }
 
             if (region !== undefined) {

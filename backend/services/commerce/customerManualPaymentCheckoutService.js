@@ -11,6 +11,7 @@ const { reserveCommercePromotion, releaseCommercePromotion } = require("./commer
 const orderRepository = require("./orderRepository");
 const { createManualPaymentApplicationService } = require("./manualPaymentApplicationService");
 const { dingerAccessDecision, isDingerMethod } = require("../dinger/dingerPaymentPolicy");
+const { normalizeDingerMyanmarPhone, DingerCustomerPhoneError } = require("../dinger/dingerCustomerPhone");
 
 const ERROR_CODES = Object.freeze({ INVALID_INPUT: "INVALID_INPUT", QUOTE_UNAVAILABLE: "QUOTE_UNAVAILABLE", PAYMENT_METHOD_UNAVAILABLE: "PAYMENT_METHOD_UNAVAILABLE", MANUAL_CHECKOUT_FAILED: "MANUAL_CHECKOUT_FAILED" });
 class CustomerManualPaymentCheckoutError extends Error { constructor(code, message, statusCode = 400) { super(message); this.name = "CustomerManualPaymentCheckoutError"; this.code = code; this.statusCode = statusCode; } }
@@ -21,14 +22,27 @@ const publicId = prefix => `${prefix}-${Date.now()}-${crypto.randomBytes(5).toSt
 function ownerFromContext(context = {}) { const userId = text(context.user?.id || context.user?._id || context.user?.userId); const sessionId = text(context.sessionId); if (userId) return { userId, sessionId: "" }; if (sessionId) return { userId: "", sessionId }; throw new CustomerManualPaymentCheckoutError(ERROR_CODES.INVALID_INPUT, "Authenticated customer is required.", 401); }
 function repositoryOwner(owner) { return owner.userId ? { type: "USER", userId: owner.userId } : { type: "SESSION", sessionId: owner.sessionId }; }
 
-async function resolveDingerCustomer({ owner, user }, dependencies = {}) {
+async function resolveDingerCustomer({ owner, user, submittedPhone, allowPhoneUpdate = false }, dependencies = {}) {
     const contextualPhone = text(user?.phone || user?.mobile || user?.phoneNumber);
     const contextualName = text(user?.fullName || user?.name || user?.username);
-    if (contextualPhone) return { phone: contextualPhone, name: contextualName || "AZIEL Customer" };
     const findCustomer = dependencies.findCustomerById || (userId => User.findById(userId).select("phone username").lean());
     const stored = owner.userId ? await findCustomer(owner.userId) : null;
-    const phone = text(stored?.phone);
-    if (!phone) throw new CustomerManualPaymentCheckoutError(ERROR_CODES.INVALID_INPUT, "A verified customer phone number is required for Dinger payment.", 422);
+    const existingPhone = text(stored?.phone || contextualPhone);
+    let phone;
+    try { phone = normalizeDingerMyanmarPhone(text(submittedPhone) || existingPhone); }
+    catch (error) {
+        if (!(error instanceof DingerCustomerPhoneError)) throw error;
+        throw new CustomerManualPaymentCheckoutError(ERROR_CODES.INVALID_INPUT, "A valid customer phone number is required for Dinger payment.", 422);
+    }
+    if (allowPhoneUpdate && text(submittedPhone) && phone !== existingPhone) {
+        const updateCustomerPhone = dependencies.updateCustomerPhone || ((userId, normalizedPhone) => User.findOneAndUpdate(
+            { _id: userId },
+            { $set: { phone: normalizedPhone, phoneVerifiedAt: null, phoneVerificationMethod: "" } },
+            { new: true, runValidators: true }
+        ).select("phone username").lean());
+        const updated = owner.userId ? await updateCustomerPhone(owner.userId, phone, { phoneVerifiedAt: null, phoneVerificationMethod: "" }) : null;
+        if (!updated || text(updated.phone) !== phone) throw new CustomerManualPaymentCheckoutError(ERROR_CODES.INVALID_INPUT, "Customer phone number could not be saved.", 409);
+    }
     return { phone, name: contextualName || text(stored?.username) || "AZIEL Customer" };
 }
 
@@ -80,7 +94,12 @@ async function startCustomerManualPaymentCheckout(input = {}, context = {}, depe
     const method = await loadManualPaymentMethod({ key: methodKey, region, user: context.user }, dependencies);
     const trueWallet = method.key === "truewallet";
     const dinger = isDingerMethod(method);
-    const dingerCustomer = dinger ? await resolveDingerCustomer({ owner, user: context.user }, dependencies) : null;
+    const dingerCustomer = dinger ? await resolveDingerCustomer({
+        owner,
+        user: context.user,
+        submittedPhone: method.key === "dinger_wavepay_pin" ? input.customerPhone : "",
+        allowPhoneUpdate: method.key === "dinger_wavepay_pin"
+    }, dependencies) : null;
     if (trueWallet && upper(quote.commercialSnapshot?.currency) !== "THB") throw new CustomerManualPaymentCheckoutError(ERROR_CODES.PAYMENT_METHOD_UNAVAILABLE, "TrueMoney Wallet is available only for THB orders.", 422);
     let redemption = null, checkoutResult = null;
     try {
