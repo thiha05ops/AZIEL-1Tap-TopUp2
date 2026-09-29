@@ -13,6 +13,7 @@ const {
     setAuthCookie
 } = require("../services/authCookieService");
 const csrf = require("../middleware/customerCsrfMiddleware");
+const { projectUser } = require("../services/authSessionService");
 
 const root = path.resolve(__dirname, "../..");
 const read = file => fs.readFileSync(path.join(root, file), "utf8");
@@ -26,6 +27,22 @@ function csrfResult(headers, method = "POST") {
 }
 
 function main() {
+    const internalId = "507f1f77bcf86cd799439011";
+    const customerId = "AZU-H7KQ2M9WXP";
+    const projectedUser = projectUser({
+        _id: internalId,
+        customerId,
+        username: "projection-test",
+        email: "projection-test@gmail.com",
+        displayName: "Projection Test",
+        region: "MM",
+        role: "user"
+    });
+    assert.strictEqual(projectedUser.id, internalId, "internal session identity must remain the MongoDB User._id string");
+    assert.strictEqual(projectedUser.customerId, customerId, "public AZIEL customer ID must survive auth projection");
+    assert.notStrictEqual(projectedUser.id, projectedUser.customerId, "internal and customer-facing identities must remain distinct");
+    assert.match(projectedUser.customerId, /^AZU-[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{10}$/);
+
     const production = { NODE_ENV: "production", AUTH_COOKIE_SECRET: "test-secret-with-enough-entropy" };
     const encoded = encodeSessionCookie("session-id", production);
     assert.strictEqual(decodeSessionCookie(encoded, production), "session-id");
@@ -72,15 +89,18 @@ function main() {
     const passport = read("backend/config/passport.js");
     const login = read("frontend/js/login.js");
     const userState = read("frontend/js/user-state.js");
+    const account = read("frontend/js/account.js");
     const worker = read("frontend/sw.js");
     const realtime = read("backend/services/realtime.js");
     const socketClient = read("frontend/js/socket-client.js");
 
     assert(auth.includes('router.get("/auth/me", authMiddleware'));
+    assert(auth.includes("user: projectUser(user)"), "/api/auth/me must return the shared user projection");
     assert(auth.includes('router.post("/auth/logout", async'));
     assert(auth.includes('revokeSession(auth.session.sessionId, auth.user, "logout")'), "logout must revoke the authoritative server session");
     assert(auth.includes("clearAuthCookie(res)"), "logout must clear canonical and legacy cookie variants through the cookie service");
     assert.strictEqual((auth.match(/setAuthCookie\(res, issued\.session\.sessionId\)/g) || []).length, 2, "password and 2FA login must set the cookie");
+    assert.strictEqual((auth.match(/user:\s*projectUser\(user\)/g) || []).length, 3, "password login, 2FA login, and /api/auth/me must share the compatible projection");
     assert(!/token:\s*issued\.token/.test(auth), "login responses must not expose reusable JWTs");
     assert(middleware.includes("readSessionId(req)"));
     assert(middleware.includes("verifyUserToken(token"), "Bearer compatibility must remain at the API boundary");
@@ -96,6 +116,8 @@ function main() {
     assert(!login.includes("data.token"));
     assert(userState.includes('AZIEL.apiUrl("/api/auth/me")'));
     assert(userState.includes('credentials: "include"'));
+    assert(account.includes('setText("profileCustomerId", user.customerId || "")'), "profile summary must consume the public customerId");
+    assert(account.includes('setValue("profileCustomerIdReadOnly", user.customerId || "")'), "profile field must consume the public customerId");
     assert(worker.includes('"/api/"'));
     assert(worker.includes("OAUTH_NAVIGATION_PATHS"), "the worker must explicitly leave OAuth navigations browser-owned");
     assert(!worker.includes('"/auth/google/success"'), "obsolete Google success transport must not return");

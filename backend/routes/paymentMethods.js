@@ -596,7 +596,26 @@ function normalizePaymentMethodKey(value = "") {
     if (["truemoney", "truemoneywallet", "thundertruewallet"].includes(compact)) return "truewallet";
     if (compact === "dingerayapayqr") return "dinger_ayapay_qr";
     if (compact === "dingerwavepaypin") return "dinger_wavepay_pin";
+    if (compact === "myanmyanpaymmqr") return "myanmyanpay_mmqr";
     return compact;
+}
+
+function applyMyanMyanPayCreationDefaults(method) {
+    method.enabled = false;
+    method.myanMyanPayActivationState = "DISABLED";
+    method.myanMyanPaySandboxTestApproved = false;
+    method.myanMyanPayAuthorizedTestUserIds = [];
+    method.region = "MM";
+    method.paymentType = "auto";
+    method.provider = "myanmyanpay_mmqr";
+    method.paymentChannel = "MYANMYANPAY_MMQR";
+    method.qrMode = "provider_generated";
+    method.receiptUploadEnabled = false;
+    method.slipRequired = false;
+    method.confirmationMode = "provider_webhook";
+    method.autoVerificationSupported = true;
+    method.webhookSupported = true;
+    return method;
 }
 
 function safeOpenAppMode(value = "", fallback = "disabled") {
@@ -1850,20 +1869,7 @@ router.post("/admin/payment-methods", adminMiddleware, requireAdminPermission(PE
             method.autoVerificationSupported = true;
             method.webhookSupported = true;
         } else if (isMyanMyanPayMethod(method)) {
-            method.enabled = false;
-            method.myanMyanPayActivationState = "DISABLED";
-            method.myanMyanPaySandboxTestApproved = false;
-            method.myanMyanPayAuthorizedTestUserIds = [];
-            method.region = "MM";
-            method.paymentType = "auto";
-            method.provider = "myanmyanpay_mmqr";
-            method.paymentChannel = "MYANMYANPAY_MMQR";
-            method.qrMode = "provider_generated";
-            method.receiptUploadEnabled = false;
-            method.slipRequired = false;
-            method.confirmationMode = "provider_webhook";
-            method.autoVerificationSupported = true;
-            method.webhookSupported = true;
+            applyMyanMyanPayCreationDefaults(method);
         }
         await validatePaymentMethodConfiguration(method);
         await method.save();
@@ -2139,6 +2145,7 @@ router.post(
 module.exports = router;
 module.exports._test = {
     applyCompatibilityModes,
+    applyMyanMyanPayCreationDefaults,
     applyPaymentMethodPatch,
     applySeedDefaultsWithoutOverwriting,
     defaultMethods,

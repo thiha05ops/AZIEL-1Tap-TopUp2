@@ -7,8 +7,53 @@ const { inspectMyanMyanPayConfiguration, loadMyanMyanPayConfiguration, CALLBACK_
 const { createMyanMyanPayClient } = require("../services/myanmyanpay/myanMyanPayClient");
 const { createMyanMyanPayAdapter } = require("../services/commerce/providers/myanMyanPayAdapter");
 const { createManualPaymentApplicationService } = require("../services/commerce/manualPaymentApplicationService");
-const { myanMyanPayAccessDecision } = require("../services/myanmyanpay/myanMyanPayPaymentPolicy");
+const { isMyanMyanPayMethod, myanMyanPayAccessDecision } = require("../services/myanmyanpay/myanMyanPayPaymentPolicy");
 const { validateCallback, eventId } = require("../routes/myanMyanPaySettlementCallback");
+const PaymentMethod = require("../models/PaymentMethod");
+const paymentMethodsRoute = require("../routes/paymentMethods");
+
+const {
+    applyMyanMyanPayCreationDefaults,
+    applyPaymentMethodPatch,
+    formatAdminMethod,
+    normalizePaymentMethodKey
+} = paymentMethodsRoute._test;
+
+assert.strictEqual(normalizePaymentMethodKey("myanmyanpay_mmqr"), "myanmyanpay_mmqr");
+assert.strictEqual(normalizePaymentMethodKey("myanmyanpaymmqr"), "myanmyanpay_mmqr");
+assert.strictEqual(normalizePaymentMethodKey("myanmyanpay-mmqr"), "myanmyanpay_mmqr");
+assert.strictEqual(normalizePaymentMethodKey("thunder_promptpay"), "thunder_promptpay", "Thunder canonicalization remains unchanged");
+assert.strictEqual(normalizePaymentMethodKey("dinger_ayapay_qr"), "dinger_ayapay_qr", "Dinger AYA Pay canonicalization remains unchanged");
+assert.strictEqual(normalizePaymentMethodKey("dinger_wavepay_pin"), "dinger_wavepay_pin", "Dinger WavePay canonicalization remains unchanged");
+
+const createRequest = {
+    method: "MyanMyanPay MMQR",
+    key: "myanmyanpay_mmqr",
+    region: "MM",
+    provider: "myanmyanpay_mmqr",
+    paymentChannel: "MYANMYANPAY_MMQR",
+    paymentType: "auto",
+    enabled: false
+};
+const createdMethod = new PaymentMethod({
+    method: createRequest.method,
+    key: normalizePaymentMethodKey(createRequest.key),
+    region: createRequest.region,
+    enabled: createRequest.enabled === true,
+    paymentType: createRequest.paymentType,
+    provider: createRequest.provider
+});
+applyPaymentMethodPatch(createdMethod, createRequest);
+assert.strictEqual(isMyanMyanPayMethod(createdMethod), true, "canonicalized creation reaches the MyanMyanPay guard");
+if (isMyanMyanPayMethod(createdMethod)) applyMyanMyanPayCreationDefaults(createdMethod);
+const serializedCreatedMethod = formatAdminMethod(createdMethod);
+assert.strictEqual(serializedCreatedMethod.key, "myanmyanpay_mmqr");
+assert.strictEqual(serializedCreatedMethod.provider, "myanmyanpay_mmqr");
+assert.strictEqual(serializedCreatedMethod.paymentChannel, "MYANMYANPAY_MMQR");
+assert.strictEqual(serializedCreatedMethod.enabled, false);
+assert.strictEqual(serializedCreatedMethod.myanMyanPayActivationState, "DISABLED");
+assert.strictEqual(serializedCreatedMethod.myanMyanPaySandboxTestApproved, false);
+assert.deepStrictEqual(serializedCreatedMethod.myanMyanPayAuthorizedTestUserIds, []);
 
 const env = { MYANMYANPAY_SANDBOX_ENABLED: "true", MYANMYANPAY_SANDBOX_APP_ID: "APP-TEST", MYANMYANPAY_SANDBOX_PUBLISHABLE_KEY: "pk_test_example", MYANMYANPAY_SANDBOX_SECRET_KEY: "sk_test_example", MYANMYANPAY_SANDBOX_API_BASE_URL: "https://sandbox.example.test" };
 assert.strictEqual(inspectMyanMyanPayConfiguration({}).configured, false, "missing configuration fails closed");

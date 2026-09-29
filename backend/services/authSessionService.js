@@ -91,6 +91,7 @@ function isEmailVerified(user) {
 function projectUser(user) {
     return {
         id: String(user._id),
+        customerId: user.customerId || "",
         username: user.username,
         email: user.email || "",
         displayName: user.displayName || user.username,
