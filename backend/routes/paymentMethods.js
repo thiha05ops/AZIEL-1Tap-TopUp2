@@ -35,6 +35,7 @@ const {
     dingerAccessDecision,
     dingerTechnicalReadiness
 } = require("../services/dinger/dingerPaymentPolicy");
+const { isMyanMyanPayMethod, myanMyanPayAccessDecision } = require("../services/myanmyanpay/myanMyanPayPaymentPolicy");
 const {
     createPromptPayQr,
     maskPromptPayRecipient
@@ -143,6 +144,14 @@ const defaultPromptPayBankLaunchers = Object.freeze([
 ]);
 
 const defaultMethods = [
+    {
+        method: "MyanMyanPay MMQR", key: "myanmyanpay_mmqr", region: "MM", enabled: false,
+        paymentType: "auto", provider: "myanmyanpay_mmqr", paymentChannel: "MYANMYANPAY_MMQR",
+        qrMode: "provider_generated", receiptUploadEnabled: false, slipRequired: false,
+        confirmationMode: "provider_webhook", autoVerificationSupported: true, webhookSupported: true,
+        myanMyanPayActivationState: "DISABLED", myanMyanPaySandboxTestApproved: false,
+        badgeText: "MMQR", shortDescription: "Pay securely with MyanMyanPay MMQR", sortOrder: 29
+    },
     {
         method: "AYA Pay QR (Dinger)", key: "dinger_ayapay_qr", region: "MM", enabled: false,
         paymentType: "auto", provider: "dinger_ayapay_qr", paymentChannel: "DINGER_AYA_PAY_QR",
@@ -1046,6 +1055,8 @@ function formatMethod(method, options = {}) {
     const displaySource = Object.assign({}, obj, { provider });
     const capabilityState = paymentMethodCapabilityState(displaySource);
     const dingerDecision = isDingerMethod(obj) ? dingerAccessDecision(obj, options.user || {}) : null;
+    const myanMyanPayDecision = isMyanMyanPayMethod(obj) ? myanMyanPayAccessDecision(obj, options.user || {}) : null;
+    const accessDecision = myanMyanPayDecision || dingerDecision;
     const providerReady = true;
     const readiness = {
         ready: capabilityState.publicReady && providerReady,
@@ -1084,9 +1095,9 @@ function formatMethod(method, options = {}) {
         provider,
         logoUrl: safePublicAssetUrl(obj.logoUrl) || getPaymentLogo(displaySource),
         trustDisplay,
-        publicReady: dingerDecision ? dingerDecision.readiness?.initiationReady === true : readiness.ready,
-        customerVisible: dingerDecision ? dingerDecision.allowed === true : capabilityState.customerVisible && providerReady,
-        unavailableReason: dingerDecision ? (dingerDecision.allowed ? "" : dingerDecision.reason) : providerReady ? capabilityState.unavailableReason : "Automatic PromptPay is not configured",
+        publicReady: accessDecision ? (myanMyanPayDecision ? accessDecision.readiness?.configured === true : accessDecision.readiness?.initiationReady === true) : readiness.ready,
+        customerVisible: accessDecision ? accessDecision.allowed === true : capabilityState.customerVisible && providerReady,
+        unavailableReason: accessDecision ? (accessDecision.allowed ? "" : accessDecision.reason) : providerReady ? capabilityState.unavailableReason : "Automatic PromptPay is not configured",
         applicableSections: capabilityState.applicableSections,
         missingConfiguration: readiness.missing,
         ...capabilityProjection(obj)
@@ -1102,6 +1113,12 @@ function applyDingerPublicAccess(formatted = {}, source = {}, user = {}) {
         customerVisible: decision.allowed === true,
         unavailableReason: decision.allowed ? "" : decision.reason
     };
+}
+
+function applyMyanMyanPayPublicAccess(formatted = {}, source = {}, user = {}) {
+    if (!isMyanMyanPayMethod(source)) return formatted;
+    const decision = myanMyanPayAccessDecision(source, user);
+    return { ...formatted, publicReady: decision.readiness?.configured === true, customerVisible: decision.allowed === true, unavailableReason: decision.allowed ? "" : decision.reason };
 }
 
 function formatAdminMethod(method) {
@@ -1174,6 +1191,12 @@ function formatAdminMethod(method) {
             dingerAuthorizedTestUserIds: Array.isArray(obj.dingerAuthorizedTestUserIds) ? obj.dingerAuthorizedTestUserIds : [],
             dingerLastTestOutcome: obj.dingerLastTestOutcome || { status: "NOT_RUN", testedAt: null, note: "" },
             dingerReadiness: dingerTechnicalReadiness(obj)
+        } : {}),
+        ...(isMyanMyanPayMethod(obj) ? {
+            myanMyanPayActivationState: obj.myanMyanPayActivationState || "DISABLED",
+            myanMyanPaySandboxTestApproved: obj.myanMyanPaySandboxTestApproved === true,
+            myanMyanPayAuthorizedTestUserIds: Array.isArray(obj.myanMyanPayAuthorizedTestUserIds) ? obj.myanMyanPayAuthorizedTestUserIds : [],
+            myanMyanPayReadiness: myanMyanPayAccessDecision(obj, {}).readiness
         } : {})
     };
 }
@@ -1214,6 +1237,7 @@ router.get("/payment-methods", optionalAuthMiddleware, async (req, res) => {
             methods: eligibleMethods
                 .map(formatMethod)
                 .map((method, index) => applyDingerPublicAccess(method, eligibleMethods[index], req.user))
+                .map((method, index) => applyMyanMyanPayPublicAccess(method, eligibleMethods[index], req.user))
                 .filter(method => method.customerVisible === true)
         });
     } catch (error) {
@@ -1825,6 +1849,21 @@ router.post("/admin/payment-methods", adminMiddleware, requireAdminPermission(PE
             method.confirmationMode = "provider_webhook";
             method.autoVerificationSupported = true;
             method.webhookSupported = true;
+        } else if (isMyanMyanPayMethod(method)) {
+            method.enabled = false;
+            method.myanMyanPayActivationState = "DISABLED";
+            method.myanMyanPaySandboxTestApproved = false;
+            method.myanMyanPayAuthorizedTestUserIds = [];
+            method.region = "MM";
+            method.paymentType = "auto";
+            method.provider = "myanmyanpay_mmqr";
+            method.paymentChannel = "MYANMYANPAY_MMQR";
+            method.qrMode = "provider_generated";
+            method.receiptUploadEnabled = false;
+            method.slipRequired = false;
+            method.confirmationMode = "provider_webhook";
+            method.autoVerificationSupported = true;
+            method.webhookSupported = true;
         }
         await validatePaymentMethodConfiguration(method);
         await method.save();
@@ -1884,6 +1923,9 @@ router.put("/admin/payment-methods/:id", adminMiddleware, requireAdminPermission
         ].some(field => Object.prototype.hasOwnProperty.call(req.body || {}, field))) {
             return res.status(409).json({ success: false, code: "DINGER_ACTIVATION_ROUTE_REQUIRED", message: "Use the Dinger activation control for activation and access changes." });
         }
+        if (isMyanMyanPayMethod(method) && ["enabled", "myanMyanPayActivationState", "myanMyanPaySandboxTestApproved", "myanMyanPayAuthorizedTestUserIds"].some(field => Object.prototype.hasOwnProperty.call(req.body || {}, field))) {
+            return res.status(409).json({ success: false, code: "MYANMYANPAY_ACTIVATION_ROUTE_REQUIRED", message: "Use the MyanMyanPay sandbox activation control." });
+        }
 
         applyPaymentMethodPatch(method, req.body);
         await validatePaymentMethodConfiguration(method);
@@ -1918,6 +1960,33 @@ router.put("/admin/payment-methods/:id", adminMiddleware, requireAdminPermission
             success: false,
             message: "Server error"
         });
+    }
+});
+
+router.put("/admin/payment-methods/:id/myanmyanpay-sandbox-activation", adminMiddleware, requireAdminPermission(PERMISSIONS.PAYMENT_METHODS_MANAGE), async (req, res) => {
+    try {
+        const method = await PaymentMethod.findById(req.params.id);
+        if (!method || !isMyanMyanPayMethod(method)) return res.status(404).json({ success: false, code: "MYANMYANPAY_METHOD_NOT_FOUND", message: "MyanMyanPay payment method not found." });
+        const state = String(req.body?.activationState || "").trim().toUpperCase();
+        if (!["DISABLED", "TEST_ONLY"].includes(state)) return res.status(400).json({ success: false, code: "MYANMYANPAY_ACTIVATION_INVALID", message: "Only DISABLED and TEST_ONLY are supported." });
+        const authorizedIds = Array.isArray(req.body?.authorizedTestUserIds)
+            ? [...new Set(req.body.authorizedTestUserIds.map(value => String(value || "").trim()).filter(value => /^[A-Za-z0-9._:-]{1,120}$/.test(value)))].slice(0, 25)
+            : (method.myanMyanPayAuthorizedTestUserIds || []);
+        const approved = req.body?.sandboxTestApproved === true;
+        const candidate = { ...method.toObject(), enabled: state === "TEST_ONLY", myanMyanPayActivationState: state, myanMyanPaySandboxTestApproved: approved, myanMyanPayAuthorizedTestUserIds: authorizedIds };
+        const decision = myanMyanPayAccessDecision(candidate, { id: authorizedIds[0] || "" });
+        if (state === "TEST_ONLY" && (!approved || authorizedIds.length === 0 || !decision.readiness.enabled || !decision.readiness.configured)) {
+            return res.status(409).json({ success: false, code: "MYANMYANPAY_TEST_ONLY_NOT_READY", message: "TEST_ONLY requires sandbox configuration, approval, and an authorized user.", missing: decision.readiness.missing });
+        }
+        method.enabled = candidate.enabled;
+        method.myanMyanPayActivationState = state;
+        method.myanMyanPaySandboxTestApproved = approved;
+        method.myanMyanPayAuthorizedTestUserIds = authorizedIds;
+        await method.save();
+        await writeAdminAudit({ actor: req.admin, req, action: ADMIN_AUDIT_ACTIONS.PAYMENT_METHOD_UPDATED, resourceType: "PaymentMethod", resourceId: String(method._id), metadata: { key: method.key, myanMyanPayActivationState: state, authorizedTestUserCount: authorizedIds.length } }).catch(error => console.log("Admin audit failed:", error.message));
+        return res.json({ success: true, method: formatAdminMethod(method) });
+    } catch (error) {
+        return res.status(500).json({ success: false, code: "MYANMYANPAY_ACTIVATION_FAILED", message: "MyanMyanPay activation update failed." });
     }
 });
 

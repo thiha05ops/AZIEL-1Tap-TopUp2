@@ -17,6 +17,7 @@ const { LEGACY_ALIASES, PAGE_ROUTES, PRODUCT_RENDERERS, frontendFile, preserveQu
 const { getCatalogProductDetail } = require("./services/catalogService");
 const { createDingerDiagnosticCallbackRouter } = require("./routes/dingerDiagnosticCallback");
 const { createDingerSettlementCallbackRouter } = require("./routes/dingerSettlementCallback");
+const { createMyanMyanPaySettlementCallbackRouter } = require("./routes/myanMyanPaySettlementCallback");
 
 dotenv.config({ path: path.join(__dirname, "../.env") });
 const configurationLoadedAt = performance.now();
@@ -204,6 +205,7 @@ function configureBaseApplication(options = {}) {
         ? createDingerSettlementCallbackRouter()
         : createDingerDiagnosticCallbackRouter();
     app.use("/api/webhooks/dinger", dingerCallbackRouter);
+    app.use("/api/webhooks/myanmyanpay", createMyanMyanPaySettlementCallbackRouter());
     startup.staticReady = true;
     recordStartupMilestone("static_middleware_ready", staticStartedAt);
 

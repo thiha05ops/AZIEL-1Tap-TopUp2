@@ -274,6 +274,7 @@ function createCommerceManualPaymentController(options = {}) {
         async customerManualPaymentCheckout(req, res) {
             try {
                 const result = await startCustomerManualPaymentCheckout(req.body || {}, { user: req.user, sessionId: req.sessionID || req.headers["x-session-id"] || "" }, options.manualCheckoutOptions || {});
+                res.setHeader("Cache-Control", "no-store, max-age=0");
                 return respondSuccess(res, result, 201);
             } catch (error) {
                 return respondError(res, error);

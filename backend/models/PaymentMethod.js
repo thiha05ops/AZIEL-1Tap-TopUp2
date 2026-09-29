@@ -38,6 +38,14 @@ const paymentMethodSchema = new mongoose.Schema(
             note: { type: String, default: "" }
         },
 
+        myanMyanPayActivationState: {
+            type: String,
+            enum: ["DISABLED", "TEST_ONLY"],
+            default: "DISABLED"
+        },
+        myanMyanPaySandboxTestApproved: { type: Boolean, default: false },
+        myanMyanPayAuthorizedTestUserIds: { type: [String], default: [] },
+
         accountName: {
             type: String,
             default: ""

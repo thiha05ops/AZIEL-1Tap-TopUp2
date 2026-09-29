@@ -14,6 +14,7 @@ const PROVIDERS = Object.freeze({
     manual_bank: { key: "manual_bank", label: "Manual Bank Transfer", region: "MM", logo: "/assets/payment/bank-neutral.svg" },
     dinger_ayapay_qr: { key: "dinger_ayapay_qr", label: "AYA Pay QR", region: "MM", logo: "/assets/payment/ayapay.png" },
     dinger_wavepay_pin: { key: "dinger_wavepay_pin", label: "Wave Pay PIN", region: "MM", logo: "/assets/payment/wavepay.png" },
+    myanmyanpay_mmqr: { key: "myanmyanpay_mmqr", label: "MyanMyanPay MMQR", region: "MM", logo: "/assets/payment/payment-neutral.svg" },
     wallet: { key: "wallet", label: "AZIEL Wallet", region: "GLOBAL", logo: "/assets/brand/aziel-icon.svg" }
 });
 
@@ -52,7 +53,7 @@ const PROVIDERS_BY_REGION_TYPE = Object.freeze({
         wallet: ["wallet"]
     },
     MM: {
-        auto: ["dinger_ayapay_qr", "dinger_wavepay_pin"],
+        auto: ["myanmyanpay_mmqr", "dinger_ayapay_qr", "dinger_wavepay_pin"],
         deeplink: ["kbzpay", "wavepay", "ayapay", "manual_bank"],
         manual: ["kbzpay", "wavepay", "ayapay", "mmqr", "manual_bank"],
         wallet: ["wallet"]
@@ -210,6 +211,12 @@ function paymentMethodReadiness(method = {}) {
             const { dingerTechnicalReadiness } = require("./dinger/dingerPaymentPolicy");
             const readiness = dingerTechnicalReadiness(method);
             missing.push(...readiness.missing);
+        }
+        if (String(method.key || "").toLowerCase() === "myanmyanpay_mmqr") {
+            const { inspectMyanMyanPayConfiguration } = require("./myanmyanpay/myanMyanPayConfiguration");
+            const readiness = inspectMyanMyanPayConfiguration();
+            if (!readiness.enabled) missing.push("MyanMyanPay sandbox enabled");
+            missing.push(...readiness.missing.map(item => `MyanMyanPay ${item}`));
         }
         return { ready: missing.length === 0, missing };
     }

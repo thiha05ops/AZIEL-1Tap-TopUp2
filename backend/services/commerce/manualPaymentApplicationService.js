@@ -15,6 +15,10 @@ const { createThunderTrueWalletAdapter } = require("./providers/thunderTrueWalle
 const { createThunderTrueWalletVerificationService, ThunderTrueWalletVerificationError, normalizeThaiWalletAccount } = require("./thunderTrueWalletVerificationService");
 const { createManualAdminAdapter, MANUAL_ADMIN_PROVIDER_ID } = require("./providers/manualAdminAdapter");
 const { createDingerAdapter, DINGER_PROVIDER_ID } = require("./providers/dingerAdapter");
+const { createMyanMyanPayAdapter, MYANMYANPAY_PROVIDER_ID } = require("./providers/myanMyanPayAdapter");
+const { loadMyanMyanPayConfiguration } = require("../myanmyanpay/myanMyanPayConfiguration");
+const { createMyanMyanPayClient } = require("../myanmyanpay/myanMyanPayClient");
+const { isMyanMyanPayMethod } = require("../myanmyanpay/myanMyanPayPaymentPolicy");
 const { loadDingerConfiguration } = require("../dinger/dingerConfiguration");
 const { createDingerApiClient } = require("../dinger/dingerApiClient");
 const { dingerAccessDecision, isDingerMethod } = require("../dinger/dingerPaymentPolicy");
@@ -30,7 +34,7 @@ const SERVICE_VERSION = "commerce.manual-payment-application.v1";
 const MANUAL_PROVIDER_ID = "MANUAL_PROMPTPAY";
 const THUNDER_PROVIDER_ID = "THUNDER_PROMPTPAY";
 const THUNDER_TRUEWALLET_PROVIDER_ID = "THUNDER_TRUEWALLET";
-const MANUAL_PROVIDER_IDS = Object.freeze(new Set([MANUAL_PROVIDER_ID, MANUAL_ADMIN_PROVIDER_ID, THUNDER_PROVIDER_ID, THUNDER_TRUEWALLET_PROVIDER_ID, DINGER_PROVIDER_ID]));
+const MANUAL_PROVIDER_IDS = Object.freeze(new Set([MANUAL_PROVIDER_ID, MANUAL_ADMIN_PROVIDER_ID, THUNDER_PROVIDER_ID, THUNDER_TRUEWALLET_PROVIDER_ID, DINGER_PROVIDER_ID, MYANMYANPAY_PROVIDER_ID]));
 const ERROR_CODES = Object.freeze({
     VALIDATION_ERROR: "VALIDATION_ERROR",
     UNAUTHENTICATED: "UNAUTHENTICATED",
@@ -134,8 +138,12 @@ function isDingerOrder(order = {}) {
     return paymentProviderOf(order) === DINGER_PROVIDER_ID || isDingerMethod({ key: order.payment?.paymentMethodId || order.payment?.methodKey });
 }
 
+function isMyanMyanPayOrder(order = {}) {
+    return paymentProviderOf(order) === MYANMYANPAY_PROVIDER_ID || isMyanMyanPayMethod({ key: order.payment?.paymentMethodId || order.payment?.methodKey });
+}
+
 function isSupportedManualOrder(order = {}) {
-    return isManualPromptPayOrder(order) || isThunderPromptPayOrder(order) || isThunderTrueWalletOrder(order) || isManualAdminOrder(order) || isDingerOrder(order);
+    return isManualPromptPayOrder(order) || isThunderPromptPayOrder(order) || isThunderTrueWalletOrder(order) || isManualAdminOrder(order) || isDingerOrder(order) || isMyanMyanPayOrder(order);
 }
 
 function fingerprint(input = {}) {
@@ -247,10 +255,15 @@ const configuration = loadDingerConfiguration();
     return configuration;
 }
 
-function createProviderResolver(configProvider, providerOptions = {}, manualAdminConfigProvider = defaultManualAdminConfigurationProvider, thunderConfigProvider = defaultThunderPromptPayConfigurationProvider, trueWalletConfigProvider = defaultThunderTrueWalletConfigurationProvider, dingerConfigProvider = defaultDingerConfigurationProvider) {
+function createProviderResolver(configProvider, providerOptions = {}, manualAdminConfigProvider = defaultManualAdminConfigurationProvider, thunderConfigProvider = defaultThunderPromptPayConfigurationProvider, trueWalletConfigProvider = defaultThunderTrueWalletConfigurationProvider, dingerConfigProvider = defaultDingerConfigurationProvider, myanMyanPayConfigProvider = loadMyanMyanPayConfiguration) {
     let cached = null;
     let cachedSignature = "";
     return async function providerResolver({ intent, operation }) {
+        if (normalizeUpper(intent?.provider) === MYANMYANPAY_PROVIDER_ID || isMyanMyanPayMethod({ key: intent?.paymentMethodId })) {
+            const configuration = await myanMyanPayConfigProvider();
+            const client = createMyanMyanPayClient(configuration, providerOptions.myanMyanPayClientOptions || {});
+            return createMyanMyanPayAdapter({ configuration, client, ...(providerOptions.myanMyanPayAdapterOptions || {}) });
+        }
         if (normalizeUpper(intent?.provider) === DINGER_PROVIDER_ID || isDingerMethod({ key: intent?.paymentMethodId })) {
             const configuration = await dingerConfigProvider({ intent, operation });
             const apiClient = createDingerApiClient({ configuration, parsePayResponse: value => value, ...(providerOptions.dingerApiClientOptions || {}) });
@@ -413,6 +426,7 @@ function createManualPaymentApplicationService(dependencies = {}) {
         thunderPromptPayConfigurationProvider: dependencies.thunderPromptPayConfigurationProvider || defaultThunderPromptPayConfigurationProvider,
         thunderTrueWalletConfigurationProvider: dependencies.thunderTrueWalletConfigurationProvider || defaultThunderTrueWalletConfigurationProvider,
         dingerConfigurationProvider: dependencies.dingerConfigurationProvider || defaultDingerConfigurationProvider,
+        myanMyanPayConfigurationProvider: dependencies.myanMyanPayConfigurationProvider || loadMyanMyanPayConfiguration,
         manualAdminConfigurationProvider: dependencies.manualAdminConfigurationProvider || defaultManualAdminConfigurationProvider,
         providerOptions: dependencies.providerOptions || {},
         clock: dependencies.clock || (() => new Date()),
@@ -422,7 +436,7 @@ function createManualPaymentApplicationService(dependencies = {}) {
     const orchestrator = deps.paymentOrchestrator || createPaymentOrchestrator({
         orderRepository: deps.commerceOrderRepository,
         paymentAttemptPort: deps.paymentAttemptRepository,
-        providerResolver: createProviderResolver(deps.manualPromptPayConfigurationProvider, deps.providerOptions, deps.manualAdminConfigurationProvider, deps.thunderPromptPayConfigurationProvider, deps.thunderTrueWalletConfigurationProvider, deps.dingerConfigurationProvider),
+        providerResolver: createProviderResolver(deps.manualPromptPayConfigurationProvider, deps.providerOptions, deps.manualAdminConfigurationProvider, deps.thunderPromptPayConfigurationProvider, deps.thunderTrueWalletConfigurationProvider, deps.dingerConfigurationProvider, deps.myanMyanPayConfigurationProvider),
         transactionRunner: deps.transactionRunner,
         clock: deps.clock,
         idGenerator: deps.idGenerator,
@@ -941,6 +955,39 @@ function createManualPaymentApplicationService(dependencies = {}) {
         }
     }
 
+    async function applyMyanMyanPayCallback(input = {}) {
+        try {
+            const result = input.result || {};
+            const providerReference = assertId(result.orderId, "orderId");
+            const transactionId = normalizeString(result.transactionRefId);
+            return await orchestrator.handleProviderEvent({
+                trustedOperational: true,
+                ...(transactionId ? { verifiedTransactionRef: transactionId } : {}),
+                providerEvent: {
+                    provider: MYANMYANPAY_PROVIDER_ID,
+                    providerReference,
+                    providerTransactionId: transactionId || providerReference,
+                    providerEventId: assertId(input.providerEventId, "providerEventId"),
+                    eventType: `MYANMYANPAY_${normalizeUpper(result.status)}`,
+                    status: normalizeUpper(result.status),
+                    rawProviderStatus: normalizeUpper(result.status),
+                    environment: normalizeUpper(input.environment),
+                    appId: normalizeString(input.appId),
+                    vendor: normalizeString(result.vendor),
+                    method: normalizeUpper(result.method),
+                    condition: normalizeUpper(result.condition),
+                    vendorQrRefId: normalizeString(result.vendorQrRefId),
+                    callbackUrl: normalizeString(result.callbackUrl),
+                    amount: Number(result.amount),
+                    currency: normalizeUpper(result.currency),
+                    occurredAt: result.createdAt || deps.clock().toISOString()
+                }
+            });
+        } catch (error) {
+            throw mapPaymentError(error, "myanmyanpay_callback");
+        }
+    }
+
     return Object.freeze({
         initiateManualPayment,
         getManualPayment,
@@ -954,6 +1001,7 @@ function createManualPaymentApplicationService(dependencies = {}) {
         expireManualPayment,
         cancelManualPayment,
         applyDingerCallback,
+        applyMyanMyanPayCallback,
         toSafePaymentView
     });
 }

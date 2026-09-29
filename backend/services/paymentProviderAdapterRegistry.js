@@ -1,4 +1,18 @@
 const PROVIDER_ADAPTERS = Object.freeze({
+    myanmyanpay: Object.freeze({
+        name: "myanmyanpay",
+        displayName: "MyanMyanPay MMQR",
+        supportedRails: ["MYANMYANPAY_MMQR"],
+        supportedCurrencies: ["MMK"],
+        checkoutModes: ["QR"],
+        cardNetworks: [],
+        refundCapability: false,
+        partialRefundCapability: false,
+        webhookRequired: true,
+        customerAvailable: false,
+        contractReadiness: Object.freeze({ environment: "SANDBOX", customerExposure: "TEST_ONLY" }),
+        methods: Object.freeze(["createPayment", "handleProviderEvent", "cancelPayment"])
+    }),
     dinger: Object.freeze({
         name: "dinger",
         displayName: "Dinger Myanmar Payments",

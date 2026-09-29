@@ -12,6 +12,7 @@ const orderRepository = require("./orderRepository");
 const { createManualPaymentApplicationService } = require("./manualPaymentApplicationService");
 const { dingerAccessDecision, isDingerMethod } = require("../dinger/dingerPaymentPolicy");
 const { normalizeDingerMyanmarPhone, DingerCustomerPhoneError } = require("../dinger/dingerCustomerPhone");
+const { isMyanMyanPayMethod, myanMyanPayAccessDecision, PROVIDER: MYANMYANPAY_PROVIDER } = require("../myanmyanpay/myanMyanPayPaymentPolicy");
 
 const ERROR_CODES = Object.freeze({ INVALID_INPUT: "INVALID_INPUT", QUOTE_UNAVAILABLE: "QUOTE_UNAVAILABLE", PAYMENT_METHOD_UNAVAILABLE: "PAYMENT_METHOD_UNAVAILABLE", MANUAL_CHECKOUT_FAILED: "MANUAL_CHECKOUT_FAILED" });
 class CustomerManualPaymentCheckoutError extends Error { constructor(code, message, statusCode = 400) { super(message); this.name = "CustomerManualPaymentCheckoutError"; this.code = code; this.statusCode = statusCode; } }
@@ -57,8 +58,10 @@ async function loadManualPaymentMethod({ key, region, user }, dependencies = {})
     if (retiredMyanmarManual) throw new CustomerManualPaymentCheckoutError(ERROR_CODES.PAYMENT_METHOD_UNAVAILABLE, "Legacy Myanmar manual payment methods are unavailable for new checkout.", 422);
     const trueWallet = methodKey === "truewallet" && market === "TH" && String(method.provider || "").toLowerCase() === "truewallet" && String(method.paymentChannel || "").toUpperCase() === "TRUE_MONEY_WALLET" && method.confirmationMode === "thunder_truewallet_slip";
     const dinger = isDingerMethod(method);
+    const myanMyanPay = isMyanMyanPayMethod(method);
     const dingerAllowed = dinger && dingerAccessDecision(method, user || {}).allowed === true;
-    if (method.enabled !== true || (!dinger && !["manual", "deeplink"].includes(type)) || (!dinger && !trueWallet && method.confirmationMode !== "manual_admin") || (!dinger && paymentMethodCapabilityState(method).customerVisible !== true) || (dinger && !dingerAllowed)) {
+    const myanMyanPayAllowed = myanMyanPay && myanMyanPayAccessDecision(method, user || {}).allowed === true;
+    if (method.enabled !== true || (!dinger && !myanMyanPay && !["manual", "deeplink"].includes(type)) || (!dinger && !myanMyanPay && !trueWallet && method.confirmationMode !== "manual_admin") || (!dinger && !myanMyanPay && paymentMethodCapabilityState(method).customerVisible !== true) || (dinger && !dingerAllowed) || (myanMyanPay && !myanMyanPayAllowed)) {
         throw new CustomerManualPaymentCheckoutError(ERROR_CODES.PAYMENT_METHOD_UNAVAILABLE, "Selected payment method is unavailable.", 422);
     }
     if (market === "TH" && methodKey === "promptpay") throw new CustomerManualPaymentCheckoutError(ERROR_CODES.PAYMENT_METHOD_UNAVAILABLE, "Use the dedicated PromptPay checkout.", 422);
@@ -69,14 +72,15 @@ function sessionFrom({ checkout, payment, method }) {
     const instructions = payment.paymentInstructions || {};
     const trueWallet = method.key === "truewallet";
     const dinger = isDingerMethod(method);
+    const myanMyanPay = isMyanMyanPayMethod(method);
     return {
         commerce: true, commerceOrderId: checkout.orderId, orderId: checkout.orderId, quoteId: checkout.quoteId, attemptId: payment.attemptId,
         reference: instructions.reference || payment.providerReference || payment.attemptId, amount: payment.amount, currency: payment.currency, region: checkout.region || method.region,
         productName: checkout.productName || checkout.product?.gameName || "", packageName: checkout.packageName || checkout.product?.packageName || "",
-        paymentName: trueWallet ? "TrueMoney Wallet" : (instructions.title || method.method), paymentMethod: method.key, paymentType: method.paymentType, provider: dinger ? "DINGER" : trueWallet ? "THUNDER_TRUEWALLET" : "MANUAL_ADMIN", paymentChannel: dinger ? method.paymentChannel : trueWallet ? "TRUE_MONEY_WALLET" : "MANUAL_ADMIN", confirmationMode: dinger ? "provider_webhook" : trueWallet ? "thunder_truewallet_slip" : "manual_admin",
+        paymentName: trueWallet ? "TrueMoney Wallet" : (instructions.title || method.method), paymentMethod: method.key, paymentType: method.paymentType, provider: myanMyanPay ? MYANMYANPAY_PROVIDER : dinger ? "DINGER" : trueWallet ? "THUNDER_TRUEWALLET" : "MANUAL_ADMIN", paymentChannel: (dinger || myanMyanPay) ? method.paymentChannel : trueWallet ? "TRUE_MONEY_WALLET" : "MANUAL_ADMIN", confirmationMode: (dinger || myanMyanPay) ? "provider_webhook" : trueWallet ? "thunder_truewallet_slip" : "manual_admin",
         accountName: instructions.accountName || "", accountNumber: instructions.accountNumber || "", qrImage: payment.qr?.image || "", qrUrl: payment.qr?.image || "", qrPayload: payment.qr?.payload || "", qrMode: payment.qr?.mode || method.qrMode || "none",
         redirect: payment.redirect || null,
-        receiptUploadEnabled: dinger ? false : instructions.receiptUploadEnabled !== false, slipRequired: dinger ? false : instructions.slipRequired !== false,
+        receiptUploadEnabled: (dinger || myanMyanPay) ? false : instructions.receiptUploadEnabled !== false, slipRequired: (dinger || myanMyanPay) ? false : instructions.slipRequired !== false,
         enableSaveQr: instructions.enableSaveQr === true,
         enableOpenApp: instructions.enableOpenApp === true, openAppMode: instructions.openAppMode || "disabled", deepLinkUrl: instructions.deepLinkUrl || "", appDisplayName: instructions.appDisplayName || "",
         expiresAt: payment.expiresAt || "",
@@ -94,6 +98,7 @@ async function startCustomerManualPaymentCheckout(input = {}, context = {}, depe
     const method = await loadManualPaymentMethod({ key: methodKey, region, user: context.user }, dependencies);
     const trueWallet = method.key === "truewallet";
     const dinger = isDingerMethod(method);
+    const myanMyanPay = isMyanMyanPayMethod(method);
     const dingerCustomer = dinger ? await resolveDingerCustomer({
         owner,
         user: context.user,
@@ -105,13 +110,13 @@ async function startCustomerManualPaymentCheckout(input = {}, context = {}, depe
     try {
         checkoutResult = await (dependencies.checkoutFromQuote || checkoutFromQuote)({
             quoteId, owner, idempotencyKey: `checkout:${seed}`,
-            paymentSelection: { paymentMethodId: method.key, paymentChannel: dinger ? method.paymentChannel : trueWallet ? "TRUE_MONEY_WALLET" : "MANUAL_ADMIN" },
+            paymentSelection: { paymentMethodId: method.key, paymentChannel: (dinger || myanMyanPay) ? method.paymentChannel : trueWallet ? "TRUE_MONEY_WALLET" : "MANUAL_ADMIN" },
             customerInput: { gameAccount: { userId: input.userId || "", zoneId: input.zoneId || "", accountFields: Array.isArray(input.accountFields) ? input.accountFields : [] }, contact: dingerCustomer ? { phone: dingerCustomer.phone } : {}, customFields: { username: input.username || "", gameKey: input.gameKey || input.productCode || "", customerPhone: dingerCustomer?.phone || "", customerName: dingerCustomer?.name || text(context.user?.fullName || context.user?.name || context.user?.username) } },
             requestMetadata: { source: "customer-storefront" }
         }, {
             validateOperationalPackageState: async ({ quote: lockedQuote }) => { const route = await (dependencies.resolveCheckoutRouteSnapshot || resolveCheckoutRouteSnapshot)({ productCode: lockedQuote.packageSnapshot?.gameCode, packageCode: lockedQuote.packageSnapshot?.packageCode, region: lockedQuote.commercialSnapshot?.region }); return route.ready ? { allowed: true, supplierRouteSnapshot: route.routeSnapshot } : { allowed: false, reasonCode: route.blockers?.[0] || "PRIMARY_SUPPLIER_NOT_READY" }; },
             validateFulfilmentInput: async ({ customerInput }) => ({ allowed: true, normalisedFulfilmentInput: customerInput }),
-            validatePaymentMethod: async () => ({ allowed: true, paymentSnapshot: { paymentMethodId: method.key, paymentChannel: dinger ? method.paymentChannel : trueWallet ? "TRUE_MONEY_WALLET" : "MANUAL_ADMIN", provider: dinger ? "DINGER" : trueWallet ? "THUNDER_TRUEWALLET" : "MANUAL_ADMIN", providerType: dinger ? "automatic" : "manual", flowType: dinger ? "dinger" : trueWallet ? "thunder_truewallet" : "manual_admin", confirmationMode: dinger ? "provider_webhook" : trueWallet ? "thunder_truewallet_slip" : "manual_admin", nextAction: dinger ? "OPEN_PROVIDER_PAYMENT" : "OPEN_MANUAL_PAYMENT", paymentMethodBound: true, metadata: { methodName: method.method, region: method.region, confirmationMode: dinger ? "provider_webhook" : trueWallet ? "thunder_truewallet_slip" : "manual_admin" } }, nextAction: dinger ? "OPEN_PROVIDER_PAYMENT" : "OPEN_MANUAL_PAYMENT" }),
+            validatePaymentMethod: async () => ({ allowed: true, paymentSnapshot: { paymentMethodId: method.key, paymentChannel: (dinger || myanMyanPay) ? method.paymentChannel : trueWallet ? "TRUE_MONEY_WALLET" : "MANUAL_ADMIN", provider: myanMyanPay ? MYANMYANPAY_PROVIDER : dinger ? "DINGER" : trueWallet ? "THUNDER_TRUEWALLET" : "MANUAL_ADMIN", providerType: (dinger || myanMyanPay) ? "automatic" : "manual", flowType: myanMyanPay ? "myanmyanpay" : dinger ? "dinger" : trueWallet ? "thunder_truewallet" : "manual_admin", confirmationMode: (dinger || myanMyanPay) ? "provider_webhook" : trueWallet ? "thunder_truewallet_slip" : "manual_admin", nextAction: (dinger || myanMyanPay) ? "OPEN_PROVIDER_PAYMENT" : "OPEN_MANUAL_PAYMENT", paymentMethodBound: true, metadata: { methodName: method.method, region: method.region, confirmationMode: (dinger || myanMyanPay) ? "provider_webhook" : trueWallet ? "thunder_truewallet_slip" : "manual_admin" } }, nextAction: (dinger || myanMyanPay) ? "OPEN_PROVIDER_PAYMENT" : "OPEN_MANUAL_PAYMENT" }),
             validatePromotionRedemption: async ({ quote: lockedQuote, orderId }) => { redemption = await (dependencies.reserveCommercePromotion || reserveCommercePromotion)({ order: { orderId, commercial: lockedQuote.commercialSnapshot, promotionSnapshot: lockedQuote.promotionSnapshot, couponSnapshot: lockedQuote.couponSnapshot, quoteSnapshot: lockedQuote }, user: context.user, expiresAt: lockedQuote.lifecycle?.expiresAt }); return { allowed: true, promotionRedemptionSnapshot: redemption }; },
             generateOrderId: () => publicId("AZL"), generateCheckoutId: () => publicId("CHK"), getCheckoutTime: () => new Date(), ...dependencies.checkoutDependencies
         });
