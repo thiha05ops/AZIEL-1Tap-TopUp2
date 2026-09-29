@@ -37,6 +37,13 @@ const {
 } = require("../services/dinger/dingerPaymentPolicy");
 const { isMyanMyanPayMethod, myanMyanPayAccessDecision } = require("../services/myanmyanpay/myanMyanPayPaymentPolicy");
 const {
+    MyanMyanPayAdminError,
+    canonicalIdentity: myanMyanPayCanonicalIdentity,
+    findTesterCandidates: findMyanMyanPayTesterCandidates,
+    projectSandboxSettings: projectMyanMyanPaySandboxSettings,
+    resolveTesterCustomerIds: resolveMyanMyanPayTesterCustomerIds
+} = require("../services/myanmyanpay/myanMyanPayAdminService");
+const {
     createPromptPayQr,
     maskPromptPayRecipient
 } = require("../services/promptPayQrService");
@@ -1214,9 +1221,10 @@ function formatAdminMethod(method) {
         ...(isMyanMyanPayMethod(obj) ? {
             myanMyanPayActivationState: obj.myanMyanPayActivationState || "DISABLED",
             myanMyanPaySandboxTestApproved: obj.myanMyanPaySandboxTestApproved === true,
-            myanMyanPayAuthorizedTestUserIds: Array.isArray(obj.myanMyanPayAuthorizedTestUserIds) ? obj.myanMyanPayAuthorizedTestUserIds : [],
+            myanMyanPayAuthorizedTestUserCount: Array.isArray(obj.myanMyanPayAuthorizedTestUserIds) ? obj.myanMyanPayAuthorizedTestUserIds.length : 0,
             myanMyanPayReadiness: myanMyanPayAccessDecision(obj, {}).readiness
-        } : {})
+        } : {}),
+        myanMyanPayIdentityWarning: String(obj.provider || "").trim().toLowerCase() === "myanmyanpay_mmqr" && !isMyanMyanPayMethod(obj)
     };
 }
 
@@ -1518,6 +1526,18 @@ router.get("/admin/payment-methods", adminMiddleware, requireAdminPermission(PER
             success: false,
             message: "Server error"
         });
+    }
+});
+
+router.get("/admin/payment-methods/myanmyanpay/tester-candidates", adminMiddleware, requireAdminPermission(PERMISSIONS.PAYMENT_METHODS_MANAGE), async (req, res) => {
+    try {
+        const testers = await findMyanMyanPayTesterCandidates(req.query.q);
+        return res.json({ success: true, testers });
+    } catch (error) {
+        if (error instanceof MyanMyanPayAdminError) {
+            return res.status(error.statusCode).json({ success: false, code: error.code, message: error.message });
+        }
+        return res.status(500).json({ success: false, code: "MYANMYANPAY_TESTER_SEARCH_FAILED", message: "Tester search failed." });
     }
 });
 
@@ -1969,17 +1989,36 @@ router.put("/admin/payment-methods/:id", adminMiddleware, requireAdminPermission
     }
 });
 
+router.get("/admin/payment-methods/:id/myanmyanpay-sandbox-settings", adminMiddleware, requireAdminPermission(PERMISSIONS.PAYMENT_METHODS_MANAGE), async (req, res) => {
+    try {
+        const method = await PaymentMethod.findById(req.params.id);
+        if (!method || !isMyanMyanPayMethod(method)) return res.status(404).json({ success: false, code: "MYANMYANPAY_METHOD_NOT_FOUND", message: "MyanMyanPay payment method not found." });
+        return res.json({ success: true, settings: await projectMyanMyanPaySandboxSettings(method.toObject()) });
+    } catch (error) {
+        return res.status(500).json({ success: false, code: "MYANMYANPAY_SETTINGS_FAILED", message: "MyanMyanPay sandbox settings could not be loaded." });
+    }
+});
+
 router.put("/admin/payment-methods/:id/myanmyanpay-sandbox-activation", adminMiddleware, requireAdminPermission(PERMISSIONS.PAYMENT_METHODS_MANAGE), async (req, res) => {
     try {
         const method = await PaymentMethod.findById(req.params.id);
         if (!method || !isMyanMyanPayMethod(method)) return res.status(404).json({ success: false, code: "MYANMYANPAY_METHOD_NOT_FOUND", message: "MyanMyanPay payment method not found." });
         const state = String(req.body?.activationState || "").trim().toUpperCase();
         if (!["DISABLED", "TEST_ONLY"].includes(state)) return res.status(400).json({ success: false, code: "MYANMYANPAY_ACTIVATION_INVALID", message: "Only DISABLED and TEST_ONLY are supported." });
-        const authorizedIds = Array.isArray(req.body?.authorizedTestUserIds)
-            ? [...new Set(req.body.authorizedTestUserIds.map(value => String(value || "").trim()).filter(value => /^[A-Za-z0-9._:-]{1,120}$/.test(value)))].slice(0, 25)
-            : (method.myanMyanPayAuthorizedTestUserIds || []);
+        const testerCustomerIdsSupplied = Object.prototype.hasOwnProperty.call(req.body || {}, "authorizedTesterCustomerIds");
+        if (state === "TEST_ONLY" && !testerCustomerIdsSupplied) {
+            return res.status(400).json({ success: false, code: "MYANMYANPAY_TESTER_CUSTOMER_IDS_REQUIRED", message: "TEST_ONLY requires customer-facing AZIEL tester IDs for server-side resolution." });
+        }
+        const resolved = testerCustomerIdsSupplied
+            ? await resolveMyanMyanPayTesterCustomerIds(req.body.authorizedTesterCustomerIds)
+            : null;
+        const authorizedIds = resolved ? resolved.internalIds : (method.myanMyanPayAuthorizedTestUserIds || []);
         const approved = req.body?.sandboxTestApproved === true;
         const candidate = { ...method.toObject(), enabled: state === "TEST_ONLY", myanMyanPayActivationState: state, myanMyanPaySandboxTestApproved: approved, myanMyanPayAuthorizedTestUserIds: authorizedIds };
+        const identity = myanMyanPayCanonicalIdentity(candidate);
+        if (state === "TEST_ONLY" && !identity.valid) {
+            return res.status(409).json({ success: false, code: "MYANMYANPAY_CANONICAL_IDENTITY_INVALID", message: "MyanMyanPay canonical payment method identity is invalid." });
+        }
         const decision = myanMyanPayAccessDecision(candidate, { id: authorizedIds[0] || "" });
         if (state === "TEST_ONLY" && (!approved || authorizedIds.length === 0 || !decision.readiness.enabled || !decision.readiness.configured)) {
             return res.status(409).json({ success: false, code: "MYANMYANPAY_TEST_ONLY_NOT_READY", message: "TEST_ONLY requires sandbox configuration, approval, and an authorized user.", missing: decision.readiness.missing });
@@ -1990,8 +2029,11 @@ router.put("/admin/payment-methods/:id/myanmyanpay-sandbox-activation", adminMid
         method.myanMyanPayAuthorizedTestUserIds = authorizedIds;
         await method.save();
         await writeAdminAudit({ actor: req.admin, req, action: ADMIN_AUDIT_ACTIONS.PAYMENT_METHOD_UPDATED, resourceType: "PaymentMethod", resourceId: String(method._id), metadata: { key: method.key, myanMyanPayActivationState: state, authorizedTestUserCount: authorizedIds.length } }).catch(error => console.log("Admin audit failed:", error.message));
-        return res.json({ success: true, method: formatAdminMethod(method) });
+        return res.json({ success: true, method: formatAdminMethod(method), settings: await projectMyanMyanPaySandboxSettings(method.toObject()) });
     } catch (error) {
+        if (error instanceof MyanMyanPayAdminError) {
+            return res.status(error.statusCode).json({ success: false, code: error.code, message: error.message, ...error.metadata });
+        }
         return res.status(500).json({ success: false, code: "MYANMYANPAY_ACTIVATION_FAILED", message: "MyanMyanPay activation update failed." });
     }
 });

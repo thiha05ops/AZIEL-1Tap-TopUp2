@@ -3,12 +3,22 @@
 const assert = require("assert");
 const crypto = require("crypto");
 const { EventEmitter } = require("events");
+const fs = require("fs");
+const path = require("path");
+const mongoose = require("mongoose");
 const { inspectMyanMyanPayConfiguration, loadMyanMyanPayConfiguration, CALLBACK_URL } = require("../services/myanmyanpay/myanMyanPayConfiguration");
 const { createMyanMyanPayClient } = require("../services/myanmyanpay/myanMyanPayClient");
 const { createMyanMyanPayAdapter } = require("../services/commerce/providers/myanMyanPayAdapter");
 const { createManualPaymentApplicationService } = require("../services/commerce/manualPaymentApplicationService");
 const { isMyanMyanPayMethod, myanMyanPayAccessDecision } = require("../services/myanmyanpay/myanMyanPayPaymentPolicy");
 const { validateCallback, eventId } = require("../routes/myanMyanPaySettlementCallback");
+const {
+    canonicalIdentity,
+    findTesterCandidates,
+    projectSandboxSettings,
+    resolveTesterCustomerIds
+} = require("../services/myanmyanpay/myanMyanPayAdminService");
+const paymentInfrastructureService = require("../services/paymentInfrastructureService");
 const PaymentMethod = require("../models/PaymentMethod");
 const paymentMethodsRoute = require("../routes/paymentMethods");
 
@@ -53,19 +63,78 @@ assert.strictEqual(serializedCreatedMethod.paymentChannel, "MYANMYANPAY_MMQR");
 assert.strictEqual(serializedCreatedMethod.enabled, false);
 assert.strictEqual(serializedCreatedMethod.myanMyanPayActivationState, "DISABLED");
 assert.strictEqual(serializedCreatedMethod.myanMyanPaySandboxTestApproved, false);
-assert.deepStrictEqual(serializedCreatedMethod.myanMyanPayAuthorizedTestUserIds, []);
+assert.strictEqual(serializedCreatedMethod.myanMyanPayAuthorizedTestUserCount, 0);
+assert.strictEqual(serializedCreatedMethod.myanMyanPayAuthorizedTestUserIds, undefined, "admin method projection must not expose internal tester ObjectIds");
 
 const env = { MYANMYANPAY_SANDBOX_ENABLED: "true", MYANMYANPAY_SANDBOX_APP_ID: "APP-TEST", MYANMYANPAY_SANDBOX_PUBLISHABLE_KEY: "pk_test_example", MYANMYANPAY_SANDBOX_SECRET_KEY: "sk_test_example", MYANMYANPAY_SANDBOX_API_BASE_URL: "https://sandbox.example.test" };
 assert.strictEqual(inspectMyanMyanPayConfiguration({}).configured, false, "missing configuration fails closed");
 const configuration = loadMyanMyanPayConfiguration(env);
 assert.strictEqual(configuration.environment, "SANDBOX");
 assert.strictEqual(configuration.callbackUrl, CALLBACK_URL);
+const safeConfiguration = inspectMyanMyanPayConfiguration(env);
+assert.strictEqual(safeConfiguration.appIdConfigured, true);
+assert.strictEqual(safeConfiguration.publishableKeyConfigured, true);
+assert.strictEqual(safeConfiguration.secretKeyConfigured, true);
+assert.strictEqual(safeConfiguration.apiBaseUrlConfigured, true);
+assert(!JSON.stringify(safeConfiguration).includes(env.MYANMYANPAY_SANDBOX_SECRET_KEY), "safe configuration projection must redact secrets");
 
 const method = { key: "myanmyanpay_mmqr", enabled: true, myanMyanPayActivationState: "TEST_ONLY", myanMyanPaySandboxTestApproved: true, myanMyanPayAuthorizedTestUserIds: ["user-1"] };
 assert.strictEqual(myanMyanPayAccessDecision(method, {}).allowed, false, "public users cannot see TEST_ONLY");
 assert.strictEqual(myanMyanPayAccessDecision(method, { id: "user-1" }, env).allowed, true, "allowlisted test user can access sandbox method");
 
 (async () => {
+    const userOne = { _id: new mongoose.Types.ObjectId("507f1f77bcf86cd799439011"), customerId: "AZU-H7KQ2M9WXP", username: "tester-one", email: "tester-one@gmail.com" };
+    const userTwo = { _id: new mongoose.Types.ObjectId("507f191e810c19729de860ea"), customerId: "AZU-7NQK3H8RZT", username: "tester-two", email: "tester-two@gmail.com" };
+    const users = [userOne, userTwo];
+    const fakeUserModel = {
+        find(query) {
+            let rows = users;
+            if (query.customerId?.$in) rows = users.filter(user => query.customerId.$in.includes(user.customerId));
+            if (query.customerId?.$regex) rows = users.filter(user => new RegExp(query.customerId.$regex, query.customerId.$options).test(user.customerId));
+            if (query._id?.$in) rows = users.filter(user => query._id.$in.some(id => String(id) === String(user._id)));
+            const chain = {
+                select() { return chain; }, sort() { return chain; }, limit(limit) { rows = rows.slice(0, limit); return chain; },
+                async lean() { return rows.map(user => ({ ...user })); }
+            };
+            return chain;
+        }
+    };
+    assert.deepStrictEqual(await findTesterCandidates("azu-h7", { UserModel: fakeUserModel }), [{ customerId: userOne.customerId, username: userOne.username, email: userOne.email }]);
+    const resolved = await resolveTesterCustomerIds([userOne.customerId, userOne.customerId, userTwo.customerId], { UserModel: fakeUserModel });
+    assert.deepStrictEqual(resolved.internalIds, [String(userOne._id), String(userTwo._id)], "customer IDs must resolve to internal ObjectId strings");
+    assert(!resolved.internalIds.includes(userOne.customerId), "customer IDs must never be stored in the internal allowlist");
+    await assert.rejects(() => resolveTesterCustomerIds(["INVALID"], { UserModel: fakeUserModel }), error => error.code === "MYANMYANPAY_TESTER_CUSTOMER_ID_INVALID");
+    await assert.rejects(() => resolveTesterCustomerIds([userOne.customerId, "AZU-AAAAAAAAAA"], { UserModel: fakeUserModel }), error => error.code === "MYANMYANPAY_TESTER_NOT_FOUND" && error.metadata.unresolvedCount === 1);
+    const canonicalMethod = { key: "myanmyanpay_mmqr", provider: "myanmyanpay_mmqr", paymentChannel: "MYANMYANPAY_MMQR", region: "MM", paymentType: "auto", myanMyanPayActivationState: "DISABLED", myanMyanPaySandboxTestApproved: false, myanMyanPayAuthorizedTestUserIds: [String(userOne._id)] };
+    assert.strictEqual(canonicalIdentity(canonicalMethod).valid, true);
+    assert.strictEqual(canonicalIdentity({ ...canonicalMethod, paymentChannel: "" }).valid, false);
+    const settings = await projectSandboxSettings(canonicalMethod, { UserModel: fakeUserModel, env });
+    assert.strictEqual(settings.environment, "SANDBOX");
+    assert.strictEqual(settings.authorizedTesters[0].customerId, userOne.customerId);
+    assert.strictEqual(settings.testOnlyReady, false, "sandbox approval remains required");
+    assert(!JSON.stringify(settings).includes(String(userOne._id)), "sandbox settings must not expose internal ObjectIds");
+
+    const infraEnvironment = paymentInfrastructureService._test.envStatusFromProcess("MYANMYANPAY", "TEST");
+    const infraProvider = paymentInfrastructureService._test.projectProvider({ providerCode: "MYANMYANPAY", displayName: "MyanMyanPay", legalRegions: ["MM"], supportedCurrencies: ["MMK"], supportedRails: ["MYANMYANPAY_MMQR"], adapterName: "myanmyanpay", enabled: true, environments: [infraEnvironment] });
+    assert.strictEqual(infraProvider.environments.length, 1);
+    assert.strictEqual(infraProvider.environments[0].environment, "SANDBOX");
+    assert.strictEqual(infraProvider.environments[0].webhook.endpoint, CALLBACK_URL);
+    assert.strictEqual(infraProvider.environments[0].webhook.authenticationImplemented, true);
+
+    const root = path.resolve(__dirname, "../..");
+    const paymentRouteSource = fs.readFileSync(path.join(root, "backend/routes/paymentMethods.js"), "utf8");
+    const adminPaymentSource = fs.readFileSync(path.join(root, "frontend/js/admin-payments.js"), "utf8");
+    const adminUsersSource = fs.readFileSync(path.join(root, "backend/routes/adminUsers.js"), "utf8");
+    assert(paymentRouteSource.includes('requireAdminPermission(PERMISSIONS.PAYMENT_METHODS_MANAGE)'), "tester lookup remains payment-management authorized");
+    assert(paymentRouteSource.includes('authorizedTesterCustomerIds'), "activation must accept customer-facing tester IDs");
+    assert(paymentRouteSource.includes('if (!["DISABLED", "TEST_ONLY"].includes(state))'), "PUBLIC must remain rejected");
+    assert(paymentRouteSource.includes('MYANMYANPAY_CANONICAL_IDENTITY_INVALID'), "canonical identity must fail closed");
+    assert(adminPaymentSource.includes('myanmyanpay_mmqr: { key: "myanmyanpay_mmqr"'), "Admin provider catalog must include MyanMyanPay");
+    assert(adminPaymentSource.includes('Use the MyanMyanPay sandbox activation control'), "generic enable toggle must remain locked");
+    assert(adminPaymentSource.includes('PUBLIC — unavailable'), "PUBLIC must be visibly unavailable");
+    assert(adminPaymentSource.includes('authorizedTesterCustomerIds'), "Admin activation must submit customer IDs, not ObjectIds");
+    assert(adminUsersSource.includes('{ customerId: { $regex:'), "Admin Users must search customerId");
+
     const calls = [];
     const adapter = createMyanMyanPayAdapter({ configuration, client: { async pay(payload) { calls.push(payload); return { orderId: payload.orderId, amount: payload.amount, currency: "MMK", status: "PENDING", vendorQrRefId: "QR-1", qr: "000201010212MMQR" }; } } });
     const created = await adapter.createPayment({ intent: { orderId: "ORDER-1", amount: 1500, currency: "MMK", paymentMethodId: "myanmyanpay_mmqr", items: [] }, attempt: { attemptId: "PAY-1" } });

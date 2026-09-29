@@ -20,6 +20,10 @@ function inspectMyanMyanPayConfiguration(env = process.env) {
     };
     return Object.freeze({
         environment: ENVIRONMENT,
+        appIdConfigured: required.appId,
+        publishableKeyConfigured: required.publishableKey,
+        secretKeyConfigured: required.secretKey,
+        apiBaseUrlConfigured: required.apiBaseUrl,
         enabled: Object.values(required).every(Boolean),
         configured: Object.values(required).every(Boolean),
         missing: Object.entries(required).filter(([, present]) => !present).map(([name]) => name),

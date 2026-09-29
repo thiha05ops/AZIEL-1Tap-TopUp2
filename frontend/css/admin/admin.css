@@ -1629,6 +1629,23 @@ textarea {
   border-radius: 9px;
 }
 
+.payment-myanmyanpay-activation h6 { margin:18px 0 8px; font-size:12px; text-transform:uppercase; letter-spacing:.05em; color:var(--admin-text-muted, #64748b); }
+.payment-mmp-identity dl, .payment-myanmyanpay-activation details dl { display:grid; gap:0; margin:0; }
+.payment-mmp-identity dl div, .payment-myanmyanpay-activation details dl div { display:flex; justify-content:space-between; gap:16px; padding:8px 0; border-bottom:1px solid var(--admin-border, #e2e8f0); }
+.payment-mmp-identity dt, .payment-myanmyanpay-activation details dt { color:var(--admin-text-muted, #64748b); }
+.payment-mmp-checklist { list-style:none; padding:0; margin:8px 0; display:grid; gap:7px; }
+.payment-mmp-checklist li { display:flex; gap:8px; color:#b45309; font-size:13px; }
+.payment-mmp-checklist li.is-ready { color:#047857; }
+.payment-mmp-public-locked { margin-top:7px; color:var(--admin-text-muted, #64748b); font-size:12px; }
+.payment-mmp-approval { display:flex!important; align-items:center; gap:8px; margin:14px 0!important; }
+.payment-mmp-tester-search { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:8px; }
+.payment-mmp-tester-results, .payment-mmp-selected-testers { display:grid; gap:8px; margin-top:10px; }
+.payment-mmp-tester-results button, .payment-mmp-selected-testers > div { display:flex; align-items:center; justify-content:space-between; gap:12px; width:100%; padding:10px; border:1px solid var(--admin-border, #e2e8f0); border-radius:10px; background:var(--admin-surface, #fff); color:inherit; text-align:left; }
+.payment-mmp-tester-results button span, .payment-mmp-selected-testers span { display:grid; gap:3px; min-width:0; }
+.payment-mmp-tester-results button span, .payment-mmp-selected-testers small { color:var(--admin-text-muted, #64748b); font-size:12px; overflow:hidden; text-overflow:ellipsis; }
+.payment-mmp-selected-testers button { border:0; background:transparent; color:#b91c1c; cursor:pointer; font-weight:700; }
+.payment-provider-identity-warning { border-color:rgba(239,68,68,.35)!important; }
+
 @media (max-width: 1199px) {
   .payment-operator-workspace.has-editor .payment-operator-layout {
     grid-template-columns: minmax(0, 1fr);

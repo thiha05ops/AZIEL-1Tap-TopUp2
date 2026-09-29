@@ -128,7 +128,7 @@ function renderUsers(users) {
             <span class="customer-avatar">${avatarMarkup(user)}</span>
             <span class="customer-row-main">
                 <strong>${escapeHTML(user.username || "Unknown")}</strong>
-                <small>${escapeHTML(regionLabel(user.region))} · ${escapeHTML(formatDate(user.lastActivityAt || user.createdAt))}</small>
+                <small>${escapeHTML(user.customerId || "No AZIEL ID")} · ${escapeHTML(regionLabel(user.region))} · ${escapeHTML(formatDate(user.lastActivityAt || user.createdAt))}</small>
                 <span class="customer-tags">${renderTagBadges(user.tags || [], 3)}</span>
             </span>
             <span class="customer-row-metrics">
@@ -231,6 +231,7 @@ function renderCustomerOverview() {
     const summary = customer.summary || {};
     const reward = customer.reward || { eligible: false, reasons: [] };
     const metrics = [
+        ["AZIEL User ID", customer.customerId || "-"],
         ["Member Since", formatDate(customer.memberSince)],
         ["Last Login", formatDate(customer.lastLogin)],
         ["Last Purchase", formatDate(summary.lastPurchaseAt)],

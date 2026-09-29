@@ -60,16 +60,19 @@ function safeProviderEnvironmentStatus(env = {}) {
         secretKeyStatus: env.secretKeyConfigured ? "Configured" : "Missing",
         webhookSecretStatus: env.webhookSecretConfigured ? "Configured" : "Missing",
         merchantIdentifierStatus: env.merchantIdentifierConfigured ? "Configured" : "Missing",
+        apiBaseUrlStatus: env.apiBaseUrlConfigured ? "Configured" : "Missing",
         healthState: env.enabled ? env.healthState || STATUS.NOT_CONFIGURED : STATUS.DISABLED,
         lastCheckedAt: env.lastCheckedAt || null,
         webhook: {
-            endpoint: "",
+            endpoint: env.webhookEndpoint || "",
             secretConfigured: env.webhookSecretConfigured === true,
             lastReceivedAt: env.lastWebhookReceivedAt || null,
             lastVerifiedAt: env.lastWebhookVerifiedAt || null,
             lastEventType: env.lastWebhookEventType || "",
             lastErrorSummary: env.lastErrorSummary || "",
-            replayProtectionReady: Boolean(env.webhookSecretConfigured)
+            replayProtectionReady: Boolean(env.replayProtectionReady ?? env.webhookSecretConfigured),
+            authenticationImplemented: env.callbackAuthenticationImplemented === true,
+            serverCallbackAuthoritative: env.serverCallbackAuthoritative === true
         }
     };
 }
@@ -100,6 +103,24 @@ function envStatusFromProcess(providerCode = "", environment = "TEST") {
             webhookSecretConfigured: Boolean(process.env[`${credentialPrefix}CALLBACK_KEY`]),
             merchantIdentifierConfigured: Boolean(process.env[`${credentialPrefix}PROJECT_NAME`] && process.env[`${credentialPrefix}MERCHANT_NAME`]),
             healthState: explicitlyEnabled && configured ? STATUS.DEGRADED : STATUS.NOT_CONFIGURED
+        };
+    }
+    if (code === "MYANMYANPAY") {
+        const { inspectMyanMyanPayConfiguration } = require("./myanmyanpay/myanMyanPayConfiguration");
+        const readiness = inspectMyanMyanPayConfiguration();
+        return {
+            environment: "SANDBOX",
+            enabled: readiness.configured,
+            publicKeyConfigured: readiness.publishableKeyConfigured,
+            secretKeyConfigured: readiness.secretKeyConfigured,
+            webhookSecretConfigured: readiness.secretKeyConfigured,
+            merchantIdentifierConfigured: readiness.appIdConfigured,
+            apiBaseUrlConfigured: readiness.apiBaseUrlConfigured,
+            healthState: readiness.configured ? STATUS.READY : STATUS.NOT_CONFIGURED,
+            webhookEndpoint: readiness.callbackUrl,
+            callbackAuthenticationImplemented: true,
+            serverCallbackAuthoritative: true,
+            replayProtectionReady: readiness.secretKeyConfigured
         };
     }
     if (code === "THUNDER_PROMPTPAY" || code === "THUNDER") {
@@ -346,8 +367,39 @@ async function getPaymentInfrastructureSnapshot(methods = []) {
                 adapterName: "dinger",
                 enabled: false,
                 environments: [envStatusFromProcess("DINGER", "TEST"), envStatusFromProcess("DINGER", "LIVE")]
+            },
+            {
+                providerCode: "MYANMYANPAY",
+                displayName: "MyanMyanPay",
+                legalRegions: ["MM"],
+                supportedCurrencies: ["MMK"],
+                supportedRails: ["MYANMYANPAY_MMQR"],
+                adapterName: "myanmyanpay",
+                enabled: true,
+                environments: [envStatusFromProcess("MYANMYANPAY", "TEST")]
             }
         ].map(projectProvider);
+    if (!providers.some(provider => String(provider.providerCode || "").toUpperCase() === "MYANMYANPAY")) {
+        providers.push(projectProvider({
+            providerCode: "MYANMYANPAY",
+            displayName: "MyanMyanPay",
+            legalRegions: ["MM"],
+            supportedCurrencies: ["MMK"],
+            supportedRails: ["MYANMYANPAY_MMQR"],
+            adapterName: "myanmyanpay",
+            enabled: true,
+            environments: [envStatusFromProcess("MYANMYANPAY", "TEST")]
+        }));
+    }
+    const myanMyanPayProvider = providers.find(provider => String(provider.providerCode || "").toUpperCase() === "MYANMYANPAY");
+    if (myanMyanPayProvider) {
+        myanMyanPayProvider.displayName = "MyanMyanPay";
+        myanMyanPayProvider.legalRegions = ["MM"];
+        myanMyanPayProvider.supportedCurrencies = ["MMK"];
+        myanMyanPayProvider.supportedRails = ["MYANMYANPAY_MMQR"];
+        myanMyanPayProvider.adapterName = "myanmyanpay";
+        myanMyanPayProvider.environments = [safeProviderEnvironmentStatus(envStatusFromProcess("MYANMYANPAY", "TEST"))];
+    }
     const regions = railsByRegion(methods);
     regions.forEach(region => {
         region.providers = providers.filter(provider =>
@@ -385,3 +437,4 @@ module.exports = {
     getPaymentInfrastructureSnapshot,
     railTypeForMethod
 };
+module.exports._test = { envStatusFromProcess, projectProvider, safeProviderEnvironmentStatus };

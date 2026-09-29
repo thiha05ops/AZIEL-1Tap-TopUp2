@@ -269,6 +269,7 @@ router.get("/admin/users", adminMiddleware, requireAdminPermission(PERMISSIONS.U
             query.$or = [
                 { username: { $regex: `^${escaped}`, $options: "i" } },
                 { email: { $regex: `^${escaped}`, $options: "i" } },
+                { customerId: { $regex: `^${escaped}`, $options: "i" } },
                 { _id: { $in: orderUserIds } }
             ];
         }
@@ -277,7 +278,7 @@ router.get("/admin/users", adminMiddleware, requireAdminPermission(PERMISSIONS.U
         if (status === "active") query.isBlocked = { $ne: true };
 
         const usersRaw = await User.find(applyCursorFilter(query, req.query.cursor))
-            .select("_id username email displayName photo region wallet isBlocked createdAt lastActiveAt lastLoginDevice sessionUpdatedAt")
+            .select("_id customerId username email displayName photo region wallet isBlocked createdAt lastActiveAt lastLoginDevice sessionUpdatedAt")
             .sort({ createdAt: -1, _id: -1 })
             .limit(limit + 1)
             .lean();
@@ -447,6 +448,7 @@ router.get("/admin/users", adminMiddleware, requireAdminPermission(PERMISSIONS.U
 
             return {
                 _id: user._id,
+                customerId: user.customerId || "",
                 username: user.username || user.email || "Unknown",
                 email: user.email || "",
                 displayName: user.displayName || user.username || "",
@@ -502,7 +504,7 @@ router.get("/admin/users", adminMiddleware, requireAdminPermission(PERMISSIONS.U
 router.get("/admin/users/:id/crm", adminMiddleware, requireAdminPermission(PERMISSIONS.USERS_READ), async (req, res) => {
     try {
         const user = await User.findById(req.params.id)
-            .select("_id username email displayName photo photoEvidence region wallet isBlocked createdAt lastActiveAt lastLoginDevice sessionUpdatedAt")
+            .select("_id customerId username email displayName photo photoEvidence region wallet isBlocked createdAt lastActiveAt lastLoginDevice sessionUpdatedAt")
             .lean();
 
         if (!user) {
@@ -547,6 +549,7 @@ router.get("/admin/users/:id/crm", adminMiddleware, requireAdminPermission(PERMI
             success: true,
             customer: {
                 _id: user._id,
+                customerId: user.customerId || "",
                 username: user.username,
                 email: user.email || "",
                 displayName: user.displayName || user.username,
