@@ -68,9 +68,23 @@ assert.strictEqual(serializedCreatedMethod.myanMyanPaySandboxTestApproved, false
 assert.strictEqual(serializedCreatedMethod.myanMyanPayAuthorizedTestUserCount, 0);
 assert.strictEqual(serializedCreatedMethod.myanMyanPayAuthorizedTestUserIds, undefined, "admin method projection must not expose internal tester ObjectIds");
 
-const env = { MYANMYANPAY_SANDBOX_ENABLED: "true", MYANMYANPAY_SANDBOX_APP_ID: "APP-TEST", MYANMYANPAY_SANDBOX_PUBLISHABLE_KEY: "pk_test_example", MYANMYANPAY_SANDBOX_SECRET_KEY: "sk_test_example", MYANMYANPAY_SANDBOX_API_BASE_URL: "https://sandbox.myanmyanpay.com" };
+const env = { MYANMYANPAY_SANDBOX_ENABLED: "true", MYANMYANPAY_SANDBOX_APP_ID: "APP-TEST", MYANMYANPAY_SANDBOX_PUBLISHABLE_KEY: "pk_test_example", MYANMYANPAY_SANDBOX_SECRET_KEY: "sk_test_example", MYANMYANPAY_SANDBOX_API_BASE_URL: "https://ezapi.myanmyanpay.com" };
 assert.strictEqual(inspectMyanMyanPayConfiguration({}).configured, false, "missing configuration fails closed");
-assert.strictEqual(inspectMyanMyanPayConfiguration({ ...env, MYANMYANPAY_SANDBOX_API_BASE_URL: "https://sandbox.myanmyanpay.com/payments" }).configured, false, "Sandbox API base must be the exact provider origin");
+[
+    "https://sandbox.myanmyanpay.com",
+    "http://ezapi.myanmyanpay.com",
+    "https://other.example.com",
+    "https://sub.ezapi.myanmyanpay.com",
+    "https://ezapi.myanmyanpay.com/",
+    "https://ezapi.myanmyanpay.com/payments",
+    "https://ezapi.myanmyanpay.com?test=1",
+    "https://ezapi.myanmyanpay.com#test",
+    "https://user@ezapi.myanmyanpay.com",
+    "https://ezapi.myanmyanpay.com:443",
+    "https://ezapi.myanmyanpay.com:8443"
+].forEach(apiBaseUrl => {
+    assert.strictEqual(inspectMyanMyanPayConfiguration({ ...env, MYANMYANPAY_SANDBOX_API_BASE_URL: apiBaseUrl }).configured, false, `Sandbox API base must reject ${apiBaseUrl}`);
+});
 assert.strictEqual(inspectMyanMyanPayConfiguration({ ...env, MYANMYANPAY_SANDBOX_PUBLISHABLE_KEY: "pk_live_example" }).configured, false, "non-Sandbox credentials must fail closed");
 const configuration = loadMyanMyanPayConfiguration(env);
 assert.strictEqual(configuration.environment, "SANDBOX");
@@ -142,7 +156,7 @@ assert.strictEqual(myanMyanPayAccessDecision(method, { id: "user-1" }, env).allo
     function assertSignedCall(call, expectedPath, expectBtoken) {
         const parsed = new URL(call.url);
         const body = JSON.parse(call.options.body);
-        assert.strictEqual(parsed.origin, "https://sandbox.myanmyanpay.com");
+        assert.strictEqual(parsed.origin, "https://ezapi.myanmyanpay.com");
         assert.strictEqual(parsed.pathname, expectedPath);
         assert.strictEqual(call.options.method, "POST");
         assert.strictEqual(call.options.headers.Authorization, `Bearer ${configuration.publishableKey}`);

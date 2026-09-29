@@ -32,8 +32,8 @@ function tlsStub(outcome = "success", code = "") {
 
 function httpsStub(outcome = "success", code = "", status = 204) {
     return (url, options, callback) => {
-        assert.strictEqual(url, "https://sandbox.myanmyanpay.com/");
-        assert.deepStrictEqual({ method: options.method, servername: options.servername, rejectUnauthorized: options.rejectUnauthorized }, { method: "HEAD", servername: "sandbox.myanmyanpay.com", rejectUnauthorized: true });
+        assert.strictEqual(url, "https://ezapi.myanmyanpay.com/");
+        assert.deepStrictEqual({ method: options.method, servername: options.servername, rejectUnauthorized: options.rejectUnauthorized }, { method: "HEAD", servername: "ezapi.myanmyanpay.com", rejectUnauthorized: true });
         const request = new EventEmitter();
         request.destroy = () => {};
         request.setTimeout = (ms, handler) => { if (outcome === "timeout") queueMicrotask(handler); };
@@ -47,7 +47,7 @@ function httpsStub(outcome = "success", code = "", status = 204) {
 
 function fetchStub(outcome = "success", code = "", status = 200) {
     return async (url, options) => {
-        assert.strictEqual(url, "https://sandbox.myanmyanpay.com/");
+        assert.strictEqual(url, "https://ezapi.myanmyanpay.com/");
         assert.strictEqual(options.method, "HEAD");
         assert.strictEqual(options.redirect, "manual");
         if (outcome === "success") return { status, body: "must-not-return", headers: { authorization: "must-not-return" } };
@@ -60,7 +60,7 @@ function baseOptions(overrides = {}) {
     return {
         timeoutMs: 250,
         dnsLookup: async (host, options) => {
-            assert.strictEqual(host, "sandbox.myanmyanpay.com");
+            assert.strictEqual(host, "ezapi.myanmyanpay.com");
             assert.deepStrictEqual(options, { all: true, verbatim: true });
             return [{ address: "203.0.113.10", family: 4 }, { address: "203.0.113.11", family: 4 }];
         },
@@ -141,7 +141,7 @@ function assertSafeShape(result) {
     assert(routeSource.includes("requireAdminPermission(PERMISSIONS.PAYMENT_METHODS_MANAGE)"), "connectivity endpoint must require payment-management permission");
     assert(routeSource.includes("rateLimit"), "connectivity endpoint must be rate limited");
     assert(!routeSource.includes("req.body.url") && !routeSource.includes("req.body.host"), "route must never accept a caller-supplied target");
-    assert.strictEqual(_test.HOST, "sandbox.myanmyanpay.com");
-    assert.strictEqual(_test.ORIGIN, "https://sandbox.myanmyanpay.com");
+    assert.strictEqual(_test.HOST, "ezapi.myanmyanpay.com");
+    assert.strictEqual(_test.ORIGIN, "https://ezapi.myanmyanpay.com");
     console.log("MyanMyanPay Sandbox connectivity diagnostic verification passed.");
 })().catch(error => { console.error(error); process.exitCode = 1; });

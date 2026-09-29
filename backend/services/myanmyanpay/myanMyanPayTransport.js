@@ -1,6 +1,7 @@
 "use strict";
 
 const crypto = require("crypto");
+const { API_BASE_URL } = require("./myanMyanPayConfiguration");
 
 const CALLBACK_URL = "https://azielplay.com/api/webhooks/myanmyanpay/payment";
 const STATUSES = Object.freeze(new Set(["PENDING", "SUCCESS", "FAILED", "REFUNDED", "CANCELLED", "EXPIRED"]));
@@ -55,7 +56,7 @@ function createMyanMyanPayTransport(configuration = {}, options = {}) {
     const fetchImpl = options.fetchImpl || globalThis.fetch;
     const nonceFactory = options.nonceFactory || (() => Date.now().toString());
     if (typeof fetchImpl !== "function") throw new MyanMyanPayTransportError("MYANMYANPAY_TRANSPORT_UNAVAILABLE", "MyanMyanPay transport is unavailable.", { stage: "configuration" });
-    if (configuration.environment !== "SANDBOX" || configuration.apiBaseUrl !== "https://sandbox.myanmyanpay.com" || !text(configuration.appId) || !text(configuration.publishableKey).includes("_test_") || !text(configuration.secretKey).includes("_test_") || configuration.callbackUrl !== CALLBACK_URL) {
+    if (configuration.environment !== "SANDBOX" || configuration.apiBaseUrl !== API_BASE_URL || !text(configuration.appId) || !text(configuration.publishableKey).includes("_test_") || !text(configuration.secretKey).includes("_test_") || configuration.callbackUrl !== CALLBACK_URL) {
         throw new MyanMyanPayTransportError("MYANMYANPAY_TRANSPORT_CONFIGURATION_INVALID", "MyanMyanPay Sandbox transport configuration is invalid.", { stage: "configuration" });
     }
 

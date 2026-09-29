@@ -2,7 +2,7 @@
 
 const ENVIRONMENT = "SANDBOX";
 const CALLBACK_URL = "https://azielplay.com/api/webhooks/myanmyanpay/payment";
-const API_BASE_URL = "https://sandbox.myanmyanpay.com";
+const API_BASE_URL = "https://ezapi.myanmyanpay.com";
 
 class MyanMyanPayConfigurationError extends Error {
     constructor(code, message, metadata = {}) { super(message); this.name = "MyanMyanPayConfigurationError"; this.code = code; this.metadata = Object.freeze({ ...metadata }); }
@@ -10,10 +10,7 @@ class MyanMyanPayConfigurationError extends Error {
 
 const text = value => String(value || "").trim();
 function exactSandboxUrl(value) {
-    try {
-        const parsed = new URL(text(value));
-        return parsed.protocol === "https:" && parsed.origin === API_BASE_URL && parsed.pathname.replace(/\/+$/, "") === "" && !parsed.username && !parsed.password && !parsed.search && !parsed.hash;
-    } catch { return false; }
+    return text(value) === API_BASE_URL;
 }
 
 function inspectMyanMyanPayConfiguration(env = process.env) {

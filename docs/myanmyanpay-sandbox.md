@@ -10,7 +10,7 @@ Required environment variables (never expose their values to the browser):
 MYANMYANPAY_SANDBOX_APP_ID=
 MYANMYANPAY_SANDBOX_PUBLISHABLE_KEY=
 MYANMYANPAY_SANDBOX_SECRET_KEY=
-MYANMYANPAY_SANDBOX_API_BASE_URL=
+MYANMYANPAY_SANDBOX_API_BASE_URL=https://ezapi.myanmyanpay.com
 ```
 
 The payment method code is `myanmyanpay_mmqr` and the provider ID is `MYANMYANPAY`. The database payment method must remain `TEST_ONLY`, require explicit sandbox-test approval, and list authorized user IDs. Payment creation and browser status never settle an order; only the authenticated callback can enter the payment orchestrator.

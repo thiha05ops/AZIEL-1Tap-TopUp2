@@ -3,10 +3,11 @@
 const dns = require("dns/promises");
 const tls = require("tls");
 const https = require("https");
+const { API_BASE_URL } = require("./myanMyanPayConfiguration");
 
 const TARGET = "MYANMYANPAY_SANDBOX";
-const HOST = "sandbox.myanmyanpay.com";
-const ORIGIN = "https://sandbox.myanmyanpay.com";
+const ORIGIN = API_BASE_URL;
+const HOST = new URL(ORIGIN).hostname;
 const DEFAULT_TIMEOUT_MS = 5000;
 const SAFE_ERROR_CODES = Object.freeze(new Set([
     "ENOTFOUND", "EAI_AGAIN", "ECONNREFUSED", "ECONNRESET", "ETIMEDOUT",
