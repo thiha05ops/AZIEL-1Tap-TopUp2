@@ -2,6 +2,7 @@
 
 const crypto = require("crypto");
 const { MMPaySDK } = require("mmpay-node-sdk");
+const { createMyanMyanPayTransport } = require("./myanMyanPayTransport");
 
 function text(value) { return String(value || "").trim(); }
 function clientError(code, message, httpStatus = 502) { return Object.assign(new Error(message), { code, httpStatus }); }
@@ -115,6 +116,26 @@ function getResponseShapeDiagnostic(response, configuration = {}) {
     });
 }
 
+function transportErrorDiagnostic(error, operation, configuration = {}) {
+    const shape = safeUrlShape(configuration);
+    const classification = safeCodePrimitive(error?.code) || "UNKNOWN_ERROR";
+    const safeCode = safeCodePrimitive(error?.providerCode);
+    const httpLikeStatus = safeHttpStatus(error?.httpStatus);
+    const stage = ["INPUT", "HANDSHAKE", "PROVIDER", "CONFIGURATION"].includes(text(error?.stage).toUpperCase()) ? text(error.stage).toUpperCase() : "UNKNOWN";
+    const errorEndpointPath = text(error?.endpointPath);
+    const safeEndpointPath = errorEndpointPath.length <= MAX_DIAGNOSTIC_PATH && /^\/[A-Za-z0-9._~\/-]*$/.test(errorEndpointPath) ? errorEndpointPath : "";
+    return Object.freeze({
+        provider: "MYANMYANPAY",
+        operation,
+        stage,
+        classification,
+        ...(safeCode !== null ? { safeCode } : {}),
+        ...(httpLikeStatus !== null ? { httpLikeStatus } : {}),
+        endpointPath: stage === "HANDSHAKE" ? shape.handshakeEndpointPath : safeEndpointPath,
+        sdkSandboxSelected: shape.sdkSandboxSelected
+    });
+}
+
 function classifyResponseShape(response) {
     if (response instanceof Error) return "ERROR_INSTANCE";
     if (!response || typeof response !== "object" || Array.isArray(response)) return "NON_OBJECT_RESPONSE";
@@ -188,14 +209,25 @@ function createMyanMyanPayClient(configuration, options = {}) {
         secretKey: configuration.secretKey,
         apiBaseUrl: configuration.apiBaseUrl
     });
+    const transport = options.transport || createMyanMyanPayTransport(configuration, { fetchImpl: options.fetchImpl, nonceFactory: options.nonceFactory });
+
+    function logTransportError(error, operation) {
+        try { logger.info?.("[MYANMYANPAY_TRANSPORT]", transportErrorDiagnostic(error, operation, configuration)); }
+        catch (_) { /* Diagnostics must never affect provider behavior. */ }
+    }
 
     async function pay(payload) {
-        const response = await sdk.pay(payload);
+        let response;
+        try { response = await transport.pay(payload); }
+        catch (error) { logTransportError(error, "PAY"); throw error; }
         try {
             logger.info?.("[MYANMYANPAY_RESPONSE_SHAPE]", responseShapeDiagnostic(response, configuration));
         } catch (_) { /* Temporary diagnostics must never affect payment behavior. */ }
-        if (!response || typeof response !== "object" || response.status !== "PENDING" || !text(response.orderId) || !text(response.qr)) {
-            throw clientError("MYANMYANPAY_CREATE_RESPONSE_INVALID", "MyanMyanPay returned an invalid payment response.");
+        if (!response || typeof response !== "object" || Array.isArray(response) || response.status !== "PENDING" || !text(response.orderId) || !text(response.qr) || !Number.isSafeInteger(Number(response.amount)) || text(response.currency).toUpperCase() !== "MMK") {
+            throw clientError("MYANMYANPAY_PROVIDER_RESPONSE_INVALID", "MyanMyanPay returned an invalid payment response.");
+        }
+        if (text(response.orderId) !== text(payload.orderId) || Number(response.amount) !== Number(payload.amount) || text(response.currency).toUpperCase() !== text(payload.currency).toUpperCase()) {
+            throw clientError("MYANMYANPAY_PROVIDER_BINDING_MISMATCH", "MyanMyanPay payment response binding is invalid.");
         }
         return response;
     }
@@ -203,8 +235,9 @@ function createMyanMyanPayClient(configuration, options = {}) {
     async function get(input) {
         let response;
         try {
-            response = await sdk.get(input);
+            response = await transport.get(input);
         } catch (error) {
+            logTransportError(error, "GET");
             try {
                 logger.info?.("[MYANMYANPAY_GET_RESPONSE_SHAPE]", getResponseShapeDiagnostic(error, configuration));
             } catch (_) { /* Temporary diagnostics must never affect provider behavior. */ }
@@ -214,6 +247,11 @@ function createMyanMyanPayClient(configuration, options = {}) {
             logger.info?.("[MYANMYANPAY_GET_RESPONSE_SHAPE]", getResponseShapeDiagnostic(response, configuration));
         } catch (_) { /* Temporary diagnostics must never affect provider behavior. */ }
         return response;
+    }
+
+    async function cancel(input) {
+        try { return await transport.cancel(input); }
+        catch (error) { logTransportError(error, "CANCEL"); throw error; }
     }
 
     async function verifyAndListen(payload, nonce, signature) {
@@ -234,10 +272,10 @@ function createMyanMyanPayClient(configuration, options = {}) {
         return JSON.parse(payload);
     }
 
-    return Object.freeze({ pay, get, cancel: input => sdk.cancel(input), verifyAndListen });
+    return Object.freeze({ pay, get, cancel, verifyAndListen });
 }
 
 module.exports = Object.freeze({
     createMyanMyanPayClient,
-    _test: Object.freeze({ boundedKeys, safePrimitive, classifyResponseShape, configurationShape, responseShapeDiagnostic, boundedSafeKeys, safeCodePrimitive, safeHttpStatus, safeErrorName, safeUrlShape, classifyGetResponseShape, getResponseShapeDiagnostic })
+    _test: Object.freeze({ boundedKeys, safePrimitive, classifyResponseShape, configurationShape, responseShapeDiagnostic, boundedSafeKeys, safeCodePrimitive, safeHttpStatus, safeErrorName, safeUrlShape, classifyGetResponseShape, getResponseShapeDiagnostic, transportErrorDiagnostic })
 });

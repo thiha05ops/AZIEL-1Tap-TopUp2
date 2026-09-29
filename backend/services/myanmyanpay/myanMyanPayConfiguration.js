@@ -2,21 +2,26 @@
 
 const ENVIRONMENT = "SANDBOX";
 const CALLBACK_URL = "https://azielplay.com/api/webhooks/myanmyanpay/payment";
+const API_BASE_URL = "https://sandbox.myanmyanpay.com";
 
 class MyanMyanPayConfigurationError extends Error {
     constructor(code, message, metadata = {}) { super(message); this.name = "MyanMyanPayConfigurationError"; this.code = code; this.metadata = Object.freeze({ ...metadata }); }
 }
 
 const text = value => String(value || "").trim();
-const enabled = value => text(value).toLowerCase() === "true";
-function httpsUrl(value) { try { return new URL(value).protocol === "https:"; } catch { return false; } }
+function exactSandboxUrl(value) {
+    try {
+        const parsed = new URL(text(value));
+        return parsed.protocol === "https:" && parsed.origin === API_BASE_URL && parsed.pathname.replace(/\/+$/, "") === "" && !parsed.username && !parsed.password && !parsed.search && !parsed.hash;
+    } catch { return false; }
+}
 
 function inspectMyanMyanPayConfiguration(env = process.env) {
     const required = {
         appId: Boolean(text(env.MYANMYANPAY_SANDBOX_APP_ID)),
-        publishableKey: Boolean(text(env.MYANMYANPAY_SANDBOX_PUBLISHABLE_KEY)),
-        secretKey: Boolean(text(env.MYANMYANPAY_SANDBOX_SECRET_KEY)),
-        apiBaseUrl: httpsUrl(text(env.MYANMYANPAY_SANDBOX_API_BASE_URL))
+        publishableKey: text(env.MYANMYANPAY_SANDBOX_PUBLISHABLE_KEY).includes("_test_"),
+        secretKey: text(env.MYANMYANPAY_SANDBOX_SECRET_KEY).includes("_test_"),
+        apiBaseUrl: exactSandboxUrl(env.MYANMYANPAY_SANDBOX_API_BASE_URL)
     };
     return Object.freeze({
         environment: ENVIRONMENT,
@@ -44,9 +49,9 @@ function loadMyanMyanPayConfiguration(env = process.env) {
         appId: text(env.MYANMYANPAY_SANDBOX_APP_ID),
         publishableKey: text(env.MYANMYANPAY_SANDBOX_PUBLISHABLE_KEY),
         secretKey: text(env.MYANMYANPAY_SANDBOX_SECRET_KEY),
-        apiBaseUrl: text(env.MYANMYANPAY_SANDBOX_API_BASE_URL).replace(/\/+$/, ""),
+        apiBaseUrl: API_BASE_URL,
         callbackUrl: CALLBACK_URL
     });
 }
 
-module.exports = Object.freeze({ ENVIRONMENT, CALLBACK_URL, MyanMyanPayConfigurationError, inspectMyanMyanPayConfiguration, loadMyanMyanPayConfiguration });
+module.exports = Object.freeze({ ENVIRONMENT, CALLBACK_URL, API_BASE_URL, MyanMyanPayConfigurationError, inspectMyanMyanPayConfiguration, loadMyanMyanPayConfiguration });

@@ -58,8 +58,10 @@ function createMyanMyanPayAdapter(options = {}) {
         let response;
         try {
             response = await client.get({ orderId: attemptId });
-        } catch (_) {
-            return { usable: false, observedStatus: "", reconciliationOutcome: "PROVIDER_ERROR_INCONCLUSIVE" };
+        } catch (error) {
+            const safeCode = text(error?.providerCode || error?.code);
+            const notFound = Number(error?.httpStatus) === 404 || /NOT[_ -]?FOUND/i.test(safeCode);
+            return { usable: false, observedStatus: "", reconciliationOutcome: notFound ? "NOT_FOUND_INCONCLUSIVE" : "PROVIDER_ERROR_INCONCLUSIVE" };
         }
         if (errorShaped(response)) {
             const safeCode = [response?.code, response?.errorCode, response?.statusCode, response?.httpStatus].find(value => ["string", "number", "boolean"].includes(typeof value));
