@@ -53,18 +53,52 @@
         action.addEventListener("click", () => copyValue(action, content));
         node.append(action); return node;
     }
+    function saveDisplayedQr(qrSource, orderId) {
+        if (!qrSource) return;
+        const safeOrderId = String(orderId || "payment").replace(/[^a-z0-9_-]/gi, "-").slice(0, 48) || "payment";
+        const download = document.createElement("a");
+        download.href = qrSource;
+        download.download = `aziel-mmqr-${safeOrderId}.png`;
+        download.hidden = true;
+        document.body.append(download);
+        download.click();
+        download.remove();
+    }
     function show(staged, { onSubmitted } = {}) {
         const order = staged.orderData || {}, session = staged.session || {};
         const payment = { ...(staged.selectedPayment || {}), ...(session.selectedPaymentMethod || {}) };
         const mount = document.getElementById("paymentSessionMount");
-        const methodName = value(session.paymentName, payment.method, payment.paymentName, payment.name, payment.key);
-        const shell = document.createElement("section"); shell.className = "checkout-card mm-payment-shell";
-        const title = document.createElement("h2"); title.className = "mm-payment-shell__title"; title.textContent = `${t("payment.payWith", "Pay with")} ${methodName}`.trim();
+        const myanMyanPay = isMyanMyanPay(staged);
+        const methodName = myanMyanPay ? "MMQR" : value(session.paymentName, payment.method, payment.paymentName, payment.name, payment.key);
+        const methodLogoUrl = value(payment.logoUrl, payment.logo);
+        const shell = document.createElement("section"); shell.className = `checkout-card mm-payment-shell${myanMyanPay ? " mm-payment-shell--mmqr" : ""}`;
+        const title = document.createElement("h2"); title.className = "mm-payment-shell__title"; title.textContent = myanMyanPay ? t("payment.payWithMmqr", "Pay with MMQR") : `${t("payment.payWith", "Pay with")} ${methodName}`.trim();
         const amount = document.createElement("strong"); amount.className = "mm-payment-shell__amount"; amount.textContent = `${Number(value(session.amount, order.amount) || 0).toLocaleString()} ${value(session.currency, order.currency)}`.trim();
         const intro = document.createElement("p"); intro.textContent = t("payment.transferExactAmount", "Transfer the exact amount.");
-        const hero = document.createElement("div"); hero.className = "mm-payment-shell__hero"; hero.append(title, amount, intro); shell.append(hero);
+        const hero = document.createElement("div"); hero.className = "mm-payment-shell__hero";
+        if (myanMyanPay && methodLogoUrl) {
+            const logo = document.createElement("img"); logo.className = "mm-payment-shell__mmqr-logo"; logo.alt = "MMQR"; logo.hidden = true;
+            logo.addEventListener("load", () => { logo.hidden = false; }, { once: true });
+            logo.addEventListener("error", () => logo.remove(), { once: true });
+            logo.src = methodLogoUrl; hero.append(logo);
+        }
+        hero.append(title, amount);
+        if (!myanMyanPay) hero.append(intro);
+        shell.append(hero);
         const qrSource = value(session.qrImage, session.qrUrl, payment.qrImage, payment.qrUrl);
-        if (qrSource) { const qrSection = document.createElement("section"); qrSection.className = "mm-payment-shell__qr-section"; const qrLabel = document.createElement("h3"); qrLabel.textContent = t("payment.scanToPay", "Scan to pay"); const qr = document.createElement("img"); qr.className = "mm-payment-shell__qr"; qr.src = qrSource; qr.alt = t("payment.qrCode", "Payment QR code"); qrSection.append(qrLabel, qr); shell.append(qrSection); }
+        if (qrSource) {
+            const qrSection = document.createElement("section"); qrSection.className = "mm-payment-shell__qr-section";
+            const qrLabel = document.createElement("h3"); qrLabel.textContent = myanMyanPay ? t("payment.scanMmqr", "Scan the MMQR") : t("payment.scanToPay", "Scan to pay");
+            const qr = document.createElement("img"); qr.className = "mm-payment-shell__qr"; qr.src = qrSource; qr.alt = myanMyanPay ? t("payment.mmqrCode", "MMQR payment QR code") : t("payment.qrCode", "Payment QR code");
+            qrSection.append(qrLabel, qr);
+            if (myanMyanPay) {
+                const save = document.createElement("button"); save.type = "button"; save.className = "mm-payment-shell__save-qr"; save.innerHTML = '<i class="fa-solid fa-download" aria-hidden="true"></i><span>Save QR</span>';
+                save.addEventListener("click", () => saveDisplayedQr(qrSource, value(session.commerceOrderId, session.orderId, order.commerceOrderId, order.orderId)));
+                const compatibility = document.createElement("p"); compatibility.className = "mm-payment-shell__compatibility"; compatibility.textContent = t("payment.mmqrCompatibility", "Scan with an MMQR-supported banking or payment app.");
+                qrSection.append(save, compatibility);
+            }
+            shell.append(qrSection);
+        }
         const details = document.createElement("div"); details.className = "mm-payment-shell__details";
         const reference = value(session.reference, session.commerceOrderId, order.commerceOrderId, order.orderId);
         const accountNameDetail = detail(t("payment.accountName", "Account name"), value(session.accountName, payment.accountName));
@@ -73,10 +107,12 @@
         accountNameDetail?.classList.add("mm-payment-shell__account-name");
         accountNumberDetail?.classList.add("mm-payment-shell__account-number");
         referenceDetail?.classList.add("mm-payment-shell__reference-row");
-        if (accountNumberDetail) details.append(accountNumberDetail);
+        if (accountNumberDetail && !myanMyanPay) details.append(accountNumberDetail);
         const extraDetails = document.createElement("div"); extraDetails.id = "mmPaymentExtraDetails"; extraDetails.className = "mm-payment-shell__detail-extra";
-        [accountNameDetail, referenceDetail].filter(Boolean).forEach(node => extraDetails.append(node));
-        if (extraDetails.childElementCount) {
+        if (myanMyanPay) {
+            if (referenceDetail) details.append(referenceDetail);
+        } else [accountNameDetail, referenceDetail].filter(Boolean).forEach(node => extraDetails.append(node));
+        if (!myanMyanPay && extraDetails.childElementCount) {
             const detailToggle = document.createElement("button"); detailToggle.type = "button"; detailToggle.className = "mm-payment-shell__detail-toggle"; detailToggle.setAttribute("aria-controls", extraDetails.id);
             const mobileDetails = window.matchMedia("(max-width: 768px)");
             const setExpanded = expanded => { detailToggle.setAttribute("aria-expanded", String(expanded)); detailToggle.textContent = expanded ? t("payment.hideDetails", "Hide details") : t("payment.showDetails", "Show details"); extraDetails.hidden = !expanded; };
@@ -85,16 +121,22 @@
             mobileDetails.addEventListener?.("change", event => setExpanded(!event.matches));
             details.append(detailToggle, extraDetails);
         }
-        if (details.childElementCount) { const detailSection = document.createElement("section"); detailSection.className = "mm-payment-shell__detail-section"; const detailTitle = document.createElement("h3"); detailTitle.textContent = t("payment.accountInformation", "Account information"); detailSection.append(detailTitle, details); shell.append(detailSection); }
+        if (details.childElementCount) {
+            const detailSection = document.createElement("section"); detailSection.className = "mm-payment-shell__detail-section";
+            if (!myanMyanPay) { const detailTitle = document.createElement("h3"); detailTitle.textContent = t("payment.accountInformation", "Account information"); detailSection.append(detailTitle); }
+            detailSection.append(details); shell.append(detailSection);
+        }
         const deepLink = value(session.deepLink, session.deepLinkUrl, payment.deepLink, payment.deepLinkUrl);
-        if (deepLink && (session.enableOpenApp === true || payment.enableOpenApp === true)) { const open = document.createElement("a"); open.className = "mm-payment-shell__open-app"; open.href = deepLink; open.textContent = t("payment.openApp", "Open payment app"); shell.append(open); }
-        if (isMyanMyanPay(staged)) {
+        if (!myanMyanPay && deepLink && (session.enableOpenApp === true || payment.enableOpenApp === true)) { const open = document.createElement("a"); open.className = "mm-payment-shell__open-app"; open.href = deepLink; open.textContent = t("payment.openApp", "Open payment app"); shell.append(open); }
+        if (myanMyanPay) {
             const status = document.createElement("p");
             status.className = `checkout-feedback ${qrSource ? "" : "is-error"}`.trim();
             status.setAttribute("role", "status");
-            status.textContent = qrSource
-                ? t("payment.waitingProviderConfirmation", "Waiting for payment confirmation. This page cannot confirm payment.")
-                : t("payment.providerQrUnavailable", "Payment QR is unavailable. Do not send payment; return to checkout and try again.");
+            if (qrSource) {
+                const waiting = document.createElement("strong"); waiting.textContent = t("payment.waiting", "Waiting for payment");
+                const automatic = document.createElement("span"); automatic.textContent = t("payment.confirmAutomatically", "We'll confirm your payment automatically.");
+                status.replaceChildren(waiting, document.createElement("br"), automatic);
+            } else status.textContent = t("payment.providerQrUnavailable", "Payment QR is unavailable. Do not send payment; return to checkout and try again.");
             shell.append(status);
             mount.replaceChildren(shell);
             return;

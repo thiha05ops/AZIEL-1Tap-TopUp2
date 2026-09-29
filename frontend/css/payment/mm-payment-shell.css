@@ -13,11 +13,20 @@
 .mm-payment-shell h2, .mm-payment-shell h3, .mm-payment-shell p { margin: 0; }
 .mm-payment-shell h3 { font-size: 13px; font-weight: 700; letter-spacing: .01em; text-transform: none; }
 .mm-payment-shell__hero { display: grid; gap: 8px; }
+.mm-payment-shell--mmqr .mm-payment-shell__hero { justify-items: center; text-align: center; }
+.mm-payment-shell__mmqr-logo { width: min(168px, 55vw); max-height: 64px; object-fit: contain; margin-bottom: 2px; }
 .mm-payment-shell__title { font-size: clamp(18px, 2.4vw, 23px) !important; font-weight: 650 !important; letter-spacing: 0 !important; text-transform: none !important; }
 .mm-payment-shell__amount { color: var(--primary); font-size: clamp(28px, 5vw, 38px); font-weight: 700; line-height: 1.08; }
 .mm-payment-shell__hero p { color: var(--text-muted); font-size: 14px; }
 .mm-payment-shell__qr-section { display: grid; justify-items: center; gap: 12px; padding: 18px; border-radius: 14px; background: var(--purchase-panel-soft); }
 .mm-payment-shell__qr { width: min(220px, 100%); max-height: 220px; object-fit: contain; padding: 8px; border-radius: 12px; background: #fff; }
+.mm-payment-shell__save-qr { min-height: 42px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 0 14px; border: 1px solid var(--purchase-border); border-radius: 10px; background: transparent; color: var(--primary); font: inherit; font-size: 13px; font-weight: 650; cursor: pointer; }
+.mm-payment-shell__save-qr:hover { background: color-mix(in srgb, var(--primary) 8%, transparent); }
+.mm-payment-shell__compatibility { max-width: 310px; color: var(--text-muted); font-size: 13px; line-height: 1.5; text-align: center; }
+.mm-payment-shell--mmqr > .checkout-feedback { padding-top: 17px; border-top: 1px solid var(--purchase-border); text-align: center; line-height: 1.55; }
+.mm-payment-shell--mmqr > .checkout-feedback strong { display: inline-flex; align-items: center; gap: 8px; color: var(--text-primary); }
+.mm-payment-shell--mmqr > .checkout-feedback strong::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--primary); box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary) 14%, transparent); }
+.mm-payment-shell--mmqr > .checkout-feedback span { color: var(--text-muted); font-size: 13px; }
 .mm-payment-shell__detail-section { display: grid; gap: 6px; }
 .mm-payment-shell__details { display: grid; }
 .mm-payment-shell__account-name { order: 1; }

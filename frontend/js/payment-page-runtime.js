@@ -45,7 +45,7 @@
         text("paymentProduct", session.productName || order.productName || order.game);
         text("paymentPackage", session.packageName || order.packageName);
         text("paymentAccount", account(order));
-        text("paymentMethodSummary", payment.method || payment.paymentName || session.paymentName || payment.key);
+        text("paymentMethodSummary", myanMyanPayIdentity({ orderData: order, session, selectedPayment: payment }) ? "MMQR" : payment.method || payment.paymentName || session.paymentName || payment.key);
         text("paymentAmount", money(session.amount || order.amount, session.currency || order.currency));
     }
 
@@ -84,9 +84,11 @@
     function updateMyanMyanPayPending() {
         updateMyanMyanPayMessage(
             t("payment.waiting", "Waiting for payment"),
-            t("payment.scanQrToComplete", "Complete the payment by scanning the QR code."),
+            t("payment.confirmAutomatically", "We'll confirm your payment automatically."),
             t("payment.pendingPayment", "Pending payment")
         );
+        const qrSection = document.querySelector(".mm-payment-shell__qr-section");
+        if (qrSection) qrSection.hidden = false;
     }
 
     function updateMyanMyanPayTerminal(status) {
@@ -110,40 +112,6 @@
             action.href = normalized === "expired" ? "/checkout" : "/orders";
             action.textContent = normalized === "expired" ? t("payment.backToCheckout", "Return to checkout") : t("payment.viewOrders", "View My Orders");
             shell.append(action);
-        }
-    }
-
-    function updateMyanMyanPayInconclusive(staged) {
-        updateMyanMyanPayMessage(
-            t("payment.waitingProviderConfirmation", "Waiting for payment confirmation"),
-            t("payment.confirmationDelayedDoNotRepay", "If you've already paid, don't pay again. Confirmation may take a little longer."),
-            t("payment.awaitingConfirmation", "Awaiting confirmation")
-        );
-        const qrSection = document.querySelector(".mm-payment-shell__qr-section");
-        if (qrSection) qrSection.hidden = false;
-        const shell = document.querySelector(".mm-payment-shell");
-        if (!shell) return;
-        shell.querySelector("[data-myanmyanpay-terminal-action]")?.remove();
-        let actions = shell.querySelector("[data-myanmyanpay-observation-actions]");
-        if (!actions) {
-            actions = document.createElement("div");
-            actions.className = "payment-completion__actions";
-            actions.dataset.myanmyanpayObservationActions = "true";
-            const check = document.createElement("button");
-            check.type = "button";
-            check.className = "primary-commerce-action";
-            check.textContent = t("payment.checkStatus", "Check Payment Status");
-            check.addEventListener("click", async () => {
-                if (myanMyanPayStatusRequestInFlight) return;
-                check.disabled = true;
-                try { await checkMyanMyanPayStatusOnce(staged); }
-                finally { if (check.isConnected) check.disabled = false; }
-            });
-            const orders = document.createElement("a");
-            orders.href = "/orders";
-            orders.textContent = t("payment.viewOrders", "View My Orders");
-            actions.append(check, orders);
-            shell.append(actions);
         }
     }
 
@@ -189,27 +157,11 @@
             paymentReceived: true,
             amount: result.authoritative.amount ?? session.amount,
             currency: result.authoritative.currency || session.currency,
-            methodName: session.paymentName || payment.method || "MyanMyanPay / MMQR",
+            methodName: "MMQR",
             reference: session.reference || "",
             orderStatus: result.orderStatus,
             myanMyanPay: true
         });
-    }
-
-    async function checkMyanMyanPayStatusOnce(staged) {
-        const identity = myanMyanPayIdentity(staged);
-        if (!identity || myanMyanPayStatusRequestInFlight) return { kind: "inconclusive" };
-        myanMyanPayStatusRequestInFlight = true;
-        try {
-            const result = await readMyanMyanPayStatus(identity);
-            if (result.kind === "pending") updateMyanMyanPayPending();
-            else if (result.kind === "success") showMyanMyanPaySuccess(staged, identity, result);
-            else if (result.kind === "terminal") updateMyanMyanPayTerminal(result.orderStatus);
-            else updateMyanMyanPayInconclusive(staged);
-            return result;
-        } finally {
-            myanMyanPayStatusRequestInFlight = false;
-        }
     }
 
     function startMyanMyanPayStatusPolling(staged) {
@@ -224,7 +176,7 @@
             if (pollIdentity !== myanMyanPayStatusIdentity || myanMyanPayStatusRequestInFlight) return;
             if (myanMyanPayStatusPollCount >= MYANMYANPAY_STATUS_MAX_POLLS) {
                 stopMyanMyanPayStatusPolling();
-                updateMyanMyanPayInconclusive(staged);
+                updateMyanMyanPayPending();
                 return;
             }
             myanMyanPayStatusPollCount += 1;
@@ -234,14 +186,14 @@
                 if (pollIdentity !== myanMyanPayStatusIdentity) return;
                 if (["inconclusive", "identity_mismatch", "unknown"].includes(result.kind)) {
                     stopMyanMyanPayStatusPolling();
-                    updateMyanMyanPayInconclusive(staged);
+                    updateMyanMyanPayPending();
                     return;
                 }
                 if (result.kind === "read_failure") {
                     myanMyanPayStatusReadFailures += 1;
                     if (myanMyanPayStatusReadFailures >= MYANMYANPAY_STATUS_MAX_CONSECUTIVE_READ_FAILURES) {
                         stopMyanMyanPayStatusPolling();
-                        updateMyanMyanPayInconclusive(staged);
+                        updateMyanMyanPayPending();
                     }
                     return;
                 }
