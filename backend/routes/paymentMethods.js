@@ -625,6 +625,86 @@ function applyMyanMyanPayCreationDefaults(method) {
     return method;
 }
 
+const MYANMYANPAY_REPAIR_TARGET_ID = "6abba63a069cd997959c41d3";
+const MYANMYANPAY_REPAIR_CONFIRMATION = `REPAIR_MYANMYANPAY_${MYANMYANPAY_REPAIR_TARGET_ID}`;
+const MYANMYANPAY_REPAIR_STATE = Object.freeze({
+    key: "myanmyanpay_mmqr",
+    region: "MM",
+    provider: "myanmyanpay_mmqr",
+    paymentChannel: "MYANMYANPAY_MMQR",
+    enabled: false,
+    myanMyanPayActivationState: "DISABLED",
+    myanMyanPaySandboxTestApproved: false,
+    myanMyanPayAuthorizedTestUserIds: Object.freeze([])
+});
+
+class MyanMyanPayCanonicalRepairError extends Error {
+    constructor(code, message, statusCode = 409) {
+        super(message);
+        this.name = "MyanMyanPayCanonicalRepairError";
+        this.code = code;
+        this.statusCode = statusCode;
+    }
+}
+
+function isExactMyanMyanPaySafeState(method = {}) {
+    return String(method._id || "") === MYANMYANPAY_REPAIR_TARGET_ID &&
+        method.key === MYANMYANPAY_REPAIR_STATE.key &&
+        method.region === MYANMYANPAY_REPAIR_STATE.region &&
+        method.provider === MYANMYANPAY_REPAIR_STATE.provider &&
+        method.paymentChannel === MYANMYANPAY_REPAIR_STATE.paymentChannel &&
+        method.enabled === false &&
+        method.myanMyanPayActivationState === "DISABLED" &&
+        method.myanMyanPaySandboxTestApproved === false &&
+        Array.isArray(method.myanMyanPayAuthorizedTestUserIds) &&
+        method.myanMyanPayAuthorizedTestUserIds.length === 0;
+}
+
+function isExactMyanMyanPayRepairConfirmation(body) {
+    if (!body || typeof body !== "object" || Array.isArray(body)) return false;
+    const bodyKeys = Object.keys(body);
+    return bodyKeys.length === 1 && bodyKeys[0] === "confirmation" && body.confirmation === MYANMYANPAY_REPAIR_CONFIRMATION;
+}
+
+async function repairMyanMyanPayCanonicalPaymentMethod({ PaymentMethodModel = PaymentMethod } = {}) {
+    const duplicate = await PaymentMethodModel.exists({
+        _id: { $ne: MYANMYANPAY_REPAIR_TARGET_ID },
+        key: MYANMYANPAY_REPAIR_STATE.key
+    });
+    if (duplicate) {
+        throw new MyanMyanPayCanonicalRepairError("MYANMYANPAY_CANONICAL_DUPLICATE", "Another canonical MyanMyanPay payment method already exists.");
+    }
+
+    let method;
+    try {
+        method = await PaymentMethodModel.findOneAndUpdate(
+            {
+                _id: MYANMYANPAY_REPAIR_TARGET_ID,
+                key: "myanmyanpaymmqr",
+                provider: MYANMYANPAY_REPAIR_STATE.provider,
+                region: MYANMYANPAY_REPAIR_STATE.region,
+                enabled: false
+            },
+            { $set: { ...MYANMYANPAY_REPAIR_STATE, myanMyanPayAuthorizedTestUserIds: [] } },
+            { new: true, runValidators: true }
+        );
+    } catch (error) {
+        if (error?.code === 11000) {
+            throw new MyanMyanPayCanonicalRepairError("MYANMYANPAY_CANONICAL_DUPLICATE", "Another canonical MyanMyanPay payment method already exists.");
+        }
+        throw error;
+    }
+
+    if (method) return Object.freeze({ method, alreadyRepaired: false });
+
+    const current = await PaymentMethodModel.findById(MYANMYANPAY_REPAIR_TARGET_ID);
+    const currentObject = typeof current?.toObject === "function" ? current.toObject() : current;
+    if (isExactMyanMyanPaySafeState(currentObject)) {
+        return Object.freeze({ method: current, alreadyRepaired: true });
+    }
+    throw new MyanMyanPayCanonicalRepairError("MYANMYANPAY_REPAIR_PRECONDITION_FAILED", "The target payment method does not match the exact repair preconditions.");
+}
+
 function safeOpenAppMode(value = "", fallback = "disabled") {
     const mode = String(value || "").trim().toLowerCase();
     return OPEN_APP_MODES.has(mode) ? mode : fallback;
@@ -1989,6 +2069,47 @@ router.put("/admin/payment-methods/:id", adminMiddleware, requireAdminPermission
     }
 });
 
+router.post(`/admin/payment-methods/${MYANMYANPAY_REPAIR_TARGET_ID}/myanmyanpay-canonical-repair`, adminMiddleware, requireAdminPermission(PERMISSIONS.PAYMENT_METHODS_MANAGE), async (req, res) => {
+    try {
+        if (!isExactMyanMyanPayRepairConfirmation(req.body)) {
+            return res.status(400).json({
+                success: false,
+                code: "MYANMYANPAY_REPAIR_CONFIRMATION_INVALID",
+                message: "Exact repair confirmation is required."
+            });
+        }
+
+        const result = await repairMyanMyanPayCanonicalPaymentMethod();
+        if (!result.alreadyRepaired) {
+            await writeAdminAudit({
+                actor: req.admin,
+                req,
+                action: ADMIN_AUDIT_ACTIONS.PAYMENT_METHOD_UPDATED,
+                resourceType: "PaymentMethod",
+                resourceId: MYANMYANPAY_REPAIR_TARGET_ID,
+                metadata: {
+                    operation: "MYANMYANPAY_CANONICAL_REPAIR",
+                    previousKey: "myanmyanpaymmqr",
+                    canonicalKey: MYANMYANPAY_REPAIR_STATE.key,
+                    enabled: false,
+                    activationState: "DISABLED"
+                }
+            });
+        }
+
+        return res.json({
+            success: true,
+            alreadyRepaired: result.alreadyRepaired,
+            method: formatAdminMethod(result.method)
+        });
+    } catch (error) {
+        if (error instanceof MyanMyanPayCanonicalRepairError) {
+            return res.status(error.statusCode).json({ success: false, code: error.code, message: error.message });
+        }
+        return res.status(500).json({ success: false, code: "MYANMYANPAY_REPAIR_FAILED", message: "MyanMyanPay canonical repair failed." });
+    }
+});
+
 router.get("/admin/payment-methods/:id/myanmyanpay-sandbox-settings", adminMiddleware, requireAdminPermission(PERMISSIONS.PAYMENT_METHODS_MANAGE), async (req, res) => {
     try {
         const method = await PaymentMethod.findById(req.params.id);
@@ -2197,10 +2318,16 @@ module.exports._test = {
     isLegacyThailandBankMethod,
     isRetiredManualPromptPayMethod,
     mergePromptPayLaunchers,
+    MYANMYANPAY_REPAIR_CONFIRMATION,
+    MYANMYANPAY_REPAIR_STATE,
+    MYANMYANPAY_REPAIR_TARGET_ID,
     normalizePaymentMethodKey,
     publicBankLaunchersProjection,
     publicTrustDisplayForMethod,
     sanitizeBankLaunchers,
+    isExactMyanMyanPaySafeState,
+    isExactMyanMyanPayRepairConfirmation,
+    repairMyanMyanPayCanonicalPaymentMethod,
     validatePaymentMethodConfiguration,
     toPaymentMethodObject
 };
