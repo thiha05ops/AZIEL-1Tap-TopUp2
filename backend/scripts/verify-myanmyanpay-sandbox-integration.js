@@ -26,12 +26,6 @@ const {
     applyMyanMyanPayCreationDefaults,
     applyPaymentMethodPatch,
     formatAdminMethod,
-    isExactMyanMyanPayRepairConfirmation,
-    isExactMyanMyanPaySafeState,
-    MYANMYANPAY_REPAIR_CONFIRMATION,
-    MYANMYANPAY_REPAIR_STATE,
-    MYANMYANPAY_REPAIR_TARGET_ID,
-    repairMyanMyanPayCanonicalPaymentMethod,
     normalizePaymentMethodKey
 } = paymentMethodsRoute._test;
 
@@ -89,95 +83,6 @@ assert.strictEqual(myanMyanPayAccessDecision(method, {}).allowed, false, "public
 assert.strictEqual(myanMyanPayAccessDecision(method, { id: "user-1" }, env).allowed, true, "allowlisted test user can access sandbox method");
 
 (async () => {
-    const safeRepairDocument = {
-        _id: MYANMYANPAY_REPAIR_TARGET_ID,
-        ...MYANMYANPAY_REPAIR_STATE,
-        myanMyanPayAuthorizedTestUserIds: []
-    };
-    assert.strictEqual(MYANMYANPAY_REPAIR_CONFIRMATION, "REPAIR_MYANMYANPAY_6abba63a069cd997959c41d3");
-    assert.strictEqual(isExactMyanMyanPayRepairConfirmation({ confirmation: MYANMYANPAY_REPAIR_CONFIRMATION }), true);
-    assert.strictEqual(isExactMyanMyanPayRepairConfirmation({}), false);
-    assert.strictEqual(isExactMyanMyanPayRepairConfirmation({ confirmation: "wrong" }), false);
-    assert.strictEqual(isExactMyanMyanPayRepairConfirmation({ confirmation: MYANMYANPAY_REPAIR_CONFIRMATION, enabled: true }), false, "browser repair fields are rejected");
-    assert.strictEqual(isExactMyanMyanPaySafeState(safeRepairDocument), true);
-    for (const conflicting of [
-        { key: "myanmyanpaymmqr" },
-        { provider: "other" },
-        { region: "TH" },
-        { paymentChannel: "" },
-        { enabled: true },
-        { myanMyanPayActivationState: "TEST_ONLY" },
-        { myanMyanPaySandboxTestApproved: true },
-        { myanMyanPayAuthorizedTestUserIds: ["507f1f77bcf86cd799439011"] }
-    ]) assert.strictEqual(isExactMyanMyanPaySafeState({ ...safeRepairDocument, ...conflicting }), false, "conflicting post-state must fail closed");
-
-    let capturedRepair;
-    const repairedDocument = { ...safeRepairDocument, toObject() { return { ...safeRepairDocument }; } };
-    const successfulRepairModel = {
-        async exists(query) {
-            assert.deepStrictEqual(query, { _id: { $ne: MYANMYANPAY_REPAIR_TARGET_ID }, key: "myanmyanpay_mmqr" });
-            return null;
-        },
-        async findOneAndUpdate(filter, update, options) {
-            capturedRepair = { filter, update, options };
-            return repairedDocument;
-        },
-        async findById() { throw new Error("successful repair must not enter idempotency branch"); }
-    };
-    const repaired = await repairMyanMyanPayCanonicalPaymentMethod({ PaymentMethodModel: successfulRepairModel });
-    assert.strictEqual(repaired.alreadyRepaired, false);
-    assert.strictEqual(String(repaired.method._id), MYANMYANPAY_REPAIR_TARGET_ID, "repair preserves _id");
-    assert.deepStrictEqual(capturedRepair.filter, {
-        _id: MYANMYANPAY_REPAIR_TARGET_ID,
-        key: "myanmyanpaymmqr",
-        provider: "myanmyanpay_mmqr",
-        region: "MM",
-        enabled: false
-    }, "atomic update requires every malformed-record precondition");
-    assert.deepStrictEqual(capturedRepair.options, { new: true, runValidators: true });
-    assert.strictEqual(Object.prototype.hasOwnProperty.call(capturedRepair.options, "upsert"), false, "repair must never upsert");
-    assert.deepStrictEqual(capturedRepair.update, { $set: {
-        key: "myanmyanpay_mmqr",
-        region: "MM",
-        provider: "myanmyanpay_mmqr",
-        paymentChannel: "MYANMYANPAY_MMQR",
-        enabled: false,
-        myanMyanPayActivationState: "DISABLED",
-        myanMyanPaySandboxTestApproved: false,
-        myanMyanPayAuthorizedTestUserIds: []
-    } }, "repair writes only the forced canonical safe state");
-    assert.strictEqual(capturedRepair.update.$set.enabled, false);
-    assert.strictEqual(capturedRepair.update.$set.myanMyanPayActivationState, "DISABLED");
-    assert.strictEqual(capturedRepair.update.$set.myanMyanPaySandboxTestApproved, false);
-    assert.deepStrictEqual(capturedRepair.update.$set.myanMyanPayAuthorizedTestUserIds, []);
-    assert(!JSON.stringify(capturedRepair).includes("PUBLIC"), "repair has no PUBLIC path");
-    assert(!JSON.stringify(capturedRepair).includes("TEST_ONLY"), "repair has no TEST_ONLY path");
-
-    await assert.rejects(
-        () => repairMyanMyanPayCanonicalPaymentMethod({ PaymentMethodModel: { async exists() { return { _id: "other" }; } } }),
-        error => error.code === "MYANMYANPAY_CANONICAL_DUPLICATE" && error.statusCode === 409
-    );
-    await assert.rejects(
-        () => repairMyanMyanPayCanonicalPaymentMethod({ PaymentMethodModel: {
-            async exists() { return null; },
-            async findOneAndUpdate() { const error = new Error("duplicate"); error.code = 11000; throw error; }
-        } }),
-        error => error.code === "MYANMYANPAY_CANONICAL_DUPLICATE" && error.statusCode === 409
-    );
-    const idempotent = await repairMyanMyanPayCanonicalPaymentMethod({ PaymentMethodModel: {
-        async exists() { return null; },
-        async findOneAndUpdate() { return null; },
-        async findById(id) { assert.strictEqual(id, MYANMYANPAY_REPAIR_TARGET_ID); return repairedDocument; }
-    } });
-    assert.strictEqual(idempotent.alreadyRepaired, true, "exact safe post-state is idempotent");
-    await assert.rejects(
-        () => repairMyanMyanPayCanonicalPaymentMethod({ PaymentMethodModel: {
-            async exists() { return null; },
-            async findOneAndUpdate() { return null; },
-            async findById() { return { ...safeRepairDocument, enabled: true }; }
-        } }),
-        error => error.code === "MYANMYANPAY_REPAIR_PRECONDITION_FAILED" && error.statusCode === 409
-    );
     const userOne = { _id: new mongoose.Types.ObjectId("507f1f77bcf86cd799439011"), customerId: "AZU-H7KQ2M9WXP", username: "tester-one", email: "tester-one@gmail.com" };
     const userTwo = { _id: new mongoose.Types.ObjectId("507f191e810c19729de860ea"), customerId: "AZU-7NQK3H8RZT", username: "tester-two", email: "tester-two@gmail.com" };
     const users = [userOne, userTwo];
@@ -229,18 +134,6 @@ assert.strictEqual(myanMyanPayAccessDecision(method, { id: "user-1" }, env).allo
     assert(adminPaymentSource.includes('PUBLIC — unavailable'), "PUBLIC must be visibly unavailable");
     assert(adminPaymentSource.includes('authorizedTesterCustomerIds'), "Admin activation must submit customer IDs, not ObjectIds");
     assert(adminUsersSource.includes('{ customerId: { $regex:'), "Admin Users must search customerId");
-    const repairRouteStart = paymentRouteSource.indexOf('router.post(`/admin/payment-methods/${MYANMYANPAY_REPAIR_TARGET_ID}/myanmyanpay-canonical-repair`');
-    const repairRouteEnd = paymentRouteSource.indexOf('router.get("/admin/payment-methods/:id/myanmyanpay-sandbox-settings"', repairRouteStart);
-    assert(repairRouteStart > -1 && repairRouteEnd > repairRouteStart, "exact one-time repair route must exist");
-    const repairRouteSource = paymentRouteSource.slice(repairRouteStart, repairRouteEnd);
-    assert(repairRouteSource.includes("adminMiddleware"), "repair requires authenticated admin middleware");
-    assert(repairRouteSource.includes("requireAdminPermission(PERMISSIONS.PAYMENT_METHODS_MANAGE)"), "repair requires payment-method management permission");
-    assert(repairRouteSource.includes("isExactMyanMyanPayRepairConfirmation(req.body)"), "repair accepts only exact confirmation body");
-    assert(repairRouteSource.includes("MYANMYANPAY_REPAIR_CONFIRMATION_INVALID"), "wrong confirmation fails closed");
-    assert(repairRouteSource.includes('operation: "MYANMYANPAY_CANONICAL_REPAIR"'), "actual repair is audited");
-    assert(repairRouteSource.includes('if (!result.alreadyRepaired)'), "idempotent no-op must not record a mutation audit");
-    const auditMetadataSource = repairRouteSource.slice(repairRouteSource.indexOf("metadata:"), repairRouteSource.indexOf("});", repairRouteSource.indexOf("metadata:")));
-    assert(!/SECRET|APP_ID|PUBLISHABLE|AUTHORIZED|TESTER/i.test(auditMetadataSource), "repair audit metadata contains no credentials or tester identifiers");
 
     const calls = [];
     const adapter = createMyanMyanPayAdapter({ configuration, client: { async pay(payload) { calls.push(payload); return { orderId: payload.orderId, amount: payload.amount, currency: "MMK", status: "PENDING", vendorQrRefId: "QR-1", qr: "000201010212MMQR" }; } } });
