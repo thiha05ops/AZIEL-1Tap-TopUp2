@@ -8,7 +8,6 @@ const path = require("path");
 const mongoose = require("mongoose");
 const { inspectMyanMyanPayConfiguration, loadMyanMyanPayConfiguration, CALLBACK_URL } = require("../services/myanmyanpay/myanMyanPayConfiguration");
 const { createMyanMyanPayClient, _test: myanMyanPayClientTest } = require("../services/myanmyanpay/myanMyanPayClient");
-const { createMyanMyanPayTransport, MyanMyanPayTransportError, _test: transportTest } = require("../services/myanmyanpay/myanMyanPayTransport");
 const { createMyanMyanPayAdapter } = require("../services/commerce/providers/myanMyanPayAdapter");
 const { createManualPaymentApplicationService } = require("../services/commerce/manualPaymentApplicationService");
 const { isMyanMyanPayMethod, myanMyanPayAccessDecision } = require("../services/myanmyanpay/myanMyanPayPaymentPolicy");
@@ -139,125 +138,45 @@ assert.strictEqual(myanMyanPayAccessDecision(method, { id: "user-1" }, env).allo
     assert.strictEqual(infraProvider.environments[0].webhook.endpoint, CALLBACK_URL);
     assert.strictEqual(infraProvider.environments[0].webhook.authenticationImplemented, true);
 
-    function response(status, data, options = {}) {
-        return { ok: status >= 200 && status < 300, status, async json() { if (options.jsonError) throw options.jsonError; return data; } };
-    }
-    function transportHarness(sequence) {
-        const calls = [];
-        let nonce = 1000;
-        const fetchImpl = async (url, options) => {
-            calls.push({ url, options });
-            const next = sequence.shift();
-            if (next instanceof Error) throw next;
-            return next;
-        };
-        return { transport: createMyanMyanPayTransport(configuration, { fetchImpl, nonceFactory: () => String(++nonce) }), calls };
-    }
-    function assertSignedCall(call, expectedPath, expectBtoken) {
-        const parsed = new URL(call.url);
-        const body = JSON.parse(call.options.body);
-        assert.strictEqual(parsed.origin, "https://ezapi.myanmyanpay.com");
-        assert.strictEqual(parsed.pathname, expectedPath);
-        assert.strictEqual(call.options.method, "POST");
-        assert.strictEqual(call.options.headers.Authorization, `Bearer ${configuration.publishableKey}`);
-        assert.strictEqual(call.options.headers["X-Mmpay-Nonce"], body.nonce);
-        assert.strictEqual(call.options.headers["X-Mmpay-Signature"], transportTest.signature(configuration.secretKey, call.options.body, body.nonce));
-        assert.strictEqual(Object.values(call.options.headers).some(value => value === undefined), false, "transport must never construct an undefined header");
-        assert.strictEqual(Object.prototype.hasOwnProperty.call(call.options.headers, "X-Mmpay-Btoken"), expectBtoken);
-        if (expectBtoken) assert.strictEqual(call.options.headers["X-Mmpay-Btoken"], "one-time-token");
-        return body;
-    }
-
     const createPayload = { orderId: "PAY-TRANSPORT-1", amount: 34740, currency: "MMK", callbackUrl: CALLBACK_URL, customMessage: "AZIEL order", items: [] };
-    const validCreateResponse = { orderId: createPayload.orderId, status: "PENDING", vendorQrRefId: "VENDOR-QR", transactionRefId: "TX-1", amount: 34740, currency: "MMK", qr: "QR-PAYLOAD" };
-    const validCreateHarness = transportHarness([response(200, { token: "one-time-token" }), response(201, validCreateResponse)]);
-    assert.strictEqual(await validCreateHarness.transport.pay(createPayload), validCreateResponse);
-    assert.strictEqual(validCreateHarness.calls.length, 2, "payment transport must make one handshake and exactly one create request");
-    const handshakeBody = assertSignedCall(validCreateHarness.calls[0], "/payments/sandbox-handshake", false);
-    const createBody = assertSignedCall(validCreateHarness.calls[1], "/payments/sandbox-create", true);
-    assert.strictEqual(handshakeBody.orderId, createPayload.orderId);
-    assert.strictEqual(createBody.orderId, createPayload.orderId);
-    assert.strictEqual(createBody.amount, createPayload.amount);
-    assert.strictEqual(createBody.currency, "MMK");
-    assert.strictEqual(createBody.callbackUrl, CALLBACK_URL);
-
-    for (const [handshakeResult, expectedCode] of [
-        [response(401, { code: "AUTH_FAILED", message: "must-not-log" }), "MYANMYANPAY_HANDSHAKE_REJECTED"],
-        [response(200, { code: "PROVIDER_REJECTED" }), "MYANMYANPAY_HANDSHAKE_REJECTED"],
-        [response(200, null), "MYANMYANPAY_HANDSHAKE_RESPONSE_INVALID"],
-        [response(200, {}), "MYANMYANPAY_HANDSHAKE_RESPONSE_INVALID"],
-        [new TypeError("network must-not-log"), "MYANMYANPAY_HANDSHAKE_TRANSPORT_ERROR"],
-        [response(200, null, { jsonError: new SyntaxError("json must-not-log") }), "MYANMYANPAY_HANDSHAKE_RESPONSE_INVALID"]
-    ]) {
-        const harness = transportHarness([handshakeResult]);
-        await assert.rejects(() => harness.transport.pay(createPayload), error => error instanceof MyanMyanPayTransportError && error.code === expectedCode);
-        assert.strictEqual(harness.calls.length, 1, "failed handshake must stop before create");
-    }
-
-    for (const [providerResult, expectedCode] of [
-        [response(401, { code: "AUTH_FAILED" }), "MYANMYANPAY_PROVIDER_REJECTED"],
-        [response(400, { code: "PROVIDER_REJECTED" }), "MYANMYANPAY_PROVIDER_REJECTED"],
-        [response(201, { code: "PROVIDER_REJECTED", message: "must-not-log" }), "MYANMYANPAY_PROVIDER_REJECTED"],
-        [new TypeError("network must-not-log"), "MYANMYANPAY_PROVIDER_TRANSPORT_ERROR"],
-        [response(201, null, { jsonError: new SyntaxError("json must-not-log") }), "MYANMYANPAY_PROVIDER_RESPONSE_INVALID"]
-    ]) {
-        const harness = transportHarness([response(200, { token: "one-time-token" }), providerResult]);
-        await assert.rejects(() => harness.transport.pay(createPayload), error => error instanceof MyanMyanPayTransportError && error.code === expectedCode);
-        assert.strictEqual(harness.calls.length, 2);
-    }
+    const validCreateResponse = { orderId: createPayload.orderId, status: "PENDING", vendorQrRefId: "VENDOR-QR", transactionRefId: "TX-1", amount: 34740, currency: "MMK", qr: "000201010212MMQR" };
+    const sdkCalls = [];
+    const sdkClient = createMyanMyanPayClient(configuration, { sdk: {
+        async pay(payload) { sdkCalls.push(["pay", payload]); return validCreateResponse; },
+        async get(payload) { sdkCalls.push(["get", payload]); return { orderId: payload.orderId, amount: 34740, status: "PENDING", method: "QR", condition: "PRISTINE" }; },
+        async cancel(payload) { sdkCalls.push(["cancel", payload]); return { orderId: payload.orderId, amount: 34740, status: "CANCELLED" }; }
+    }, logger: { info() {} } });
+    const createdBySdk = await sdkClient.pay(createPayload);
+    assert.strictEqual(createdBySdk.status, "PENDING");
+    assert.deepStrictEqual(sdkCalls[0], ["pay", { orderId: createPayload.orderId, amount: 34740, currency: "MMK", callbackUrl: CALLBACK_URL, customMessage: "AZIEL order" }], "AZIEL must call SDK pay exactly once with documented fields only");
+    assert.strictEqual(sdkCalls.some(([operation]) => operation === "handShake"), false, "AZIEL must not manually invoke SDK handshake");
+    await sdkClient.get({ orderId: createPayload.orderId, expectedAmount: 34740, expectedCurrency: "MMK" });
+    assert.deepStrictEqual(sdkCalls[1], ["get", { orderId: createPayload.orderId }], "reconciliation must call SDK get with only orderId");
+    await sdkClient.cancel({ orderId: createPayload.orderId, expectedAmount: 34740 });
+    assert.deepStrictEqual(sdkCalls[2], ["cancel", { orderId: createPayload.orderId }], "cancellation must use SDK cancel contract");
 
     const clientResponseCases = [
+        [new Error("resolved SDK error must-not-log"), "MYANMYANPAY_SDK_RETURNED_ERROR"],
+        [{ code: "PROVIDER_REJECTED", message: "must-not-log" }, "MYANMYANPAY_PROVIDER_REJECTED"],
         [{ ...validCreateResponse, orderId: "WRONG" }, "MYANMYANPAY_PROVIDER_BINDING_MISMATCH"],
         [{ ...validCreateResponse, amount: 34741 }, "MYANMYANPAY_PROVIDER_BINDING_MISMATCH"],
         [{ ...validCreateResponse, currency: "USD" }, "MYANMYANPAY_PROVIDER_RESPONSE_INVALID"],
         [{ ...validCreateResponse, qr: "" }, "MYANMYANPAY_PROVIDER_RESPONSE_INVALID"],
+        [{ ...validCreateResponse, qr: "not-an-emvco-payload" }, "MYANMYANPAY_PROVIDER_RESPONSE_INVALID"],
+        [{ ...validCreateResponse, vendorQrRefId: "unsafe reference" }, "MYANMYANPAY_PROVIDER_RESPONSE_INVALID"],
         [{ ...validCreateResponse, status: "SUCCESS" }, "MYANMYANPAY_PROVIDER_RESPONSE_INVALID"],
         [{}, "MYANMYANPAY_PROVIDER_RESPONSE_INVALID"]
     ];
     for (const [providerResult, expectedCode] of clientResponseCases) {
         let payCalls = 0;
-        const client = createMyanMyanPayClient(configuration, { transport: { async pay() { payCalls += 1; return providerResult; } }, logger: { info() {} } });
+        const client = createMyanMyanPayClient(configuration, { sdk: { async pay() { payCalls += 1; return providerResult; } }, logger: { info() {} } });
         await assert.rejects(() => client.pay(createPayload), error => error.code === expectedCode);
         assert.strictEqual(payCalls, 1, "client validation must not retry provider create");
     }
-
-    for (const status of ["PENDING", "SUCCESS", "FAILED", "CANCELLED", "EXPIRED", "REFUNDED"]) {
-        const providerResult = { orderId: "PAY-GET-MATRIX", appId: configuration.appId, amount: 34740, method: "QR", status, condition: "PRISTINE" };
-        const harness = transportHarness([response(200, { token: "one-time-token" }), response(200, providerResult)]);
-        assert.strictEqual(await harness.transport.get({ orderId: "PAY-GET-MATRIX" }), providerResult);
-        assertSignedCall(harness.calls[0], "/payments/sandbox-handshake", false);
-        assertSignedCall(harness.calls[1], "/payments/sandbox-get", true);
-    }
-    for (const [providerResult, expectedCode] of [
-        [response(404, { code: "NOT_FOUND" }), "MYANMYANPAY_PROVIDER_REJECTED"],
-        [response(401, { code: "AUTH_FAILED" }), "MYANMYANPAY_PROVIDER_REJECTED"],
-        [new TypeError("network must-not-log"), "MYANMYANPAY_PROVIDER_TRANSPORT_ERROR"],
-        [response(200, null, { jsonError: new SyntaxError("json must-not-log") }), "MYANMYANPAY_PROVIDER_RESPONSE_INVALID"],
-        [response(200, {}), "MYANMYANPAY_PROVIDER_RESPONSE_INVALID"]
-    ]) {
-        const harness = transportHarness([response(200, { token: "one-time-token" }), providerResult]);
-        await assert.rejects(() => harness.transport.get({ orderId: "PAY-GET-MATRIX" }), error => error.code === expectedCode);
-    }
-
-    const cancelHarness = transportHarness([response(200, { token: "one-time-token" }), response(200, { orderId: "PAY-CANCEL-1", amount: 34740, status: "CANCELLED" })]);
-    await cancelHarness.transport.cancel({ orderId: "PAY-CANCEL-1" });
-    assertSignedCall(cancelHarness.calls[1], "/payments/sandbox-cancel", true);
-
-    const transportDiagnosticLogs = [];
-    let diagnosticFetchCount = 0;
-    const transportDiagnosticClient = createMyanMyanPayClient(configuration, {
-        fetchImpl: async () => { diagnosticFetchCount += 1; return response(401, { code: "AUTH_FAILED", message: "provider-secret-message-must-not-log", token: "BTOKEN-MUST-NOT-LOG", qr: "QR-MUST-NOT-LOG" }); },
-        nonceFactory: () => "NONCE-MUST-NOT-LOG",
-        logger: { info(...args) { transportDiagnosticLogs.push(args); } }
-    });
-    await assert.rejects(() => transportDiagnosticClient.pay(createPayload), error => error.code === "MYANMYANPAY_HANDSHAKE_REJECTED");
-    assert.strictEqual(diagnosticFetchCount, 1, "rejected handshake must prevent the create request");
-    const serializedTransportLogs = JSON.stringify(transportDiagnosticLogs);
-    assert(serializedTransportLogs.includes("MYANMYANPAY_HANDSHAKE_REJECTED"));
-    assert.strictEqual(transportDiagnosticLogs[0][1].endpointPath, "/payments/sandbox-handshake");
-    for (const forbidden of [configuration.appId, configuration.publishableKey, configuration.secretKey, createPayload.orderId, String(createPayload.amount), "provider-secret-message-must-not-log", "BTOKEN-MUST-NOT-LOG", "QR-MUST-NOT-LOG", "NONCE-MUST-NOT-LOG"]) {
-        assert(!serializedTransportLogs.includes(forbidden), `transport diagnostic must redact sensitive/raw value: ${forbidden}`);
-    }
+    let thrownPayCalls = 0;
+    const thrownPayClient = createMyanMyanPayClient(configuration, { sdk: { async pay() { thrownPayCalls += 1; throw new TypeError("secret SDK failure must-not-log"); } }, logger: { info() {} } });
+    await assert.rejects(() => thrownPayClient.pay(createPayload), error => error.code === "MYANMYANPAY_SDK_OPERATION_FAILED" && error.metadata.classification === "THROWN_EXCEPTION");
+    assert.strictEqual(thrownPayCalls, 1, "thrown SDK pay must not be retried");
 
     const diagnosticConfiguration = {
         ...configuration,
@@ -312,17 +231,17 @@ assert.strictEqual(myanMyanPayAccessDecision(method, { id: "user-1" }, env).allo
 
     const capturedLogs = [];
     const diagnosticClient = createMyanMyanPayClient(diagnosticConfiguration, {
-        transport: { async pay() { return sensitiveResponse; } },
+        sdk: { async pay() { return sensitiveResponse; } },
         logger: { info(...args) { capturedLogs.push(args); } }
     });
-    await assert.rejects(() => diagnosticClient.pay({}), error => error.code === "MYANMYANPAY_PROVIDER_RESPONSE_INVALID", "invalid provider responses must retain a safe structured classification");
+    await assert.rejects(() => diagnosticClient.pay(createPayload), error => error.code === "MYANMYANPAY_PROVIDER_REJECTED", "resolved provider errors must retain a safe structured classification");
     assert.strictEqual(capturedLogs.length, 1, "exactly one response-shape diagnostic must be emitted");
     assert.strictEqual(capturedLogs[0][0], "[MYANMYANPAY_RESPONSE_SHAPE]");
     assert.notStrictEqual(capturedLogs[0][1], sensitiveResponse, "raw provider response must never be logged");
     assert(!JSON.stringify(capturedLogs).includes("must-not-log"), "diagnostic log must contain no raw response or credential values");
-    const validResponse = { status: "PENDING", orderId: "PAY-1", qr: "QR", amount: 1, currency: "MMK" };
-    const loggerFailureClient = createMyanMyanPayClient(configuration, { transport: { async pay() { return validResponse; } }, logger: { info() { throw new Error("logger unavailable"); } } });
-    assert.strictEqual(await loggerFailureClient.pay({ orderId: "PAY-1", amount: 1, currency: "MMK" }), validResponse, "diagnostic logging failure must not change successful payment behavior");
+    const validResponse = { status: "PENDING", orderId: "PAY-1", qr: "000201010212MMQR", amount: 1, currency: "MMK" };
+    const loggerFailureClient = createMyanMyanPayClient(configuration, { sdk: { async pay() { return validResponse; } }, logger: { info() { throw new Error("logger unavailable"); } } });
+    assert.deepStrictEqual(await loggerFailureClient.pay({ orderId: "PAY-1", amount: 1, currency: "MMK", callbackUrl: CALLBACK_URL }), { ...validResponse, vendorQrRefId: "", transactionRefId: "", url: "" }, "diagnostic logging failure must not change successful payment behavior");
 
     const getConfiguration = { ...configuration, apiBaseUrl: "https://sandbox.example.test/api" };
     const documentedGetResponse = status => ({ orderId: "ORDER-MUST-NOT-LOG", appId: "APP-MUST-NOT-LOG", amount: 34740, status, method: "QR", condition: "PRISTINE" });
@@ -384,16 +303,16 @@ assert.strictEqual(myanMyanPayAccessDecision(method, { id: "user-1" }, env).allo
     const getLogs = [];
     let getCalls = 0;
     const getDiagnosticClient = createMyanMyanPayClient(getConfiguration, {
-        transport: { async get(input) { getCalls += 1; assert.deepStrictEqual(input, { orderId: "PAY-GET-1" }); return getErrorResponse; } },
+        sdk: { async get(input) { getCalls += 1; assert.deepStrictEqual(input, { orderId: "PAY-GET-1" }); return getErrorResponse; } },
         logger: { info(...args) { getLogs.push(args); } }
     });
-    assert.strictEqual(await getDiagnosticClient.get({ orderId: "PAY-GET-1" }), getErrorResponse, "GET wrapper must return the exact SDK value unchanged");
+    await assert.rejects(() => getDiagnosticClient.get({ orderId: "PAY-GET-1" }), error => error.code === "MYANMYANPAY_PROVIDER_REJECTED", "GET wrapper must reject resolved error-shaped values");
     assert.strictEqual(getCalls, 1, "GET wrapper must call sdk.get exactly once");
     assert.strictEqual(getLogs.length, 1, "GET wrapper must emit exactly one diagnostic");
     assert.strictEqual(getLogs[0][0], "[MYANMYANPAY_GET_RESPONSE_SHAPE]");
     const getDiagnostic = getLogs[0][1];
     assert.notStrictEqual(getDiagnostic, getErrorResponse, "GET diagnostic must never log the raw provider response");
-    const allowedGetDiagnosticFields = new Set(["provider", "operation", "httpMethod", "classification", "responseType", "safeErrorName", "topLevelKeys", "safeCode", "httpLikeStatus", "hasOrderId", "hasStatus", "hasQr", "hasAmount", "hasCurrency", "hasCode", "hasError", "hasMessage", "apiBaseUrlOrigin", "apiBaseUrlPath", "apiBaseUrlAlreadyContainsPaymentsPath", "sdkSandboxSelected", "endpointPath", "handshakeEndpointPath"]);
+    const allowedGetDiagnosticFields = new Set(["provider", "operation", "httpMethod", "stage", "classification", "responseType", "isNull", "isArray", "isErrorInstance", "safeErrorName", "topLevelKeys", "dataKeys", "resultKeys", "statusType", "safeStatus", "safeCode", "httpLikeStatus", "hasOrderId", "hasStatus", "hasQr", "hasAmount", "hasCurrency", "hasCode", "hasError", "hasMessage", "apiBaseUrlOrigin", "apiBaseUrlPath", "apiBaseUrlAlreadyContainsPaymentsPath", "sdkSandboxSelected", "sdkSandboxKeyClassification", "endpointPath", "handshakeEndpointPath"]);
     assert(Object.keys(getDiagnostic).every(key => allowedGetDiagnosticFields.has(key)), "GET diagnostic must contain only approved fields");
     assert.strictEqual(getDiagnostic.classification, "ERROR_SHAPED_OBJECT");
     assert.strictEqual(getDiagnostic.safeCode, "AUTH_FAILED");
@@ -407,8 +326,8 @@ assert.strictEqual(myanMyanPayAccessDecision(method, { id: "user-1" }, env).allo
     const thrownGetError = new TypeError("secret thrown message must-not-log");
     const thrownGetLogs = [];
     let thrownGetCalls = 0;
-    const thrownGetClient = createMyanMyanPayClient(getConfiguration, { transport: { async get() { thrownGetCalls += 1; throw thrownGetError; } }, logger: { info(...args) { thrownGetLogs.push(args); } } });
-    await assert.rejects(() => thrownGetClient.get({ orderId: "PAY-GET-2" }), error => error === thrownGetError, "GET wrapper must rethrow the exact same error");
+    const thrownGetClient = createMyanMyanPayClient(getConfiguration, { sdk: { async get() { thrownGetCalls += 1; throw thrownGetError; } }, logger: { info(...args) { thrownGetLogs.push(args); } } });
+    await assert.rejects(() => thrownGetClient.get({ orderId: "PAY-GET-2" }), error => error.code === "MYANMYANPAY_SDK_OPERATION_FAILED" && error.metadata.classification === "THROWN_EXCEPTION", "GET wrapper must classify thrown SDK errors");
     assert.strictEqual(thrownGetCalls, 1);
     const thrownGetShapeLogs = thrownGetLogs.filter(entry => entry[0] === "[MYANMYANPAY_GET_RESPONSE_SHAPE]");
     assert.strictEqual(thrownGetShapeLogs.length, 1, "thrown GET must emit exactly one GET response-shape diagnostic");
@@ -417,12 +336,12 @@ assert.strictEqual(myanMyanPayAccessDecision(method, { id: "user-1" }, env).allo
     assert(!JSON.stringify(thrownGetLogs).includes("must-not-log"), "thrown GET diagnostic must not expose the error message");
     const getLoggerFailureValue = documentedGetResponse("PENDING");
     let loggerFailureGetCalls = 0;
-    const getLoggerFailureClient = createMyanMyanPayClient(getConfiguration, { transport: { async get() { loggerFailureGetCalls += 1; return getLoggerFailureValue; } }, logger: { info() { throw new Error("logger unavailable"); } } });
-    assert.strictEqual(await getLoggerFailureClient.get({ orderId: "PAY-GET-3" }), getLoggerFailureValue, "GET logger failure must not alter returned behavior");
+    const getLoggerFailureClient = createMyanMyanPayClient(getConfiguration, { sdk: { async get() { loggerFailureGetCalls += 1; return { ...getLoggerFailureValue, orderId: "PAY-GET-3" }; } }, logger: { info() { throw new Error("logger unavailable"); } } });
+    assert.strictEqual((await getLoggerFailureClient.get({ orderId: "PAY-GET-3" })).status, "PENDING", "GET logger failure must not alter returned behavior");
     assert.strictEqual(loggerFailureGetCalls, 1);
     const getLoggerThrowOriginal = new Error("original SDK failure");
-    const getLoggerThrowClient = createMyanMyanPayClient(getConfiguration, { transport: { async get() { throw getLoggerThrowOriginal; } }, logger: { info() { throw new Error("logger unavailable"); } } });
-    await assert.rejects(() => getLoggerThrowClient.get({ orderId: "PAY-GET-4" }), error => error === getLoggerThrowOriginal, "GET logger failure must not replace an SDK error");
+    const getLoggerThrowClient = createMyanMyanPayClient(getConfiguration, { sdk: { async get() { throw getLoggerThrowOriginal; } }, logger: { info() { throw new Error("logger unavailable"); } } });
+    await assert.rejects(() => getLoggerThrowClient.get({ orderId: "PAY-GET-4" }), error => error.code === "MYANMYANPAY_SDK_OPERATION_FAILED", "GET logger failure must not suppress SDK error classification");
 
     function reconciliationHarness(providerResponse) {
         const state = {
@@ -451,7 +370,7 @@ assert.strictEqual(myanMyanPayAccessDecision(method, { id: "user-1" }, env).allo
             commerceOrderRepository,
             transactionRunner: callback => callback({}),
             myanMyanPayConfigurationProvider: async () => configuration,
-            providerOptions: { myanMyanPayClientOptions: { transport: sdk, logger: { info() {} } } },
+            providerOptions: { myanMyanPayClientOptions: { sdk, logger: { info() {} } } },
             paidFulfillmentHandler: async () => { state.calls.fulfillment += 1; }
         });
         return { state, service };
@@ -494,7 +413,7 @@ assert.strictEqual(myanMyanPayAccessDecision(method, { id: "user-1" }, env).allo
     const notFoundResult = await notFoundHarness.service.reconcileMyanMyanPayPayment({ attemptId: "PAY-RECON-1" });
     assert.strictEqual(notFoundResult.reconciliationOutcome, "NOT_FOUND_INCONCLUSIVE");
     assert.strictEqual(notFoundResult.stateChanged, false);
-    const thrownNotFound = new MyanMyanPayTransportError("MYANMYANPAY_PROVIDER_REJECTED", "not found", { stage: "PROVIDER", operation: "GET", httpStatus: 404, providerCode: "NOT_FOUND" });
+    const thrownNotFound = Object.assign(new Error("not found"), { code: "MYANMYANPAY_PROVIDER_REJECTED", httpStatus: 404, providerCode: "NOT_FOUND" });
     const thrownNotFoundHarness = reconciliationHarness(() => { throw thrownNotFound; });
     const thrownNotFoundResult = await thrownNotFoundHarness.service.reconcileMyanMyanPayPayment({ attemptId: "PAY-RECON-1" });
     assert.strictEqual(thrownNotFoundResult.reconciliationOutcome, "NOT_FOUND_INCONCLUSIVE");
@@ -519,6 +438,10 @@ assert.strictEqual(myanMyanPayAccessDecision(method, { id: "user-1" }, env).allo
     const paymentEngineSource = fs.readFileSync(path.join(root, "frontend/js/payment/payment-engine.js"), "utf8");
     const mmPaymentShellSource = fs.readFileSync(path.join(root, "frontend/js/payment/mm-payment-shell.js"), "utf8");
     const customerCheckoutSource = fs.readFileSync(path.join(root, "backend/services/commerce/customerManualPaymentCheckoutService.js"), "utf8");
+    const myanMyanPayClientSource = fs.readFileSync(path.join(root, "backend/services/myanmyanpay/myanMyanPayClient.js"), "utf8");
+    assert(myanMyanPayClientSource.includes('const { MMPaySDK } = require("mmpay-node-sdk")'), "official SDK must be the protocol implementation");
+    assert(myanMyanPayClientSource.includes('await sdk[operation.toLowerCase()](input)'), "provider operations must delegate through the SDK boundary");
+    assert(!myanMyanPayClientSource.includes("createMyanMyanPayTransport") && !fs.existsSync(path.join(root, "backend/services/myanmyanpay/myanMyanPayTransport.js")), "superseded custom transport must be removed");
     assert(paymentRouteSource.includes('requireAdminPermission(PERMISSIONS.PAYMENT_METHODS_MANAGE)'), "tester lookup remains payment-management authorized");
     assert(paymentRouteSource.includes('authorizedTesterCustomerIds'), "activation must accept customer-facing tester IDs");
     assert(paymentRouteSource.includes('if (!["DISABLED", "TEST_ONLY"].includes(state))'), "PUBLIC must remain rejected");

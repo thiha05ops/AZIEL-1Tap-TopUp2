@@ -39,7 +39,7 @@ function createMyanMyanPayAdapter(options = {}) {
         return {
             provider: PROVIDER,
             providerReference: orderId,
-            providerTransactionId: orderId,
+            providerTransactionId: text(response.transactionRefId) || orderId,
             status: "PENDING",
             amount,
             currency: "MMK",
@@ -57,7 +57,7 @@ function createMyanMyanPayAdapter(options = {}) {
         if (!attemptId || text(attempt.orderId) !== text(intent.orderId) || text(attempt.currency || intent.currency).toUpperCase() !== "MMK" || !Number.isSafeInteger(amount) || amount <= 0) throw fail("MyanMyanPay reconciliation binding is invalid.", "identity");
         let response;
         try {
-            response = await client.get({ orderId: attemptId });
+            response = await client.get({ orderId: attemptId, expectedAmount: amount, expectedCurrency: "MMK" });
         } catch (error) {
             const safeCode = text(error?.providerCode || error?.code);
             const notFound = Number(error?.httpStatus) === 404 || /NOT[_ -]?FOUND/i.test(safeCode);
@@ -124,7 +124,7 @@ function createMyanMyanPayAdapter(options = {}) {
 
     async function cancelPayment({ attempt = {} } = {}) {
         if (typeof client.cancel !== "function") throw fail("MyanMyanPay cancellation is unavailable.", "configuration");
-        const response = await client.cancel({ orderId: text(attempt.providerReference || attempt.attemptId) });
+        const response = await client.cancel({ orderId: text(attempt.providerReference || attempt.attemptId), expectedAmount: Number(attempt.amount) });
         if (!response || text(response.orderId) !== text(attempt.providerReference || attempt.attemptId) || text(response.status).toUpperCase() !== "CANCELLED" || Number(response.amount) !== Number(attempt.amount)) {
             throw fail("MyanMyanPay cancellation response does not match the payment attempt.", "cancel");
         }
