@@ -6,6 +6,12 @@
     let countdownTimer = null;
     let completionState = null;
     let completionRemaining = 5;
+    let myanMyanPayStatusTimer = null;
+    let myanMyanPayStatusRequestInFlight = false;
+    let myanMyanPayStatusPollCount = 0;
+    let myanMyanPayStatusIdentity = "";
+    const MYANMYANPAY_STATUS_INTERVAL_MS = 3000;
+    const MYANMYANPAY_STATUS_MAX_POLLS = 200;
 
     function readSession() {
         try { return JSON.parse(sessionStorage.getItem(SESSION_KEY) || "null"); } catch (_) { return null; }
@@ -41,6 +47,147 @@
         text("paymentAmount", money(session.amount || order.amount, session.currency || order.currency));
     }
 
+    function myanMyanPayIdentity(staged = {}) {
+        const session = staged.session || {};
+        const order = staged.orderData || {};
+        const payment = staged.selectedPayment || session.selectedPaymentMethod || {};
+        const exactContract = String(session.provider || payment.provider || "").toUpperCase() === "MYANMYANPAY" &&
+            String(session.paymentMethod || payment.key || "").toLowerCase() === "myanmyanpay_mmqr" &&
+            String(session.paymentChannel || payment.paymentChannel || "").toUpperCase() === "MYANMYANPAY_MMQR" &&
+            String(session.confirmationMode || payment.confirmationMode || "").toLowerCase() === "provider_webhook";
+        const orderId = String(session.commerceOrderId || session.orderId || order.commerceOrderId || order.orderId || "").trim();
+        const attemptId = String(session.attemptId || order.commercePaymentAttemptId || "").trim();
+        return exactContract && orderId && attemptId ? { orderId, attemptId } : null;
+    }
+
+    function stopMyanMyanPayStatusPolling() {
+        if (myanMyanPayStatusTimer) window.clearInterval(myanMyanPayStatusTimer);
+        myanMyanPayStatusTimer = null;
+        myanMyanPayStatusRequestInFlight = false;
+        myanMyanPayStatusIdentity = "";
+    }
+
+    function updateMyanMyanPayTerminal(status) {
+        const normalized = String(status || "").toLowerCase();
+        const labels = {
+            failed: [t("payment.state.failed", "Payment failed"), t("payment.providerPaymentFailed", "Payment could not be confirmed. Please review your order or contact support.")],
+            cancelled: [t("payment.state.cancelled", "Cancelled"), t("payment.providerPaymentCancelled", "This payment was cancelled.")],
+            expired: [t("payment.state.expired", "Expired"), t("payment.providerQrExpired", "Payment QR expired.")]
+        };
+        const [summary, message] = labels[normalized] || [t("payment.statusUnavailable", "Status unavailable"), t("payment.statusCheckUnavailable", "Payment status could not be verified. Please view your orders.")];
+        text("paymentStatusSummary", summary);
+        const statusNode = document.querySelector(".mm-payment-shell .checkout-feedback[role='status']");
+        if (statusNode) {
+            statusNode.textContent = message;
+            statusNode.classList.add("is-error");
+        }
+        if (["failed", "cancelled", "expired"].includes(normalized)) {
+            const qrSection = document.querySelector(".mm-payment-shell__qr-section");
+            if (qrSection) qrSection.hidden = true;
+            sessionStorage.removeItem(SESSION_KEY);
+        }
+        const shell = document.querySelector(".mm-payment-shell");
+        if (shell && !shell.querySelector("[data-myanmyanpay-terminal-action]")) {
+            const action = document.createElement("a");
+            action.className = "primary-commerce-action payment-page-link";
+            action.dataset.myanmyanpayTerminalAction = "true";
+            action.href = normalized === "expired" ? "/checkout" : "/orders";
+            action.textContent = normalized === "expired" ? t("payment.backToCheckout", "Return to checkout") : t("payment.viewOrders", "View My Orders");
+            shell.append(action);
+        }
+    }
+
+    function classifyMyanMyanPayServerState(order = {}) {
+        const paymentStatus = String(order.paymentStatus || "").trim().toLowerCase();
+        const orderStatus = String(order.orderStatus || order.status || "").trim().toLowerCase();
+        const terminal = [paymentStatus, orderStatus].find(status => ["failed", "cancelled", "canceled", "expired"].includes(status));
+        const successful = paymentStatus === "paid" || ["paid", "processing", "completed"].includes(orderStatus);
+        if (successful && terminal) return { kind: "unknown", orderStatus };
+        if (successful) return { kind: "success", orderStatus };
+        if (terminal) return { kind: "terminal", orderStatus: terminal === "canceled" ? "cancelled" : terminal };
+        if (["", "pending_payment", "pending", "unpaid", "initiating"].includes(paymentStatus) && ["", "pending_payment", "pending", "unpaid", "initiating"].includes(orderStatus)) return { kind: "pending", orderStatus };
+        return { kind: "unknown", orderStatus };
+    }
+
+    function startMyanMyanPayStatusPolling(staged) {
+        const identity = myanMyanPayIdentity(staged);
+        if (!identity) return false;
+        stopMyanMyanPayStatusPolling();
+        myanMyanPayStatusPollCount = 0;
+        myanMyanPayStatusIdentity = `${identity.orderId}:${identity.attemptId}`;
+        const pollIdentity = myanMyanPayStatusIdentity;
+        const poll = async () => {
+            if (pollIdentity !== myanMyanPayStatusIdentity || myanMyanPayStatusRequestInFlight) return;
+            if (myanMyanPayStatusPollCount >= MYANMYANPAY_STATUS_MAX_POLLS) {
+                stopMyanMyanPayStatusPolling();
+                updateMyanMyanPayTerminal("unknown");
+                return;
+            }
+            const headers = window.PaymentUtils?.authHeaders?.() || {};
+            if (!headers.Authorization) {
+                stopMyanMyanPayStatusPolling();
+                updateMyanMyanPayTerminal("unknown");
+                return;
+            }
+            myanMyanPayStatusPollCount += 1;
+            myanMyanPayStatusRequestInFlight = true;
+            try {
+                const response = await fetch(window.PaymentUtils.apiUrl(`/api/order/status/${encodeURIComponent(identity.orderId)}`), { method: "GET", headers });
+                if (pollIdentity !== myanMyanPayStatusIdentity) return;
+                if (response.status === 401 || response.status === 403) {
+                    stopMyanMyanPayStatusPolling();
+                    updateMyanMyanPayTerminal("unknown");
+                    return;
+                }
+                const data = await response.json().catch(() => ({}));
+                if (pollIdentity !== myanMyanPayStatusIdentity) return;
+                if (!response.ok || !data.success || !data.order) return;
+                const authoritative = data.order;
+                const returnedOrderId = String(authoritative.commerceOrderId || authoritative.orderId || "").trim();
+                const returnedProvider = String(authoritative.paymentProvider || authoritative.provider || "").trim().toUpperCase();
+                const returnedAttemptId = String(authoritative.commercePaymentAttemptId || "").trim();
+                if (returnedOrderId !== identity.orderId || returnedProvider !== "MYANMYANPAY" || (returnedAttemptId && returnedAttemptId !== identity.attemptId)) {
+                    stopMyanMyanPayStatusPolling();
+                    updateMyanMyanPayTerminal("unknown");
+                    return;
+                }
+                const state = classifyMyanMyanPayServerState(authoritative);
+                if (state.kind === "pending") return;
+                stopMyanMyanPayStatusPolling();
+                if (state.kind === "terminal") {
+                    updateMyanMyanPayTerminal(state.orderStatus);
+                    return;
+                }
+                if (state.kind !== "success") {
+                    updateMyanMyanPayTerminal("unknown");
+                    return;
+                }
+                sessionStorage.removeItem(SESSION_KEY);
+                sessionStorage.removeItem("azielProductCheckoutDraft");
+                const session = staged.session || {};
+                const payment = staged.selectedPayment || session.selectedPaymentMethod || {};
+                showCompletion({
+                    orderId: identity.orderId,
+                    paid: true,
+                    paymentReceived: true,
+                    amount: authoritative.amount ?? session.amount,
+                    currency: authoritative.currency || session.currency,
+                    methodName: session.paymentName || payment.method || "MyanMyanPay / MMQR",
+                    reference: session.reference || "",
+                    orderStatus: state.orderStatus,
+                    myanMyanPay: true
+                });
+            } catch (_) {
+                // Transient read failures leave the QR visible until the bounded poller retries.
+            } finally {
+                if (pollIdentity === myanMyanPayStatusIdentity) myanMyanPayStatusRequestInFlight = false;
+            }
+        };
+        poll();
+        myanMyanPayStatusTimer = window.setInterval(poll, MYANMYANPAY_STATUS_INTERVAL_MS);
+        return true;
+    }
+
     function showStaged(staged) {
         const order = staged.orderData || staged.session?.order || {};
         const session = staged.session || {};
@@ -55,16 +202,17 @@
                 sessionStorage.removeItem("azielProductCheckoutDraft");
                 showCompletion({ orderId, paid: false, amount, currency, methodName, reference, manualSubmission: true });
             } });
+            startMyanMyanPayStatusPolling(staged);
             return;
         }
         if (String(staged.paymentType || session.paymentType || payment.paymentType || "").toLowerCase() === "auto") window.PaymentPromptPay.show(order, session);
         else window.PaymentManual.show(order, session);
     }
 
-    function showCompletion({ orderId, paid = false, paymentReceived = false, amount = null, currency = "", methodName = "", reference = "", manualSubmission = false } = {}) {
+    function showCompletion({ orderId, paid = false, paymentReceived = false, amount = null, currency = "", methodName = "", reference = "", manualSubmission = false, orderStatus = "", myanMyanPay = false } = {}) {
         if (!orderId) return;
         let remaining = 5;
-        completionState = { orderId, paid, manualSubmission };
+        completionState = { orderId, paid, manualSubmission, paymentReceived, orderStatus, myanMyanPay };
         completionRemaining = remaining;
         const mount = document.getElementById("paymentSessionMount");
         const section = document.createElement("section");
@@ -72,8 +220,8 @@
         section.setAttribute("role", "status");
         const icon = document.createElement("div"); icon.className = "payment-completion__icon"; icon.textContent = "✓";
         const eyebrow = document.createElement("p"); eyebrow.className = "checkout-eyebrow"; eyebrow.textContent = t("order.statusLabel", "Order status");
-        const title = document.createElement("h2"); title.textContent = paymentReceived ? "Payment received" : paid ? t("payment.success.title", "Payment Successful") : t("payment.submitted.title", "Payment Submitted");
-        const body = document.createElement("p"); body.textContent = paymentReceived ? "Your payment has been confirmed. Processing your order..." : paid ? t("payment.success.receivedProcessing", "Your payment has been received. Your order is being processed.") : t("payment.submitted.awaiting", "Your receipt has been received. Your payment is waiting for verification.");
+        const title = document.createElement("h2"); title.textContent = myanMyanPay && paid ? t("payment.success.title", "Payment Successful") : paymentReceived ? "Payment received" : paid ? t("payment.success.title", "Payment Successful") : t("payment.submitted.title", "Payment Submitted");
+        const body = document.createElement("p"); body.textContent = myanMyanPay && orderStatus === "completed" ? t("payment.success.completed", "Payment received. Your order is completed.") : paymentReceived ? "Your payment has been confirmed. Processing your order..." : paid ? t("payment.success.receivedProcessing", "Your payment has been received. Your order is being processed.") : t("payment.submitted.awaiting", "Your receipt has been received. Your payment is waiting for verification.");
         const details = document.createElement("dl"); details.className = "payment-completion__details";
         [[t("payment.amount", "Amount"), amount != null ? money(amount, currency) : ""], [t("payment.method", "Payment Method"), methodName], [t("payment.reference", "Reference"), reference]].forEach(([label, value]) => { if (!value) return; const row = document.createElement("div"); const dt = document.createElement("dt"); dt.textContent = label; const dd = document.createElement("dd"); dd.textContent = value; row.append(dt, dd); details.append(row); });
         const countdown = document.createElement("p"); countdown.id = "paymentRedirectCountdown"; countdown.textContent = t("payment.redirectCountdown", "Redirecting to order tracking in {seconds} seconds", { seconds: remaining });
@@ -201,19 +349,24 @@
         const orderId = event.detail?.order?.orderId || event.detail?.order?.commerceOrderId || "";
         if (orderId) showCompletion({ orderId, paid: false });
     });
+    window.addEventListener("pagehide", stopMyanMyanPayStatusPolling);
+    window.addEventListener("beforeunload", stopMyanMyanPayStatusPolling);
     window.addEventListener("aziel:locale-changed", () => {
         if (!completionState) return;
-        const paid = completionState.paid;
+        const { paid, paymentReceived, orderStatus, myanMyanPay } = completionState;
         const section = document.querySelector(".payment-completion");
         if (!section) return;
         section.querySelector(".checkout-eyebrow").textContent = t("order.statusLabel", "Order status");
-        section.querySelector("h2").textContent = paid ? t("payment.success.title", "Payment Successful") : t("payment.submitted.title", "Payment Submitted");
-        section.querySelector("h2 + p").textContent = paid ? t("payment.success.receivedProcessing", "Your payment has been received. Your order is being processed.") : t("payment.submitted.awaiting", "Your receipt has been received. Your payment is waiting for verification.");
+        section.querySelector("h2").textContent = myanMyanPay && paid ? t("payment.success.title", "Payment Successful") : paymentReceived ? "Payment received" : paid ? t("payment.success.title", "Payment Successful") : t("payment.submitted.title", "Payment Submitted");
+        section.querySelector("h2 + p").textContent = myanMyanPay && orderStatus === "completed" ? t("payment.success.completed", "Payment received. Your order is completed.") : paymentReceived ? "Your payment has been confirmed. Processing your order..." : paid ? t("payment.success.receivedProcessing", "Your payment has been received. Your order is being processed.") : t("payment.submitted.awaiting", "Your receipt has been received. Your payment is waiting for verification.");
         document.getElementById("paymentRedirectCountdown").textContent = t("payment.redirectCountdown", "Redirecting to order tracking in {seconds} seconds", { seconds: completionRemaining });
         document.getElementById("trackOrderNow").textContent = t("payment.trackOrderNow", "Track Order");
         document.getElementById("paymentBackHome").textContent = t("payment.backHome", "Back to Home");
         text("paymentStatusSummary", paid ? t("payment.state.paid", "Paid") : t("payment.state.pendingVerification", "Pending verification"));
     });
 
-    window.AZIEL_PAYMENT_PAGE = { showCompletion };
+    window.AZIEL_PAYMENT_PAGE = {
+        showCompletion,
+        _test: Object.freeze({ myanMyanPayIdentity, classifyMyanMyanPayServerState })
+    };
 })();

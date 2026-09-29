@@ -5,6 +5,7 @@ const crypto = require("crypto");
 const { EventEmitter } = require("events");
 const fs = require("fs");
 const path = require("path");
+const vm = require("vm");
 const mongoose = require("mongoose");
 const { inspectMyanMyanPayConfiguration, loadMyanMyanPayConfiguration, CALLBACK_URL } = require("../services/myanmyanpay/myanMyanPayConfiguration");
 const { createMyanMyanPayClient, _test: myanMyanPayClientTest } = require("../services/myanmyanpay/myanMyanPayClient");
@@ -452,10 +453,13 @@ assert.strictEqual(myanMyanPayAccessDecision(method, { id: "user-1" }, env).allo
     const adminPaymentSource = fs.readFileSync(path.join(root, "frontend/js/admin-payments.js"), "utf8");
     const adminUsersSource = fs.readFileSync(path.join(root, "backend/routes/adminUsers.js"), "utf8");
     const paymentEngineSource = fs.readFileSync(path.join(root, "frontend/js/payment/payment-engine.js"), "utf8");
+    const paymentPageHtmlSource = fs.readFileSync(path.join(root, "frontend/payment.html"), "utf8");
     const mmPaymentShellSource = fs.readFileSync(path.join(root, "frontend/js/payment/mm-payment-shell.js"), "utf8");
+    const paymentPageRuntimeSource = fs.readFileSync(path.join(root, "frontend/js/payment-page-runtime.js"), "utf8");
     const customerCheckoutSource = fs.readFileSync(path.join(root, "backend/services/commerce/customerManualPaymentCheckoutService.js"), "utf8");
     const myanMyanPayClientSource = fs.readFileSync(path.join(root, "backend/services/myanmyanpay/myanMyanPayClient.js"), "utf8");
     const paymentOrchestratorSource = fs.readFileSync(path.join(root, "backend/services/commerce/paymentOrchestrator.js"), "utf8");
+    const sdkTypesSource = fs.readFileSync(path.join(root, "node_modules/mmpay-node-sdk/src/types.ts"), "utf8");
     assert(myanMyanPayClientSource.includes('const { MMPaySDK } = require("mmpay-node-sdk")'), "official SDK must be the protocol implementation");
     assert(myanMyanPayClientSource.includes('await sdk[operation.toLowerCase()](input)'), "provider operations must delegate through the SDK boundary");
     assert(!myanMyanPayClientSource.includes("createMyanMyanPayTransport") && !fs.existsSync(path.join(root, "backend/services/myanmyanpay/myanMyanPayTransport.js")), "superseded custom transport must be removed");
@@ -464,6 +468,46 @@ assert.strictEqual(myanMyanPayAccessDecision(method, { id: "user-1" }, env).allo
     const providerPayIndex = paymentOrchestratorSource.indexOf("await adapter.createPayment", persistAttemptIndex);
     assert(prepareAttemptIndex >= 0 && persistAttemptIndex > prepareAttemptIndex && providerPayIndex > persistAttemptIndex, "provider order ID must be generated and persisted before provider pay");
     assert(paymentOrchestratorSource.includes("providerReference: normalizeString(preparedAttempt?.providerReference)"), "prepared provider order ID must be persisted on PaymentAttempt");
+    const runtimeWindow = {
+        addEventListener() {},
+        setInterval() { return 1; },
+        clearInterval() {},
+        setTimeout() { return 1; },
+        clearTimeout() {},
+        AZIEL_PAYMENT_SESSION_AUTHORITY: null,
+        AZIEL_LOCALE: { t(key, fallback) { return fallback; } }
+    };
+    vm.runInNewContext(paymentPageRuntimeSource, {
+        window: runtimeWindow,
+        document: { addEventListener() {}, getElementById() { return null; }, querySelector() { return null; } },
+        sessionStorage: { getItem() { return null; }, removeItem() {} },
+        localStorage: { getItem() { return null; } },
+        URLSearchParams,
+        console,
+        fetch: async () => { throw new Error("polling must not execute while loading verifier helpers"); }
+    });
+    const statusSync = runtimeWindow.AZIEL_PAYMENT_PAGE._test;
+    const exactStatusStaged = { session: { provider: "MYANMYANPAY", paymentMethod: "myanmyanpay_mmqr", paymentChannel: "MYANMYANPAY_MMQR", confirmationMode: "provider_webhook", commerceOrderId: "AZL-1", attemptId: "PAY-1" } };
+    assert.deepStrictEqual({ ...statusSync.myanMyanPayIdentity(exactStatusStaged) }, { orderId: "AZL-1", attemptId: "PAY-1" }, "status polling must require the exact MyanMyanPay MMQR identity");
+    for (const mutation of [{ provider: "DINGER" }, { paymentMethod: "thunder_promptpay" }, { paymentChannel: "THUNDER_PROMPTPAY" }, { confirmationMode: "manual_admin" }, { commerceOrderId: "" }, { attemptId: "" }]) {
+        assert.strictEqual(statusSync.myanMyanPayIdentity({ session: { ...exactStatusStaged.session, ...mutation } }), null, "non-MyanMyanPay and incomplete identities must not start polling");
+    }
+    for (const order of [{ paymentStatus: "paid", status: "pending_payment" }, { paymentStatus: "pending", status: "paid" }, { paymentStatus: "pending", status: "processing" }, { paymentStatus: "pending", status: "completed" }]) {
+        assert.strictEqual(statusSync.classifyMyanMyanPayServerState(order).kind, "success", "paid/processing/completed server state must render success");
+    }
+    for (const status of ["failed", "cancelled", "expired"]) assert.deepStrictEqual({ ...statusSync.classifyMyanMyanPayServerState({ paymentStatus: status, status }) }, { kind: "terminal", orderStatus: status });
+    for (const status of ["pending_payment", "pending", "unpaid", "initiating"]) assert.strictEqual(statusSync.classifyMyanMyanPayServerState({ paymentStatus: status, status: "pending_payment" }).kind, "pending", "pending server state must preserve the QR");
+    assert(paymentPageRuntimeSource.includes("/api/order/status/${encodeURIComponent(identity.orderId)}"), "MyanMyanPay polling must use the authenticated canonical order-status endpoint");
+    assert(paymentPageRuntimeSource.includes('{ method: "GET", headers }'), "status polling must remain explicitly read-only");
+    assert(paymentPageRuntimeSource.includes("headers.Authorization"), "status polling must require customer authentication");
+    assert(paymentPageRuntimeSource.includes('returnedOrderId !== identity.orderId') && paymentPageRuntimeSource.includes('returnedProvider !== "MYANMYANPAY"') && paymentPageRuntimeSource.includes('returnedAttemptId !== identity.attemptId'), "polling responses must fail closed on order, provider, and attempt mismatches");
+    assert(paymentPageRuntimeSource.includes("MYANMYANPAY_STATUS_MAX_POLLS") && paymentPageRuntimeSource.includes("myanMyanPayStatusRequestInFlight"), "polling must be bounded and non-overlapping");
+    assert(paymentPageRuntimeSource.includes("paid: true") && paymentPageRuntimeSource.includes("paymentReceived: true") && paymentPageRuntimeSource.includes("showCompletion({"), "authoritative success must use the existing successful completion presentation");
+    assert(paymentPageRuntimeSource.includes('updateMyanMyanPayTerminal(state.orderStatus)') && paymentPageRuntimeSource.includes('qrSection.hidden = true'), "failed, cancelled, and expired states must stop using the stale QR without mutating payment state");
+    assert(!paymentPageRuntimeSource.includes("/api/payment/status/") && !paymentPageRuntimeSource.includes("myanmyanpay-reconcile") && !paymentPageRuntimeSource.includes("MMPay.get"), "browser polling must not use legacy, reconciliation, or provider endpoints");
+    assert(!/expiresAt|expiry|ttl|validUntil/i.test(sdkTypesSource), "installed MyanMyanPay SDK response contract must not be treated as supplying an expiry when it does not");
+    assert(!paymentPageRuntimeSource.includes("QR expires in"), "no MyanMyanPay expiry countdown may be invented without an authoritative provider expiry");
+    assert(paymentPageHtmlSource.includes("payment-page-runtime.js?v=20260930-myanmyanpay-status-1"), "payment page must load the status-sync runtime with a fresh deployment asset version");
     assert(paymentRouteSource.includes('requireAdminPermission(PERMISSIONS.PAYMENT_METHODS_MANAGE)'), "tester lookup remains payment-management authorized");
     assert(paymentRouteSource.includes('authorizedTesterCustomerIds'), "activation must accept customer-facing tester IDs");
     assert(paymentRouteSource.includes('if (!["DISABLED", "TEST_ONLY"].includes(state))'), "PUBLIC must remain rejected");
