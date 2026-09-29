@@ -265,6 +265,7 @@ function configureDatabaseApplication(mongoConnection) {
     ["supplier", "wallet", "support", "settings", "paymentMethods"].forEach(route =>
         app.use("/api", require(`./routes/${route}`))
     );
+    app.use("/api", require("./routes/myanMyanPayConnectivityDiagnostic"));
     app.use("/api/live-chat", require("./routes/liveChat"));
     ["catalog", "homeBanners", "campaigns", "promos", "coupons", "sitePlacements", "configurationRegistry", "websiteRuntime"].forEach(route =>
         app.use("/api", require(`./routes/${route}`))
