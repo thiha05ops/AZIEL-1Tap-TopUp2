@@ -187,6 +187,89 @@ assert.strictEqual(myanMyanPayAccessDecision(method, { id: "user-1" }, env).allo
     const loggerFailureClient = createMyanMyanPayClient(configuration, { sdk: { async pay() { return validResponse; } }, logger: { info() { throw new Error("logger unavailable"); } } });
     assert.strictEqual(await loggerFailureClient.pay({}), validResponse, "diagnostic logging failure must not change successful payment behavior");
 
+    function reconciliationHarness(providerResponse) {
+        const state = {
+            attempt: { attemptId: "PAY-RECON-1", orderId: "AZL-RECON-1", subjectType: "COMMERCE_ORDER", subjectId: "AZL-RECON-1", ownerId: "user-1", owner: { type: "USER", userId: "user-1" }, provider: "MYANMYANPAY", paymentMethod: "myanmyanpay_mmqr", paymentMethodId: "myanmyanpay_mmqr", paymentChannel: "MYANMYANPAY_MMQR", confirmationMode: "provider_webhook", amount: 34740, currency: "MMK", region: "MM", status: "INITIATING", providerReference: "", providerTransactionId: "", qr: null },
+            order: { orderId: "AZL-RECON-1", status: "pending_payment", paymentStatus: "unpaid", payment: { provider: "MYANMYANPAY", paymentMethodId: "myanmyanpay_mmqr", paymentChannel: "MYANMYANPAY_MMQR", status: "unpaid" }, commercial: { amount: 34740, totalAmount: 34740, currency: "MMK", region: "MM" } },
+            calls: { get: 0, pay: 0, setReference: 0, attemptStatus: 0, orderPayment: 0, orderStatus: 0, createAttempt: 0, createOrder: 0, fulfillment: 0 }
+        };
+        const paymentAttemptRepository = {
+            async findAttemptById() { return { ...state.attempt }; },
+            async setProviderReference(input) { state.calls.setReference += 1; Object.assign(state.attempt, { providerReference: input.providerReference, providerTransactionId: input.providerTransactionId, rawProviderStatus: input.rawProviderStatus, qr: input.qr, paymentInstructions: input.paymentInstructions, safeMetadata: input.safeMetadata }); return { ...state.attempt }; },
+            async updateStatus(input) { state.calls.attemptStatus += 1; assert(input.fromStatuses.includes(state.attempt.status)); state.attempt.status = input.toStatus; return { ...state.attempt }; },
+            async createAttempt() { state.calls.createAttempt += 1; throw new Error("must not create attempt"); }
+        };
+        const commerceOrderRepository = {
+            async findOrderById() { return { ...state.order, payment: { ...state.order.payment } }; },
+            async updatePaymentStatus(input) { state.calls.orderPayment += 1; assert(input.fromStatuses.includes(state.order.paymentStatus)); state.order.paymentStatus = input.toStatus; state.order.payment.status = input.toStatus; return { ...state.order, payment: { ...state.order.payment } }; },
+            async updateOrderStatus(input) { state.calls.orderStatus += 1; assert(input.fromStatuses.includes(state.order.status)); state.order.status = input.toStatus; return { ...state.order, payment: { ...state.order.payment } }; },
+            async createOrderRecord() { state.calls.createOrder += 1; throw new Error("must not create order"); }
+        };
+        const sdk = {
+            async get(input) { state.calls.get += 1; assert.deepStrictEqual(input, { orderId: state.attempt.attemptId }, "reconciliation get must use the exact PaymentAttempt ID"); return typeof providerResponse === "function" ? providerResponse(state) : providerResponse; },
+            async pay() { state.calls.pay += 1; throw new Error("pay must never be called by reconciliation"); }
+        };
+        const service = createManualPaymentApplicationService({
+            paymentAttemptRepository,
+            commerceOrderRepository,
+            transactionRunner: callback => callback({}),
+            myanMyanPayConfigurationProvider: async () => configuration,
+            providerOptions: { myanMyanPayClientOptions: { sdk, logger: { info() {} } } },
+            paidFulfillmentHandler: async () => { state.calls.fulfillment += 1; }
+        });
+        return { state, service };
+    }
+
+    for (const response of [() => { throw new Error("handshake failed"); }, new Error("network"), { code: "PROVIDER_ERROR", message: "rejected" }, null, { status: "PENDING" }, { orderId: "WRONG", amount: 34740, currency: "MMK", method: "QR", status: "PENDING" }, { orderId: "PAY-RECON-1", amount: 34741, currency: "MMK", method: "QR", status: "PENDING" }, { orderId: "PAY-RECON-1", amount: 34740, currency: "MMK", method: "QR", status: "UNKNOWN" }]) {
+        const { state, service } = reconciliationHarness(response);
+        const result = await service.reconcileMyanMyanPayPayment({ attemptId: "PAY-RECON-1", actor: { id: "admin-1" } });
+        assert.strictEqual(result.stateChanged, false, "error, malformed, mismatched and unknown results must not mutate state");
+        assert.deepStrictEqual({ setReference: state.calls.setReference, attemptStatus: state.calls.attemptStatus, orderPayment: state.calls.orderPayment, orderStatus: state.calls.orderStatus, pay: state.calls.pay }, { setReference: 0, attemptStatus: 0, orderPayment: 0, orderStatus: 0, pay: 0 });
+    }
+
+    const pendingHarness = reconciliationHarness({ orderId: "PAY-RECON-1", amount: 34740, currency: "MMK", appId: configuration.appId, method: "QR", vendor: "KBZPay", status: "PENDING", transactionRefId: "TX-1", vendorQrRefId: "QR-1", qr: "000201010212MMQR" });
+    const pendingResult = await pendingHarness.service.reconcileMyanMyanPayPayment({ attemptId: "PAY-RECON-1" });
+    assert.strictEqual(pendingResult.resultingAttemptStatus, "PENDING");
+    assert.strictEqual(pendingResult.qrRecovered, true);
+    assert.strictEqual(pendingResult.providerSuccessObserved, false);
+    assert.strictEqual(pendingHarness.state.order.paymentStatus, "pending");
+    assert.strictEqual(pendingHarness.state.order.status, "pending_payment", "PENDING reconciliation must not settle the CommerceOrder");
+    assert(!JSON.stringify(pendingResult).includes("000201010212MMQR") && !Object.prototype.hasOwnProperty.call(pendingResult, "qr"), "reconciliation response must not expose provider QR or raw response data");
+    const repeatedPending = await pendingHarness.service.reconcileMyanMyanPayPayment({ attemptId: "PAY-RECON-1" });
+    assert.strictEqual(repeatedPending.stateChanged, false, "repeated PENDING reconciliation must be idempotent");
+    assert.strictEqual(pendingHarness.state.calls.setReference, 1, "repeated reconciliation must not rewrite recovered provider data");
+
+    const successHarness = reconciliationHarness({ orderId: "PAY-RECON-1", amount: 34740, currency: "MMK", appId: configuration.appId, method: "QR", status: "SUCCESS", transactionRefId: "TX-SUCCESS" });
+    const successResult = await successHarness.service.reconcileMyanMyanPayPayment({ attemptId: "PAY-RECON-1" });
+    assert.strictEqual(successResult.providerSuccessObserved, true);
+    assert.strictEqual(successResult.settlementAuthority, "AUTHENTICATED_CALLBACK");
+    assert.strictEqual(successResult.stateChanged, false);
+    assert.strictEqual(successHarness.state.attempt.status, "INITIATING");
+    assert.strictEqual(successHarness.state.order.paymentStatus, "unpaid");
+    assert.strictEqual(successHarness.state.calls.fulfillment, 0, "SUCCESS reconciliation must never trigger fulfillment");
+
+    const refundedHarness = reconciliationHarness({ orderId: "PAY-RECON-1", amount: 34740, currency: "MMK", appId: configuration.appId, method: "QR", status: "REFUNDED" });
+    const refundedResult = await refundedHarness.service.reconcileMyanMyanPayPayment({ attemptId: "PAY-RECON-1" });
+    assert.strictEqual(refundedResult.reconciliationOutcome, "PROVIDER_REFUNDED_OBSERVED");
+    assert.strictEqual(refundedResult.stateChanged, false, "REFUNDED observation must remain non-mutating until refund lifecycle support exists");
+
+    const notFoundHarness = reconciliationHarness({ code: "NOT_FOUND", message: "not found" });
+    const notFoundResult = await notFoundHarness.service.reconcileMyanMyanPayPayment({ attemptId: "PAY-RECON-1" });
+    assert.strictEqual(notFoundResult.reconciliationOutcome, "NOT_FOUND_INCONCLUSIVE");
+    assert.strictEqual(notFoundResult.stateChanged, false);
+
+    for (const [providerStatus, attemptStatus, orderPayment, orderStatus] of [["FAILED", "FAILED", "failed", "payment_failed"], ["CANCELLED", "CANCELLED", "cancelled", "cancelled"], ["EXPIRED", "EXPIRED", "expired", "expired"]]) {
+        const harness = reconciliationHarness({ orderId: "PAY-RECON-1", amount: 34740, currency: "MMK", appId: configuration.appId, method: "QR", status: providerStatus });
+        const result = await harness.service.reconcileMyanMyanPayPayment({ attemptId: "PAY-RECON-1" });
+        assert.strictEqual(result.resultingAttemptStatus, attemptStatus);
+        assert.strictEqual(harness.state.order.paymentStatus, orderPayment);
+        assert.strictEqual(harness.state.order.status, orderStatus);
+        assert.strictEqual(harness.state.calls.pay, 0);
+        assert.strictEqual(harness.state.calls.createAttempt, 0);
+        assert.strictEqual(harness.state.calls.createOrder, 0);
+        assert.strictEqual(harness.state.calls.fulfillment, 0);
+    }
+
     const root = path.resolve(__dirname, "../..");
     const paymentRouteSource = fs.readFileSync(path.join(root, "backend/routes/paymentMethods.js"), "utf8");
     const adminPaymentSource = fs.readFileSync(path.join(root, "frontend/js/admin-payments.js"), "utf8");
@@ -203,6 +286,9 @@ assert.strictEqual(myanMyanPayAccessDecision(method, { id: "user-1" }, env).allo
     assert(adminPaymentSource.includes('PUBLIC — unavailable'), "PUBLIC must be visibly unavailable");
     assert(adminPaymentSource.includes('authorizedTesterCustomerIds'), "Admin activation must submit customer IDs, not ObjectIds");
     assert(adminUsersSource.includes('{ customerId: { $regex:'), "Admin Users must search customerId");
+    const commerceRoutesSource = fs.readFileSync(path.join(root, "backend/routes/commerceManualPaymentRoutes.js"), "utf8");
+    assert(commerceRoutesSource.includes('"/admin/payment-attempts/:attemptId/myanmyanpay-reconcile"'), "Admin reconciliation route must remain registered");
+    assert(commerceRoutesSource.includes("requireAdminPermission(PERMISSIONS.ORDERS_MANAGE)"), "Admin reconciliation must require order-management permission");
     const myanMyanPayEngineBranch = paymentEngineSource.slice(
         paymentEngineSource.indexOf("if (isMyanMyanPaySelection(selectedPayment, orderData))"),
         paymentEngineSource.indexOf("if (isDingerSelection(selectedPayment, orderData))")

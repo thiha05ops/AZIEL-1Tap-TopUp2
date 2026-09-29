@@ -2,6 +2,7 @@
 
 const { runtimeDebug } = require("../utils/runtimeDebug");
 const { diagnosticTag, logThunderDiagnostic } = require("../utils/thunderDiagnostics");
+const { ADMIN_AUDIT_ACTIONS, writeAdminAudit } = require("../services/adminAuditService");
 
 const crypto = require("crypto");
 
@@ -277,6 +278,37 @@ function createCommerceManualPaymentController(options = {}) {
                 res.setHeader("Cache-Control", "no-store, max-age=0");
                 return respondSuccess(res, result, 201);
             } catch (error) {
+                return respondError(res, error);
+            }
+        },
+
+        async reconcileMyanMyanPay(req, res) {
+            const attemptId = String(req.params.attemptId || "").trim();
+            let result = null;
+            try {
+                if (req.body?.confirmation !== "RECONCILE_MYANMYANPAY_SANDBOX" || Object.keys(req.body || {}).some(key => key !== "confirmation")) {
+                    await writeAdminAudit({ actor: req.admin, req, action: ADMIN_AUDIT_ACTIONS.MYANMYANPAY_RECONCILIATION, resourceType: "PaymentAttempt", resourceId: attemptId, metadata: { success: false, outcome: "CONFIRMATION_REJECTED" } }).catch(() => null);
+                    return res.status(400).json({ success: false, code: "MYANMYANPAY_RECONCILIATION_CONFIRMATION_REQUIRED", message: "Explicit MyanMyanPay Sandbox reconciliation confirmation is required." });
+                }
+                result = await service.reconcileMyanMyanPayPayment({ attemptId, actor: req.admin });
+                await writeAdminAudit({
+                    actor: req.admin,
+                    req,
+                    action: ADMIN_AUDIT_ACTIONS.MYANMYANPAY_RECONCILIATION,
+                    resourceType: "PaymentAttempt",
+                    resourceId: attemptId,
+                    metadata: result
+                });
+                return res.json(result);
+            } catch (error) {
+                await writeAdminAudit({
+                    actor: req.admin,
+                    req,
+                    action: ADMIN_AUDIT_ACTIONS.MYANMYANPAY_RECONCILIATION,
+                    resourceType: "PaymentAttempt",
+                    resourceId: attemptId,
+                    metadata: { success: false, outcome: "RECONCILIATION_REJECTED", code: error?.code || "MYANMYANPAY_RECONCILIATION_FAILED" }
+                }).catch(() => null);
                 return respondError(res, error);
             }
         },

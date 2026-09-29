@@ -7,6 +7,13 @@ const { PROVIDER, METHOD } = require("../../myanmyanpay/myanMyanPayPaymentPolicy
 const text = value => String(value || "").trim();
 const fail = (message, stage = "callback") => new ProviderAdapterError(ERROR_CODES.PAYMENT_PROVIDER_EVENT_INVALID, message, { stage });
 const STATUS = Object.freeze({ PENDING: "PENDING", SUCCESS: "PAID", FAILED: "FAILED", CANCELLED: "CANCELLED", EXPIRED: "EXPIRED", REFUNDED: "REFUNDED" });
+const RECONCILIATION_STATUSES = Object.freeze(new Set(["PENDING", "SUCCESS", "FAILED", "CANCELLED", "EXPIRED", "REFUNDED"]));
+
+function errorShaped(value) {
+    if (value instanceof Error || !value || typeof value !== "object" || Array.isArray(value)) return true;
+    if (["error", "errorCode", "code", "statusCode", "httpStatus"].some(key => Object.prototype.hasOwnProperty.call(value, key))) return true;
+    return Object.prototype.hasOwnProperty.call(value, "message") && (!text(value.orderId) || !text(value.status));
+}
 
 function createMyanMyanPayAdapter(options = {}) {
     const configuration = options.configuration || {};
@@ -38,6 +45,46 @@ function createMyanMyanPayAdapter(options = {}) {
             currency: "MMK",
             qr: { type: "MYANMYANPAY_MMQR", mode: "provider_generated", payload: qrPayload, image: await QRCode.toDataURL(qrPayload, { errorCorrectionLevel: "M", margin: 2, width: 360 }) },
             paymentInstructions: { type: "MYANMYANPAY_MMQR", title: "MyanMyanPay / MMQR", reference: orderId, steps: ["Scan the MMQR", "Pay the exact amount", "Wait for payment confirmation"], requiresReceiptUpload: false, receiptUploadEnabled: false, slipRequired: false, confirmationMode: "provider_webhook" },
+            safeMetadata: { environment: "SANDBOX", appId: configuration.appId, vendorQrRefId: text(response.vendorQrRefId), paymentMethodId: METHOD }
+        };
+    }
+
+    async function queryPayment({ intent = {}, attempt = {} } = {}) {
+        const attemptId = text(attempt.attemptId);
+        const amount = Number(attempt.amount ?? intent.amount);
+        if (configuration.enabled !== true || configuration.environment !== "SANDBOX") throw fail("MyanMyanPay sandbox is unavailable.", "configuration");
+        if (text(attempt.provider) !== PROVIDER || text(attempt.paymentMethodId || attempt.paymentMethod) !== METHOD || text(attempt.paymentChannel) !== "MYANMYANPAY_MMQR") throw fail("MyanMyanPay reconciliation identity mismatch.", "identity");
+        if (!attemptId || text(attempt.orderId) !== text(intent.orderId) || text(attempt.currency || intent.currency).toUpperCase() !== "MMK" || !Number.isSafeInteger(amount) || amount <= 0) throw fail("MyanMyanPay reconciliation binding is invalid.", "identity");
+        let response;
+        try {
+            response = await client.get({ orderId: attemptId });
+        } catch (_) {
+            return { usable: false, observedStatus: "", reconciliationOutcome: "PROVIDER_ERROR_INCONCLUSIVE" };
+        }
+        if (errorShaped(response)) {
+            const safeCode = [response?.code, response?.errorCode, response?.statusCode, response?.httpStatus].find(value => ["string", "number", "boolean"].includes(typeof value));
+            const notFound = Number(safeCode) === 404 || /NOT[_ -]?FOUND/i.test(String(safeCode || ""));
+            return { usable: false, observedStatus: "", reconciliationOutcome: notFound ? "NOT_FOUND_INCONCLUSIVE" : "PROVIDER_ERROR_INCONCLUSIVE" };
+        }
+        const observedStatus = text(response.status).toUpperCase();
+        const safeObservedStatus = RECONCILIATION_STATUSES.has(observedStatus) ? observedStatus : "UNKNOWN";
+        if (text(response.orderId) !== attemptId || Number(response.amount) !== amount || (text(response.currency) && text(response.currency).toUpperCase() !== "MMK") || (text(response.appId) && text(response.appId) !== text(configuration.appId)) || (text(response.method) && text(response.method).toUpperCase() !== "QR")) {
+            return { usable: false, observedStatus: safeObservedStatus, reconciliationOutcome: "BINDING_MISMATCH" };
+        }
+        if (!RECONCILIATION_STATUSES.has(observedStatus)) return { usable: false, observedStatus: "UNKNOWN", reconciliationOutcome: "UNKNOWN_STATUS_INCONCLUSIVE" };
+        const qrPayload = text(response.qr);
+        const qr = qrPayload ? { type: "MYANMYANPAY_MMQR", mode: "provider_generated", payload: qrPayload, image: await QRCode.toDataURL(qrPayload, { errorCorrectionLevel: "M", margin: 2, width: 360 }) } : null;
+        return {
+            usable: true,
+            observedStatus,
+            reconciliationOutcome: observedStatus === "SUCCESS" ? "SUCCESS_AWAITING_AUTHENTICATED_CALLBACK" : `PROVIDER_${observedStatus}_OBSERVED`,
+            providerReference: attemptId,
+            providerTransactionId: text(response.transactionRefId) || attemptId,
+            rawProviderStatus: observedStatus,
+            amount,
+            currency: "MMK",
+            qr,
+            paymentInstructions: qr ? { type: "MYANMYANPAY_MMQR", title: "MyanMyanPay / MMQR", reference: attemptId, steps: ["Scan the MMQR", "Pay the exact amount", "Wait for payment confirmation"], requiresReceiptUpload: false, receiptUploadEnabled: false, slipRequired: false, confirmationMode: "provider_webhook" } : null,
             safeMetadata: { environment: "SANDBOX", appId: configuration.appId, vendorQrRefId: text(response.vendorQrRefId), paymentMethodId: METHOD }
         };
     }
@@ -82,7 +129,7 @@ function createMyanMyanPayAdapter(options = {}) {
         return { provider: PROVIDER, providerReference: text(attempt.providerReference), providerTransactionId: text(attempt.providerTransactionId || attempt.providerReference), status: "CANCELLED", amount: Number(attempt.amount), currency: "MMK", rawProviderStatus: "CANCELLED" };
     }
 
-    return createProviderAdapter({ providerId: PROVIDER, displayName: "MyanMyanPay MMQR", version: "1", supportedCurrencies: ["MMK"], supportedPaymentMethods: [METHOD], supportedCapabilities: [CAPABILITIES.CREATE_PAYMENT, CAPABILITIES.CANCEL_PAYMENT, CAPABILITIES.WEBHOOK, CAPABILITIES.QR_CODE], environment: "sandbox", handlers: { createPayment, cancelPayment, handleProviderEvent } });
+    return createProviderAdapter({ providerId: PROVIDER, displayName: "MyanMyanPay MMQR", version: "1", supportedCurrencies: ["MMK"], supportedPaymentMethods: [METHOD], supportedCapabilities: [CAPABILITIES.CREATE_PAYMENT, CAPABILITIES.QUERY_PAYMENT, CAPABILITIES.REFRESH_PAYMENT, CAPABILITIES.CANCEL_PAYMENT, CAPABILITIES.WEBHOOK, CAPABILITIES.QR_CODE], environment: "sandbox", handlers: { createPayment, queryPayment, refreshPayment: queryPayment, cancelPayment, handleProviderEvent } });
 }
 
 module.exports = Object.freeze({ createMyanMyanPayAdapter, MYANMYANPAY_PROVIDER_ID: PROVIDER, MYANMYANPAY_METHOD_ID: METHOD });

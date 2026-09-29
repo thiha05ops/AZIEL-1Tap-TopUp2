@@ -116,6 +116,14 @@ function createCommerceManualPaymentRoutes(options = {}) {
     );
 
     router.post(
+        "/admin/payment-attempts/:attemptId/myanmyanpay-reconcile",
+        requestProbe,
+        adminMiddleware,
+        requireAdminPermission(PERMISSIONS.ORDERS_MANAGE),
+        controller.reconcileMyanMyanPay
+    );
+
+    router.post(
         "/admin/commerce/payments/:attemptId/approve",
         requestProbe,
         adminMiddleware,

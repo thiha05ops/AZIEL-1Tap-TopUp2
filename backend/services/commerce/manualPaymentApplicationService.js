@@ -590,6 +590,114 @@ function createManualPaymentApplicationService(dependencies = {}) {
         }
     }
 
+    async function reconcileMyanMyanPayPayment(input = {}) {
+        const attemptId = assertId(input.attemptId, "attemptId");
+        const { attempt, order } = await loadOperationalAttempt(attemptId);
+        const previousAttemptStatus = normalizeUpper(attempt.status);
+        const method = normalizeString(attempt.paymentMethodId || attempt.paymentMethod);
+        const orderAmount = Number(order.commercial?.totalAmount ?? order.commercialSnapshot?.totalAmount);
+        const orderCurrency = normalizeString(order.commercial?.currency || order.commercialSnapshot?.currency);
+        if (normalizeString(attempt.provider) !== MYANMYANPAY_PROVIDER_ID || method !== "myanmyanpay_mmqr" || normalizeString(attempt.paymentChannel) !== "MYANMYANPAY_MMQR" || normalizeString(attempt.currency) !== "MMK" || orderCurrency !== "MMK" || Number(attempt.amount) !== orderAmount || normalizeString(attempt.orderId) !== normalizeString(order.orderId)) {
+            throw appError(ERROR_CODES.UNSUPPORTED_PAYMENT_METHOD, "Payment attempt is not a canonical MyanMyanPay MMQR payment.", 422, "reconciliation");
+        }
+        const configuration = await deps.myanMyanPayConfigurationProvider();
+        if (configuration.enabled !== true || configuration.environment !== "SANDBOX") throw appError(ERROR_CODES.PROVIDER_UNAVAILABLE, "MyanMyanPay Sandbox reconciliation is unavailable.", 503, "reconciliation");
+        const client = createMyanMyanPayClient(configuration, deps.providerOptions.myanMyanPayClientOptions || {});
+        const adapter = createMyanMyanPayAdapter({ configuration, client, ...(deps.providerOptions.myanMyanPayAdapterOptions || {}) });
+        const observed = await adapter.queryPayment({
+            attempt,
+            intent: { orderId: order.orderId, amount: Number(attempt.amount), currency: attempt.currency, provider: attempt.provider, paymentMethodId: method, paymentChannel: attempt.paymentChannel }
+        });
+        const base = {
+            success: true,
+            attemptId,
+            commerceOrderId: order.orderId,
+            previousAttemptStatus,
+            providerObservedStatus: normalizeUpper(observed.observedStatus),
+            resultingAttemptStatus: previousAttemptStatus,
+            providerReferencePresent: Boolean(attempt.providerReference),
+            qrRecovered: false,
+            providerSuccessObserved: normalizeUpper(observed.observedStatus) === "SUCCESS",
+            settlementAuthority: "AUTHENTICATED_CALLBACK",
+            stateChanged: false,
+            reconciliationOutcome: normalizeString(observed.reconciliationOutcome || "INCONCLUSIVE")
+        };
+        if (observed.usable !== true || ["SUCCESS", "REFUNDED"].includes(base.providerObservedStatus)) return base;
+
+        const targetStatus = base.providerObservedStatus;
+        if (!["PENDING", "FAILED", "CANCELLED", "EXPIRED"].includes(targetStatus)) return base;
+        const terminal = ["FAILED", "CANCELLED", "EXPIRED"].includes(targetStatus);
+        if (["PAID", "REFUNDED", "FAILED", "CANCELLED", "EXPIRED"].includes(previousAttemptStatus)) {
+            return { ...base, reconciliationOutcome: previousAttemptStatus === targetStatus ? `ALREADY_${targetStatus}` : "TERMINAL_STATE_PRESERVED" };
+        }
+        if (!["INITIATING", "PENDING"].includes(previousAttemptStatus)) return { ...base, reconciliationOutcome: "ATTEMPT_STATE_NOT_RECONCILABLE" };
+
+        const changedAt = deps.clock();
+        const result = await deps.transactionRunner(async transactionContext => {
+            const paymentOptions = { transactionContext };
+            const orderOptions = { session: transactionContext?.mongoSession || transactionContext?.session || null };
+            let currentAttempt = await deps.paymentAttemptRepository.findAttemptById({ attemptId }, paymentOptions);
+            let currentOrder = await deps.commerceOrderRepository.findOrderById(order.orderId, orderOptions);
+            const currentAttemptStatus = normalizeUpper(currentAttempt?.status);
+            let stateChanged = false;
+            let qrRecovered = false;
+            if (!currentAttempt || !currentOrder) throw appError(ERROR_CODES.NOT_FOUND, "Reconciliation state is unavailable.", 404, "reconciliation");
+            if (["PAID", "REFUNDED", "FAILED", "CANCELLED", "EXPIRED"].includes(currentAttemptStatus)) {
+                return { currentAttempt, currentOrder, stateChanged, qrRecovered };
+            }
+            if (!["INITIATING", "PENDING"].includes(currentAttemptStatus)) return { currentAttempt, currentOrder, stateChanged, qrRecovered };
+            if (targetStatus === "PENDING" && (!currentAttempt.providerReference || (observed.qr && !currentAttempt.qr))) {
+                const recoveringQr = Boolean(observed.qr && !currentAttempt.qr);
+                currentAttempt = await deps.paymentAttemptRepository.setProviderReference({
+                    attemptId,
+                    providerReference: observed.providerReference,
+                    providerTransactionId: observed.providerTransactionId,
+                    rawProviderStatus: observed.rawProviderStatus,
+                    qr: observed.qr,
+                    paymentInstructions: observed.paymentInstructions,
+                    safeMetadata: observed.safeMetadata,
+                    changedAt,
+                    transactionContext
+                }, paymentOptions);
+                stateChanged = true;
+                qrRecovered = recoveringQr;
+            }
+            if (currentAttemptStatus !== targetStatus) {
+                currentAttempt = await deps.paymentAttemptRepository.updateStatus({ attemptId, fromStatuses: [currentAttemptStatus], toStatus: targetStatus, changedAt, reason: "MyanMyanPay Sandbox reconciliation", transactionContext }, paymentOptions);
+                stateChanged = true;
+            }
+            const currentPaymentStatus = normalizeString(currentOrder.paymentStatus || currentOrder.payment?.status || "unpaid").toLowerCase();
+            const paymentTarget = targetStatus.toLowerCase();
+            if (currentPaymentStatus !== paymentTarget) {
+                if (targetStatus === "CANCELLED" && currentPaymentStatus === "unpaid") {
+                    currentOrder = await deps.commerceOrderRepository.updatePaymentStatus({ orderId: order.orderId, fromStatuses: ["unpaid"], toStatus: "pending", changedAt, reason: "MyanMyanPay reconciliation preparation" }, orderOptions);
+                    currentOrder = await deps.commerceOrderRepository.updatePaymentStatus({ orderId: order.orderId, fromStatuses: ["pending"], toStatus: "cancelled", changedAt, reason: "MyanMyanPay reconciliation" }, orderOptions);
+                } else {
+                    currentOrder = await deps.commerceOrderRepository.updatePaymentStatus({ orderId: order.orderId, fromStatuses: [currentPaymentStatus], toStatus: paymentTarget, changedAt, reason: "MyanMyanPay reconciliation" }, orderOptions);
+                }
+                stateChanged = true;
+            }
+            if (terminal) {
+                const orderTarget = targetStatus === "FAILED" ? "payment_failed" : paymentTarget;
+                const currentOrderStatus = normalizeString(currentOrder.status || order.status).toLowerCase();
+                if (currentOrderStatus !== orderTarget) {
+                    currentOrder = await deps.commerceOrderRepository.updateOrderStatus({ orderId: order.orderId, fromStatuses: [currentOrderStatus], toStatus: orderTarget, changedAt, reason: "MyanMyanPay reconciliation" }, orderOptions);
+                    stateChanged = true;
+                }
+            }
+            return { currentAttempt, currentOrder, stateChanged, qrRecovered };
+        });
+        const resultingAttemptStatus = normalizeUpper(result.currentAttempt?.status || targetStatus);
+        return {
+            ...base,
+            resultingAttemptStatus,
+            providerReferencePresent: Boolean(result.currentAttempt?.providerReference || observed.providerReference),
+            qrRecovered: result.qrRecovered,
+            stateChanged: result.stateChanged,
+            reconciliationOutcome: result.stateChanged ? `RECONCILED_${targetStatus}` : resultingAttemptStatus === targetStatus ? `ALREADY_${targetStatus}` : "TERMINAL_STATE_PRESERVED"
+        };
+    }
+
     async function attachReceiptEvidence(input = {}) {
         let receiptBound = false;
         let duplicateUploadUnbound = false;
@@ -1002,6 +1110,7 @@ function createManualPaymentApplicationService(dependencies = {}) {
         cancelManualPayment,
         applyDingerCallback,
         applyMyanMyanPayCallback,
+        reconcileMyanMyanPayPayment,
         toSafePaymentView
     });
 }
