@@ -5,6 +5,7 @@ const express = require("express");
 const rateLimit = require("express-rate-limit");
 const { loadMyanMyanPayConfiguration } = require("../services/myanmyanpay/myanMyanPayConfiguration");
 const { createMyanMyanPayClient } = require("../services/myanmyanpay/myanMyanPayClient");
+const { isMyanMyanPayProviderOrderId } = require("../services/myanmyanpay/myanMyanPayProviderOrderId");
 const { createManualPaymentApplicationService } = require("../services/commerce/manualPaymentApplicationService");
 
 const MAX_BODY_BYTES = 16 * 1024;
@@ -16,7 +17,7 @@ const CONDITIONS = new Set(["PRISTINE", "TOUCHED", "EXPIRED", "DIRTY"]);
 function validateCallback(body) {
     if (!body || typeof body !== "object" || Array.isArray(body) || Object.keys(body).some(key => !ALLOWED.has(key))) throw Object.assign(new Error("Invalid callback body."), { code: "MYANMYANPAY_CALLBACK_INVALID", httpStatus: 400 });
     const result = { ...body, orderId: text(body.orderId), currency: text(body.currency).toUpperCase(), vendor: text(body.vendor), method: text(body.method).toUpperCase(), status: text(body.status).toUpperCase(), condition: text(body.condition).toUpperCase(), transactionRefId: text(body.transactionRefId), vendorQrRefId: text(body.vendorQrRefId), appId: text(body.appId) };
-    if (!result.orderId || !Number.isSafeInteger(Number(result.amount)) || Number(result.amount) <= 0 || result.currency !== "MMK" || !result.vendor || result.method !== "QR" || !STATUSES.has(result.status) || !CONDITIONS.has(result.condition) || !result.transactionRefId) throw Object.assign(new Error("Invalid callback fields."), { code: "MYANMYANPAY_CALLBACK_INVALID", httpStatus: 400 });
+    if (!isMyanMyanPayProviderOrderId(result.orderId) || !Number.isSafeInteger(Number(result.amount)) || Number(result.amount) <= 0 || result.currency !== "MMK" || !result.vendor || result.method !== "QR" || !STATUSES.has(result.status) || !CONDITIONS.has(result.condition) || !result.transactionRefId) throw Object.assign(new Error("Invalid callback fields."), { code: "MYANMYANPAY_CALLBACK_INVALID", httpStatus: 400 });
     return result;
 }
 

@@ -2,6 +2,7 @@
 
 const crypto = require("crypto");
 const { MMPaySDK } = require("mmpay-node-sdk");
+const { isMyanMyanPayProviderOrderId } = require("./myanMyanPayProviderOrderId");
 
 function text(value) { return String(value || "").trim(); }
 function clientError(code, message, httpStatus = 502, metadata = {}) {
@@ -186,7 +187,7 @@ function createMyanMyanPayClient(configuration, options = {}) {
     async function pay(payload = {}) {
         const orderId = text(payload.orderId);
         const amount = Number(payload.amount);
-        if (!SAFE_REFERENCE.test(orderId) || !Number.isSafeInteger(amount) || amount <= 0 || text(payload.currency).toUpperCase() !== "MMK" || text(payload.callbackUrl) !== text(configuration.callbackUrl)) throw clientError("MYANMYANPAY_PROVIDER_REQUEST_INVALID", "MyanMyanPay payment request is invalid.", 422);
+        if (!isMyanMyanPayProviderOrderId(orderId) || !Number.isSafeInteger(amount) || amount <= 0 || text(payload.currency).toUpperCase() !== "MMK" || text(payload.callbackUrl) !== text(configuration.callbackUrl)) throw clientError("MYANMYANPAY_PROVIDER_REQUEST_INVALID", "MyanMyanPay payment request is invalid.", 422);
         const sdkPayload = {
             orderId,
             amount,
@@ -203,7 +204,7 @@ function createMyanMyanPayClient(configuration, options = {}) {
 
     async function get(input = {}) {
         const orderId = text(input.orderId);
-        if (!SAFE_REFERENCE.test(orderId)) throw clientError("MYANMYANPAY_PROVIDER_REQUEST_INVALID", "MyanMyanPay orderId is invalid.", 422);
+        if (!isMyanMyanPayProviderOrderId(orderId)) throw clientError("MYANMYANPAY_PROVIDER_REQUEST_INVALID", "MyanMyanPay orderId is invalid.", 422);
         const response = await invoke("GET", { orderId });
         const status = text(response.status).toUpperCase();
         if (classifyResponseShape(response, "GET") !== "DOCUMENTED_PAYMENT_SHAPE" || !validReference(response.transactionRefId) || !validReference(response.vendorQrRefId) || (response.qr && !validQr(response.qr))) throw clientError("MYANMYANPAY_PROVIDER_RESPONSE_INVALID", "MyanMyanPay returned an invalid reconciliation response.");
@@ -213,7 +214,7 @@ function createMyanMyanPayClient(configuration, options = {}) {
 
     async function cancel(input = {}) {
         const orderId = text(input.orderId);
-        if (!SAFE_REFERENCE.test(orderId)) throw clientError("MYANMYANPAY_PROVIDER_REQUEST_INVALID", "MyanMyanPay orderId is invalid.", 422);
+        if (!isMyanMyanPayProviderOrderId(orderId)) throw clientError("MYANMYANPAY_PROVIDER_REQUEST_INVALID", "MyanMyanPay orderId is invalid.", 422);
         const response = await invoke("CANCEL", { orderId });
         if (classifyResponseShape(response, "CANCEL") !== "DOCUMENTED_CANCEL_SHAPE" || !validReference(response.vendorQrRefId)) throw clientError("MYANMYANPAY_PROVIDER_RESPONSE_INVALID", "MyanMyanPay returned an invalid cancellation response.");
         if (text(response.orderId) !== orderId || (own(input, "expectedAmount") && Number(response.amount) !== Number(input.expectedAmount))) throw clientError("MYANMYANPAY_PROVIDER_BINDING_MISMATCH", "MyanMyanPay cancellation response binding is invalid.");

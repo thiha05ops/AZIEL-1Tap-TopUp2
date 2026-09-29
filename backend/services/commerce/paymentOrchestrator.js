@@ -638,6 +638,9 @@ function createPaymentOrchestrator(dependencies = {}) {
             throw new PaymentOrchestratorError(ERROR_CODES.PAYMENT_PROVIDER_UNSUPPORTED, "Provider does not support payment creation.", { stage: "provider" });
         }
         const attemptId = normalizeId(source.attemptId || deps.idGenerator("paymentAttempt"), "attemptId");
+        const preparedAttempt = typeof adapter.prepareAttempt === "function"
+            ? await adapter.prepareAttempt({ intent, attempt: { attemptId } })
+            : {};
         const createAttempt = assertPortFunction(deps.paymentAttemptPort, "createAttempt");
         const initiatingAttempt = await runTransaction(transactionContext => createAttempt({
             attemptId,
@@ -658,6 +661,8 @@ function createPaymentOrchestrator(dependencies = {}) {
             idempotencyKey,
             operation: "initiatePayment",
             requestFingerprint: fingerprint,
+            providerReference: normalizeString(preparedAttempt?.providerReference),
+            safeMetadata: preparedAttempt?.safeMetadata || {},
             createdAt: deps.clock(),
             transactionContext
         }));

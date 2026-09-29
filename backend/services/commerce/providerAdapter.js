@@ -270,6 +270,7 @@ function createProviderAdapter(config = {}) {
     const handlers = isPlainObject(config.handlers) ? config.handlers : {};
     const adapter = {
         ...identity,
+        prepareAttempt: typeof handlers.prepareAttempt === "function" ? handlers.prepareAttempt : null,
         createPayment: handlers.createPayment || unsupportedMethod(identity.providerId, "createPayment"),
         refreshPayment: handlers.refreshPayment || unsupportedMethod(identity.providerId, "refreshPayment"),
         cancelPayment: handlers.cancelPayment || unsupportedMethod(identity.providerId, "cancelPayment"),
