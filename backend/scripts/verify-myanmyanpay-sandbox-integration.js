@@ -7,7 +7,7 @@ const fs = require("fs");
 const path = require("path");
 const mongoose = require("mongoose");
 const { inspectMyanMyanPayConfiguration, loadMyanMyanPayConfiguration, CALLBACK_URL } = require("../services/myanmyanpay/myanMyanPayConfiguration");
-const { createMyanMyanPayClient } = require("../services/myanmyanpay/myanMyanPayClient");
+const { createMyanMyanPayClient, _test: myanMyanPayClientTest } = require("../services/myanmyanpay/myanMyanPayClient");
 const { createMyanMyanPayAdapter } = require("../services/commerce/providers/myanMyanPayAdapter");
 const { createManualPaymentApplicationService } = require("../services/commerce/manualPaymentApplicationService");
 const { isMyanMyanPayMethod, myanMyanPayAccessDecision } = require("../services/myanmyanpay/myanMyanPayPaymentPolicy");
@@ -121,6 +121,71 @@ assert.strictEqual(myanMyanPayAccessDecision(method, { id: "user-1" }, env).allo
     assert.strictEqual(infraProvider.environments[0].environment, "SANDBOX");
     assert.strictEqual(infraProvider.environments[0].webhook.endpoint, CALLBACK_URL);
     assert.strictEqual(infraProvider.environments[0].webhook.authenticationImplemented, true);
+
+    const diagnosticConfiguration = {
+        ...configuration,
+        appId: "APP-SECRET-MUST-NOT-LOG",
+        publishableKey: "pk_test_publishable-secret-must-not-log",
+        secretKey: "sk_test_secret-must-not-log",
+        apiBaseUrl: "https://sandbox.example.test/payments?token=must-not-log#secret"
+    };
+    const sensitiveResponse = {
+        status: "FAILED",
+        code: "PROVIDER_REJECTED",
+        message: "customer@example.test must-not-log",
+        error: { secretKey: "response-secret-must-not-log" },
+        orderId: "ORDER-MUST-NOT-LOG",
+        qr: "000201QR-PAYLOAD-MUST-NOT-LOG",
+        amount: 34740,
+        currency: "MMK",
+        transactionRefId: "TX-MUST-NOT-LOG",
+        vendorQrRefId: "VENDOR-MUST-NOT-LOG",
+        customer: "CUSTOMER-MUST-NOT-LOG",
+        data: { reason: "not-enumerated", credential: "not-enumerated" },
+        result: { outcome: "not-enumerated" },
+        ["x".repeat(120)]: true
+    };
+    const diagnostic = myanMyanPayClientTest.responseShapeDiagnostic(sensitiveResponse, diagnosticConfiguration);
+    assert.strictEqual(diagnostic.classification, "ERROR_SHAPED_OBJECT");
+    assert(diagnostic.topLevelKeys.length <= 24 && diagnostic.topLevelKeys.every(key => key.length <= 80), "diagnostic property-name arrays must be bounded");
+    assert.deepStrictEqual(diagnostic.dataKeys, ["reason", "credential"], "nested diagnostics enumerate data property names only");
+    assert.deepStrictEqual(diagnostic.resultKeys, ["outcome"], "nested diagnostics enumerate result property names only");
+    assert.strictEqual(diagnostic.safeStatus, "FAILED");
+    assert.strictEqual(diagnostic.safeCode, "PROVIDER_REJECTED");
+    assert.strictEqual(diagnostic.hasMessage, true);
+    assert.strictEqual(diagnostic.apiBaseUrlOrigin, "https://sandbox.example.test");
+    assert.strictEqual(diagnostic.apiBaseUrlPath, "/payments");
+    assert.strictEqual(diagnostic.apiBaseUrlAlreadyContainsPaymentsPath, true);
+    assert.deepStrictEqual(diagnostic.sdkSandboxKeyClassification, { publishableKeyLooksSandbox: true, secretKeyLooksSandbox: true, sdkWouldUseSandbox: true });
+    const serializedDiagnostic = JSON.stringify(diagnostic);
+    for (const forbidden of [diagnosticConfiguration.appId, diagnosticConfiguration.publishableKey, diagnosticConfiguration.secretKey, "must-not-log", "ORDER-MUST-NOT-LOG", "000201QR-PAYLOAD-MUST-NOT-LOG", "34740", "MMK", "TX-MUST-NOT-LOG", "VENDOR-MUST-NOT-LOG", "CUSTOMER-MUST-NOT-LOG", "customer@example.test"]) {
+        assert(!serializedDiagnostic.includes(forbidden), `diagnostic must redact sensitive value: ${forbidden}`);
+    }
+    assert.strictEqual(myanMyanPayClientTest.safePrimitive("https://secret.example/token"), null, "URL-like primitive diagnostics must be redacted");
+    assert.strictEqual(myanMyanPayClientTest.safePrimitive("eyJhbGciOiJIUzI1NiJ9.payload.signature"), null, "JWT-like primitive diagnostics must be redacted");
+    assert.strictEqual(myanMyanPayClientTest.safePrimitive("A".repeat(90)), null, "long opaque primitive diagnostics must be redacted");
+    assert.strictEqual(myanMyanPayClientTest.safePrimitive("safe-status-".repeat(9)).length, 80, "safe diagnostic primitives must be bounded");
+    assert.strictEqual(myanMyanPayClientTest.classifyResponseShape(new Error("secret")), "ERROR_INSTANCE");
+    assert.strictEqual(myanMyanPayClientTest.classifyResponseShape({ error: true }), "ERROR_SHAPED_OBJECT");
+    assert.strictEqual(myanMyanPayClientTest.classifyResponseShape({ status: "PENDING", orderId: "PAY-1", qr: "QR", amount: 1, currency: "MMK" }), "DOCUMENTED_SUCCESS_SHAPE");
+    assert.strictEqual(myanMyanPayClientTest.classifyResponseShape({ status: "PENDING", orderId: "PAY-1" }), "SUCCESS_SHAPED_MISSING_FIELDS");
+    assert.strictEqual(myanMyanPayClientTest.classifyResponseShape("provider-error"), "NON_OBJECT_RESPONSE");
+    assert.strictEqual(myanMyanPayClientTest.configurationShape({ apiBaseUrl: "https://sandbox.example.test/api", publishableKey: "pk_live", secretKey: "sk_test_value" }).apiBaseUrlAlreadyContainsPaymentsPath, false);
+    assert.deepStrictEqual(myanMyanPayClientTest.configurationShape({ apiBaseUrl: "https://sandbox.example.test", publishableKey: "pk_live", secretKey: "sk_test_value" }).sdkSandboxKeyClassification, { publishableKeyLooksSandbox: false, secretKeyLooksSandbox: true, sdkWouldUseSandbox: true });
+
+    const capturedLogs = [];
+    const diagnosticClient = createMyanMyanPayClient(diagnosticConfiguration, {
+        sdk: { async pay() { return sensitiveResponse; } },
+        logger: { info(...args) { capturedLogs.push(args); } }
+    });
+    await assert.rejects(() => diagnosticClient.pay({}), error => error.code === "MYANMYANPAY_CREATE_RESPONSE_INVALID", "temporary diagnostics must not change invalid-response behavior");
+    assert.strictEqual(capturedLogs.length, 1, "exactly one response-shape diagnostic must be emitted");
+    assert.strictEqual(capturedLogs[0][0], "[MYANMYANPAY_RESPONSE_SHAPE]");
+    assert.notStrictEqual(capturedLogs[0][1], sensitiveResponse, "raw provider response must never be logged");
+    assert(!JSON.stringify(capturedLogs).includes("must-not-log"), "diagnostic log must contain no raw response or credential values");
+    const validResponse = { status: "PENDING", orderId: "PAY-1", qr: "QR", amount: 1, currency: "MMK" };
+    const loggerFailureClient = createMyanMyanPayClient(configuration, { sdk: { async pay() { return validResponse; } }, logger: { info() { throw new Error("logger unavailable"); } } });
+    assert.strictEqual(await loggerFailureClient.pay({}), validResponse, "diagnostic logging failure must not change successful payment behavior");
 
     const root = path.resolve(__dirname, "../..");
     const paymentRouteSource = fs.readFileSync(path.join(root, "backend/routes/paymentMethods.js"), "utf8");
