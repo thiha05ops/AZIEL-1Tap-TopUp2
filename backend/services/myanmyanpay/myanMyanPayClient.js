@@ -7,6 +7,8 @@ function text(value) { return String(value || "").trim(); }
 function clientError(code, message, httpStatus = 502) { return Object.assign(new Error(message), { code, httpStatus }); }
 const MAX_DIAGNOSTIC_KEYS = 24;
 const MAX_DIAGNOSTIC_TEXT = 80;
+const MAX_DIAGNOSTIC_PATH = 240;
+const GET_PAYMENT_STATUSES = Object.freeze(new Set(["PENDING", "SUCCESS", "FAILED", "CANCELLED", "EXPIRED", "REFUNDED"]));
 
 function boundedKeys(value) {
     if (!value || typeof value !== "object" || Array.isArray(value)) return [];
@@ -22,6 +24,96 @@ function safePrimitive(value) {
 }
 
 function own(value, key) { return Boolean(value && typeof value === "object" && Object.prototype.hasOwnProperty.call(value, key)); }
+
+function boundedSafeKeys(value) {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return [];
+    return Object.keys(value)
+        .filter(key => /^[A-Za-z][A-Za-z0-9_.:-]{0,79}$/.test(key))
+        .slice(0, MAX_DIAGNOSTIC_KEYS);
+}
+
+function safeCodePrimitive(value) {
+    if (typeof value === "number") return Number.isSafeInteger(value) && String(Math.abs(value)).length <= 12 ? value : null;
+    if (typeof value !== "string") return null;
+    const candidate = value.trim();
+    return candidate.length <= MAX_DIAGNOSTIC_TEXT && /^[A-Za-z0-9][A-Za-z0-9_.:-]*$/.test(candidate) ? candidate : null;
+}
+
+function safeHttpStatus(value) {
+    const candidate = typeof value === "number" ? value : typeof value === "string" && /^\d{3}$/.test(value.trim()) ? Number(value.trim()) : NaN;
+    return Number.isInteger(candidate) && candidate >= 100 && candidate <= 599 ? candidate : null;
+}
+
+function safeErrorName(value) {
+    if (!(value instanceof Error)) return "";
+    if (value.name === "TypeError") return "TYPE_ERROR";
+    if (value.name === "AbortError") return "ABORT_ERROR";
+    if (value.name === "Error") return "ERROR";
+    return "UNKNOWN_ERROR";
+}
+
+function safeUrlShape(configuration = {}) {
+    const empty = { apiBaseUrlOrigin: "", apiBaseUrlPath: "", apiBaseUrlAlreadyContainsPaymentsPath: false, sdkSandboxSelected: false, endpointPath: "", handshakeEndpointPath: "" };
+    const sandbox = text(configuration.publishableKey).includes("_test_") || text(configuration.secretKey).includes("_test_");
+    try {
+        const parsed = new URL(text(configuration.apiBaseUrl));
+        if (parsed.protocol !== "https:" || parsed.username || parsed.password || parsed.search || parsed.hash) return { ...empty, sdkSandboxSelected: sandbox };
+        const basePath = parsed.pathname.replace(/\/+$/, "");
+        const pathSafe = basePath.length <= MAX_DIAGNOSTIC_PATH && /^\/[A-Za-z0-9._~\/-]*$/.test(basePath || "/") && !/(?:^|\/)(?:token|secret|signature|credential|authorization|auth)(?:\/|$)/i.test(basePath);
+        if (!pathSafe || basePath.split("/").some(segment => segment.length > MAX_DIAGNOSTIC_TEXT)) return { ...empty, apiBaseUrlOrigin: parsed.origin, sdkSandboxSelected: sandbox };
+        const apiBaseUrlPath = basePath || "/";
+        const suffix = sandbox ? "sandbox-get" : "get";
+        const handshakeSuffix = sandbox ? "sandbox-handshake" : "handshake";
+        const prefix = basePath || "";
+        const endpointPath = `${prefix}/payments/${suffix}`;
+        const handshakeEndpointPath = `${prefix}/payments/${handshakeSuffix}`;
+        return {
+            apiBaseUrlOrigin: parsed.origin,
+            apiBaseUrlPath,
+            apiBaseUrlAlreadyContainsPaymentsPath: /(?:^|\/)payments(?:\/|$)/i.test(apiBaseUrlPath),
+            sdkSandboxSelected: sandbox,
+            endpointPath: endpointPath.length <= MAX_DIAGNOSTIC_PATH ? endpointPath : "",
+            handshakeEndpointPath: handshakeEndpointPath.length <= MAX_DIAGNOSTIC_PATH ? handshakeEndpointPath : ""
+        };
+    } catch (_) {
+        return { ...empty, sdkSandboxSelected: sandbox };
+    }
+}
+
+function classifyGetResponseShape(response) {
+    if (response instanceof Error) return "ERROR_INSTANCE";
+    if (!response || typeof response !== "object" || Array.isArray(response)) return "NON_OBJECT_RESPONSE";
+    if (["error", "errorCode", "code", "statusCode", "httpStatus", "message"].some(key => own(response, key))) return "ERROR_SHAPED_OBJECT";
+    const status = text(response.status).toUpperCase();
+    if (GET_PAYMENT_STATUSES.has(status) && own(response, "orderId") && Boolean(text(response.orderId)) && own(response, "amount")) return "DOCUMENTED_PAYMENT_SHAPE";
+    return "SUCCESS_SHAPED_MISSING_FIELDS";
+}
+
+function getResponseShapeDiagnostic(response, configuration = {}) {
+    const objectResponse = Boolean(response && typeof response === "object" && !Array.isArray(response));
+    const safeCode = safeCodePrimitive(objectResponse ? (response.code ?? response.errorCode) : undefined);
+    const httpLikeStatus = safeHttpStatus(objectResponse ? (response.httpStatus ?? response.statusCode ?? response.status) : undefined);
+    return Object.freeze({
+        provider: "MYANMYANPAY",
+        operation: "GET",
+        httpMethod: "POST",
+        classification: classifyGetResponseShape(response),
+        responseType: typeof response,
+        safeErrorName: safeErrorName(response),
+        topLevelKeys: boundedSafeKeys(response),
+        ...(safeCode !== null ? { safeCode } : {}),
+        ...(httpLikeStatus !== null ? { httpLikeStatus } : {}),
+        hasOrderId: own(response, "orderId"),
+        hasStatus: own(response, "status"),
+        hasQr: own(response, "qr"),
+        hasAmount: own(response, "amount"),
+        hasCurrency: own(response, "currency"),
+        hasCode: own(response, "code") || own(response, "errorCode"),
+        hasError: own(response, "error"),
+        hasMessage: own(response, "message"),
+        ...safeUrlShape(configuration)
+    });
+}
 
 function classifyResponseShape(response) {
     if (response instanceof Error) return "ERROR_INSTANCE";
@@ -108,6 +200,22 @@ function createMyanMyanPayClient(configuration, options = {}) {
         return response;
     }
 
+    async function get(input) {
+        let response;
+        try {
+            response = await sdk.get(input);
+        } catch (error) {
+            try {
+                logger.info?.("[MYANMYANPAY_GET_RESPONSE_SHAPE]", getResponseShapeDiagnostic(error, configuration));
+            } catch (_) { /* Temporary diagnostics must never affect provider behavior. */ }
+            throw error;
+        }
+        try {
+            logger.info?.("[MYANMYANPAY_GET_RESPONSE_SHAPE]", getResponseShapeDiagnostic(response, configuration));
+        } catch (_) { /* Temporary diagnostics must never affect provider behavior. */ }
+        return response;
+    }
+
     async function verifyAndListen(payload, nonce, signature) {
         const expected = text(sdk._generateSignature(payload, nonce));
         const supplied = text(signature);
@@ -126,10 +234,10 @@ function createMyanMyanPayClient(configuration, options = {}) {
         return JSON.parse(payload);
     }
 
-    return Object.freeze({ pay, get: input => sdk.get(input), cancel: input => sdk.cancel(input), verifyAndListen });
+    return Object.freeze({ pay, get, cancel: input => sdk.cancel(input), verifyAndListen });
 }
 
 module.exports = Object.freeze({
     createMyanMyanPayClient,
-    _test: Object.freeze({ boundedKeys, safePrimitive, classifyResponseShape, configurationShape, responseShapeDiagnostic })
+    _test: Object.freeze({ boundedKeys, safePrimitive, classifyResponseShape, configurationShape, responseShapeDiagnostic, boundedSafeKeys, safeCodePrimitive, safeHttpStatus, safeErrorName, safeUrlShape, classifyGetResponseShape, getResponseShapeDiagnostic })
 });

@@ -187,6 +187,105 @@ assert.strictEqual(myanMyanPayAccessDecision(method, { id: "user-1" }, env).allo
     const loggerFailureClient = createMyanMyanPayClient(configuration, { sdk: { async pay() { return validResponse; } }, logger: { info() { throw new Error("logger unavailable"); } } });
     assert.strictEqual(await loggerFailureClient.pay({}), validResponse, "diagnostic logging failure must not change successful payment behavior");
 
+    const getConfiguration = { ...configuration, apiBaseUrl: "https://sandbox.example.test/api" };
+    const documentedGetResponse = status => ({ orderId: "ORDER-MUST-NOT-LOG", appId: "APP-MUST-NOT-LOG", amount: 34740, status, method: "QR", condition: "PRISTINE" });
+    for (const status of ["PENDING", "SUCCESS", "FAILED", "CANCELLED", "EXPIRED", "REFUNDED"]) {
+        assert.strictEqual(myanMyanPayClientTest.classifyGetResponseShape(documentedGetResponse(status)), "DOCUMENTED_PAYMENT_SHAPE", `${status} must be recognized as a documented GET payment shape without requiring QR or currency`);
+    }
+    assert.strictEqual(myanMyanPayClientTest.classifyGetResponseShape(new Error("must-not-log")), "ERROR_INSTANCE");
+    assert.strictEqual(myanMyanPayClientTest.classifyGetResponseShape({ code: "AUTH_FAILED", message: "must-not-log" }), "ERROR_SHAPED_OBJECT");
+    assert.strictEqual(myanMyanPayClientTest.classifyGetResponseShape({ orderId: "PAY-1", amount: 1, status: "PENDING", message: "must-not-log" }), "ERROR_SHAPED_OBJECT");
+    assert.strictEqual(myanMyanPayClientTest.classifyGetResponseShape({ orderId: "PAY-1", status: "PENDING" }), "SUCCESS_SHAPED_MISSING_FIELDS");
+    assert.strictEqual(myanMyanPayClientTest.classifyGetResponseShape("must-not-log"), "NON_OBJECT_RESPONSE");
+    assert.strictEqual(myanMyanPayClientTest.safeErrorName(new Error("must-not-log")), "ERROR");
+    assert.strictEqual(myanMyanPayClientTest.safeErrorName(new TypeError("must-not-log")), "TYPE_ERROR");
+    const abortError = new Error("must-not-log"); abortError.name = "AbortError";
+    const customError = new Error("must-not-log"); customError.name = "SecretCustomError";
+    assert.strictEqual(myanMyanPayClientTest.safeErrorName(abortError), "ABORT_ERROR");
+    assert.strictEqual(myanMyanPayClientTest.safeErrorName(customError), "UNKNOWN_ERROR");
+    assert.strictEqual(myanMyanPayClientTest.safeCodePrimitive("AUTH_FAILED"), "AUTH_FAILED");
+    assert.strictEqual(myanMyanPayClientTest.safeCodePrimitive("unsafe code with spaces"), null);
+    assert.strictEqual(myanMyanPayClientTest.safeCodePrimitive("A".repeat(81)), null);
+    assert.strictEqual(myanMyanPayClientTest.safeCodePrimitive(1234567890123), null);
+    assert.strictEqual(myanMyanPayClientTest.safeHttpStatus(401), 401);
+    assert.strictEqual(myanMyanPayClientTest.safeHttpStatus("503"), 503);
+    assert.strictEqual(myanMyanPayClientTest.safeHttpStatus("FAILED"), null);
+    const safeGetUrl = myanMyanPayClientTest.safeUrlShape(getConfiguration);
+    assert.deepStrictEqual(safeGetUrl, {
+        apiBaseUrlOrigin: "https://sandbox.example.test",
+        apiBaseUrlPath: "/api",
+        apiBaseUrlAlreadyContainsPaymentsPath: false,
+        sdkSandboxSelected: true,
+        endpointPath: "/api/payments/sandbox-get",
+        handshakeEndpointPath: "/api/payments/sandbox-handshake"
+    });
+    const duplicatePaymentsUrl = myanMyanPayClientTest.safeUrlShape({ ...getConfiguration, apiBaseUrl: "https://sandbox.example.test/api/payments/" });
+    assert.strictEqual(duplicatePaymentsUrl.apiBaseUrlAlreadyContainsPaymentsPath, true);
+    assert.strictEqual(duplicatePaymentsUrl.endpointPath, "/api/payments/payments/sandbox-get", "diagnostic must reveal the SDK's exact duplicate path construction");
+    for (const unsafeUrl of ["https://user:password@sandbox.example.test/api", "https://sandbox.example.test/api?token=must-not-log", "https://sandbox.example.test/api#must-not-log", `https://sandbox.example.test/${"a".repeat(81)}`]) {
+        const shape = myanMyanPayClientTest.safeUrlShape({ ...getConfiguration, apiBaseUrl: unsafeUrl });
+        assert.strictEqual(shape.endpointPath, "", "unsafe URL components and unbounded paths must not be exposed");
+        assert.strictEqual(shape.handshakeEndpointPath, "", "unsafe URL components and unbounded paths must not be exposed");
+    }
+
+    const getErrorResponse = {
+        code: "AUTH_FAILED",
+        statusCode: 401,
+        message: "customer@example.test must-not-log",
+        error: { token: "must-not-log" },
+        orderId: "ORDER-MUST-NOT-LOG",
+        amount: 34740,
+        currency: "MMK",
+        qr: "QR-MUST-NOT-LOG",
+        appId: "APP-MUST-NOT-LOG",
+        transactionRefId: "TX-MUST-NOT-LOG",
+        vendorQrRefId: "VENDOR-QR-MUST-NOT-LOG",
+        vendor: "VENDOR-MUST-NOT-LOG",
+        customer: "CUSTOMER-MUST-NOT-LOG",
+        ["x".repeat(81)]: "must-not-log"
+    };
+    const getLogs = [];
+    let getCalls = 0;
+    const getDiagnosticClient = createMyanMyanPayClient(getConfiguration, {
+        sdk: { async get(input) { getCalls += 1; assert.deepStrictEqual(input, { orderId: "PAY-GET-1" }); return getErrorResponse; } },
+        logger: { info(...args) { getLogs.push(args); } }
+    });
+    assert.strictEqual(await getDiagnosticClient.get({ orderId: "PAY-GET-1" }), getErrorResponse, "GET wrapper must return the exact SDK value unchanged");
+    assert.strictEqual(getCalls, 1, "GET wrapper must call sdk.get exactly once");
+    assert.strictEqual(getLogs.length, 1, "GET wrapper must emit exactly one diagnostic");
+    assert.strictEqual(getLogs[0][0], "[MYANMYANPAY_GET_RESPONSE_SHAPE]");
+    const getDiagnostic = getLogs[0][1];
+    assert.notStrictEqual(getDiagnostic, getErrorResponse, "GET diagnostic must never log the raw provider response");
+    const allowedGetDiagnosticFields = new Set(["provider", "operation", "httpMethod", "classification", "responseType", "safeErrorName", "topLevelKeys", "safeCode", "httpLikeStatus", "hasOrderId", "hasStatus", "hasQr", "hasAmount", "hasCurrency", "hasCode", "hasError", "hasMessage", "apiBaseUrlOrigin", "apiBaseUrlPath", "apiBaseUrlAlreadyContainsPaymentsPath", "sdkSandboxSelected", "endpointPath", "handshakeEndpointPath"]);
+    assert(Object.keys(getDiagnostic).every(key => allowedGetDiagnosticFields.has(key)), "GET diagnostic must contain only approved fields");
+    assert.strictEqual(getDiagnostic.classification, "ERROR_SHAPED_OBJECT");
+    assert.strictEqual(getDiagnostic.safeCode, "AUTH_FAILED");
+    assert.strictEqual(getDiagnostic.httpLikeStatus, 401);
+    assert(getDiagnostic.topLevelKeys.length <= 24 && getDiagnostic.topLevelKeys.every(key => key.length <= 80 && /^[A-Za-z][A-Za-z0-9_.:-]*$/.test(key)), "GET property names must be safe and bounded");
+    const serializedGetDiagnostic = JSON.stringify(getDiagnostic);
+    for (const forbidden of [getConfiguration.appId, getConfiguration.publishableKey, getConfiguration.secretKey, "must-not-log", "ORDER-MUST-NOT-LOG", "34740", "MMK", "QR-MUST-NOT-LOG", "APP-MUST-NOT-LOG", "TX-MUST-NOT-LOG", "VENDOR-QR-MUST-NOT-LOG", "VENDOR-MUST-NOT-LOG", "CUSTOMER-MUST-NOT-LOG", "customer@example.test"]) {
+        assert(!serializedGetDiagnostic.includes(forbidden), `GET diagnostic must redact sensitive/raw value: ${forbidden}`);
+    }
+
+    const thrownGetError = new TypeError("secret thrown message must-not-log");
+    const thrownGetLogs = [];
+    let thrownGetCalls = 0;
+    const thrownGetClient = createMyanMyanPayClient(getConfiguration, { sdk: { async get() { thrownGetCalls += 1; throw thrownGetError; } }, logger: { info(...args) { thrownGetLogs.push(args); } } });
+    await assert.rejects(() => thrownGetClient.get({ orderId: "PAY-GET-2" }), error => error === thrownGetError, "GET wrapper must rethrow the exact same error");
+    assert.strictEqual(thrownGetCalls, 1);
+    assert.strictEqual(thrownGetLogs.length, 1);
+    assert.strictEqual(thrownGetLogs[0][1].classification, "ERROR_INSTANCE");
+    assert.strictEqual(thrownGetLogs[0][1].safeErrorName, "TYPE_ERROR");
+    assert(!JSON.stringify(thrownGetLogs).includes("must-not-log"), "thrown GET diagnostic must not expose the error message");
+    const getLoggerFailureValue = documentedGetResponse("PENDING");
+    let loggerFailureGetCalls = 0;
+    const getLoggerFailureClient = createMyanMyanPayClient(getConfiguration, { sdk: { async get() { loggerFailureGetCalls += 1; return getLoggerFailureValue; } }, logger: { info() { throw new Error("logger unavailable"); } } });
+    assert.strictEqual(await getLoggerFailureClient.get({ orderId: "PAY-GET-3" }), getLoggerFailureValue, "GET logger failure must not alter returned behavior");
+    assert.strictEqual(loggerFailureGetCalls, 1);
+    const getLoggerThrowOriginal = new Error("original SDK failure");
+    const getLoggerThrowClient = createMyanMyanPayClient(getConfiguration, { sdk: { async get() { throw getLoggerThrowOriginal; } }, logger: { info() { throw new Error("logger unavailable"); } } });
+    await assert.rejects(() => getLoggerThrowClient.get({ orderId: "PAY-GET-4" }), error => error === getLoggerThrowOriginal, "GET logger failure must not replace an SDK error");
+
     function reconciliationHarness(providerResponse) {
         const state = {
             attempt: { attemptId: "PAY-RECON-1", orderId: "AZL-RECON-1", subjectType: "COMMERCE_ORDER", subjectId: "AZL-RECON-1", ownerId: "user-1", owner: { type: "USER", userId: "user-1" }, provider: "MYANMYANPAY", paymentMethod: "myanmyanpay_mmqr", paymentMethodId: "myanmyanpay_mmqr", paymentChannel: "MYANMYANPAY_MMQR", confirmationMode: "provider_webhook", amount: 34740, currency: "MMK", region: "MM", status: "INITIATING", providerReference: "", providerTransactionId: "", qr: null },
