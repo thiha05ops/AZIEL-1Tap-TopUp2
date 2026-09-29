@@ -164,6 +164,12 @@
         return ["dinger_ayapay_qr", "dinger_wavepay_pin"].includes(key) || String(selectedPayment.provider || "").toUpperCase() === "DINGER";
     }
 
+    function isMyanMyanPaySelection(selectedPayment = {}, orderData = {}) {
+        const key = String(selectedPayment.key || orderData.paymentMethod || "").trim().toLowerCase();
+        const provider = String(selectedPayment.provider || orderData.provider || "").trim().toLowerCase();
+        return key === "myanmyanpay_mmqr" && provider === "myanmyanpay_mmqr";
+    }
+
     function confirmedDingerHostedUrl(value) {
         try {
             const url = new URL(String(value || ""));
@@ -182,6 +188,20 @@
         if (useBlockingLoader) PaymentUtils.showLoading();
 
         try {
+            if (isMyanMyanPaySelection(selectedPayment, orderData)) {
+                const session = await createCommerceManualPaymentCheckout(orderData);
+                session.selectedPaymentMethod = selectedPayment;
+                const attemptOrder = {
+                    ...orderData,
+                    orderId: session.orderId || session.commerceOrderId,
+                    commerceOrderId: session.commerceOrderId || session.orderId,
+                    commercePaymentAttemptId: session.attemptId,
+                    amount: session.amount,
+                    currency: session.currency
+                };
+                stagePaymentPage(session, attemptOrder, selectedPayment, "auto");
+                return { success: true, navigating: true, paymentType: "auto" };
+            }
             if (isDingerSelection(selectedPayment, orderData)) {
                 const session = await createCommerceManualPaymentCheckout(orderData);
                 session.selectedPaymentMethod = selectedPayment;

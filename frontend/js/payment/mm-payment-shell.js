@@ -1,7 +1,16 @@
 (function () {
     const t = (key, fallback) => window.AZIEL_LOCALE?.t?.(key, fallback) || fallback;
     const value = (...items) => items.find(item => item !== undefined && item !== null && String(item).trim()) || "";
+    function isMyanMyanPay(staged = {}) {
+        const session = staged.session || {};
+        const payment = staged.selectedPayment || session.selectedPaymentMethod || {};
+        return String(session.provider || payment.provider || "").toUpperCase() === "MYANMYANPAY" &&
+            String(session.paymentMethod || payment.key || "").toLowerCase() === "myanmyanpay_mmqr" &&
+            String(session.paymentChannel || payment.paymentChannel || "").toUpperCase() === "MYANMYANPAY_MMQR" &&
+            String(session.confirmationMode || payment.confirmationMode || "").toLowerCase() === "provider_webhook";
+    }
     function supports(staged) {
+        if (isMyanMyanPay(staged)) return true;
         const region = String(staged?.session?.region || staged?.orderData?.region || staged?.selectedPayment?.region || "").toUpperCase();
         const type = String(staged?.paymentType || staged?.selectedPayment?.paymentType || staged?.session?.paymentType || "").toLowerCase();
         return region === "MM" && ["manual", "deeplink", "deep_link"].includes(type);
@@ -79,6 +88,17 @@
         if (details.childElementCount) { const detailSection = document.createElement("section"); detailSection.className = "mm-payment-shell__detail-section"; const detailTitle = document.createElement("h3"); detailTitle.textContent = t("payment.accountInformation", "Account information"); detailSection.append(detailTitle, details); shell.append(detailSection); }
         const deepLink = value(session.deepLink, session.deepLinkUrl, payment.deepLink, payment.deepLinkUrl);
         if (deepLink && (session.enableOpenApp === true || payment.enableOpenApp === true)) { const open = document.createElement("a"); open.className = "mm-payment-shell__open-app"; open.href = deepLink; open.textContent = t("payment.openApp", "Open payment app"); shell.append(open); }
+        if (isMyanMyanPay(staged)) {
+            const status = document.createElement("p");
+            status.className = `checkout-feedback ${qrSource ? "" : "is-error"}`.trim();
+            status.setAttribute("role", "status");
+            status.textContent = qrSource
+                ? t("payment.waitingProviderConfirmation", "Waiting for payment confirmation. This page cannot confirm payment.")
+                : t("payment.providerQrUnavailable", "Payment QR is unavailable. Do not send payment; return to checkout and try again.");
+            shell.append(status);
+            mount.replaceChildren(shell);
+            return;
+        }
         const receiptEnabled = session.receiptUploadEnabled !== false && payment.receiptUploadEnabled !== false;
         const slipRequired = receiptEnabled && session.requiresSlip !== false && payment.requiresSlip !== false && session.slipRequired !== false && payment.slipRequired !== false;
         const form = document.createElement("form"); form.className = "mm-payment-shell__form";

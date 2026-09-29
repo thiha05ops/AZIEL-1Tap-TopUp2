@@ -19,6 +19,7 @@ const {
     resolveTesterCustomerIds
 } = require("../services/myanmyanpay/myanMyanPayAdminService");
 const paymentInfrastructureService = require("../services/paymentInfrastructureService");
+const { sessionFrom } = require("../services/commerce/customerManualPaymentCheckoutService");
 const PaymentMethod = require("../models/PaymentMethod");
 const paymentMethodsRoute = require("../routes/paymentMethods");
 
@@ -125,6 +126,9 @@ assert.strictEqual(myanMyanPayAccessDecision(method, { id: "user-1" }, env).allo
     const paymentRouteSource = fs.readFileSync(path.join(root, "backend/routes/paymentMethods.js"), "utf8");
     const adminPaymentSource = fs.readFileSync(path.join(root, "frontend/js/admin-payments.js"), "utf8");
     const adminUsersSource = fs.readFileSync(path.join(root, "backend/routes/adminUsers.js"), "utf8");
+    const paymentEngineSource = fs.readFileSync(path.join(root, "frontend/js/payment/payment-engine.js"), "utf8");
+    const mmPaymentShellSource = fs.readFileSync(path.join(root, "frontend/js/payment/mm-payment-shell.js"), "utf8");
+    const customerCheckoutSource = fs.readFileSync(path.join(root, "backend/services/commerce/customerManualPaymentCheckoutService.js"), "utf8");
     assert(paymentRouteSource.includes('requireAdminPermission(PERMISSIONS.PAYMENT_METHODS_MANAGE)'), "tester lookup remains payment-management authorized");
     assert(paymentRouteSource.includes('authorizedTesterCustomerIds'), "activation must accept customer-facing tester IDs");
     assert(paymentRouteSource.includes('if (!["DISABLED", "TEST_ONLY"].includes(state))'), "PUBLIC must remain rejected");
@@ -134,6 +138,31 @@ assert.strictEqual(myanMyanPayAccessDecision(method, { id: "user-1" }, env).allo
     assert(adminPaymentSource.includes('PUBLIC — unavailable'), "PUBLIC must be visibly unavailable");
     assert(adminPaymentSource.includes('authorizedTesterCustomerIds'), "Admin activation must submit customer IDs, not ObjectIds");
     assert(adminUsersSource.includes('{ customerId: { $regex:'), "Admin Users must search customerId");
+    const myanMyanPayEngineBranch = paymentEngineSource.slice(
+        paymentEngineSource.indexOf("if (isMyanMyanPaySelection(selectedPayment, orderData))"),
+        paymentEngineSource.indexOf("if (isDingerSelection(selectedPayment, orderData))")
+    );
+    assert(myanMyanPayEngineBranch.includes("createCommerceManualPaymentCheckout(orderData)"), "MyanMyanPay continuation must use Commerce checkout");
+    assert(myanMyanPayEngineBranch.includes('stagePaymentPage(session, attemptOrder, selectedPayment, "auto")'), "MyanMyanPay must stage the canonical payment page");
+    assert(!myanMyanPayEngineBranch.includes("createPaymentSession") && !myanMyanPayEngineBranch.includes("createManualAttempt"), "MyanMyanPay must never use legacy payable creation");
+    assert(paymentEngineSource.includes('PaymentUtils.apiUrl("/api/commerce/checkout/manual-payment")'), "MyanMyanPay Commerce continuation endpoint must remain canonical");
+    assert(paymentEngineSource.includes("body: JSON.stringify(orderData)"), "Commerce continuation must preserve the review request body, including reviewQuoteId and checkoutKey");
+    assert(customerCheckoutSource.includes("quoteId = text(input.reviewQuoteId)"), "Commerce checkout must require the server-issued review quote");
+    assert(customerCheckoutSource.includes("seed = text(input.checkoutKey || input.orderId)"), "Commerce checkout must preserve the stable checkout identity");
+    assert(customerCheckoutSource.includes('idempotencyKey: `checkout:${seed}`'), "CommerceOrder creation must remain checkout-key idempotent");
+    assert(customerCheckoutSource.includes('idempotencyKey: `manual:${seed}`'), "PaymentAttempt creation must remain checkout-key idempotent");
+    const methodLoadIndex = customerCheckoutSource.indexOf("const method = await loadManualPaymentMethod");
+    const checkoutCreateIndex = customerCheckoutSource.indexOf("checkoutResult = await");
+    assert(methodLoadIndex >= 0 && checkoutCreateIndex > methodLoadIndex, "TEST_ONLY method authorization must complete before CommerceOrder creation");
+    assert(customerCheckoutSource.includes("myanMyanPayAccessDecision(method, user || {}).allowed === true"), "MyanMyanPay TEST_ONLY authorization must remain server-enforced");
+    assert(customerCheckoutSource.includes("amount: payment.amount, currency: payment.currency"), "staged amount and currency must come from the server PaymentAttempt");
+    assert(mmPaymentShellSource.includes('String(session.provider || payment.provider || "").toUpperCase() === "MYANMYANPAY"'), "payment page must require exact MyanMyanPay provider identity");
+    assert(mmPaymentShellSource.includes('String(session.paymentMethod || payment.key || "").toLowerCase() === "myanmyanpay_mmqr"'), "payment page must require canonical MyanMyanPay method");
+    assert(mmPaymentShellSource.includes('String(session.paymentChannel || payment.paymentChannel || "").toUpperCase() === "MYANMYANPAY_MMQR"'), "payment page must require canonical MyanMyanPay channel");
+    assert(mmPaymentShellSource.includes("Waiting for payment confirmation. This page cannot confirm payment."), "MyanMyanPay presentation must remain callback-authoritative");
+    assert(mmPaymentShellSource.includes("Payment QR is unavailable. Do not send payment"), "missing provider QR must fail visibly");
+    const myanMyanPayPresentationBranch = mmPaymentShellSource.slice(mmPaymentShellSource.indexOf("if (isMyanMyanPay(staged)) {", mmPaymentShellSource.indexOf("const deepLink")), mmPaymentShellSource.indexOf("const receiptEnabled"));
+    assert(!myanMyanPayPresentationBranch.includes("submitReceipt") && !myanMyanPayPresentationBranch.includes("Submit Payment"), "MyanMyanPay presentation must expose no manual submission action");
 
     const calls = [];
     const adapter = createMyanMyanPayAdapter({ configuration, client: { async pay(payload) { calls.push(payload); return { orderId: payload.orderId, amount: payload.amount, currency: "MMK", status: "PENDING", vendorQrRefId: "QR-1", qr: "000201010212MMQR" }; } } });
@@ -143,6 +172,25 @@ assert.strictEqual(myanMyanPayAccessDecision(method, { id: "user-1" }, env).allo
     assert.strictEqual(calls[0].callbackUrl, CALLBACK_URL);
     assert(created.qr.image.startsWith("data:image/png;base64,"), "MMQR rendered as safe image");
     assert(!JSON.stringify(created).includes(configuration.secretKey), "secret never enters normalized result");
+    const checkoutSession = sessionFrom({
+        checkout: { orderId: "AZL-1", quoteId: "QUOTE-1", region: "MM", productName: "Game", packageName: "Package" },
+        payment: { attemptId: "PAY-1", paymentStatus: "pending", provider: "MYANMYANPAY", amount: 34740, currency: "MMK", qr: created.qr, paymentInstructions: created.paymentInstructions },
+        method: { key: "myanmyanpay_mmqr", method: "MyanMyanPay / MMQR", paymentType: "auto", paymentChannel: "MYANMYANPAY_MMQR", confirmationMode: "provider_webhook" }
+    });
+    assert.deepStrictEqual({
+        commerceOrderId: checkoutSession.commerceOrderId,
+        attemptId: checkoutSession.attemptId,
+        provider: checkoutSession.provider,
+        paymentChannel: checkoutSession.paymentChannel,
+        confirmationMode: checkoutSession.confirmationMode,
+        qrImage: checkoutSession.qrImage,
+        qrPayload: checkoutSession.qrPayload,
+        amount: checkoutSession.amount,
+        currency: checkoutSession.currency
+    }, {
+        commerceOrderId: "AZL-1", attemptId: "PAY-1", provider: "MYANMYANPAY", paymentChannel: "MYANMYANPAY_MMQR",
+        confirmationMode: "provider_webhook", qrImage: created.qr.image, qrPayload: created.qr.payload, amount: 34740, currency: "MMK"
+    }, "Commerce session must preserve the provider QR presentation contract");
 
     const attempt = { attemptId: "PAY-1", provider: "MYANMYANPAY", providerReference: "PAY-1", providerTransactionId: "PAY-1", paymentMethodId: "myanmyanpay_mmqr", amount: 1500, currency: "MMK", status: "PENDING", safeMetadata: { environment: "SANDBOX", appId: "APP-TEST", vendorQrRefId: "QR-1" } };
     const baseEvent = { provider: "MYANMYANPAY", providerReference: "PAY-1", providerTransactionId: "TX-1", providerEventId: "EVT-1", environment: "SANDBOX", appId: "APP-TEST", vendor: "KBZPay", method: "QR", condition: "PRISTINE", vendorQrRefId: "QR-1", amount: 1500, currency: "MMK" };
