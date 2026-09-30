@@ -1,4 +1,5 @@
 const assert = require("assert");
+const fs = require("fs");
 const Module = require("module");
 const path = require("path");
 
@@ -12,6 +13,7 @@ const sent = [];
 const deliveries = new Map();
 let sendFailure = null;
 let catalogFailure = false;
+let mediaFailure = false;
 const users = new Map([
     ["legacy_user", { _id: "66f000000000000000000101", username: "legacy_user", email: "legacy.user@example.com" }],
     ["google_user", { _id: "66f000000000000000000102", username: "google_user", email: "google.user@example.com" }],
@@ -52,20 +54,33 @@ const UserMock = {
 const CatalogProductMock = {
     findOne({ productCode }) {
         if (catalogFailure) throw new Error("catalog unavailable");
-        if (productCode === "mlbb" || productCode === "unsafe") {
-            return query({ name: "Mobile Legends", presentation: { imageAssetId: `asset-${productCode}` }, deletedAt: null });
-        }
+        const products = {
+            mlbb: { name: "Mobile Legends", imageAssetId: "asset-mlbb" },
+            pubg: { name: "PUBG Mobile", imageAssetId: "" },
+            unsafe: { name: "Catalog Controlled Display", imageAssetId: "asset-unsafe" },
+            local: { name: "Local Artwork Product", imageAssetId: "asset-local" },
+            missing: { name: "Missing Artwork Product", imageAssetId: "asset-missing" },
+            mediafail: { name: "Media Failure Product", imageAssetId: "asset-mediafail" }
+        };
+        const product = products[productCode];
+        if (product) return query({ name: product.name, presentation: { imageAssetId: product.imageAssetId }, deletedAt: null });
         return query(null);
     }
 };
 const MediaAssetMock = {
-    findOne({ assetId }) {
-        const safe = assetId === "asset-mlbb";
-        return query(assetId ? {
+    findOne({ assetId, status, category }) {
+        assert.strictEqual(status, "active");
+        assert.strictEqual(category, "product_image");
+        if (mediaFailure || assetId === "asset-mediafail") throw new Error("media unavailable");
+        if (assetId === "asset-missing") return query(null);
+        const urls = {
+            "asset-mlbb": "https://res.cloudinary.com/aziel-test/image/upload/v1/catalog/mlbb.webp",
+            "asset-local": "/uploads/media-assets/product_image/local.webp",
+            "asset-unsafe": "https://example.invalid/private.webp"
+        };
+        return query(urls[assetId] ? {
             assetId,
-            secureUrl: safe
-                ? "https://res.cloudinary.com/aziel-test/image/upload/v1/catalog/mlbb.webp"
-                : "https://example.invalid/private.webp",
+            secureUrl: urls[assetId],
             altText: "Mobile Legends & Diamonds",
             category: "product_image",
             status: "active"
@@ -176,7 +191,11 @@ async function verifyEveryEvent() {
 }
 
 async function verifyImages() {
-    await service.notifyOrderTransition(order("processing", "IMAGE"), { status: "processing" });
+    const mlbb = order("processing", "IMAGE");
+    mlbb.product.gameName = "mlbb";
+    await service.notifyOrderTransition(mlbb, { status: "processing" });
+    assert(sent.at(-1).text.includes("Product: Mobile Legends"), "mlbb must resolve through canonical CatalogProduct.name");
+    assert(!sent.at(-1).text.includes("Product: mlbb"));
     assert(sent.at(-1).html.includes('src="https://res.cloudinary.com/aziel-test/image/upload/v1/catalog/mlbb.webp"'));
     assert(sent.at(-1).html.includes('alt="Mobile Legends &amp; Diamonds"'));
     assert(sent.at(-1).html.includes('width="166"'), "Product thumbnail must use the bounded email-safe width.");
@@ -187,19 +206,63 @@ async function verifyImages() {
         "https://evil.example/x.webp",
         "https://res.cloudinary.com/wrong-cloud/x.webp",
         "https://res.cloudinary.com/aziel-test/x.webp?token=secret",
-        "https://user:pass@res.cloudinary.com/aziel-test/x.webp"
+        "https://res.cloudinary.com/aziel-test/x.webp#fragment",
+        "https://user:pass@res.cloudinary.com/aziel-test/x.webp",
+        "/images/unapproved.webp",
+        "uploads/media-assets/product_image/missing-leading-slash.webp",
+        "//azielplay.com/uploads/media-assets/product_image/protocol-relative.webp"
     ]) assert.strictEqual(service.safePublicImageUrl(unsafe), "");
+    assert.strictEqual(
+        service.safePublicImageUrl("/uploads/media-assets/product_image/local.webp"),
+        "https://azielplay.com/uploads/media-assets/product_image/local.webp"
+    );
+
+    const pubg = order("processing", "PUBG-NAME");
+    pubg.product.gameCode = "pubg";
+    pubg.product.gameName = "pubg";
+    await service.notifyOrderTransition(pubg, { status: "processing" });
+    assert(sent.at(-1).text.includes("Product: PUBG Mobile"), "pubg must resolve through canonical CatalogProduct.name without artwork");
+    assert(!sent.at(-1).text.includes("Product: pubg"));
+    assert(!sent.at(-1).html.includes("pubg.webp"), "missing artwork must use the clean text-only product hero");
+
+    const local = order("processing", "LOCAL-IMAGE");
+    local.product.gameCode = "local";
+    await service.notifyOrderTransition(local, { status: "processing" });
+    assert(sent.at(-1).html.includes('src="https://azielplay.com/uploads/media-assets/product_image/local.webp"'));
 
     const fallback = order("processing", "UNSAFE-IMAGE");
     fallback.product.gameCode = "unsafe";
+    fallback.product.gameName = "unsafe-snapshot";
     await service.notifyOrderTransition(fallback, { status: "processing" });
     assert(!sent.at(-1).html.includes("example.invalid"));
-    assert(sent.at(-1).html.includes("Mobile Legends"));
+    assert(sent.at(-1).text.includes("Product: Catalog Controlled Display"), "canonical name must survive rejected artwork");
 
+    const missingArtwork = order("processing", "MISSING-IMAGE");
+    missingArtwork.product.gameCode = "missing";
+    missingArtwork.product.gameName = "missing-snapshot";
+    await service.notifyOrderTransition(missingArtwork, { status: "processing" });
+    assert(sent.at(-1).text.includes("Product: Missing Artwork Product"), "canonical name must survive a missing MediaAsset");
+    assert(!sent.at(-1).html.includes("asset-missing") && !sent.at(-1).html.includes('src=""'), "missing artwork must not create a broken image");
+
+    const mediaLookupFailure = order("processing", "MEDIA-FAIL");
+    mediaLookupFailure.product.gameCode = "mediafail";
+    mediaLookupFailure.product.gameName = "media-fallback";
+    mediaFailure = true;
+    await service.notifyOrderTransition(mediaLookupFailure, { status: "processing" });
+    mediaFailure = false;
+    assert(sent.at(-1).text.includes("Product: Media Failure Product"), "canonical name must survive MediaAsset lookup failure");
+
+    const catalogFallback = order("processing", "CATALOG-FAIL");
+    catalogFallback.product.gameName = "Immutable Snapshot Name";
     catalogFailure = true;
-    await service.notifyOrderTransition(order("processing", "CATALOG-FAIL"), { status: "processing" });
+    await service.notifyOrderTransition(catalogFallback, { status: "processing" });
     catalogFailure = false;
-    assert(sent.at(-1).html.includes("Mobile Legends"), "Catalog failure must use fallback and still send.");
+    assert(sent.at(-1).text.includes("Product: Immutable Snapshot Name"), "Catalog failure must use the immutable snapshot fallback and still send");
+
+    const serviceSource = fs.readFileSync(path.join(ROOT, "backend/services/orderEmailService.js"), "utf8");
+    assert(!/mlbb\s*[:=].*Mobile Legends|pubg\s*[:=].*PUBG Mobile/i.test(serviceSource), "order email must not introduce an email-specific product-name map");
+    assert(serviceSource.includes("buildEmailV3Shell({"), "all lifecycle templates must continue using the shared Email V3 shell");
+    assert(!serviceSource.includes("background:#f8fafc"), "legacy light lifecycle markup must not return");
 }
 
 function verifySafetyAndTimeline() {

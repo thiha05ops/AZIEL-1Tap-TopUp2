@@ -106,11 +106,11 @@ const EVENT_COPY = Object.freeze({
     }
 });
 
-function getPublicBaseUrl() {
+function getPublicBaseUrl(env = process.env) {
     const raw = String(
-        process.env.FRONTEND_URL ||
-        process.env.PUBLIC_URL ||
-        process.env.APP_URL ||
+        env.FRONTEND_URL ||
+        env.PUBLIC_URL ||
+        env.APP_URL ||
         ""
     ).trim();
 
@@ -151,7 +151,11 @@ function normalizeProductCode(order = {}) {
 
 function safePublicImageUrl(value = "", env = process.env) {
     try {
-        const url = new URL(String(value || ""));
+        const raw = String(value || "").trim();
+        const approvedRelativePath = raw.startsWith("/uploads/media-assets/") && !raw.startsWith("//");
+        const url = approvedRelativePath
+            ? new URL(raw, getPublicBaseUrl(env))
+            : new URL(raw);
         if (url.protocol !== "https:" || url.username || url.href.includes("@") || url.search || url.hash) return "";
 
         if (url.hostname === "res.cloudinary.com") {
@@ -160,7 +164,7 @@ function safePublicImageUrl(value = "", env = process.env) {
             return cloudName && assetCloudName === cloudName ? url.href : "";
         }
 
-        return url.origin === getPublicBaseUrl() && url.pathname.startsWith("/uploads/media-assets/")
+        return url.origin === getPublicBaseUrl(env) && url.pathname.startsWith("/uploads/media-assets/")
             ? url.href
             : "";
     } catch (_error) {
@@ -175,20 +179,31 @@ async function resolveProductPresentation(order = {}, deps = {}) {
     const ProductModel = deps.ProductModel || CatalogProduct;
     const AssetModel = deps.AssetModel || MediaAsset;
     const product = await ProductModel.findOne({ productCode }).select("name presentation.imageAssetId deletedAt").lean();
-    const assetId = String(product?.presentation?.imageAssetId || "").trim();
-    if (!product || product.deletedAt || !assetId) return null;
+    if (!product || product.deletedAt) return null;
 
-    const asset = await AssetModel.findOne({
-        assetId,
-        status: "active",
-        category: "product_image"
-    }).select("assetId secureUrl url altText category status").lean();
-    if (!asset) return null;
+    const presentation = {
+        productName: String(product.name || "").trim()
+    };
+    const assetId = String(product?.presentation?.imageAssetId || "").trim();
+    if (!assetId) return presentation;
+
+    let asset = null;
+    try {
+        asset = await AssetModel.findOne({
+            assetId,
+            status: "active",
+            category: "product_image"
+        }).select("assetId secureUrl url altText category status").lean();
+    } catch (_error) {
+        return presentation;
+    }
+    if (!asset) return presentation;
 
     const imageUrl = safePublicImageUrl(asset.secureUrl || asset.url || "", deps.env || process.env);
-    if (!imageUrl) return null;
+    if (!imageUrl) return presentation;
 
     return {
+        ...presentation,
         imageUrl,
         altText: String(asset.altText || `${product.name || "AZIEL product"} artwork`).trim().slice(0, 180)
     };
@@ -291,7 +306,7 @@ function buildOrderEmail(order = {}, eventType, options = {}) {
     const supportUrl = absoluteUrl("/support");
     const presentation = options.presentation || null;
     const timeline = buildTimeline(order);
-    const productName = order.product?.gameName || order.productName || order.game || "Your product";
+    const productName = presentation?.productName || order.product?.gameName || order.productName || order.game || "Your product";
     const refundDestination = eventType === "REFUND_COMPLETED"
         ? `Refund destination: ${order.refundMethod === "wallet" || !order.refundMethod ? "AZIEL Wallet" : paymentLabel(order.refundMethod)}`
         : "";
