@@ -93,7 +93,7 @@ router.post("/send-otp", async (req, res) => {
         await user.save();
 
         try {
-            await sendResetOTP(email, otp);
+            await sendResetOTP(email, otp, { expiresInMs: RESET_OTP_TTL_MS });
         } catch (error) {
             clearResetOTP(user);
             await user.save();

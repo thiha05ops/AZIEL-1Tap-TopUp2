@@ -4,297 +4,313 @@ const path = require("path");
 
 const ROOT = path.resolve(__dirname, "../..");
 const originalLoad = Module._load;
-const sentMessages = [];
-const deliveries = new Map();
-const usersByUsername = new Map([
-    ["legacy_user", { _id: "66f000000000000000000101", username: "legacy_user", email: "legacy.user@example.com", authProvider: "local" }],
-    ["google_user", { _id: "66f000000000000000000102", username: "google_user", email: "google.user@example.com", authProvider: "google" }],
-    ["local_user", { _id: "66f000000000000000000103", username: "local_user", email: "local.user@example.com", authProvider: "local" }],
-    ["missing_email", { _id: "66f000000000000000000104", username: "missing_email", email: "", authProvider: "local" }]
-]);
-const usersById = new Map([...usersByUsername.values()].map(user => [String(user._id), user]));
+const oldEnv = { FRONTEND_URL: process.env.FRONTEND_URL, CLOUDINARY_CLOUD_NAME: process.env.CLOUDINARY_CLOUD_NAME };
+process.env.FRONTEND_URL = "https://azielplay.com";
+process.env.CLOUDINARY_CLOUD_NAME = "aziel-test";
 
-function deliveryMatchesCurrentFilter(existing) {
-    if (!existing) return true;
-    if (existing.status === "failed") return true;
-    if (!existing.status) return true;
-    if (existing.status === "pending") {
-        return Date.now() - Number(existing.updatedAt || 0) > 2 * 60 * 1000;
-    }
-    return false;
-}
+const sent = [];
+const deliveries = new Map();
+let sendFailure = null;
+let catalogFailure = false;
+const users = new Map([
+    ["legacy_user", { _id: "66f000000000000000000101", username: "legacy_user", email: "legacy.user@example.com" }],
+    ["google_user", { _id: "66f000000000000000000102", username: "google_user", email: "google.user@example.com" }],
+    ["local_user", { _id: "66f000000000000000000103", username: "local_user", email: "local.user@example.com" }],
+    ["missing_email", { _id: "66f000000000000000000104", username: "missing_email", email: "" }]
+]);
+const byId = new Map([...users.values()].map(user => [String(user._id), user]));
+const query = value => ({ select: () => ({ lean: async () => value }) });
 
 const EmailDeliveryMock = {
     async findOneAndUpdate(filter, update) {
-        const key = filter.deliveryKey;
-        const existing = deliveries.get(key);
-        if (!deliveryMatchesCurrentFilter(existing)) {
-            const duplicate = new Error("duplicate key");
-            duplicate.code = 11000;
-            throw duplicate;
+        const existing = deliveries.get(filter.deliveryKey);
+        const retryable = !existing || existing.status === "failed" ||
+            (existing.status === "pending" && Date.now() - existing.updatedAt > 120000);
+        if (!retryable) {
+            const error = new Error("duplicate key");
+            error.code = 11000;
+            throw error;
         }
-
-        const next = {
-            _id: key,
-            deliveryKey: key,
-            messageType: update.$setOnInsert?.messageType || existing?.messageType || "",
-            orderId: update.$setOnInsert?.orderId || existing?.orderId || "",
-            recipientHash: update.$setOnInsert?.recipientHash || existing?.recipientHash || "",
-            recipientMasked: update.$setOnInsert?.recipientMasked || existing?.recipientMasked || "",
-            status: update.$set?.status || "pending",
-            lastAttemptAt: update.$set?.lastAttemptAt || new Date(),
-            attemptCount: Number(existing?.attemptCount || 0) + Number(update.$inc?.attemptCount || 0),
+        const value = {
+            _id: filter.deliveryKey,
+            deliveryKey: filter.deliveryKey,
+            status: update.$set.status,
+            attemptCount: Number(existing?.attemptCount || 0) + 1,
             updatedAt: Date.now()
         };
-        deliveries.set(key, next);
-        return next;
+        deliveries.set(filter.deliveryKey, value);
+        return value;
     },
     async updateOne(filter, update) {
-        const key = filter._id;
-        const existing = deliveries.get(key) || { _id: key, deliveryKey: key };
-        deliveries.set(key, {
-            ...existing,
-            ...(update.$set || {}),
-            updatedAt: Date.now()
-        });
-        return { modifiedCount: 1 };
+        deliveries.set(filter._id, { ...deliveries.get(filter._id), ...update.$set, updatedAt: Date.now() });
     }
 };
-
 const UserMock = {
-    findById(id) {
-        return {
-            select() {
-                return {
-                    lean: async () => usersById.get(String(id)) || null
-                };
-            }
-        };
-    },
-    findOne(query) {
-        return {
-            select() {
-                return {
-                    lean: async () => usersByUsername.get(String(query.username || "")) || null
-                };
-            }
-        };
+    findById: id => query(byId.get(String(id)) || null),
+    findOne: ({ username }) => query(users.get(String(username)) || null)
+};
+const CatalogProductMock = {
+    findOne({ productCode }) {
+        if (catalogFailure) throw new Error("catalog unavailable");
+        if (productCode === "mlbb" || productCode === "unsafe") {
+            return query({ name: "Mobile Legends", presentation: { imageAssetId: `asset-${productCode}` }, deletedAt: null });
+        }
+        return query(null);
     }
 };
-
-const emailTransportMock = {
-    classifyTransportError(error) {
-        return error?.code || "EMAIL_SEND_FAILED";
-    },
-    hashRecipient(email = "") {
-        return `hash:${email}`;
-    },
-    maskEmail(email = "") {
-        return email.replace(/^(.{2}).*(@.*)$/, "$1***$2");
-    },
+const MediaAssetMock = {
+    findOne({ assetId }) {
+        const safe = assetId === "asset-mlbb";
+        return query(assetId ? {
+            assetId,
+            secureUrl: safe
+                ? "https://res.cloudinary.com/aziel-test/image/upload/v1/catalog/mlbb.webp"
+                : "https://example.invalid/private.webp",
+            altText: "Mobile Legends & Diamonds",
+            category: "product_image",
+            status: "active"
+        } : null);
+    }
+};
+const transportMock = {
+    classifyTransportError: error => error.code || "EMAIL_SEND_FAILED",
+    hashRecipient: email => `hash:${email}`,
+    maskEmail: email => email,
     async sendEmail(message) {
-        sentMessages.push(message);
-        return {
-            messageId: `msg-${sentMessages.length}`,
-            provider: "mock"
-        };
+        if (sendFailure) throw sendFailure;
+        sent.push(message);
+        return { messageId: `msg-${sent.length}`, provider: "mock" };
     }
 };
 
-Module._load = function patchedLoad(request, parent, isMain) {
+Module._load = function (request, parent, isMain) {
     const resolved = Module._resolveFilename(request, parent, isMain);
     if (resolved === path.join(ROOT, "backend/models/EmailDelivery.js")) return EmailDeliveryMock;
     if (resolved === path.join(ROOT, "backend/models/User.js")) return UserMock;
-    if (resolved === path.join(ROOT, "backend/services/emailTransportService.js")) return emailTransportMock;
+    if (resolved === path.join(ROOT, "backend/models/CatalogProduct.js")) return CatalogProductMock;
+    if (resolved === path.join(ROOT, "backend/models/MediaAsset.js")) return MediaAssetMock;
+    if (resolved === path.join(ROOT, "backend/services/emailTransportService.js")) return transportMock;
     return originalLoad.apply(this, arguments);
 };
 
-const orderEmailService = require("../services/orderEmailService");
-const { buildOrderCustomerSnapshot } = require("../services/orderCustomerSnapshotService");
+const service = require("../services/orderEmailService");
 
-async function verifyLifecycleStatus(status, eventType) {
-    const order = {
-        orderId: `QA-${status.toUpperCase()}`,
+const EVENTS = [
+    ["pending_payment", "ORDER_CREATED_PENDING_PAYMENT"],
+    ["paid", "PAYMENT_CONFIRMED"],
+    ["processing", "ORDER_PROCESSING"],
+    ["completed", "ORDER_COMPLETED"],
+    ["failed", "ORDER_FAILED"],
+    ["cancelled", "ORDER_CANCELLED"],
+    ["refund_requested", "REFUND_REQUESTED"],
+    ["refund_rejected", "REFUND_REJECTED"],
+    ["refunded", "REFUND_COMPLETED"]
+];
+const EVENT_ACCENTS = {
+    pending_payment: "#7c3aed",
+    paid: "#16a34a",
+    processing: "#7c3aed",
+    completed: "#16a34a",
+    failed: "#dc2626",
+    cancelled: "#dc2626",
+    refund_requested: "#7c3aed",
+    refund_rejected: "#dc2626",
+    refunded: "#16a34a"
+};
+
+function order(status, id = status.toUpperCase()) {
+    return {
+        orderId: `QA-${id}`,
         username: "local_user",
-        ...buildOrderCustomerSnapshot(usersByUsername.get("local_user")),
-        game: "Mobile Legends",
-        productName: "Mobile Legends",
-        packageName: "7740+1548 Diamonds",
-        amount: 1490,
-        currency: "THB",
+        customerEmail: "local.user@example.com",
+        customerUserId: "66f000000000000000000103",
+        product: { gameCode: "mlbb", gameName: "Mobile Legends", packageName: "7740+1548 Diamonds" },
+        commercial: { totalAmount: 1490, currency: "THB" },
+        payment: { paymentMethodId: "promptpay" },
+        createdAt: new Date("2026-09-30T08:00:00.000Z"),
+        statusHistory: [
+            { field: "orderStatus", toStatus: "paid", changedAt: new Date("2026-09-30T08:05:00.000Z") },
+            { field: "paymentStatus", toStatus: "paid", changedAt: new Date("2026-09-30T08:05:00.000Z") },
+            { field: "orderStatus", toStatus: status, changedAt: new Date("2026-09-30T08:10:00.000Z") }
+        ],
         status
     };
-
-    const before = sentMessages.length;
-    const first = await orderEmailService.notifyOrderTransition(order, { status });
-    assert.deepStrictEqual(first, { delivered: true }, `${status}: first transition should deliver.`);
-    assert.strictEqual(sentMessages.length, before + 1, `${status}: provider should receive one message.`);
-
-    const sent = sentMessages[sentMessages.length - 1];
-    assert.strictEqual(sent.to, "local.user@example.com", `${status}: customerEmail snapshot should be used.`);
-    assert.strictEqual(sent.messageType, eventType, `${status}: wrong message type.`);
-    assert(sent.subject && sent.subject.includes(order.orderId), `${status}: subject should include order id.`);
-    assert(sent.html.includes("AZIEL 1Tap Shop"), `${status}: branded HTML template missing.`);
-    assert(sent.html.includes("/orders?orderId="), `${status}: tracking link missing.`);
-    assert(sent.html.includes("/support"), `${status}: support link missing.`);
-    assert(sent.text.includes("Track order:"), `${status}: plain text tracking link missing.`);
-
-    const second = await orderEmailService.notifyOrderTransition(order, { status });
-    assert.strictEqual(second.skipped, true, `${status}: duplicate transition should be skipped.`);
-    assert.strictEqual(second.reason, "duplicate_or_pending", `${status}: duplicate reason should be stable.`);
-    assert.strictEqual(sentMessages.length, before + 1, `${status}: duplicate should not send again.`);
 }
 
-async function verifyRecipientFallbacks() {
+async function verifyEveryEvent() {
     assert.deepStrictEqual(
-        buildOrderCustomerSnapshot(usersByUsername.get("google_user")),
-        {
-            customerEmail: "google.user@example.com",
-            customerUserId: "66f000000000000000000102"
-        },
-        "Google-auth user snapshot should include canonical email and user id."
+        Object.keys(service.EVENT_COPY).sort(),
+        [...EVENTS.map(([, event]) => event), "PAYMENT_SLIP_SUBMITTED"].sort()
     );
-    assert.deepStrictEqual(
-        buildOrderCustomerSnapshot(usersByUsername.get("local_user")),
-        {
-            customerEmail: "local.user@example.com",
-            customerUserId: "66f000000000000000000103"
-        },
-        "Username/password user snapshot should include canonical email and user id."
-    );
+    for (const [status, event] of EVENTS) {
+        assert.strictEqual(service.eventTypeForTransition({ status }), event);
+        const item = order(status);
+        assert.deepStrictEqual(await service.notifyOrderTransition(item, { status }), { delivered: true });
+        const message = sent.at(-1);
+        assert.strictEqual(message.messageType, event);
+        assert(message.subject.includes(item.orderId));
+        assert(message.html.startsWith("<!doctype html>"));
+        assert(message.html.includes('name="viewport"'));
+        assert(message.html.includes('role="presentation"'));
+        assert(message.html.includes("max-width:640px"));
+        assert(message.html.includes(">View Order Details →</a>"));
+        assert(message.html.includes("https://azielplay.com/orders?orderId="));
+        assert(message.html.includes("border-radius:999px"), `${status}: accessible status badge missing.`);
+        assert(message.html.includes("border-radius:10px"), `${status}: compact order details card missing.`);
+        assert(message.html.includes("color:#ffd522;font-size:15px"), `${status}: total must be emphasized in AZIEL yellow.`);
+        assert(message.text.includes("View order: https://azielplay.com/orders?orderId="));
+        assert(message.text.includes("Order timeline:"));
+        assert(message.text.includes("Product: Mobile Legends"));
+        assert(message.text.includes("Package: 7740+1548 Diamonds"));
+        assert(message.text.includes("Total: 1,490 THB"));
+        assert(message.text.includes(`Current status: ${status.replace(/_/g, " ").replace(/\b\w/g, letter => letter.toUpperCase())}`));
+        assert(message.html.includes(`color:${EVENT_ACCENTS[status]}`), `${status}: event status accent missing.`);
+        assert(!/<script|<style|data:image|tracking.?pixel/i.test(message.html));
+        assert.deepStrictEqual(await service.notifyOrderTransition(item, { status }), {
+            skipped: true, reason: "duplicate_or_pending"
+        });
+    }
+    const manual = order("pending_payment", "MANUAL-SLIP");
+    assert.deepStrictEqual(await service.notifyManualPaymentSubmitted(manual), { delivered: true });
+    assert.strictEqual(sent.at(-1).messageType, "PAYMENT_SLIP_SUBMITTED");
+}
 
-    const cases = [
-        {
-            label: "legacy_username",
-            order: {
-                orderId: "QA-LEGACY-USERNAME",
-                username: "legacy_user",
-                status: "paid",
-                game: "Mobile Legends",
-                packageName: "Weekly Diamond Pass",
-                amount: 55,
-                currency: "THB"
-            },
-            expectedRecipient: "legacy.user@example.com"
-        },
-        {
-            label: "linked_user_id",
-            order: {
-                orderId: "QA-LINKED-ID",
-                username: "unknown_username",
-                customerUserId: usersByUsername.get("google_user")._id,
-                status: "processing",
-                game: "Mobile Legends",
-                packageName: "Weekly Diamond Pass",
-                amount: 55,
-                currency: "THB"
-            },
-            expectedRecipient: "google.user@example.com"
-        },
-        {
-            label: "legacy_email_field",
-            order: {
-                orderId: "QA-LEGACY-EMAIL",
-                username: "guest",
-                email: "legacy.field@example.com",
-                status: "completed",
-                game: "Mobile Legends",
-                packageName: "Weekly Diamond Pass",
-                amount: 55,
-                currency: "THB"
-            },
-            expectedRecipient: "legacy.field@example.com"
-        }
+async function verifyImages() {
+    await service.notifyOrderTransition(order("processing", "IMAGE"), { status: "processing" });
+    assert(sent.at(-1).html.includes('src="https://res.cloudinary.com/aziel-test/image/upload/v1/catalog/mlbb.webp"'));
+    assert(sent.at(-1).html.includes('alt="Mobile Legends &amp; Diamonds"'));
+    assert(sent.at(-1).html.includes('width="166"'), "Product thumbnail must use the bounded email-safe width.");
+    assert(sent.at(-1).html.includes("width:166px;max-width:100%;height:auto"));
+    assert(!/object-fit|background-image/i.test(sent.at(-1).html), "Hero must not depend on unsupported cropping CSS.");
+    for (const unsafe of [
+        "http://res.cloudinary.com/aziel-test/x.webp",
+        "https://evil.example/x.webp",
+        "https://res.cloudinary.com/wrong-cloud/x.webp",
+        "https://res.cloudinary.com/aziel-test/x.webp?token=secret",
+        "https://user:pass@res.cloudinary.com/aziel-test/x.webp"
+    ]) assert.strictEqual(service.safePublicImageUrl(unsafe), "");
+
+    const fallback = order("processing", "UNSAFE-IMAGE");
+    fallback.product.gameCode = "unsafe";
+    await service.notifyOrderTransition(fallback, { status: "processing" });
+    assert(!sent.at(-1).html.includes("example.invalid"));
+    assert(sent.at(-1).html.includes("Mobile Legends"));
+
+    catalogFailure = true;
+    await service.notifyOrderTransition(order("processing", "CATALOG-FAIL"), { status: "processing" });
+    catalogFailure = false;
+    assert(sent.at(-1).html.includes("Mobile Legends"), "Catalog failure must use fallback and still send.");
+}
+
+function verifySafetyAndTimeline() {
+    process.env.FRONTEND_URL = "https://attacker.example";
+    assert.strictEqual(service.absoluteUrl("/orders"), "https://azielplay.com/orders");
+    process.env.FRONTEND_URL = "https://azielplay.com";
+    const hostile = {
+        orderId: 'AZL-<script>alert("id")</script>',
+        product: { gameName: '<img src=x onerror="bad">', packageName: "A&B <Premium>" },
+        commercial: { totalAmount: 3573, currency: "MMK" },
+        status: "refund_rejected",
+        refundRejectedReason: "<script>secret()</script>",
+        createdAt: "2026-09-30T08:00:00.000Z",
+        statusHistory: [
+            { field: "orderStatus", toStatus: "processing", changedAt: "2026-09-30T08:10:00.000Z" },
+            { field: "orderStatus", toStatus: "completed", changedAt: "invalid" }
+        ]
+    };
+    const message = service.buildOrderEmail(hostile, "REFUND_REJECTED");
+    assert(!message.html.includes("<script>"));
+    assert(!message.html.includes("<img src=x"));
+    assert(message.html.includes("&lt;script&gt;secret()&lt;/script&gt;"));
+    assert(message.html.includes("A&amp;B &lt;Premium&gt;"));
+    assert(message.html.includes("orderId=AZL-%3Cscript%3E"));
+    assert(!/token=|jwt=|player.?id/i.test(message.html));
+    assert.deepStrictEqual(service.buildTimeline(hostile).map(item => item.status), ["pending_payment", "processing"]);
+    assert(!message.html.includes(">Completed</div>"));
+    const noHistory = service.buildOrderEmail({ orderId: "QA-NONE", status: "processing" }, "ORDER_PROCESSING");
+    assert(!noHistory.html.includes("Order Timeline</h2>"));
+
+    const longValue = "Fictional Ultra Long Package Name ".repeat(8).trim();
+    const longMessage = service.buildOrderEmail({
+        orderId: "QA-LONG-VALUE",
+        product: { gameName: `${longValue} Product`, packageName: longValue },
+        commercial: { totalAmount: 1234567, currency: "MMK" },
+        status: "processing",
+        createdAt: "2026-09-30T08:00:00.000Z"
+    }, "ORDER_PROCESSING");
+    assert(longMessage.html.includes("word-break:break-word"));
+    assert(longMessage.html.includes("overflow-wrap:anywhere"));
+    assert(longMessage.html.includes(longValue));
+    assert(longMessage.text.includes(`Package: ${longValue}`));
+
+    const failedOrder = order("failed", "TIMELINE-COLORS");
+    failedOrder.statusHistory = [
+        { field: "orderStatus", toStatus: "paid", changedAt: "2026-09-30T08:04:00.000Z" },
+        { field: "orderStatus", toStatus: "processing", changedAt: "2026-09-30T08:08:00.000Z" },
+        { field: "orderStatus", toStatus: "failed", changedAt: "2026-09-30T08:12:00.000Z" }
     ];
+    const failedTimeline = service.buildOrderEmail(failedOrder, "ORDER_FAILED").html.split("Order Timeline</h2>")[1];
+    assert.strictEqual((failedTimeline.match(/color:#dc2626/g) || []).length, 1, "Only the actual failed timeline step may be red.");
+    assert((failedTimeline.match(/color:#16a34a/g) || []).length >= 2, "Successful historical steps must remain green.");
+    assert(failedTimeline.includes("color:#64748b"), "Historical pending step must remain neutral.");
+    assert(failedTimeline.includes(">✓</td>"), "Completed timeline evidence must use check markers.");
+    assert(failedTimeline.includes(">!</td>"), "Actual failure must use a failure marker.");
+    assert(failedTimeline.includes("border-left:2px solid #3a3151"), "Timeline markers must be visibly connected.");
 
-    for (const item of cases) {
-        const before = sentMessages.length;
-        const result = await orderEmailService.notifyOrderTransition(item.order, { status: item.order.status });
-        assert.deepStrictEqual(result, { delivered: true }, `${item.label}: should deliver.`);
-        assert.strictEqual(sentMessages.length, before + 1, `${item.label}: should send once.`);
-        assert.strictEqual(sentMessages[sentMessages.length - 1].to, item.expectedRecipient, `${item.label}: wrong recipient.`);
-    }
-
-    const missing = await orderEmailService.notifyOrderTransition({
-        orderId: "QA-MISSING-EMAIL",
-        username: "missing_email",
-        status: "failed",
-        game: "Mobile Legends",
-        packageName: "Weekly Diamond Pass",
-        amount: 55,
-        currency: "THB"
-    }, { status: "failed" });
-    assert.strictEqual(missing.skipped, true, "Missing email should skip safely.");
-    assert.strictEqual(missing.reason, "missing_recipient", "Missing email skip reason should be stable.");
+    const processingTimeline = service.buildOrderEmail(order("processing", "CURRENT-PROCESSING"), "ORDER_PROCESSING").html.split("Order Timeline</h2>")[1];
+    assert(processingTimeline.includes("color:#7c3aed"), "Current processing step must be purple.");
 }
 
-async function verifyCanonicalCommerceOrder() {
-    for (const status of ["processing", "completed"]) {
-        const expectedLabel = status === "completed" ? "Completed" : "Processing";
-        const otherLabel = status === "completed" ? "Processing" : "Completed";
-        const order = {
-            orderId: `QA-COMMERCE-${status.toUpperCase()}`,
-            owner: { type: "USER", userId: usersByUsername.get("google_user")._id },
-            customer: { contact: { email: "commerce.customer@example.com" } },
-            product: { gameName: "Canonical Product", packageName: "Canonical Package" },
-            commercial: { totalAmount: 2490, currency: "THB" },
-            payment: { paymentMethodId: "promptpay" },
-            status
-        };
-        const before = sentMessages.length;
-        await orderEmailService.notifyOrderTransition(order, { status });
-        const sent = sentMessages[sentMessages.length - 1];
-        assert.strictEqual(sentMessages.length, before + 1);
-        assert.strictEqual(sent.to, "commerce.customer@example.com");
-        assert(sent.text.includes("Canonical Product"));
-        assert(sent.text.includes("Canonical Package"));
-        assert(sent.text.includes("2,490 THB"));
-        assert(sent.text.includes("PromptPay"));
-        assert(
-            sent.text.includes(`Current status: ${expectedLabel}`),
-            `${status}: details must render the canonical CommerceOrder status.`
-        );
-        assert(
-            !sent.text.includes(`Current status: ${otherLabel}`),
-            `${status}: details must not render a stale lifecycle status.`
-        );
-        assert(
-            sent.html.includes(`>${expectedLabel}</td>`),
-            `${status}: HTML details must render the canonical CommerceOrder status.`
-        );
+async function verifyRecipientsAndFailureIsolation() {
+    const fallback = order("paid", "USER-FALLBACK");
+    delete fallback.customerEmail;
+    await service.notifyOrderTransition(fallback, { status: "paid" });
+    assert.strictEqual(sent.at(-1).to, "local.user@example.com");
+    const recipientCases = [
+        [{ username: "legacy_user", customerEmail: "", customerUserId: "" }, "legacy.user@example.com"],
+        [{ username: "unknown", customerEmail: "", customerUserId: "66f000000000000000000102" }, "google.user@example.com"],
+        [{ username: "guest", customerEmail: "legacy.field@example.com", customerUserId: "" }, "legacy.field@example.com"]
+    ];
+    for (const [identity, recipient] of recipientCases) {
+        const item = { ...order("completed", `RECIPIENT-${sent.length}`), ...identity };
+        await service.notifyOrderTransition(item, { status: "completed" });
+        assert.strictEqual(sent.at(-1).to, recipient);
+        assert(sent.at(-1).text.includes("Current status: Completed"));
+        assert(sent.at(-1).text.includes("1,490 THB"));
     }
+    const missing = order("failed", "MISSING-EMAIL");
+    missing.username = "missing_email";
+    missing.customerEmail = "";
+    missing.customerUserId = "";
+    assert.deepStrictEqual(await service.notifyOrderTransition(missing, { status: "failed" }), {
+        skipped: true, reason: "missing_recipient"
+    });
+
+    const failed = order("processing", "SEND-FAIL");
+    const before = JSON.stringify(failed);
+    sendFailure = Object.assign(new Error("unavailable"), { code: "EMAIL_NETWORK_UNAVAILABLE" });
+    await assert.rejects(service.notifyOrderTransition(failed, { status: "processing" }),
+        error => error.code === "EMAIL_NETWORK_UNAVAILABLE");
+    sendFailure = null;
+    assert.strictEqual(JSON.stringify(failed), before, "Email failure must not mutate the order.");
+    assert.strictEqual(deliveries.get(`${failed.orderId}:ORDER_PROCESSING`).status, "failed");
 }
 
 async function main() {
-    const statuses = [
-        ["pending_payment", "ORDER_CREATED_PENDING_PAYMENT"],
-        ["paid", "PAYMENT_CONFIRMED"],
-        ["processing", "ORDER_PROCESSING"],
-        ["completed", "ORDER_COMPLETED"],
-        ["failed", "ORDER_FAILED"],
-        ["cancelled", "ORDER_CANCELLED"]
-    ];
-
-    statuses.forEach(([status, eventType]) => {
-        assert.strictEqual(
-            orderEmailService.eventTypeForTransition({ status }),
-            eventType,
-            `${status}: transition event map is incorrect.`
-        );
-    });
-
-    for (const [status, eventType] of statuses) {
-        await verifyLifecycleStatus(status, eventType);
-    }
-    await verifyRecipientFallbacks();
-    await verifyCanonicalCommerceOrder();
-
+    await verifyEveryEvent();
+    await verifyImages();
+    verifySafetyAndTimeline();
+    await verifyRecipientsAndFailureIsolation();
     console.log("Order status email notification verification passed.");
 }
 
 main().catch(error => {
     console.error(error);
-    process.exit(1);
+    process.exitCode = 1;
 }).finally(() => {
     Module._load = originalLoad;
+    for (const [key, value] of Object.entries(oldEnv)) {
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+    }
 });

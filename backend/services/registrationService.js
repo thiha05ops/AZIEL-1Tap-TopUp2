@@ -206,7 +206,7 @@ async function beginRegistration(input, options = {}) {
             }
         );
 
-        await deps.sendVerifyOTP(normalized.email, otp);
+        await deps.sendVerifyOTP(normalized.email, otp, { expiresInMs: REGISTER_OTP_TTL_MS });
     } catch (error) {
         if (challenge?._id || normalized.email) {
             await deps.PendingRegistrationModel.deleteOne({
