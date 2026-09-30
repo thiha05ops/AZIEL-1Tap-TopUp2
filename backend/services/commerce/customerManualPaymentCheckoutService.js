@@ -83,7 +83,7 @@ function sessionFrom({ checkout, payment, method }) {
         receiptUploadEnabled: (dinger || myanMyanPay) ? false : instructions.receiptUploadEnabled !== false, slipRequired: (dinger || myanMyanPay) ? false : instructions.slipRequired !== false,
         enableSaveQr: instructions.enableSaveQr === true,
         enableOpenApp: instructions.enableOpenApp === true, openAppMode: instructions.openAppMode || "disabled", deepLinkUrl: instructions.deepLinkUrl || "", appDisplayName: instructions.appDisplayName || "",
-        expiresAt: payment.expiresAt || "",
+        initiatedAt: payment.initiatedAt || "", expiresAt: payment.expiresAt || "",
         dynamicQr: payment.expiresAt ? { expiresAt: payment.expiresAt } : null
     };
 }

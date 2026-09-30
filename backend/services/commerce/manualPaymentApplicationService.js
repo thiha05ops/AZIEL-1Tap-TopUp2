@@ -379,6 +379,7 @@ function toSafePaymentView({ order = {}, attempt = {}, paymentResult = null, adm
         } : null,
         redirect: source.redirect || attempt.redirect || null,
         paymentInstructions: instructions ? clonePlain(instructions) : null,
+        initiatedAt: attempt.createdAt || source.createdAt || null,
         expiresAt: source.expiresAt || attempt.expiresAt || null,
         receiptEvidence: receiptView(attempt),
         retryEligible: ["failed", "expired"].includes(normalizeString(source.paymentStatus || attempt.status).toLowerCase()),

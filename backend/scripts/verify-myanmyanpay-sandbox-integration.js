@@ -558,6 +558,7 @@ assert.strictEqual(myanMyanPayAccessDecision(method, { id: "user-1" }, env).allo
     const customerCheckoutSource = fs.readFileSync(path.join(root, "backend/services/commerce/customerManualPaymentCheckoutService.js"), "utf8");
     const myanMyanPayClientSource = fs.readFileSync(path.join(root, "backend/services/myanmyanpay/myanMyanPayClient.js"), "utf8");
     const paymentOrchestratorSource = fs.readFileSync(path.join(root, "backend/services/commerce/paymentOrchestrator.js"), "utf8");
+    const paymentAttemptModelSource = fs.readFileSync(path.join(root, "backend/models/PaymentAttempt.js"), "utf8");
     const sdkTypesSource = fs.readFileSync(path.join(root, "node_modules/mmpay-node-sdk/src/types.ts"), "utf8");
     assert(myanMyanPayClientSource.includes('const { MMPaySDK } = require("mmpay-node-sdk")'), "official SDK must be the protocol implementation");
     assert(myanMyanPayClientSource.includes('await sdk[operation.toLowerCase()](input)'), "provider operations must delegate through the SDK boundary");
@@ -609,9 +610,10 @@ assert.strictEqual(myanMyanPayAccessDecision(method, { id: "user-1" }, env).allo
     assert(paymentPageRuntimeSource.includes("MYANMYANPAY_STATUS_MAX_CONSECUTIVE_READ_FAILURES"), "transient reads must remain bounded while leaving the customer in the quiet waiting state");
     assert(!paymentPageRuntimeSource.includes("createCommerceManualPaymentCheckout") && !paymentPageRuntimeSource.includes("resumeOrRetryManualPayment"), "status observation UX must never create or retry a payment");
     assert(!paymentPageRuntimeSource.includes("/api/payment/status/") && !paymentPageRuntimeSource.includes("myanmyanpay-reconcile") && !paymentPageRuntimeSource.includes("MMPay.get"), "browser polling must not use legacy, reconciliation, or provider endpoints");
-    assert(!/expiresAt|expiry|ttl|validUntil/i.test(sdkTypesSource), "installed MyanMyanPay SDK response contract must not be treated as supplying an expiry when it does not");
-    assert(!paymentPageRuntimeSource.includes("QR expires in"), "no MyanMyanPay expiry countdown may be invented without an authoritative provider expiry");
-    assert(paymentPageHtmlSource.includes("payment-page-runtime.js?v=20260930-mmqr-brand-1") && paymentPageHtmlSource.includes("mm-payment-shell.js?v=20260930-mmqr-brand-1") && paymentPageHtmlSource.includes("mm-payment-shell.css?v=20260930-mmqr-brand-1"), "payment page must load the MMQR presentation assets with a fresh deployment version");
+    assert(!/expiresAt|expiry|ttl|validUntil/i.test(sdkTypesSource), "installed MyanMyanPay SDK response contract must not be treated as supplying an authoritative expiry when it does not");
+    assert(paymentAttemptModelSource.includes("createdAt: { type: Date, required: true, immutable: true }"), "MMQR timer authority must be the persisted immutable PaymentAttempt creation timestamp");
+    assert(customerCheckoutSource.includes('initiatedAt: payment.initiatedAt || ""'), "customer session must preserve the server-projected PaymentAttempt initiation timestamp");
+    assert(paymentPageHtmlSource.includes("payment-page-runtime.js?v=20260930-mmqr-brand-1") && paymentPageHtmlSource.includes("mm-payment-shell.js?v=20260930-mmqr-timer-1") && paymentPageHtmlSource.includes("mm-payment-shell.css?v=20260930-mmqr-timer-1"), "payment page must load the versioned MMQR timer assets");
     assert(paymentRouteSource.includes('requireAdminPermission(PERMISSIONS.PAYMENT_METHODS_MANAGE)'), "tester lookup remains payment-management authorized");
     assert(paymentRouteSource.includes('authorizedTesterCustomerIds'), "activation must accept customer-facing tester IDs");
     assert(paymentRouteSource.includes('MYANMYANPAY_PUBLIC_NOT_READY') && paymentRouteSource.includes('decision.publicReady'), "PUBLIC must fail closed behind Production readiness");
@@ -654,6 +656,47 @@ assert.strictEqual(myanMyanPayAccessDecision(method, { id: "user-1" }, env).allo
     assert(mmPaymentShellSource.includes("saveDisplayedQr(qrSource") && mmPaymentShellSource.includes("download.href = qrSource") && !mmPaymentShellSource.includes("fetch(qrSource"), "Save QR must download the displayed provider QR without provider or regeneration calls");
     assert(mmPaymentShellSource.includes("!myanMyanPay && deepLink"), "MyanMyanPay presentation must not expose deep-link behavior");
     assert(mmPaymentShellSource.includes("Waiting for payment") && mmPaymentShellSource.includes("We'll confirm your payment automatically."), "MyanMyanPay waiting presentation must remain automatic and callback-authoritative");
+    const shellWindow = {
+        AZIEL_LOCALE: { t(key, fallback) { return fallback; } },
+        addEventListener() {}, setInterval() { throw new Error("real timer must not run in verifier"); }, clearInterval() {}
+    };
+    vm.runInNewContext(mmPaymentShellSource, { window: shellWindow, document: {}, Date, MutationObserver: undefined });
+    const timer = shellWindow.AZIEL_MM_PAYMENT_SHELL._test;
+    const initiatedAt = "2026-09-30T00:00:00.000Z";
+    const initiatedAtMs = new Date(initiatedAt).getTime();
+    assert.strictEqual(timer.durationMs, 15 * 60 * 1000);
+    assert.deepStrictEqual({ ...timer.countdownState(initiatedAt, initiatedAtMs) }, { valid: true, expired: false, remainingSeconds: 900, deadlineMs: initiatedAtMs + 15 * 60 * 1000 }, "initial display must derive from the authoritative initiation timestamp");
+    assert.strictEqual(timer.countdownState(initiatedAt, initiatedAtMs + 5 * 60 * 1000).remainingSeconds, 600, "refresh/re-entry must continue the original absolute window instead of resetting it");
+    assert.strictEqual(timer.countdownState(initiatedAt, initiatedAtMs + 14 * 60 * 1000 + 59 * 1000).remainingSeconds, 1);
+    assert.deepStrictEqual({ ...timer.countdownState(initiatedAt, initiatedAtMs + 60 * 60 * 1000) }, { valid: true, expired: true, remainingSeconds: 0, deadlineMs: initiatedAtMs + 15 * 60 * 1000 }, "background time jumps must recalculate and clamp at zero");
+    assert.strictEqual(timer.formatCountdown(900), "15:00");
+    assert.strictEqual(timer.formatCountdown(-1), "00:00");
+    let nowMs = initiatedAtMs, scheduledTick = null, scheduledCount = 0, clearedCount = 0;
+    const classNames = new Set();
+    const timerNode = { isConnected: true, textContent: "", classList: { add(name) { classNames.add(name); }, toggle(name, active) { if (active) classNames.add(name); else classNames.delete(name); } } };
+    timer.startMyanMyanPayCountdown(timerNode, initiatedAt, {
+        now: () => nowMs,
+        setInterval(callback, delay) { assert.strictEqual(delay, 1000); scheduledCount += 1; scheduledTick = callback; return 19; },
+        clearInterval(id) { assert.strictEqual(id, 19); clearedCount += 1; }
+    });
+    assert.strictEqual(timerNode.textContent, "Expires in 15:00");
+    assert.strictEqual(scheduledCount, 1, "only one countdown interval may be scheduled");
+    timer.startMyanMyanPayCountdown(timerNode, initiatedAt, {
+        now: () => nowMs,
+        setInterval(callback) { scheduledCount += 1; scheduledTick = callback; return 19; },
+        clearInterval(id) { assert.strictEqual(id, 19); clearedCount += 1; }
+    });
+    assert.strictEqual(scheduledCount, 2);
+    assert.strictEqual(clearedCount, 1, "starting a replacement countdown must clear the prior interval");
+    nowMs += 10 * 60 * 1000;
+    scheduledTick();
+    assert.strictEqual(timerNode.textContent, "Expires in 05:00", "timer ticks must derive from absolute time rather than decrementing memory");
+    nowMs += 20 * 60 * 1000;
+    scheduledTick();
+    assert.strictEqual(timerNode.textContent, "Expires in 00:00 · Waiting for payment");
+    assert(classNames.has("is-expired"));
+    assert.strictEqual(clearedCount, 2, "elapsed UI timer must clean its interval");
+    assert(!/fetch\s*\(|cancel(?:Payment)?\s*\(|paymentStatus\s*=|orderStatus\s*=/.test(mmPaymentShellSource), "MMQR timer shell must contain no network, cancellation, or authoritative-state mutation path");
     assert(mmPaymentShellSource.includes("Payment QR is unavailable. Do not send payment"), "missing provider QR must fail visibly");
     const myanMyanPayPresentationBranch = mmPaymentShellSource.slice(mmPaymentShellSource.indexOf("if (isMyanMyanPay(staged)) {", mmPaymentShellSource.indexOf("const deepLink")), mmPaymentShellSource.indexOf("const receiptEnabled"));
     assert(!myanMyanPayPresentationBranch.includes("submitReceipt") && !myanMyanPayPresentationBranch.includes("Submit Payment"), "MyanMyanPay presentation must expose no manual submission action");
@@ -670,14 +713,21 @@ assert.strictEqual(myanMyanPayAccessDecision(method, { id: "user-1" }, env).allo
     assert.strictEqual(calls[0].callbackUrl, CALLBACK_URL);
     assert(created.qr.image.startsWith("data:image/png;base64,"), "MMQR rendered as safe image");
     assert(!JSON.stringify(created).includes(configuration.secretKey), "secret never enters normalized result");
+    const timestampProjection = createManualPaymentApplicationService().toSafePaymentView({
+        order: { orderId: "AZL-1" },
+        attempt: { attemptId: "PAY-1", createdAt: initiatedAt },
+        paymentResult: { attemptId: "PAY-1", createdAt: "2099-01-01T00:00:00.000Z" }
+    });
+    assert.strictEqual(timestampProjection.initiatedAt, initiatedAt, "customer-safe projection must prefer persisted PaymentAttempt.createdAt over transient result timestamps");
     const checkoutSession = sessionFrom({
         checkout: { orderId: "AZL-1", quoteId: "QUOTE-1", region: "MM", productName: "Game", packageName: "Package" },
-        payment: { attemptId: "PAY-1", paymentStatus: "pending", provider: "MYANMYANPAY", amount: 34740, currency: "MMK", qr: created.qr, paymentInstructions: created.paymentInstructions },
+        payment: { attemptId: "PAY-1", paymentStatus: "pending", provider: "MYANMYANPAY", amount: 34740, currency: "MMK", initiatedAt, qr: created.qr, paymentInstructions: created.paymentInstructions },
         method: { key: "myanmyanpay_mmqr", method: "MyanMyanPay / MMQR", paymentType: "auto", paymentChannel: "MYANMYANPAY_MMQR", confirmationMode: "provider_webhook" }
     });
     assert.deepStrictEqual({
         commerceOrderId: checkoutSession.commerceOrderId,
         attemptId: checkoutSession.attemptId,
+        initiatedAt: checkoutSession.initiatedAt,
         provider: checkoutSession.provider,
         paymentChannel: checkoutSession.paymentChannel,
         confirmationMode: checkoutSession.confirmationMode,
@@ -686,7 +736,7 @@ assert.strictEqual(myanMyanPayAccessDecision(method, { id: "user-1" }, env).allo
         amount: checkoutSession.amount,
         currency: checkoutSession.currency
     }, {
-        commerceOrderId: "AZL-1", attemptId: "PAY-1", provider: "MYANMYANPAY", paymentChannel: "MYANMYANPAY_MMQR",
+        commerceOrderId: "AZL-1", attemptId: "PAY-1", initiatedAt, provider: "MYANMYANPAY", paymentChannel: "MYANMYANPAY_MMQR",
         confirmationMode: "provider_webhook", qrImage: created.qr.image, qrPayload: created.qr.payload, amount: 34740, currency: "MMK"
     }, "Commerce session must preserve the provider QR presentation contract");
 

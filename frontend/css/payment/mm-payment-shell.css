@@ -19,6 +19,8 @@
 .mm-payment-shell__amount { color: var(--primary); font-size: clamp(28px, 5vw, 38px); font-weight: 700; line-height: 1.08; }
 .mm-payment-shell__hero p { color: var(--text-muted); font-size: 14px; }
 .mm-payment-shell__qr-section { display: grid; justify-items: center; gap: 12px; padding: 18px; border-radius: 14px; background: var(--purchase-panel-soft); }
+.mm-payment-shell__countdown { min-width: 190px; padding: 9px 14px; border: 1px solid color-mix(in srgb, var(--primary) 32%, var(--purchase-border)); border-radius: 999px; background: color-mix(in srgb, var(--primary) 8%, transparent); color: var(--text-primary); font-size: 14px; font-weight: 700; line-height: 1.25; text-align: center; font-variant-numeric: tabular-nums; }
+.mm-payment-shell__countdown.is-expired, .mm-payment-shell__countdown.is-unavailable { max-width: 340px; border-color: var(--purchase-border); background: transparent; color: var(--text-muted); font-size: 13px; font-weight: 600; }
 .mm-payment-shell__qr { width: min(220px, 100%); max-height: 220px; object-fit: contain; padding: 8px; border-radius: 12px; background: #fff; }
 .mm-payment-shell__save-qr { min-height: 42px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 0 14px; border: 1px solid var(--purchase-border); border-radius: 10px; background: transparent; color: var(--primary); font: inherit; font-size: 13px; font-weight: 650; cursor: pointer; }
 .mm-payment-shell__save-qr:hover { background: color-mix(in srgb, var(--primary) 8%, transparent); }

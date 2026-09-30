@@ -1,6 +1,66 @@
 (function () {
-    const t = (key, fallback) => window.AZIEL_LOCALE?.t?.(key, fallback) || fallback;
+    const t = (key, fallback, params = {}) => {
+        const translated = window.AZIEL_LOCALE?.t?.(key, fallback, params) || fallback;
+        return Object.entries(params).reduce((result, [name, replacement]) => result.replaceAll(`{${name}}`, String(replacement)), translated);
+    };
     const value = (...items) => items.find(item => item !== undefined && item !== null && String(item).trim()) || "";
+    const MYANMYANPAY_QR_WINDOW_MS = 15 * 60 * 1000;
+    let myanMyanPayCountdownInterval = null;
+    let myanMyanPayCountdownClear = null;
+    let myanMyanPayCountdownObserver = null;
+
+    function countdownState(initiatedAt, now = Date.now()) {
+        const initiatedAtMs = new Date(initiatedAt).getTime();
+        const nowMs = Number(now);
+        if (!initiatedAt || !Number.isFinite(initiatedAtMs) || !Number.isFinite(nowMs)) return Object.freeze({ valid: false, expired: false, remainingSeconds: 0, deadlineMs: 0 });
+        const deadlineMs = initiatedAtMs + MYANMYANPAY_QR_WINDOW_MS;
+        const remainingSeconds = Math.max(0, Math.ceil((deadlineMs - nowMs) / 1000));
+        return Object.freeze({ valid: true, expired: remainingSeconds === 0, remainingSeconds, deadlineMs });
+    }
+
+    function formatCountdown(seconds) {
+        const safe = Math.max(0, Math.floor(Number(seconds) || 0));
+        return `${String(Math.floor(safe / 60)).padStart(2, "0")}:${String(safe % 60).padStart(2, "0")}`;
+    }
+
+    function stopMyanMyanPayCountdown() {
+        if (myanMyanPayCountdownInterval !== null) (myanMyanPayCountdownClear || window.clearInterval)(myanMyanPayCountdownInterval);
+        myanMyanPayCountdownInterval = null;
+        myanMyanPayCountdownClear = null;
+        myanMyanPayCountdownObserver?.disconnect?.();
+        myanMyanPayCountdownObserver = null;
+    }
+
+    function startMyanMyanPayCountdown(node, initiatedAt, options = {}) {
+        stopMyanMyanPayCountdown();
+        const now = typeof options.now === "function" ? options.now : Date.now;
+        const schedule = options.setInterval || window.setInterval.bind(window);
+        const clear = options.clearInterval || window.clearInterval.bind(window);
+        const render = () => {
+            if (node.isConnected === false) { stopMyanMyanPayCountdown(); return null; }
+            const state = countdownState(initiatedAt, now());
+            if (!state.valid) {
+                node.textContent = t("payment.mmqrTimerUnavailable", "Payment time unavailable");
+                node.classList?.add?.("is-unavailable");
+                stopMyanMyanPayCountdown();
+                return state;
+            }
+            node.classList?.toggle?.("is-expired", state.expired);
+            node.textContent = state.expired
+                ? `${t("payment_qr_expires_in", "Expires in")} 00:00 · ${t("waitingPayment", "Waiting for payment")}`
+                : `${t("payment_qr_expires_in", "Expires in")} ${formatCountdown(state.remainingSeconds)}`;
+            if (state.expired) stopMyanMyanPayCountdown();
+            return state;
+        };
+        const initialState = render();
+        if (initialState?.valid && !initialState.expired) {
+            myanMyanPayCountdownClear = clear;
+            myanMyanPayCountdownInterval = schedule(render, 1000);
+        }
+        return stopMyanMyanPayCountdown;
+    }
+
+    window.addEventListener?.("pagehide", stopMyanMyanPayCountdown);
     function isMyanMyanPay(staged = {}) {
         const session = staged.session || {};
         const payment = staged.selectedPayment || session.selectedPaymentMethod || {};
@@ -65,6 +125,7 @@
         download.remove();
     }
     function show(staged, { onSubmitted } = {}) {
+        stopMyanMyanPayCountdown();
         const order = staged.orderData || {}, session = staged.session || {};
         const payment = { ...(staged.selectedPayment || {}), ...(session.selectedPaymentMethod || {}) };
         const mount = document.getElementById("paymentSessionMount");
@@ -86,12 +147,15 @@
         if (!myanMyanPay) hero.append(intro);
         shell.append(hero);
         const qrSource = value(session.qrImage, session.qrUrl, payment.qrImage, payment.qrUrl);
+        let countdown = null;
         if (qrSource) {
             const qrSection = document.createElement("section"); qrSection.className = "mm-payment-shell__qr-section";
             const qrLabel = document.createElement("h3"); qrLabel.textContent = myanMyanPay ? t("payment.scanMmqr", "Scan the MMQR") : t("payment.scanToPay", "Scan to pay");
             const qr = document.createElement("img"); qr.className = "mm-payment-shell__qr"; qr.src = qrSource; qr.alt = myanMyanPay ? t("payment.mmqrCode", "MMQR payment QR code") : t("payment.qrCode", "Payment QR code");
             qrSection.append(qrLabel, qr);
             if (myanMyanPay) {
+                countdown = document.createElement("p"); countdown.className = "mm-payment-shell__countdown"; countdown.setAttribute("role", "timer"); countdown.setAttribute("aria-live", "polite");
+                qrLabel.after(countdown);
                 const save = document.createElement("button"); save.type = "button"; save.className = "mm-payment-shell__save-qr"; save.innerHTML = '<i class="fa-solid fa-download" aria-hidden="true"></i><span>Save QR</span>';
                 save.addEventListener("click", () => saveDisplayedQr(qrSource, value(session.commerceOrderId, session.orderId, order.commerceOrderId, order.orderId)));
                 const compatibility = document.createElement("p"); compatibility.className = "mm-payment-shell__compatibility"; compatibility.textContent = t("payment.mmqrCompatibility", "Scan with an MMQR-supported banking or payment app.");
@@ -145,6 +209,13 @@
             shell.append(providerAttribution);
 
             mount.replaceChildren(shell);
+            if (countdown) {
+                startMyanMyanPayCountdown(countdown, value(session.initiatedAt, session.paymentInitiatedAt));
+                if (typeof MutationObserver === "function") {
+                    myanMyanPayCountdownObserver = new MutationObserver(() => { if (!countdown.isConnected) stopMyanMyanPayCountdown(); });
+                    myanMyanPayCountdownObserver.observe(mount, { childList: true });
+                }
+            }
             return;
         }
         const receiptEnabled = session.receiptUploadEnabled !== false && payment.receiptUploadEnabled !== false;
@@ -187,5 +258,5 @@
             } catch (error) { message.textContent = error.message || t("payment.submitFailed", "Submission failed. Please try again."); lock.release(); }
         });
     }
-    window.AZIEL_MM_PAYMENT_SHELL = Object.freeze({ supports, show });
+    window.AZIEL_MM_PAYMENT_SHELL = Object.freeze({ supports, show, _test: Object.freeze({ countdownState, formatCountdown, startMyanMyanPayCountdown, stopMyanMyanPayCountdown, durationMs: MYANMYANPAY_QR_WINDOW_MS }) });
 })();
