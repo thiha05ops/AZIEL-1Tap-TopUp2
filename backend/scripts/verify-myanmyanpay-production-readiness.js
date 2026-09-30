@@ -43,15 +43,15 @@ assert.strictEqual(inspectMyanMyanPayEnvironments(productionEnv).production.conf
 assert(!JSON.stringify(productionReadiness).includes(productionEnv.MYANMYANPAY_PRODUCTION_SECRET_KEY), "readiness must not expose Production secrets");
 
 for (const invalid of [
-    SANDBOX_API_BASE_URL,
-    "http://api.myanmyanpay.com",
-    "https://sub.api.myanmyanpay.com",
-    "https://api.myanmyanpay.com/",
-    "https://api.myanmyanpay.com/payments",
-    "https://api.myanmyanpay.com?x=1",
-    "https://api.myanmyanpay.com#x",
-    "https://user@api.myanmyanpay.com",
-    "https://api.myanmyanpay.com:443"
+    "https://api.myanmyanpay.com",
+    "http://ezapi.myanmyanpay.com",
+    "https://sub.ezapi.myanmyanpay.com",
+    "https://ezapi.myanmyanpay.com/",
+    "https://ezapi.myanmyanpay.com/payments",
+    "https://ezapi.myanmyanpay.com?x=1",
+    "https://ezapi.myanmyanpay.com#x",
+    "https://user@ezapi.myanmyanpay.com",
+    "https://ezapi.myanmyanpay.com:443"
 ]) assert.strictEqual(inspectMyanMyanPayConfiguration({ ...productionEnv, MYANMYANPAY_PRODUCTION_API_BASE_URL: invalid }).configured, false, `Production origin must reject ${invalid}`);
 assert.strictEqual(inspectMyanMyanPayConfiguration({ ...productionEnv, MYANMYANPAY_PRODUCTION_PUBLISHABLE_KEY: "pk_test_wrong" }).configured, false, "Sandbox publishable credentials must not initialize Production");
 assert.strictEqual(inspectMyanMyanPayConfiguration({ ...productionEnv, MYANMYANPAY_PRODUCTION_SECRET_KEY: "sk_test_wrong" }).configured, false, "Sandbox secret credentials must not initialize Production");
@@ -99,6 +99,7 @@ assert.strictEqual(myanMyanPayAccessDecision({ ...method, myanMyanPayActivationS
 
     const productionUrlShape = clientTest.safeUrlShape(configuration, "GET");
     assert.strictEqual(productionUrlShape.sdkSandboxSelected, false);
+    assert.strictEqual(productionUrlShape.apiBaseUrlOrigin, PRODUCTION_API_BASE_URL);
     assert.strictEqual(productionUrlShape.handshakeEndpointPath, "/payments/handshake");
     assert.strictEqual(productionUrlShape.endpointPath, "/payments/get");
     assert.strictEqual(clientTest.safeUrlShape(configuration, "PAY").endpointPath, "/payments/create");
@@ -116,10 +117,9 @@ assert.strictEqual(myanMyanPayAccessDecision({ ...method, myanMyanPayActivationS
     assert(!JSON.stringify(settings).includes(productionEnv.MYANMYANPAY_PRODUCTION_SECRET_KEY));
 
     const sdkSource = fs.readFileSync(path.join(root, "node_modules/mmpay-node-sdk/src/index.ts"), "utf8");
-    const sdkPlugin = fs.readFileSync(path.join(root, "node_modules/mmpay-node-sdk/plugins/fastifyJS/mmpayPlugin.md"), "utf8");
     assert(sdkSource.includes("this.#isSandbox ? 'sandbox-handshake' : 'handshake'") && sdkSource.includes("this.#isSandbox ? 'sandbox-create' : 'create'"));
     assert(sdkSource.includes("this.#isSandbox ? 'sandbox-get' : 'get'") && sdkSource.includes("this.#isSandbox ? 'sandbox-cancel' : 'cancel'"));
-    assert(sdkPlugin.includes("apiBaseUrl: 'https://api.myanmyanpay.com'"), "bundled SDK provider documentation must evidence the Production origin");
+    assert(sdkSource.includes("apiBaseUrl: options.apiBaseUrl") && sdkSource.includes("this.#apiBaseUrl = options.apiBaseUrl"), "official SDK must accept and use AZIEL's validated API base URL");
 
     const callbackSource = fs.readFileSync(path.join(root, "backend/routes/myanMyanPaySettlementCallback.js"), "utf8");
     const appSource = fs.readFileSync(path.join(root, "backend/services/commerce/manualPaymentApplicationService.js"), "utf8");

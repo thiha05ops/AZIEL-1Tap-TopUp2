@@ -11,10 +11,21 @@ MYANMYANPAY_ENVIRONMENT=PRODUCTION
 MYANMYANPAY_PRODUCTION_APP_ID=
 MYANMYANPAY_PRODUCTION_PUBLISHABLE_KEY=
 MYANMYANPAY_PRODUCTION_SECRET_KEY=
-MYANMYANPAY_PRODUCTION_API_BASE_URL=https://api.myanmyanpay.com
+MYANMYANPAY_PRODUCTION_API_BASE_URL=https://ezapi.myanmyanpay.com
 ```
 
 Production keys must have the SDK-documented `pk_live_` and `sk_live_` classifications. The API base URL is fail-closed to the exact HTTPS origin above. Sandbox variables remain separate and may stay configured.
+
+With Production credentials, the official SDK uses these paths on that origin:
+
+```text
+POST /payments/handshake
+POST /payments/create
+POST /payments/get
+POST /payments/cancel
+```
+
+The obsolete `https://api.myanmyanpay.com` origin is rejected. A trailing slash, path, query string, fragment, userinfo, alternate scheme, host, subdomain, or explicit port is also rejected.
 
 The Production webhook remains:
 

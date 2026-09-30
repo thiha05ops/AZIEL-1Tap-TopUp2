@@ -4,7 +4,7 @@ const ENVIRONMENTS = Object.freeze({ SANDBOX: "SANDBOX", PRODUCTION: "PRODUCTION
 const ENVIRONMENT = ENVIRONMENTS.SANDBOX;
 const CALLBACK_URL = "https://azielplay.com/api/webhooks/myanmyanpay/payment";
 const SANDBOX_API_BASE_URL = "https://ezapi.myanmyanpay.com";
-const PRODUCTION_API_BASE_URL = "https://api.myanmyanpay.com";
+const PRODUCTION_API_BASE_URL = "https://ezapi.myanmyanpay.com";
 const API_BASE_URL = SANDBOX_API_BASE_URL;
 
 class MyanMyanPayConfigurationError extends Error {
