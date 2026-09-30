@@ -55,6 +55,33 @@ const emailDeliverySchema = new mongoose.Schema(
             type: String,
             trim: true,
             default: ""
+        },
+        rfcMessageId: {
+            type: String,
+            trim: true,
+            default: "",
+            maxlength: 200
+        },
+        threadRootMessageId: {
+            type: String,
+            trim: true,
+            default: "",
+            maxlength: 200
+        },
+        inReplyTo: {
+            type: String,
+            trim: true,
+            default: "",
+            maxlength: 200
+        },
+        references: {
+            type: [{ type: String, trim: true, maxlength: 200 }],
+            default: []
+        },
+        transport: {
+            type: String,
+            enum: ["", "gmail_smtp", "brevo"],
+            default: ""
         }
     },
     {

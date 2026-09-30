@@ -77,6 +77,9 @@ function verifyOtpIntegration() {
 function verifyOrderEmailOwnership() {
     includes("backend/models/EmailDelivery.js", "deliveryKey", "Email delivery model must own semantic delivery key.");
     includes("backend/models/EmailDelivery.js", "unique: true", "Email delivery key must be unique.");
+    includes("backend/models/OrderEmailThread.js", "commerceOrderId", "Order email threads must be durable and order-scoped.");
+    includes("backend/models/OrderEmailThread.js", "rootDeliveryKey", "Thread root ownership must be durable.");
+    includes("backend/models/EmailDelivery.js", "rfcMessageId", "Logical deliveries must persist RFC identity.");
     includes("backend/models/Order.js", "customerEmail", "Order must snapshot customer email for lifecycle delivery.");
     includes("backend/models/Order.js", "customerUserId", "Order must snapshot linked customer user id for lifecycle delivery fallback.");
     includes("backend/models/ManualPaymentAttempt.js", "customerEmail", "Manual payment attempts must carry customer email into deferred Order creation.");
@@ -108,6 +111,7 @@ function verifyOrderEmailOwnership() {
     includes("backend/services/orderEmailService.js", "status: \"delivered\"", "Delivered lifecycle emails must be marked.");
     includes("backend/services/orderEmailService.js", "status: \"failed\"", "Failed lifecycle emails must be retryable.");
     includes("backend/services/orderEmailService.js", "duplicate_or_pending", "Duplicate semantic lifecycle emails must be skipped.");
+    includes("backend/services/orderEmailService.js", "transportProvider: \"gmail_smtp\"", "Order lifecycle mail must explicitly use threading-capable SMTP.");
 }
 
 function verifyTemplateAndLinkSafety() {

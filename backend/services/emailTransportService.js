@@ -132,8 +132,9 @@ function assertGmailSmtpConfig(env = process.env) {
     }
 }
 
-function assertEmailConfig(env = process.env) {
-    const provider = getEmailProvider(env);
+function assertEmailConfig(env = process.env, providerOverride = "") {
+    const provider = providerOverride ? normalizeProvider(providerOverride) : getEmailProvider(env);
+    if (!SUPPORTED_EMAIL_PROVIDERS.has(provider)) throw new EmailTransportError("EMAIL_PROVIDER_UNSUPPORTED");
     if (provider === "brevo") return assertBrevoConfig(env);
     return assertGmailSmtpConfig(env);
 }
@@ -284,9 +285,24 @@ async function sendBrevoEmail(message = {}, env = process.env) {
     const data = await response.json().catch(() => ({}));
     return {
         messageId: data.messageId || data.messageIds?.[0] || "",
+        providerMessageId: data.messageId || data.messageIds?.[0] || "",
         provider: "brevo",
         response: data
     };
+}
+
+function buildSmtpMessage({ to, subject, html, text, messageId = "", inReplyTo = "", references = [] } = {}, env = process.env) {
+    const message = {
+        from: buildFrom(env),
+        to,
+        subject,
+        html,
+        text
+    };
+    if (messageId) message.messageId = messageId;
+    if (inReplyTo) message.inReplyTo = inReplyTo;
+    if (Array.isArray(references) && references.length) message.references = references;
+    return message;
 }
 
 async function verifyBrevoTransport(env = process.env) {
@@ -336,26 +352,44 @@ function logEmailFailure({ operation = "email.send", to = "", messageType = "" }
     });
 }
 
-async function sendEmail({ to, subject, html, text, messageType = "transactional", operation = "email.send" } = {}) {
+async function sendEmail({
+    to,
+    subject,
+    html,
+    text,
+    messageType = "transactional",
+    operation = "email.send",
+    transportProvider = "",
+    messageId = "",
+    inReplyTo = "",
+    references = []
+} = {}) {
     if (suppressTestEmail(to)) {
         recordSuppressedEvent("email", { operation, recipient: to });
         return { accepted: [String(to)], suppressed: true, messageId: "aziel-e2e-suppressed" };
     }
-    assertEmailConfig();
-    const provider = getEmailProvider();
+    const provider = transportProvider ? normalizeProvider(transportProvider) : getEmailProvider();
+    assertEmailConfig(process.env, provider);
     activeProvider = provider;
 
     try {
         const message = { to, subject, html, text };
-        const result = provider === "brevo"
+        const rawResult = provider === "brevo"
             ? await sendBrevoEmail(message)
-            : await (await getTransporter()).sendMail({
-                from: buildFrom(),
-                to,
-                subject,
-                html,
-                text
-            });
+            : await (await getTransporter()).sendMail(buildSmtpMessage({
+                ...message,
+                messageId,
+                inReplyTo,
+                references
+            }));
+        const result = provider === "brevo"
+            ? rawResult
+            : {
+                ...rawResult,
+                provider: "gmail_smtp",
+                rfcMessageId: rawResult?.messageId || "",
+                providerMessageId: ""
+            };
 
         console.log("Email delivered:", {
             operation,
@@ -363,7 +397,7 @@ async function sendEmail({ to, subject, html, text, messageType = "transactional
             provider,
             recipient: maskEmail(to),
             recipientHash: hashRecipient(to),
-            messageId: result?.messageId || "",
+            providerMessageId: result?.providerMessageId || "",
             at: new Date().toISOString()
         });
 
@@ -391,6 +425,7 @@ module.exports = {
     SAFE_EMAIL_FAILURE_MESSAGE,
     SUPPORTED_EMAIL_PROVIDERS,
     buildBrevoPayload,
+    buildSmtpMessage,
     buildFrom,
     classifyTransportError,
     createTransport,

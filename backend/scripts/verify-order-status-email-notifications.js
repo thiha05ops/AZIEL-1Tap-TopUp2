@@ -11,6 +11,7 @@ process.env.CLOUDINARY_CLOUD_NAME = "aziel-test";
 
 const sent = [];
 const deliveries = new Map();
+const threads = new Map();
 let sendFailure = null;
 let catalogFailure = false;
 let mediaFailure = false;
@@ -38,6 +39,7 @@ const EmailDeliveryMock = {
             deliveryKey: filter.deliveryKey,
             status: update.$set.status,
             attemptCount: Number(existing?.attemptCount || 0) + 1,
+            ...(existing || update.$setOnInsert),
             updatedAt: Date.now()
         };
         deliveries.set(filter.deliveryKey, value);
@@ -45,6 +47,21 @@ const EmailDeliveryMock = {
     },
     async updateOne(filter, update) {
         deliveries.set(filter._id, { ...deliveries.get(filter._id), ...update.$set, updatedAt: Date.now() });
+    }
+};
+const OrderEmailThreadMock = {
+    async findOneAndUpdate(filter, update) {
+        if (!threads.has(filter.commerceOrderId)) {
+            threads.set(filter.commerceOrderId, { ...update.$setOnInsert });
+        }
+        return threads.get(filter.commerceOrderId);
+    },
+    async findOne({ commerceOrderId }) {
+        return threads.get(commerceOrderId) || null;
+    },
+    async updateOne(filter, update) {
+        const value = threads.get(filter.commerceOrderId);
+        if (value) threads.set(filter.commerceOrderId, { ...value, ...update.$set });
     }
 };
 const UserMock = {
@@ -94,13 +111,14 @@ const transportMock = {
     async sendEmail(message) {
         if (sendFailure) throw sendFailure;
         sent.push(message);
-        return { messageId: `msg-${sent.length}`, provider: "mock" };
+        return { providerMessageId: `provider-${sent.length}`, provider: "mock" };
     }
 };
 
 Module._load = function (request, parent, isMain) {
     const resolved = Module._resolveFilename(request, parent, isMain);
     if (resolved === path.join(ROOT, "backend/models/EmailDelivery.js")) return EmailDeliveryMock;
+    if (resolved === path.join(ROOT, "backend/models/OrderEmailThread.js")) return OrderEmailThreadMock;
     if (resolved === path.join(ROOT, "backend/models/User.js")) return UserMock;
     if (resolved === path.join(ROOT, "backend/models/CatalogProduct.js")) return CatalogProductMock;
     if (resolved === path.join(ROOT, "backend/models/MediaAsset.js")) return MediaAssetMock;
@@ -163,7 +181,9 @@ async function verifyEveryEvent() {
         assert.deepStrictEqual(await service.notifyOrderTransition(item, { status }), { delivered: true });
         const message = sent.at(-1);
         assert.strictEqual(message.messageType, event);
-        assert(message.subject.includes(item.orderId));
+        assert.strictEqual(message.subject, `AZIEL Order ${item.orderId}`);
+        assert.strictEqual(message.transportProvider, "gmail_smtp");
+        assert(/^<aziel-[a-f0-9]{36}@mail\.azielplay\.com>$/.test(message.messageId));
         assert(message.html.startsWith("<!doctype html>"));
         assert(message.html.includes('name="viewport"'));
         assert(message.html.includes('role="presentation"'));

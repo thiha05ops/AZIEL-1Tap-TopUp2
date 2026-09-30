@@ -1,4 +1,6 @@
+const crypto = require("crypto");
 const EmailDelivery = require("../models/EmailDelivery");
+const OrderEmailThread = require("../models/OrderEmailThread");
 const CatalogProduct = require("../models/CatalogProduct");
 const MediaAsset = require("../models/MediaAsset");
 const User = require("../models/User");
@@ -16,6 +18,7 @@ const STALE_PENDING_MS = 2 * 60 * 1000;
 const CANONICAL_STOREFRONT_ORIGIN = "https://azielplay.com";
 const STOREFRONT_ORIGINS = new Set([CANONICAL_STOREFRONT_ORIGIN, "https://www.azielplay.com"]);
 const TIMELINE_LIMIT = 12;
+const MESSAGE_ID_DOMAIN = "mail.azielplay.com";
 
 const STATUS_EVENT_MAP = Object.freeze({
     pending: "ORDER_CREATED_PENDING_PAYMENT",
@@ -380,7 +383,7 @@ function buildOrderEmail(order = {}, eventType, options = {}) {
     const html = buildEmailV3Shell({ title: copy.title, preheader: copy.nextStep, content });
 
     return {
-        subject: `${copy.subject} — ${orderId}`,
+        subject: `AZIEL Order ${orderId}`,
         text,
         html
     };
@@ -409,8 +412,46 @@ async function resolveRecipient(order = {}) {
     return "";
 }
 
-async function acquireDelivery({ deliveryKey, messageType, orderId, recipient }) {
+function generateRfcMessageId() {
+    return `<aziel-${crypto.randomBytes(18).toString("hex")}@${MESSAGE_ID_DOMAIN}>`;
+}
+
+async function acquireOrderEmailThread({ commerceOrderId, deliveryKey, recipientHash }) {
+    const candidateRoot = generateRfcMessageId();
+    let thread;
+    try {
+        thread = await OrderEmailThread.findOneAndUpdate(
+            { commerceOrderId },
+            {
+                $setOnInsert: {
+                    commerceOrderId,
+                    rootMessageId: candidateRoot,
+                    rootDeliveryKey: deliveryKey,
+                    recipientHash
+                }
+            },
+            { returnDocument: "after", upsert: true }
+        );
+    } catch (error) {
+        if (error?.code !== 11000) throw error;
+        thread = await OrderEmailThread.findOne({ commerceOrderId });
+    }
+
+    if (!thread) throw new Error("ORDER_EMAIL_THREAD_ACQUIRE_FAILED");
+    if (String(thread.recipientHash || "") !== recipientHash) {
+        const error = new Error("ORDER_EMAIL_THREAD_RECIPIENT_MISMATCH");
+        error.code = "ORDER_EMAIL_THREAD_RECIPIENT_MISMATCH";
+        throw error;
+    }
+    return thread;
+}
+
+async function acquireDelivery({ deliveryKey, messageType, orderId, recipient, thread }) {
     const staleBefore = new Date(Date.now() - STALE_PENDING_MS);
+    const ownsRoot = String(thread.rootDeliveryKey) === deliveryKey;
+    const rfcMessageId = ownsRoot ? String(thread.rootMessageId) : generateRfcMessageId();
+    const inReplyTo = ownsRoot ? "" : String(thread.rootMessageId);
+    const references = ownsRoot ? [] : [String(thread.rootMessageId)];
 
     try {
         const delivery = await EmailDelivery.findOneAndUpdate(
@@ -428,7 +469,12 @@ async function acquireDelivery({ deliveryKey, messageType, orderId, recipient })
                     messageType,
                     orderId,
                     recipientHash: hashRecipient(recipient),
-                    recipientMasked: maskEmail(recipient)
+                    recipientMasked: maskEmail(recipient),
+                    rfcMessageId,
+                    threadRootMessageId: String(thread.rootMessageId),
+                    inReplyTo,
+                    references,
+                    transport: "gmail_smtp"
                 },
                 $set: {
                     status: "pending",
@@ -459,7 +505,7 @@ async function markDelivered(delivery, result) {
             $set: {
                 status: "delivered",
                 deliveredAt: new Date(),
-                providerMessageId: result?.messageId || "",
+                providerMessageId: result?.providerMessageId || "",
                 lastErrorCode: ""
             }
         }
@@ -493,20 +539,27 @@ async function deliverOrderEmail(order, eventType) {
     }
     const message = buildOrderEmail(order, eventType, { presentation });
 
+    if (!message) {
+        return { skipped: true, reason: "event_unmapped" };
+    }
+
     const deliveryKey = `${order.orderId}:${eventType}`;
+    const recipientHash = hashRecipient(recipient);
+    const thread = await acquireOrderEmailThread({
+        commerceOrderId: order.orderId,
+        deliveryKey,
+        recipientHash
+    });
     const delivery = await acquireDelivery({
         deliveryKey,
         messageType: eventType,
         orderId: order.orderId,
-        recipient
+        recipient,
+        thread
     });
 
     if (!delivery) {
         return { skipped: true, reason: "duplicate_or_pending" };
-    }
-
-    if (!message) {
-        return { skipped: true, reason: "event_unmapped" };
     }
 
     try {
@@ -516,7 +569,11 @@ async function deliverOrderEmail(order, eventType) {
             html: message.html,
             text: message.text,
             messageType: eventType,
-            operation: "order.lifecycle.email"
+            operation: "order.lifecycle.email",
+            transportProvider: "gmail_smtp",
+            messageId: delivery.rfcMessageId,
+            inReplyTo: delivery.inReplyTo,
+            references: delivery.references
         });
         await markDelivered(delivery, result);
         return { delivered: true };
@@ -548,10 +605,12 @@ module.exports = {
     absoluteUrl,
     buildOrderEmail,
     buildTimeline,
+    acquireOrderEmailThread,
     deliverOrderEmail,
     eventTypeForTransition,
     notifyManualPaymentSubmitted,
     notifyOrderTransition,
+    generateRfcMessageId,
     resolveProductPresentation,
     safePublicImageUrl
 };

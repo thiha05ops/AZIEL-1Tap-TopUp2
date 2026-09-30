@@ -6,6 +6,7 @@ const ROOT = path.resolve(__dirname, "../..");
 
 const {
     buildBrevoPayload,
+    buildSmtpMessage,
     classifyTransportError,
     getEmailProvider,
     normalizeSmtpError,
@@ -76,6 +77,33 @@ function verifyBrevoPayload() {
     assert.strictEqual(payload.htmlContent, "<p>Hello</p>");
     assert.strictEqual(payload.textContent, "Hello");
     assert.deepStrictEqual(payload.replyTo, { email: "support@aziel.example.com" });
+    assert.strictEqual(payload.headers, undefined, "Default Brevo payload must not gain undocumented threading headers.");
+}
+
+function verifySmtpThreadingPayload() {
+    const root = buildSmtpMessage({
+        to: "customer@example.com",
+        subject: "AZIEL Order AZL-THREAD",
+        html: "<p>Created</p>",
+        text: "Created",
+        messageId: "<root@mail.azielplay.com>"
+    }, { EMAIL_FROM: "noreply@azielplay.com", EMAIL_FROM_NAME: "AZIEL" });
+    assert.strictEqual(root.messageId, "<root@mail.azielplay.com>");
+    assert.strictEqual(root.inReplyTo, undefined);
+    assert.strictEqual(root.references, undefined);
+
+    const child = buildSmtpMessage({
+        to: "customer@example.com",
+        subject: "AZIEL Order AZL-THREAD",
+        html: "<p>Paid</p>",
+        text: "Paid",
+        messageId: "<paid@mail.azielplay.com>",
+        inReplyTo: "<root@mail.azielplay.com>",
+        references: ["<root@mail.azielplay.com>"]
+    }, { EMAIL_FROM: "noreply@azielplay.com", EMAIL_FROM_NAME: "AZIEL" });
+    assert.strictEqual(child.messageId, "<paid@mail.azielplay.com>");
+    assert.strictEqual(child.inReplyTo, "<root@mail.azielplay.com>");
+    assert.deepStrictEqual(child.references, ["<root@mail.azielplay.com>"]);
 }
 
 function verifyErrorMappingAndRedaction() {
@@ -130,6 +158,7 @@ function verifySourceContracts() {
 function main() {
     verifyProviderSelection();
     verifyBrevoPayload();
+    verifySmtpThreadingPayload();
     verifyErrorMappingAndRedaction();
     verifySourceContracts();
     console.log("Email provider API verification passed.");
