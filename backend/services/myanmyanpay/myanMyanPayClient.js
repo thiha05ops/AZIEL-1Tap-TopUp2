@@ -16,6 +16,13 @@ const MAX_DIAGNOSTIC_TEXT = 80;
 const MAX_DIAGNOSTIC_PATH = 240;
 const GET_PAYMENT_STATUSES = Object.freeze(new Set(["PENDING", "SUCCESS", "FAILED", "CANCELLED", "EXPIRED", "REFUNDED"]));
 const SAFE_REFERENCE = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,219}$/;
+const SAFE_CAUSE_CODES = Object.freeze(new Set([
+    "ENOTFOUND", "EAI_AGAIN", "ECONNREFUSED", "ECONNRESET", "ETIMEDOUT",
+    "UND_ERR_CONNECT_TIMEOUT", "UND_ERR_SOCKET",
+    "DEPTH_ZERO_SELF_SIGNED_CERT", "SELF_SIGNED_CERT_IN_CHAIN", "UNABLE_TO_VERIFY_LEAF_SIGNATURE",
+    "CERT_HAS_EXPIRED", "ERR_TLS_CERT_ALTNAME_INVALID", "ERR_TLS_CERT_SIGNATURE_ALGORITHM_UNSUPPORTED",
+    "ERR_TLS_INVALID_PROTOCOL_VERSION"
+]));
 
 function own(value, key) { return Boolean(value && typeof value === "object" && Object.prototype.hasOwnProperty.call(value, key)); }
 function plainObject(value) { return Boolean(value && typeof value === "object" && !Array.isArray(value) && !(value instanceof Error)); }
@@ -56,6 +63,45 @@ function safeErrorName(value) {
     if (value.name === "AbortError") return "ABORT_ERROR";
     if (value.name === "Error") return "ERROR";
     return "UNKNOWN_ERROR";
+}
+
+function safeCauseCode(value) {
+    if (!(value instanceof Error)) return "";
+    try {
+        const code = typeof value.cause?.code === "string" ? value.cause.code.trim().toUpperCase() : "";
+        return SAFE_CAUSE_CODES.has(code) ? code : "UNKNOWN";
+    } catch (_) { return "UNKNOWN"; }
+}
+
+function safeCreatePhase(value) {
+    if (!(value instanceof Error)) return "";
+    try {
+        const stack = typeof value.stack === "string" ? value.stack : "";
+        if (/(?:dist[\\/]cjs[\\/]index\.js:160|src[\\/]index\.ts:173)(?::\d+)?/.test(stack)) return "CREATE_FETCH";
+        if (/(?:dist[\\/]cjs[\\/]index\.js:171|src[\\/]index\.ts:184)(?::\d+)?/.test(stack)) return "CREATE_RESPONSE_BODY";
+        return "UNKNOWN_CREATE_PHASE";
+    } catch (_) { return "UNKNOWN_CREATE_PHASE"; }
+}
+
+function handshakeShapeDiagnostic(value, configuration = {}) {
+    const sandbox = text(configuration.publishableKey).includes("_test_") || text(configuration.secretKey).includes("_test_");
+    const objectValue = plainObject(value);
+    const tokenPresent = Boolean(objectValue && typeof value.token === "string" && value.token.length > 0);
+    let classification = "NON_OBJECT_RESPONSE";
+    if (value instanceof Error) classification = "ERROR_INSTANCE";
+    else if (tokenPresent) classification = "TOKEN_PRESENT";
+    else if (errorShaped(value)) classification = "ERROR_SHAPED_OBJECT";
+    else if (objectValue) classification = "TOKEN_MISSING";
+    return Object.freeze({
+        provider: "MYANMYANPAY",
+        environment: sandbox ? "SANDBOX" : "PRODUCTION",
+        classification,
+        safeErrorName: safeErrorName(value),
+        ...(value instanceof Error ? { safeCauseCode: safeCauseCode(value) } : {}),
+        tokenPresent,
+        sdkSandboxSelected: sandbox,
+        endpointPath: sandbox ? "/payments/sandbox-handshake" : "/payments/handshake"
+    });
 }
 
 function safeUrlShape(configuration = {}, operation = "GET") {
@@ -114,6 +160,7 @@ function responseShapeDiagnostic(response, configuration = {}, operation = "PAY"
         isArray: Array.isArray(response),
         isErrorInstance: response instanceof Error,
         safeErrorName: safeErrorName(response),
+        ...(response instanceof Error ? { safeCauseCode: safeCauseCode(response), ...(operation === "PAY" ? { createPhase: safeCreatePhase(response) } : {}) } : {}),
         topLevelKeys: boundedSafeKeys(response),
         dataKeys: boundedSafeKeys(objectResponse ? response.data : null),
         resultKeys: boundedSafeKeys(objectResponse ? response.result : null),
@@ -163,6 +210,24 @@ function validQr(value) { const qr = text(value); return qr.length >= 12 && qr.l
 function createMyanMyanPayClient(configuration, options = {}) {
     const logger = options.logger || console;
     const sdk = options.sdk || MMPaySDK({ appId: configuration.appId, publishableKey: configuration.publishableKey, secretKey: configuration.secretKey, apiBaseUrl: configuration.apiBaseUrl });
+
+    try {
+        if (typeof sdk.handShake === "function") {
+            const originalHandShake = sdk.handShake;
+            sdk.handShake = async function instrumentedHandShake(...args) {
+                try {
+                    const result = await originalHandShake.apply(this, args);
+                    try { logger.info?.("[MYANMYANPAY_HANDSHAKE_SHAPE]", handshakeShapeDiagnostic(result, configuration)); }
+                    catch (_) { /* Diagnostics must never affect provider behavior. */ }
+                    return result;
+                } catch (error) {
+                    try { logger.info?.("[MYANMYANPAY_HANDSHAKE_SHAPE]", handshakeShapeDiagnostic(error, configuration)); }
+                    catch (_) { /* Diagnostics must never affect provider behavior. */ }
+                    throw error;
+                }
+            };
+        }
+    } catch (_) { /* Inability to install diagnostics must never affect provider behavior. */ }
 
     function logShape(tag, value, operation, stage) {
         try { logger.info?.(tag, responseShapeDiagnostic(value, configuration, operation, stage)); }
@@ -241,5 +306,5 @@ function createMyanMyanPayClient(configuration, options = {}) {
 
 module.exports = Object.freeze({
     createMyanMyanPayClient,
-    _test: Object.freeze({ boundedKeys, safePrimitive, boundedSafeKeys, safeCodePrimitive, safeHttpStatus, safeErrorName, safeUrlShape, errorShaped, classifyResponseShape, classifyGetResponseShape, responseShapeDiagnostic, getResponseShapeDiagnostic, configurationShape, validReference, validQr })
+    _test: Object.freeze({ boundedKeys, safePrimitive, boundedSafeKeys, safeCodePrimitive, safeHttpStatus, safeErrorName, safeCauseCode, safeCreatePhase, handshakeShapeDiagnostic, safeUrlShape, errorShaped, classifyResponseShape, classifyGetResponseShape, responseShapeDiagnostic, getResponseShapeDiagnostic, configurationShape, validReference, validQr })
 });

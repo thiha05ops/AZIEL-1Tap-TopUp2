@@ -276,6 +276,17 @@ assert.strictEqual(myanMyanPayAccessDecision(method, { id: "user-1" }, env).allo
     const customError = new Error("must-not-log"); customError.name = "SecretCustomError";
     assert.strictEqual(myanMyanPayClientTest.safeErrorName(abortError), "ABORT_ERROR");
     assert.strictEqual(myanMyanPayClientTest.safeErrorName(customError), "UNKNOWN_ERROR");
+    const allowedCauseError = new TypeError("secret transport message must-not-log", { cause: { code: "ECONNRESET", secret: "cause-secret-must-not-log" } });
+    const unknownCauseError = new TypeError("secret transport message must-not-log", { cause: { code: "SECRET_OPAQUE_CAUSE", secret: "cause-secret-must-not-log" } });
+    assert.strictEqual(myanMyanPayClientTest.safeCauseCode(allowedCauseError), "ECONNRESET");
+    assert.strictEqual(myanMyanPayClientTest.safeCauseCode(unknownCauseError), "UNKNOWN", "unknown native-fetch cause codes must be reduced to a fixed enum");
+    const createFetchError = new TypeError("secret create message must-not-log");
+    createFetchError.stack = "TypeError: secret create message must-not-log\n    at async MMPaySdkClass.pay (/app/node_modules/mmpay-node-sdk/dist/cjs/index.js:160:30)";
+    const createBodyError = new TypeError("secret body message must-not-log");
+    createBodyError.stack = "TypeError: secret body message must-not-log\n    at async MMPaySdkClass.pay (/app/node_modules/mmpay-node-sdk/dist/cjs/index.js:171:26)";
+    assert.strictEqual(myanMyanPayClientTest.safeCreatePhase(createFetchError), "CREATE_FETCH");
+    assert.strictEqual(myanMyanPayClientTest.safeCreatePhase(createBodyError), "CREATE_RESPONSE_BODY");
+    assert.strictEqual(myanMyanPayClientTest.safeCreatePhase(new TypeError("secret")), "UNKNOWN_CREATE_PHASE");
     assert.strictEqual(myanMyanPayClientTest.safeCodePrimitive("AUTH_FAILED"), "AUTH_FAILED");
     assert.strictEqual(myanMyanPayClientTest.safeCodePrimitive("unsafe code with spaces"), null);
     assert.strictEqual(myanMyanPayClientTest.safeCodePrimitive("A".repeat(81)), null);
@@ -283,6 +294,94 @@ assert.strictEqual(myanMyanPayAccessDecision(method, { id: "user-1" }, env).allo
     assert.strictEqual(myanMyanPayClientTest.safeHttpStatus(401), 401);
     assert.strictEqual(myanMyanPayClientTest.safeHttpStatus("503"), 503);
     assert.strictEqual(myanMyanPayClientTest.safeHttpStatus("FAILED"), null);
+
+    const handshakeLogs = [];
+    const handshakeResult = { token: "BTOKEN-MUST-NOT-LOG", message: "handshake-message-must-not-log" };
+    let handshakeCalls = 0;
+    let handshakeThis = null;
+    let wrapperReturnedValue = null;
+    const instrumentedSdk = {
+        async handShake(...args) {
+            handshakeCalls += 1;
+            handshakeThis = this;
+            assert.deepStrictEqual(args, [{ orderId: "ORDER-MUST-NOT-LOG", nonce: "NONCE-MUST-NOT-LOG" }]);
+            return handshakeResult;
+        },
+        async pay() {
+            wrapperReturnedValue = await this.handShake({ orderId: "ORDER-MUST-NOT-LOG", nonce: "NONCE-MUST-NOT-LOG" });
+            return validCreateResponse;
+        }
+    };
+    const instrumentedClient = createMyanMyanPayClient(configuration, { sdk: instrumentedSdk, logger: { info(...args) { handshakeLogs.push(args); } } });
+    await instrumentedClient.pay(createPayload);
+    assert.strictEqual(handshakeCalls, 1, "instrumentation must not invoke handshake separately or retry it");
+    assert.strictEqual(handshakeThis, instrumentedSdk, "instrumentation must preserve the SDK method this binding");
+    assert.strictEqual(wrapperReturnedValue, handshakeResult, "instrumentation must return the exact original handshake value");
+    const handshakeLog = handshakeLogs.find(([tag]) => tag === "[MYANMYANPAY_HANDSHAKE_SHAPE]");
+    assert(handshakeLog, "instrumented SDK handshake must emit its bounded diagnostic");
+    assert.deepStrictEqual(handshakeLog[1], {
+        provider: "MYANMYANPAY", environment: "SANDBOX", classification: "TOKEN_PRESENT", safeErrorName: "",
+        tokenPresent: true, sdkSandboxSelected: true, endpointPath: "/payments/sandbox-handshake"
+    });
+    assert.deepStrictEqual(myanMyanPayClientTest.handshakeShapeDiagnostic({ token: "LIVE-TOKEN-MUST-NOT-LOG" }, { publishableKey: "pk_live_value", secretKey: "sk_live_value" }), {
+        provider: "MYANMYANPAY", environment: "PRODUCTION", classification: "TOKEN_PRESENT", safeErrorName: "",
+        tokenPresent: true, sdkSandboxSelected: false, endpointPath: "/payments/handshake"
+    }, "live credentials must produce only the fixed Production handshake path and environment metadata");
+    const serializedHandshakeLogs = JSON.stringify(handshakeLogs);
+    for (const forbidden of ["BTOKEN-MUST-NOT-LOG", "handshake-message-must-not-log", "ORDER-MUST-NOT-LOG", "NONCE-MUST-NOT-LOG"]) assert(!serializedHandshakeLogs.includes(forbidden), `handshake diagnostics must redact ${forbidden}`);
+
+    const handshakeErrorLogs = [];
+    const returnedHandshakeError = new TypeError("handshake-secret-must-not-log", { cause: { code: "ENOTFOUND", secret: "must-not-log" } });
+    const returnedCreateError = new TypeError("create-secret-must-not-log", { cause: { code: "SECRET_CAUSE_MUST_NOT_LOG" } });
+    returnedCreateError.stack = "TypeError: create-secret-must-not-log\n    at async MMPaySdkClass.pay (/app/node_modules/mmpay-node-sdk/dist/cjs/index.js:160:30)";
+    let errorHandshakeCalls = 0;
+    const errorSdk = {
+        async handShake() { errorHandshakeCalls += 1; return returnedHandshakeError; },
+        async pay() { assert.strictEqual(await this.handShake({}), returnedHandshakeError); return returnedCreateError; }
+    };
+    const errorDiagnosticClient = createMyanMyanPayClient(configuration, { sdk: errorSdk, logger: { info(...args) { handshakeErrorLogs.push(args); } } });
+    await assert.rejects(() => errorDiagnosticClient.pay(createPayload), error => error.code === "MYANMYANPAY_SDK_RETURNED_ERROR");
+    assert.strictEqual(errorHandshakeCalls, 1);
+    const boundedHandshakeError = handshakeErrorLogs.find(([tag]) => tag === "[MYANMYANPAY_HANDSHAKE_SHAPE]")[1];
+    assert.deepStrictEqual(boundedHandshakeError, {
+        provider: "MYANMYANPAY", environment: "SANDBOX", classification: "ERROR_INSTANCE", safeErrorName: "TYPE_ERROR",
+        safeCauseCode: "ENOTFOUND", tokenPresent: false, sdkSandboxSelected: true, endpointPath: "/payments/sandbox-handshake"
+    });
+    const boundedCreateError = handshakeErrorLogs.find(([tag]) => tag === "[MYANMYANPAY_RESPONSE_SHAPE]")[1];
+    assert.strictEqual(boundedCreateError.safeCauseCode, "UNKNOWN");
+    assert.strictEqual(boundedCreateError.createPhase, "CREATE_FETCH");
+    for (const forbidden of ["handshake-secret-must-not-log", "create-secret-must-not-log", "SECRET_CAUSE_MUST_NOT_LOG", "must-not-log", "stack", "headers", "body"]) {
+        assert(!JSON.stringify(handshakeErrorLogs).toLowerCase().includes(forbidden.toLowerCase()), `error diagnostics must not emit ${forbidden}`);
+    }
+
+    let loggerFailureHandshakeCalls = 0;
+    const loggerFailureHandshakeResult = { token: "LOGGER-FAILURE-TOKEN-MUST-NOT-LOG" };
+    const loggerFailureSdk = {
+        async handShake() { loggerFailureHandshakeCalls += 1; return loggerFailureHandshakeResult; },
+        async pay() { assert.strictEqual(await this.handShake({}), loggerFailureHandshakeResult); return validCreateResponse; }
+    };
+    const loggerFailureInstrumentedClient = createMyanMyanPayClient(configuration, { sdk: loggerFailureSdk, logger: { info() { throw new Error("logger unavailable"); } } });
+    assert.strictEqual((await loggerFailureInstrumentedClient.pay(createPayload)).status, "PENDING", "handshake diagnostic failure must not change SDK/payment behavior");
+    assert.strictEqual(loggerFailureHandshakeCalls, 1);
+
+    const thrownHandshakeError = new TypeError("thrown-handshake-secret-must-not-log", { cause: { code: "ETIMEDOUT" } });
+    let thrownHandshakeCalls = 0;
+    let observedThrownHandshakeError = null;
+    const throwingHandshakeSdk = {
+        async handShake() { thrownHandshakeCalls += 1; throw thrownHandshakeError; },
+        async pay() {
+            try { await this.handShake({}); }
+            catch (error) { observedThrownHandshakeError = error; throw error; }
+        }
+    };
+    const thrownHandshakeLogs = [];
+    const throwingHandshakeClient = createMyanMyanPayClient(configuration, { sdk: throwingHandshakeSdk, logger: { info(...args) { thrownHandshakeLogs.push(args); } } });
+    await assert.rejects(() => throwingHandshakeClient.pay(createPayload), error => error.code === "MYANMYANPAY_SDK_OPERATION_FAILED");
+    assert.strictEqual(thrownHandshakeCalls, 1);
+    assert.strictEqual(observedThrownHandshakeError, thrownHandshakeError, "instrumentation must rethrow the exact original handshake exception");
+    assert.strictEqual(thrownHandshakeLogs.find(([tag]) => tag === "[MYANMYANPAY_HANDSHAKE_SHAPE]")[1].safeCauseCode, "ETIMEDOUT");
+    assert(!JSON.stringify(thrownHandshakeLogs).includes("thrown-handshake-secret-must-not-log"));
+
     const safeGetUrl = myanMyanPayClientTest.safeUrlShape(getConfiguration);
     assert.deepStrictEqual(safeGetUrl, {
         apiBaseUrlOrigin: "https://sandbox.example.test",
