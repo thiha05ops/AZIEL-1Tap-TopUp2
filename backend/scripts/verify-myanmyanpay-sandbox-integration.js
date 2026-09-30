@@ -614,8 +614,8 @@ assert.strictEqual(myanMyanPayAccessDecision(method, { id: "user-1" }, env).allo
     for (const status of ["failed", "cancelled", "expired"]) assert.deepStrictEqual({ ...statusSync.classifyMyanMyanPayServerState({ paymentStatus: status, status }) }, { kind: "terminal", orderStatus: status });
     for (const status of ["pending_payment", "pending", "unpaid", "initiating"]) assert.strictEqual(statusSync.classifyMyanMyanPayServerState({ paymentStatus: status, status: "pending_payment" }).kind, "pending", "pending server state must preserve the QR");
     assert(paymentPageRuntimeSource.includes("/api/order/status/${encodeURIComponent(identity.orderId)}"), "MyanMyanPay polling must use the authenticated canonical order-status endpoint");
-    assert(paymentPageRuntimeSource.includes('{ method: "GET", headers, cache: "no-store" }'), "status polling must remain explicitly read-only and bypass caches");
-    assert(paymentPageRuntimeSource.includes("headers.Authorization"), "status polling must require customer authentication");
+    assert(paymentPageRuntimeSource.includes('{ method: "GET", headers, credentials: "same-origin", cache: "no-store" }'), "status polling must use same-origin session credentials and bypass caches");
+    assert(!paymentPageRuntimeSource.includes("if (!headers.Authorization)"), "cookie-authenticated polling must not require a legacy browser Bearer token");
     assert(paymentPageRuntimeSource.includes('returnedOrderId !== identity.orderId') && paymentPageRuntimeSource.includes('returnedProvider !== "MYANMYANPAY"') && paymentPageRuntimeSource.includes('returnedAttemptId !== identity.attemptId'), "polling responses must fail closed on order, provider, and attempt mismatches");
     assert(!paymentPageRuntimeSource.includes("MYANMYANPAY_STATUS_MAX_POLLS") && !paymentPageRuntimeSource.includes("MYANMYANPAY_STATUS_MAX_CONSECUTIVE_READ_FAILURES"), "status observation must not terminate on a fixed poll or transient-failure count");
     assert(paymentPageRuntimeSource.includes("MYANMYANPAY_STATUS_RETRY_DELAYS_MS") && paymentPageRuntimeSource.includes("myanMyanPayStatusRequestInFlight"), "polling retries must be delay-bounded and non-overlapping");
@@ -631,7 +631,7 @@ assert.strictEqual(myanMyanPayAccessDecision(method, { id: "user-1" }, env).allo
     assert(!/expiresAt|expiry|ttl|validUntil/i.test(sdkTypesSource), "installed MyanMyanPay SDK response contract must not be treated as supplying an authoritative expiry when it does not");
     assert(paymentAttemptModelSource.includes("createdAt: { type: Date, required: true, immutable: true }"), "MMQR timer authority must be the persisted immutable PaymentAttempt creation timestamp");
     assert(customerCheckoutSource.includes('initiatedAt: payment.initiatedAt || ""'), "customer session must preserve the server-projected PaymentAttempt initiation timestamp");
-    assert(paymentPageHtmlSource.includes("payment-page-runtime.js?v=20260930-mmqr-brand-1") && paymentPageHtmlSource.includes("mm-payment-shell.js?v=20260930-mmqr-timer-1") && paymentPageHtmlSource.includes("mm-payment-shell.css?v=20260930-mmqr-timer-1"), "payment page must load the versioned MMQR timer assets");
+    assert(paymentPageHtmlSource.includes("payment-page-runtime.js?v=20261001-mmqr-cookie-status-1") && paymentPageHtmlSource.includes("mm-payment-shell.js?v=20260930-mmqr-timer-1") && paymentPageHtmlSource.includes("mm-payment-shell.css?v=20260930-mmqr-timer-1"), "payment page must load the cache-busted status runtime without changing the MMQR timer assets");
 
     function paymentStatusHarness(responses = [], options = {}) {
         const timers = [];
@@ -641,7 +641,9 @@ assert.strictEqual(myanMyanPayAccessDecision(method, { id: "user-1" }, env).allo
         const nodesById = new Map();
         let authAction = null;
         let completionRenders = 0;
+        let shellRenders = 0;
         let fetchCalls = 0;
+        let lastRequest = null;
         let timerId = 0;
         const classList = () => ({ values: new Set(), add(name) { this.values.add(name); }, remove(name) { this.values.delete(name); }, toggle(name, active) { if (active) this.values.add(name); else this.values.delete(name); } });
         const makeNode = tag => ({
@@ -682,6 +684,7 @@ assert.strictEqual(myanMyanPayAccessDecision(method, { id: "user-1" }, env).allo
             AZIEL_LOCALE: { t(key, fallback) { return fallback; } },
             AZIEL_PAYMENT_SESSION_AUTHORITY: null,
             PaymentUtils: { authHeaders() { return options.auth === false ? {} : { Authorization: "Bearer test-token" }; }, apiUrl(pathname) { return pathname; } },
+            AZIEL_MM_PAYMENT_SHELL: { show() { shellRenders += 1; } },
             location: { replace() {} },
             addEventListener(name, callback) { listeners[name] = callback; },
             setTimeout(callback, delay) { const id = ++timerId; timers.push({ id, callback, delay }); return id; },
@@ -691,7 +694,9 @@ assert.strictEqual(myanMyanPayAccessDecision(method, { id: "user-1" }, env).allo
         const sessionStorage = { removeItem() {}, getItem() { return null; } };
         const fetch = async (_url, request) => {
             fetchCalls += 1;
+            lastRequest = request;
             assert.strictEqual(request.method, "GET");
+            assert.strictEqual(request.credentials, "same-origin");
             assert.strictEqual(request.cache, "no-store");
             const next = responses.shift();
             if (next instanceof Error) throw next;
@@ -709,7 +714,7 @@ assert.strictEqual(myanMyanPayAccessDecision(method, { id: "user-1" }, env).allo
             await flush();
             return timer.delay;
         };
-        return { api, staged, listeners, documentListeners, document, qrSection, statusNode, shell, flush, runNextTimer, get fetchCalls() { return fetchCalls; }, get completionRenders() { return completionRenders; }, get authAction() { return authAction; } };
+        return { api, staged, listeners, documentListeners, document, qrSection, statusNode, shell, nodesById, flush, runNextTimer, get fetchCalls() { return fetchCalls; }, get completionRenders() { return completionRenders; }, get shellRenders() { return shellRenders; }, get lastRequest() { return lastRequest; }, get authAction() { return authAction; } };
     }
 
     const pendingResponse = () => ({ ok: true, status: 200, async json() { return { success: true, order: { orderId: "AZL-1", commerceOrderId: "AZL-1", commercePaymentAttemptId: "PAY-1", paymentProvider: "MYANMYANPAY", paymentStatus: "pending", orderStatus: "pending_payment" } }; } });
@@ -742,12 +747,18 @@ assert.strictEqual(myanMyanPayAccessDecision(method, { id: "user-1" }, env).allo
     await onlineHarness.flush();
     assert.strictEqual(onlineHarness.completionRenders, 1, "online recovery must observe authoritative success");
 
-    const mismatchResponse = { ok: true, status: 200, async json() { return { success: true, order: { orderId: "AZL-1", commerceOrderId: "AZL-1", commercePaymentAttemptId: "OTHER", paymentProvider: "MYANMYANPAY", paymentStatus: "paid", orderStatus: "processing" } }; } };
-    const mismatchHarness = paymentStatusHarness([mismatchResponse]);
-    mismatchHarness.api.startMyanMyanPayStatusPolling(mismatchHarness.staged);
-    await mismatchHarness.flush();
-    assert.strictEqual(mismatchHarness.completionRenders, 0, "an attempt identity mismatch must never trigger success");
-    assert.strictEqual(await mismatchHarness.runNextTimer(), 3000, "identity mismatch must remain fail-closed while observation retries");
+    for (const mismatch of [
+        { commerceOrderId: "OTHER" },
+        { paymentProvider: "DINGER" },
+        { commercePaymentAttemptId: "OTHER" }
+    ]) {
+        const mismatchResponse = { ok: true, status: 200, async json() { return { success: true, order: { orderId: "AZL-1", commerceOrderId: "AZL-1", commercePaymentAttemptId: "PAY-1", paymentProvider: "MYANMYANPAY", paymentStatus: "paid", orderStatus: "processing", ...mismatch } }; } };
+        const mismatchHarness = paymentStatusHarness([mismatchResponse]);
+        mismatchHarness.api.startMyanMyanPayStatusPolling(mismatchHarness.staged);
+        await mismatchHarness.flush();
+        assert.strictEqual(mismatchHarness.completionRenders, 0, "order, provider, and attempt identity mismatches must never trigger success");
+        assert.strictEqual(await mismatchHarness.runNextTimer(), 3000, "identity mismatch must remain fail-closed while observation retries");
+    }
 
     const expiredHarness = paymentStatusHarness([pendingResponse()], { initiatedAt: "2000-01-01T00:00:00.000Z" });
     expiredHarness.api.startMyanMyanPayStatusPolling(expiredHarness.staged);
@@ -756,18 +767,29 @@ assert.strictEqual(myanMyanPayAccessDecision(method, { id: "user-1" }, env).allo
     assert.strictEqual(expiredHarness.fetchCalls, 1, "expired QR presentation must continue read-only order observation");
     assert.strictEqual(expiredHarness.api.myanMyanPayIdentity(expiredHarness.staged).orderId, "AZL-1", "expiry must not replace the original order identity");
 
-    const authHarness = paymentStatusHarness([], { auth: false });
-    authHarness.api.startMyanMyanPayStatusPolling(authHarness.staged);
-    await authHarness.flush();
-    assert.strictEqual(authHarness.fetchCalls, 0, "missing authentication must fail before any status request");
-    assert(authHarness.authAction && authHarness.authAction.href === "/login", "missing authentication must offer a recoverable sign-in action");
-    assert.strictEqual(authHarness.completionRenders, 0, "missing authentication must never imply payment success");
+    const cookieSessionHarness = paymentStatusHarness([paidResponse()], { auth: false });
+    cookieSessionHarness.api.startMyanMyanPayStatusPolling(cookieSessionHarness.staged);
+    await cookieSessionHarness.flush();
+    assert.strictEqual(cookieSessionHarness.fetchCalls, 1, "a cookie-authenticated customer without a browser Bearer token must issue the status GET");
+    assert.strictEqual(cookieSessionHarness.lastRequest.credentials, "same-origin");
+    assert.strictEqual(cookieSessionHarness.completionRenders, 1, "matching paid/processing state must replace the QR with Payment Successful exactly once");
+    assert.strictEqual(cookieSessionHarness.nodesById.get("paymentStatusSummary").textContent, "Paid", "authoritative success must update Order Summary to Paid");
 
-    const expiredAuthHarness = paymentStatusHarness([{ ok: false, status: 401, async json() { return {}; } }]);
-    expiredAuthHarness.api.startMyanMyanPayStatusPolling(expiredAuthHarness.staged);
-    await expiredAuthHarness.flush();
-    assert.strictEqual(expiredAuthHarness.fetchCalls, 1);
-    assert(expiredAuthHarness.authAction && expiredAuthHarness.completionRenders === 0, "expired authentication must offer sign-in without implying success");
+    const recoveredHarness = paymentStatusHarness([paidResponse()], { auth: false });
+    assert.strictEqual(recoveredHarness.api.showRecovered({ ...recoveredHarness.staged.session, region: "MM", paymentName: "MMQR" }), true);
+    await recoveredHarness.flush();
+    assert.strictEqual(recoveredHarness.shellRenders, 1, "valid recovered MMQR must render its existing payment presentation");
+    assert.strictEqual(recoveredHarness.fetchCalls, 1, "valid recovered MMQR must start read-only status observation");
+    assert.strictEqual(recoveredHarness.completionRenders, 1, "recovered MMQR must observe authoritative success without creating another payment");
+
+    for (const status of [401, 403]) {
+        const expiredAuthHarness = paymentStatusHarness([{ ok: false, status, async json() { return {}; } }], { auth: false });
+        expiredAuthHarness.api.startMyanMyanPayStatusPolling(expiredAuthHarness.staged);
+        await expiredAuthHarness.flush();
+        assert.strictEqual(expiredAuthHarness.fetchCalls, 1);
+        assert(expiredAuthHarness.authAction && expiredAuthHarness.completionRenders === 0, "backend 401/403 must offer recoverable sign-in without implying success");
+        assert.strictEqual(await expiredAuthHarness.runNextTimer(), 3000, "authentication-required observation must remain recoverable");
+    }
     assert(paymentRouteSource.includes('requireAdminPermission(PERMISSIONS.PAYMENT_METHODS_MANAGE)'), "tester lookup remains payment-management authorized");
     assert(paymentRouteSource.includes('authorizedTesterCustomerIds'), "activation must accept customer-facing tester IDs");
     assert(paymentRouteSource.includes('MYANMYANPAY_PUBLIC_NOT_READY') && paymentRouteSource.includes('decision.publicReady'), "PUBLIC must fail closed behind Production readiness");

@@ -185,9 +185,8 @@
 
     async function readMyanMyanPayStatus(identity) {
         const headers = window.PaymentUtils?.authHeaders?.() || {};
-        if (!headers.Authorization) return { kind: "authentication_required" };
         try {
-            const response = await fetch(window.PaymentUtils.apiUrl(`/api/order/status/${encodeURIComponent(identity.orderId)}`), { method: "GET", headers, cache: "no-store" });
+            const response = await fetch(window.PaymentUtils.apiUrl(`/api/order/status/${encodeURIComponent(identity.orderId)}`), { method: "GET", headers, credentials: "same-origin", cache: "no-store" });
             if (response.status === 401 || response.status === 403) return { kind: "authentication_required" };
             const data = await response.json().catch(() => ({}));
             if (!response.ok || !data.success || !data.order) return { kind: "read_failure" };
@@ -347,7 +346,9 @@
                 showCompletion({ orderId: recovery.orderId || recovery.commerceOrderId, paid: false, amount: recovery.amount, currency: recovery.currency, methodName: recovery.paymentName || recovery.paymentMethod, reference: recovery.reference, manualSubmission: true });
                 return true;
             }
-            window.AZIEL_MM_PAYMENT_SHELL.show({ session: recovery, orderData: recovery, selectedPayment: recovery, paymentType: "manual" }, { onSubmitted: ({ orderId, amount, currency, methodName, reference }) => showCompletion({ orderId, paid: false, amount, currency, methodName, reference, manualSubmission: true }) });
+            const recoveredPayment = { session: recovery, orderData: recovery, selectedPayment: recovery, paymentType: "manual" };
+            window.AZIEL_MM_PAYMENT_SHELL.show(recoveredPayment, { onSubmitted: ({ orderId, amount, currency, methodName, reference }) => showCompletion({ orderId, paid: false, amount, currency, methodName, reference, manualSubmission: true }) });
+            if (myanMyanPayIdentity(recoveredPayment)) startMyanMyanPayStatusPolling(recoveredPayment);
             return true;
         }
         window.PaymentCheckoutSheet.openRecoveredPayment(recovery);
@@ -468,6 +469,7 @@
             markMyanMyanPayQrExpiry,
             readMyanMyanPayStatus,
             showMyanMyanPaySuccess,
+            showRecovered,
             startMyanMyanPayStatusPolling,
             stopMyanMyanPayStatusPolling,
             wakeMyanMyanPayStatusPolling
