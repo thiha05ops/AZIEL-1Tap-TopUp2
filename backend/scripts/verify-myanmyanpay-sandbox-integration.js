@@ -555,6 +555,7 @@ assert.strictEqual(myanMyanPayAccessDecision(method, { id: "user-1" }, env).allo
     const paymentPageHtmlSource = fs.readFileSync(path.join(root, "frontend/payment.html"), "utf8");
     const mmPaymentShellSource = fs.readFileSync(path.join(root, "frontend/js/payment/mm-payment-shell.js"), "utf8");
     const paymentPageRuntimeSource = fs.readFileSync(path.join(root, "frontend/js/payment-page-runtime.js"), "utf8");
+    const orderRouteSource = fs.readFileSync(path.join(root, "backend/routes/order.js"), "utf8");
     const customerCheckoutSource = fs.readFileSync(path.join(root, "backend/services/commerce/customerManualPaymentCheckoutService.js"), "utf8");
     const myanMyanPayClientSource = fs.readFileSync(path.join(root, "backend/services/myanmyanpay/myanMyanPayClient.js"), "utf8");
     const paymentOrchestratorSource = fs.readFileSync(path.join(root, "backend/services/commerce/paymentOrchestrator.js"), "utf8");
@@ -598,22 +599,160 @@ assert.strictEqual(myanMyanPayAccessDecision(method, { id: "user-1" }, env).allo
     for (const status of ["failed", "cancelled", "expired"]) assert.deepStrictEqual({ ...statusSync.classifyMyanMyanPayServerState({ paymentStatus: status, status }) }, { kind: "terminal", orderStatus: status });
     for (const status of ["pending_payment", "pending", "unpaid", "initiating"]) assert.strictEqual(statusSync.classifyMyanMyanPayServerState({ paymentStatus: status, status: "pending_payment" }).kind, "pending", "pending server state must preserve the QR");
     assert(paymentPageRuntimeSource.includes("/api/order/status/${encodeURIComponent(identity.orderId)}"), "MyanMyanPay polling must use the authenticated canonical order-status endpoint");
-    assert(paymentPageRuntimeSource.includes('{ method: "GET", headers }'), "status polling must remain explicitly read-only");
+    assert(paymentPageRuntimeSource.includes('{ method: "GET", headers, cache: "no-store" }'), "status polling must remain explicitly read-only and bypass caches");
     assert(paymentPageRuntimeSource.includes("headers.Authorization"), "status polling must require customer authentication");
     assert(paymentPageRuntimeSource.includes('returnedOrderId !== identity.orderId') && paymentPageRuntimeSource.includes('returnedProvider !== "MYANMYANPAY"') && paymentPageRuntimeSource.includes('returnedAttemptId !== identity.attemptId'), "polling responses must fail closed on order, provider, and attempt mismatches");
-    assert(paymentPageRuntimeSource.includes("MYANMYANPAY_STATUS_MAX_POLLS") && paymentPageRuntimeSource.includes("myanMyanPayStatusRequestInFlight"), "polling must be bounded and non-overlapping");
+    assert(!paymentPageRuntimeSource.includes("MYANMYANPAY_STATUS_MAX_POLLS") && !paymentPageRuntimeSource.includes("MYANMYANPAY_STATUS_MAX_CONSECUTIVE_READ_FAILURES"), "status observation must not terminate on a fixed poll or transient-failure count");
+    assert(paymentPageRuntimeSource.includes("MYANMYANPAY_STATUS_RETRY_DELAYS_MS") && paymentPageRuntimeSource.includes("myanMyanPayStatusRequestInFlight"), "polling retries must be delay-bounded and non-overlapping");
     assert(paymentPageRuntimeSource.includes("paid: true") && paymentPageRuntimeSource.includes("paymentReceived: true") && paymentPageRuntimeSource.includes("showCompletion({"), "authoritative success must use the existing successful completion presentation");
     assert(paymentPageRuntimeSource.includes('updateMyanMyanPayTerminal(result.orderStatus)') && paymentPageRuntimeSource.includes('qrSection.hidden = true'), "failed, cancelled, and expired states must stop using the stale QR without mutating payment state");
     assert(paymentPageRuntimeSource.includes("Waiting for payment") && paymentPageRuntimeSource.includes("We'll confirm your payment automatically."), "pending and observation uncertainty must retain the quiet automatic-confirmation state");
     assert(!paymentPageRuntimeSource.includes("updateMyanMyanPayInconclusive") && !paymentPageRuntimeSource.includes("Check Payment Status") && !paymentPageRuntimeSource.includes("Awaiting confirmation"), "customer payment UX must expose no inconclusive state or manual status control");
     assert(!paymentPageRuntimeSource.includes("checkMyanMyanPayStatusOnce") && !paymentPageRuntimeSource.includes('updateMyanMyanPayTerminal("unknown")'), "observation uncertainty must not become a customer-managed or terminal state");
-    assert(paymentPageRuntimeSource.includes("MYANMYANPAY_STATUS_MAX_CONSECUTIVE_READ_FAILURES"), "transient reads must remain bounded while leaving the customer in the quiet waiting state");
+    assert(paymentPageRuntimeSource.includes('window.addEventListener("online", wakeMyanMyanPayStatusPolling)') && paymentPageRuntimeSource.includes('document.addEventListener("visibilitychange"'), "online and visible pages must resume observation");
+    assert(orderRouteSource.includes('res.setHeader("Cache-Control", "no-store, max-age=0")'), "authenticated canonical order status must be non-cacheable");
     assert(!paymentPageRuntimeSource.includes("createCommerceManualPaymentCheckout") && !paymentPageRuntimeSource.includes("resumeOrRetryManualPayment"), "status observation UX must never create or retry a payment");
     assert(!paymentPageRuntimeSource.includes("/api/payment/status/") && !paymentPageRuntimeSource.includes("myanmyanpay-reconcile") && !paymentPageRuntimeSource.includes("MMPay.get"), "browser polling must not use legacy, reconciliation, or provider endpoints");
     assert(!/expiresAt|expiry|ttl|validUntil/i.test(sdkTypesSource), "installed MyanMyanPay SDK response contract must not be treated as supplying an authoritative expiry when it does not");
     assert(paymentAttemptModelSource.includes("createdAt: { type: Date, required: true, immutable: true }"), "MMQR timer authority must be the persisted immutable PaymentAttempt creation timestamp");
     assert(customerCheckoutSource.includes('initiatedAt: payment.initiatedAt || ""'), "customer session must preserve the server-projected PaymentAttempt initiation timestamp");
     assert(paymentPageHtmlSource.includes("payment-page-runtime.js?v=20260930-mmqr-brand-1") && paymentPageHtmlSource.includes("mm-payment-shell.js?v=20260930-mmqr-timer-1") && paymentPageHtmlSource.includes("mm-payment-shell.css?v=20260930-mmqr-timer-1"), "payment page must load the versioned MMQR timer assets");
+
+    function paymentStatusHarness(responses = [], options = {}) {
+        const timers = [];
+        const clearedTimers = new Set();
+        const listeners = {};
+        const documentListeners = {};
+        const nodesById = new Map();
+        let authAction = null;
+        let completionRenders = 0;
+        let fetchCalls = 0;
+        let timerId = 0;
+        const classList = () => ({ values: new Set(), add(name) { this.values.add(name); }, remove(name) { this.values.delete(name); }, toggle(name, active) { if (active) this.values.add(name); else this.values.delete(name); } });
+        const makeNode = tag => ({
+            tag, textContent: "", className: "", id: "", href: "", hidden: false, dataset: {}, children: [], classList: classList(),
+            append(...children) { this.children.push(...children); if (children.some(child => child?.dataset?.myanmyanpayAuthAction)) authAction = children.find(child => child?.dataset?.myanmyanpayAuthAction); },
+            replaceChildren(...children) { this.children = children; if (this.id === "paymentSessionMount" && children[0]?.className === "checkout-card payment-completion") completionRenders += 1; },
+            setAttribute(name, value) { this[name] = String(value); },
+            addEventListener() {},
+            querySelector(selector) {
+                if (selector === "[data-myanmyanpay-auth-action]") return authAction;
+                if (selector === "[data-myanmyanpay-terminal-action]") return null;
+                return null;
+            },
+            remove() { if (this === authAction) authAction = null; }
+        });
+        const mount = makeNode("section"); mount.id = "paymentSessionMount";
+        const statusNode = makeNode("p");
+        const qrSection = makeNode("section");
+        const shell = makeNode("section");
+        for (const id of ["paymentStatusSummary", "paymentOrderId", "paymentProduct", "paymentPackage", "paymentAccount", "paymentMethodSummary", "paymentAmount", "paymentPageTitle", "paymentRedirectCountdown", "trackOrderNow", "paymentBackHome"]) {
+            const node = makeNode("span"); node.id = id; nodesById.set(id, node);
+        }
+        nodesById.set("paymentSessionMount", mount);
+        const document = {
+            visibilityState: "visible",
+            addEventListener(name, callback) { documentListeners[name] = callback; },
+            createElement: makeNode,
+            getElementById(id) { return nodesById.get(id) || null; },
+            querySelector(selector) {
+                if (selector === ".mm-payment-shell .checkout-feedback[role='status']") return statusNode;
+                if (selector === ".mm-payment-shell__qr-section") return qrSection;
+                if (selector === ".mm-payment-shell") return shell;
+                if (selector === "[data-myanmyanpay-auth-action]") return authAction;
+                return null;
+            }
+        };
+        const runtimeWindow = {
+            AZIEL_LOCALE: { t(key, fallback) { return fallback; } },
+            AZIEL_PAYMENT_SESSION_AUTHORITY: null,
+            PaymentUtils: { authHeaders() { return options.auth === false ? {} : { Authorization: "Bearer test-token" }; }, apiUrl(pathname) { return pathname; } },
+            location: { replace() {} },
+            addEventListener(name, callback) { listeners[name] = callback; },
+            setTimeout(callback, delay) { const id = ++timerId; timers.push({ id, callback, delay }); return id; },
+            clearTimeout(id) { clearedTimers.add(id); },
+            setInterval() { return ++timerId; }, clearInterval() {}
+        };
+        const sessionStorage = { removeItem() {}, getItem() { return null; } };
+        const fetch = async (_url, request) => {
+            fetchCalls += 1;
+            assert.strictEqual(request.method, "GET");
+            assert.strictEqual(request.cache, "no-store");
+            const next = responses.shift();
+            if (next instanceof Error) throw next;
+            return next || { ok: true, status: 200, async json() { return { success: true, order: { orderId: "AZL-1", commerceOrderId: "AZL-1", commercePaymentAttemptId: "PAY-1", paymentProvider: "MYANMYANPAY", paymentStatus: "pending", orderStatus: "pending_payment" } }; } };
+        };
+        vm.runInNewContext(paymentPageRuntimeSource, { window: runtimeWindow, document, sessionStorage, localStorage: { getItem() { return null; } }, URLSearchParams, console, fetch, Date });
+        const api = runtimeWindow.AZIEL_PAYMENT_PAGE._test;
+        const staged = { session: { provider: "MYANMYANPAY", paymentMethod: "myanmyanpay_mmqr", paymentChannel: "MYANMYANPAY_MMQR", confirmationMode: "provider_webhook", commerceOrderId: "AZL-1", attemptId: "PAY-1", initiatedAt: options.initiatedAt || new Date().toISOString(), amount: 3573, currency: "MMK" }, orderData: {} };
+        const flush = async () => { await new Promise(resolve => setImmediate(resolve)); await new Promise(resolve => setImmediate(resolve)); };
+        const runNextTimer = async () => {
+            let timer = timers.shift();
+            while (timer && clearedTimers.has(timer.id)) timer = timers.shift();
+            assert(timer, "a retry timer must be scheduled");
+            timer.callback();
+            await flush();
+            return timer.delay;
+        };
+        return { api, staged, listeners, documentListeners, document, qrSection, statusNode, shell, flush, runNextTimer, get fetchCalls() { return fetchCalls; }, get completionRenders() { return completionRenders; }, get authAction() { return authAction; } };
+    }
+
+    const pendingResponse = () => ({ ok: true, status: 200, async json() { return { success: true, order: { orderId: "AZL-1", commerceOrderId: "AZL-1", commercePaymentAttemptId: "PAY-1", paymentProvider: "MYANMYANPAY", paymentStatus: "pending", orderStatus: "pending_payment" } }; } });
+    const paidResponse = () => ({ ok: true, status: 200, async json() { return { success: true, order: { orderId: "AZL-1", commerceOrderId: "AZL-1", commercePaymentAttemptId: "PAY-1", paymentProvider: "MYANMYANPAY", paymentStatus: "paid", orderStatus: "processing", amount: 3573, currency: "MMK" } }; } });
+
+    const recoveryHarness = paymentStatusHarness([new Error("offline"), paidResponse()]);
+    assert.strictEqual(recoveryHarness.api.myanMyanPayRetryDelay(1), 3000);
+    assert.strictEqual(recoveryHarness.api.myanMyanPayRetryDelay(999), 30000, "transient retry delay must remain bounded");
+    assert.strictEqual(recoveryHarness.api.startMyanMyanPayStatusPolling(recoveryHarness.staged), true);
+    await recoveryHarness.flush();
+    assert.strictEqual(await recoveryHarness.runNextTimer(), 3000, "first transient retry must use the bounded minimum delay");
+    assert.strictEqual(recoveryHarness.fetchCalls, 2, "a transient read failure must recover through another authenticated GET");
+    assert.strictEqual(recoveryHarness.completionRenders, 1, "authoritative paid/processing must replace the QR with completion exactly once");
+    assert.strictEqual(recoveryHarness.api.wakeMyanMyanPayStatusPolling(), false, "terminal success must leave no observer to duplicate the transition");
+    assert.strictEqual(recoveryHarness.completionRenders, 1);
+
+    const visibilityHarness = paymentStatusHarness([pendingResponse(), paidResponse()]);
+    visibilityHarness.api.startMyanMyanPayStatusPolling(visibilityHarness.staged);
+    await visibilityHarness.flush();
+    visibilityHarness.document.visibilityState = "visible";
+    visibilityHarness.documentListeners.visibilitychange();
+    await visibilityHarness.flush();
+    assert.strictEqual(visibilityHarness.fetchCalls, 2, "returning to a visible tab must immediately resume observation");
+    assert.strictEqual(visibilityHarness.completionRenders, 1);
+
+    const onlineHarness = paymentStatusHarness([pendingResponse(), paidResponse()]);
+    onlineHarness.api.startMyanMyanPayStatusPolling(onlineHarness.staged);
+    await onlineHarness.flush();
+    onlineHarness.listeners.online();
+    await onlineHarness.flush();
+    assert.strictEqual(onlineHarness.completionRenders, 1, "online recovery must observe authoritative success");
+
+    const mismatchResponse = { ok: true, status: 200, async json() { return { success: true, order: { orderId: "AZL-1", commerceOrderId: "AZL-1", commercePaymentAttemptId: "OTHER", paymentProvider: "MYANMYANPAY", paymentStatus: "paid", orderStatus: "processing" } }; } };
+    const mismatchHarness = paymentStatusHarness([mismatchResponse]);
+    mismatchHarness.api.startMyanMyanPayStatusPolling(mismatchHarness.staged);
+    await mismatchHarness.flush();
+    assert.strictEqual(mismatchHarness.completionRenders, 0, "an attempt identity mismatch must never trigger success");
+    assert.strictEqual(await mismatchHarness.runNextTimer(), 3000, "identity mismatch must remain fail-closed while observation retries");
+
+    const expiredHarness = paymentStatusHarness([pendingResponse()], { initiatedAt: "2000-01-01T00:00:00.000Z" });
+    expiredHarness.api.startMyanMyanPayStatusPolling(expiredHarness.staged);
+    await expiredHarness.flush();
+    assert.strictEqual(expiredHarness.qrSection.dataset.myanmyanpayQrExpired, "true", "elapsed UI time must mark the existing QR expired");
+    assert.strictEqual(expiredHarness.fetchCalls, 1, "expired QR presentation must continue read-only order observation");
+    assert.strictEqual(expiredHarness.api.myanMyanPayIdentity(expiredHarness.staged).orderId, "AZL-1", "expiry must not replace the original order identity");
+
+    const authHarness = paymentStatusHarness([], { auth: false });
+    authHarness.api.startMyanMyanPayStatusPolling(authHarness.staged);
+    await authHarness.flush();
+    assert.strictEqual(authHarness.fetchCalls, 0, "missing authentication must fail before any status request");
+    assert(authHarness.authAction && authHarness.authAction.href === "/login", "missing authentication must offer a recoverable sign-in action");
+    assert.strictEqual(authHarness.completionRenders, 0, "missing authentication must never imply payment success");
+
+    const expiredAuthHarness = paymentStatusHarness([{ ok: false, status: 401, async json() { return {}; } }]);
+    expiredAuthHarness.api.startMyanMyanPayStatusPolling(expiredAuthHarness.staged);
+    await expiredAuthHarness.flush();
+    assert.strictEqual(expiredAuthHarness.fetchCalls, 1);
+    assert(expiredAuthHarness.authAction && expiredAuthHarness.completionRenders === 0, "expired authentication must offer sign-in without implying success");
     assert(paymentRouteSource.includes('requireAdminPermission(PERMISSIONS.PAYMENT_METHODS_MANAGE)'), "tester lookup remains payment-management authorized");
     assert(paymentRouteSource.includes('authorizedTesterCustomerIds'), "activation must accept customer-facing tester IDs");
     assert(paymentRouteSource.includes('MYANMYANPAY_PUBLIC_NOT_READY') && paymentRouteSource.includes('decision.publicReady'), "PUBLIC must fail closed behind Production readiness");

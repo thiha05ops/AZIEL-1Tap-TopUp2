@@ -8,18 +8,20 @@
     let completionRemaining = 5;
     let myanMyanPayStatusTimer = null;
     let myanMyanPayStatusRequestInFlight = false;
-    let myanMyanPayStatusPollCount = 0;
     let myanMyanPayStatusReadFailures = 0;
     let myanMyanPayStatusIdentity = "";
+    let myanMyanPayStatusPoll = null;
+    let myanMyanPaySuccessTransitioned = false;
     const MYANMYANPAY_STATUS_INTERVAL_MS = 3000;
-    const MYANMYANPAY_STATUS_MAX_POLLS = 200;
-    const MYANMYANPAY_STATUS_MAX_CONSECUTIVE_READ_FAILURES = 5;
+    const MYANMYANPAY_STATUS_RETRY_DELAYS_MS = Object.freeze([3000, 5000, 10000, 15000, 30000]);
+    const MYANMYANPAY_QR_WINDOW_MS = 15 * 60 * 1000;
 
     function readSession() {
         try { return JSON.parse(sessionStorage.getItem(SESSION_KEY) || "null"); } catch (_) { return null; }
     }
 
     function stagedSessionIsActive(staged) {
+        if (myanMyanPayIdentity(staged)) return true;
         const expiresAt = staged?.session?.expiresAt || staged?.session?.recoverableExpiresAt || staged?.session?.dynamicQr?.expiresAt;
         if (!expiresAt) return Boolean(staged?.session?.attemptId);
         const expires = new Date(expiresAt).getTime();
@@ -63,10 +65,33 @@
     }
 
     function stopMyanMyanPayStatusPolling() {
-        if (myanMyanPayStatusTimer) window.clearInterval(myanMyanPayStatusTimer);
+        if (myanMyanPayStatusTimer) window.clearTimeout(myanMyanPayStatusTimer);
         myanMyanPayStatusTimer = null;
         myanMyanPayStatusRequestInFlight = false;
         myanMyanPayStatusIdentity = "";
+        myanMyanPayStatusPoll = null;
+    }
+
+    function myanMyanPayRetryDelay(failureCount) {
+        const index = Math.min(Math.max(0, Number(failureCount || 1) - 1), MYANMYANPAY_STATUS_RETRY_DELAYS_MS.length - 1);
+        return MYANMYANPAY_STATUS_RETRY_DELAYS_MS[index];
+    }
+
+    function scheduleMyanMyanPayStatusPoll(poll, delay = MYANMYANPAY_STATUS_INTERVAL_MS) {
+        if (poll !== myanMyanPayStatusPoll || !myanMyanPayStatusIdentity) return;
+        if (myanMyanPayStatusTimer) window.clearTimeout(myanMyanPayStatusTimer);
+        myanMyanPayStatusTimer = window.setTimeout(() => {
+            myanMyanPayStatusTimer = null;
+            poll();
+        }, Math.max(MYANMYANPAY_STATUS_INTERVAL_MS, Number(delay) || MYANMYANPAY_STATUS_INTERVAL_MS));
+    }
+
+    function wakeMyanMyanPayStatusPolling() {
+        if (!myanMyanPayStatusPoll || !myanMyanPayStatusIdentity || myanMyanPayStatusRequestInFlight) return false;
+        if (myanMyanPayStatusTimer) window.clearTimeout(myanMyanPayStatusTimer);
+        myanMyanPayStatusTimer = null;
+        myanMyanPayStatusPoll();
+        return true;
     }
 
     function updateMyanMyanPayMessage(title, message, summary, error = false) {
@@ -89,6 +114,37 @@
         );
         const qrSection = document.querySelector(".mm-payment-shell__qr-section");
         if (qrSection) qrSection.hidden = false;
+        document.querySelector("[data-myanmyanpay-auth-action]")?.remove();
+    }
+
+    function updateMyanMyanPayAuthenticationRequired() {
+        updateMyanMyanPayMessage(
+            t("payment.signInRequired", "Sign in required"),
+            t("payment.signInToConfirm", "Sign in again to continue automatic payment confirmation."),
+            t("payment.pendingPayment", "Pending payment")
+        );
+        const shell = document.querySelector(".mm-payment-shell");
+        if (shell && !shell.querySelector("[data-myanmyanpay-auth-action]")) {
+            const action = document.createElement("a");
+            action.className = "primary-commerce-action payment-page-link";
+            action.dataset.myanmyanpayAuthAction = "true";
+            action.href = "/login";
+            action.textContent = t("auth.signIn", "Sign in");
+            shell.append(action);
+        }
+    }
+
+    function markMyanMyanPayQrExpiry(staged, now = Date.now()) {
+        const initiatedAt = staged?.session?.initiatedAt || staged?.session?.paymentInitiatedAt;
+        const initiatedAtMs = new Date(initiatedAt).getTime();
+        const expired = Number.isFinite(initiatedAtMs) && Number(now) >= initiatedAtMs + MYANMYANPAY_QR_WINDOW_MS;
+        const qrSection = document.querySelector(".mm-payment-shell__qr-section");
+        if (qrSection) {
+            qrSection.classList?.toggle?.("is-expired", expired);
+            if (expired) qrSection.dataset.myanmyanpayQrExpired = "true";
+            else delete qrSection.dataset.myanmyanpayQrExpired;
+        }
+        return expired;
     }
 
     function updateMyanMyanPayTerminal(status) {
@@ -129,10 +185,10 @@
 
     async function readMyanMyanPayStatus(identity) {
         const headers = window.PaymentUtils?.authHeaders?.() || {};
-        if (!headers.Authorization) return { kind: "inconclusive" };
+        if (!headers.Authorization) return { kind: "authentication_required" };
         try {
-            const response = await fetch(window.PaymentUtils.apiUrl(`/api/order/status/${encodeURIComponent(identity.orderId)}`), { method: "GET", headers });
-            if (response.status === 401 || response.status === 403) return { kind: "inconclusive" };
+            const response = await fetch(window.PaymentUtils.apiUrl(`/api/order/status/${encodeURIComponent(identity.orderId)}`), { method: "GET", headers, cache: "no-store" });
+            if (response.status === 401 || response.status === 403) return { kind: "authentication_required" };
             const data = await response.json().catch(() => ({}));
             if (!response.ok || !data.success || !data.order) return { kind: "read_failure" };
             const authoritative = data.order;
@@ -147,6 +203,8 @@
     }
 
     function showMyanMyanPaySuccess(staged, identity, result) {
+        if (myanMyanPaySuccessTransitioned) return false;
+        myanMyanPaySuccessTransitioned = true;
         sessionStorage.removeItem(SESSION_KEY);
         sessionStorage.removeItem("azielProductCheckoutDraft");
         const session = staged.session || {};
@@ -162,39 +220,36 @@
             orderStatus: result.orderStatus,
             myanMyanPay: true
         });
+        return true;
     }
 
     function startMyanMyanPayStatusPolling(staged) {
         const identity = myanMyanPayIdentity(staged);
         if (!identity) return false;
         stopMyanMyanPayStatusPolling();
-        myanMyanPayStatusPollCount = 0;
         myanMyanPayStatusReadFailures = 0;
+        myanMyanPaySuccessTransitioned = false;
         myanMyanPayStatusIdentity = `${identity.orderId}:${identity.attemptId}`;
         const pollIdentity = myanMyanPayStatusIdentity;
         const poll = async () => {
             if (pollIdentity !== myanMyanPayStatusIdentity || myanMyanPayStatusRequestInFlight) return;
-            if (myanMyanPayStatusPollCount >= MYANMYANPAY_STATUS_MAX_POLLS) {
-                stopMyanMyanPayStatusPolling();
-                updateMyanMyanPayPending();
-                return;
-            }
-            myanMyanPayStatusPollCount += 1;
             myanMyanPayStatusRequestInFlight = true;
+            let nextDelay = MYANMYANPAY_STATUS_INTERVAL_MS;
+            let continueObservation = true;
             try {
+                markMyanMyanPayQrExpiry(staged);
                 const result = await readMyanMyanPayStatus(identity);
                 if (pollIdentity !== myanMyanPayStatusIdentity) return;
-                if (["inconclusive", "identity_mismatch", "unknown"].includes(result.kind)) {
-                    stopMyanMyanPayStatusPolling();
-                    updateMyanMyanPayPending();
+                if (result.kind === "authentication_required") {
+                    myanMyanPayStatusReadFailures += 1;
+                    nextDelay = myanMyanPayRetryDelay(myanMyanPayStatusReadFailures);
+                    updateMyanMyanPayAuthenticationRequired();
                     return;
                 }
-                if (result.kind === "read_failure") {
+                if (["read_failure", "identity_mismatch", "unknown"].includes(result.kind)) {
                     myanMyanPayStatusReadFailures += 1;
-                    if (myanMyanPayStatusReadFailures >= MYANMYANPAY_STATUS_MAX_CONSECUTIVE_READ_FAILURES) {
-                        stopMyanMyanPayStatusPolling();
-                        updateMyanMyanPayPending();
-                    }
+                    nextDelay = myanMyanPayRetryDelay(myanMyanPayStatusReadFailures);
+                    updateMyanMyanPayPending();
                     return;
                 }
                 myanMyanPayStatusReadFailures = 0;
@@ -202,19 +257,24 @@
                     updateMyanMyanPayPending();
                     return;
                 }
-                stopMyanMyanPayStatusPolling();
+                continueObservation = false;
                 if (result.kind === "terminal") {
+                    stopMyanMyanPayStatusPolling();
                     updateMyanMyanPayTerminal(result.orderStatus);
                     return;
                 }
+                stopMyanMyanPayStatusPolling();
                 showMyanMyanPaySuccess(staged, identity, result);
             } finally {
-                if (pollIdentity === myanMyanPayStatusIdentity) myanMyanPayStatusRequestInFlight = false;
+                if (pollIdentity === myanMyanPayStatusIdentity) {
+                    myanMyanPayStatusRequestInFlight = false;
+                    if (continueObservation) scheduleMyanMyanPayStatusPoll(poll, nextDelay);
+                }
             }
         };
+        myanMyanPayStatusPoll = poll;
         updateMyanMyanPayPending();
         poll();
-        myanMyanPayStatusTimer = window.setInterval(poll, MYANMYANPAY_STATUS_INTERVAL_MS);
         return true;
     }
 
@@ -381,6 +441,10 @@
     });
     window.addEventListener("pagehide", stopMyanMyanPayStatusPolling);
     window.addEventListener("beforeunload", stopMyanMyanPayStatusPolling);
+    window.addEventListener("online", wakeMyanMyanPayStatusPolling);
+    document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState !== "hidden") wakeMyanMyanPayStatusPolling();
+    });
     window.addEventListener("aziel:locale-changed", () => {
         if (!completionState) return;
         const { paid, paymentReceived, orderStatus, myanMyanPay } = completionState;
@@ -397,6 +461,16 @@
 
     window.AZIEL_PAYMENT_PAGE = {
         showCompletion,
-        _test: Object.freeze({ myanMyanPayIdentity, classifyMyanMyanPayServerState })
+        _test: Object.freeze({
+            myanMyanPayIdentity,
+            classifyMyanMyanPayServerState,
+            myanMyanPayRetryDelay,
+            markMyanMyanPayQrExpiry,
+            readMyanMyanPayStatus,
+            showMyanMyanPaySuccess,
+            startMyanMyanPayStatusPolling,
+            stopMyanMyanPayStatusPolling,
+            wakeMyanMyanPayStatusPolling
+        })
     };
 })();

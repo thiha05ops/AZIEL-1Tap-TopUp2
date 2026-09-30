@@ -753,6 +753,7 @@ router.get("/order/track/:orderId", authMiddleware, async (req, res) => {
 
 // AUTHENTICATED CANONICAL ORDER STATUS
 router.get("/order/status/:orderId", authMiddleware, async (req, res) => {
+    res.setHeader("Cache-Control", "no-store, max-age=0");
     try {
         const order = await Order.findOne({
             orderId: req.params.orderId,
