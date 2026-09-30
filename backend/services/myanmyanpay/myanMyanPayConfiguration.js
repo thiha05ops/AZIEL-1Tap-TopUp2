@@ -1,54 +1,93 @@
 "use strict";
 
-const ENVIRONMENT = "SANDBOX";
+const ENVIRONMENTS = Object.freeze({ SANDBOX: "SANDBOX", PRODUCTION: "PRODUCTION" });
+const ENVIRONMENT = ENVIRONMENTS.SANDBOX;
 const CALLBACK_URL = "https://azielplay.com/api/webhooks/myanmyanpay/payment";
-const API_BASE_URL = "https://ezapi.myanmyanpay.com";
+const SANDBOX_API_BASE_URL = "https://ezapi.myanmyanpay.com";
+const PRODUCTION_API_BASE_URL = "https://api.myanmyanpay.com";
+const API_BASE_URL = SANDBOX_API_BASE_URL;
 
 class MyanMyanPayConfigurationError extends Error {
     constructor(code, message, metadata = {}) { super(message); this.name = "MyanMyanPayConfigurationError"; this.code = code; this.metadata = Object.freeze({ ...metadata }); }
 }
 
 const text = value => String(value || "").trim();
-function exactSandboxUrl(value) {
-    return text(value) === API_BASE_URL;
+function normalizeEnvironment(value, fallback = ENVIRONMENTS.SANDBOX) {
+    const normalized = text(value).toUpperCase();
+    return Object.values(ENVIRONMENTS).includes(normalized) ? normalized : fallback;
+}
+function selectedEnvironment(env = process.env) {
+    const supplied = text(env.MYANMYANPAY_ENVIRONMENT);
+    return supplied ? normalizeEnvironment(supplied, "") : ENVIRONMENTS.SANDBOX;
+}
+function exactApiBaseUrl(value, environment) { return text(value) === (environment === ENVIRONMENTS.PRODUCTION ? PRODUCTION_API_BASE_URL : SANDBOX_API_BASE_URL); }
+function credentialMatches(value, kind, environment) {
+    const marker = environment === ENVIRONMENTS.PRODUCTION ? "live" : "test";
+    return new RegExp(`^${kind}_${marker}_[A-Za-z0-9._-]+$`).test(text(value));
+}
+function variableNames(environment) {
+    const prefix = environment === ENVIRONMENTS.PRODUCTION ? "MYANMYANPAY_PRODUCTION" : "MYANMYANPAY_SANDBOX";
+    return Object.freeze({ appId: `${prefix}_APP_ID`, publishableKey: `${prefix}_PUBLISHABLE_KEY`, secretKey: `${prefix}_SECRET_KEY`, apiBaseUrl: `${prefix}_API_BASE_URL` });
 }
 
-function inspectMyanMyanPayConfiguration(env = process.env) {
+function inspectMyanMyanPayConfiguration(env = process.env, options = {}) {
+    const environment = options.environment ? normalizeEnvironment(options.environment, "") : selectedEnvironment(env);
+    const environmentValid = Object.values(ENVIRONMENTS).includes(environment);
+    const names = variableNames(environment);
     const required = {
-        appId: Boolean(text(env.MYANMYANPAY_SANDBOX_APP_ID)),
-        publishableKey: text(env.MYANMYANPAY_SANDBOX_PUBLISHABLE_KEY).includes("_test_"),
-        secretKey: text(env.MYANMYANPAY_SANDBOX_SECRET_KEY).includes("_test_"),
-        apiBaseUrl: exactSandboxUrl(env.MYANMYANPAY_SANDBOX_API_BASE_URL)
+        appId: Boolean(text(env[names.appId])),
+        publishableKey: credentialMatches(env[names.publishableKey], "pk", environment),
+        secretKey: credentialMatches(env[names.secretKey], "sk", environment),
+        apiBaseUrl: exactApiBaseUrl(env[names.apiBaseUrl], environment)
     };
+    const configured = environmentValid && Object.values(required).every(Boolean);
     return Object.freeze({
-        environment: ENVIRONMENT,
+        environment,
+        environmentValid,
+        selectedEnvironment: selectedEnvironment(env),
         appIdConfigured: required.appId,
         publishableKeyConfigured: required.publishableKey,
         secretKeyConfigured: required.secretKey,
         apiBaseUrlConfigured: required.apiBaseUrl,
-        enabled: Object.values(required).every(Boolean),
-        configured: Object.values(required).every(Boolean),
-        missing: Object.entries(required).filter(([, present]) => !present).map(([name]) => name),
+        credentialStructureValid: required.publishableKey && required.secretKey,
+        apiContractConfigured: required.apiBaseUrl,
+        enabled: configured,
+        configured,
+        missing: [...(!environmentValid ? ["environment"] : []), ...Object.entries(required).filter(([, present]) => !present).map(([name]) => name)],
         callbackUrl: CALLBACK_URL
     });
 }
 
-function loadMyanMyanPayConfiguration(env = process.env) {
-    const readiness = inspectMyanMyanPayConfiguration(env);
-    if (!readiness.configured) throw new MyanMyanPayConfigurationError(
-        "MYANMYANPAY_SANDBOX_CONFIGURATION_INVALID",
-        "MyanMyanPay sandbox is disabled or incomplete.",
-        { missing: readiness.missing }
-    );
+function inspectMyanMyanPayEnvironments(env = process.env) {
     return Object.freeze({
-        environment: ENVIRONMENT,
+        selectedEnvironment: selectedEnvironment(env),
+        sandbox: inspectMyanMyanPayConfiguration(env, { environment: ENVIRONMENTS.SANDBOX }),
+        production: inspectMyanMyanPayConfiguration(env, { environment: ENVIRONMENTS.PRODUCTION })
+    });
+}
+
+function loadMyanMyanPayConfiguration(env = process.env, options = {}) {
+    const environment = options.environment ? normalizeEnvironment(options.environment, "") : selectedEnvironment(env);
+    const readiness = inspectMyanMyanPayConfiguration(env, { environment });
+    if (!readiness.configured) throw new MyanMyanPayConfigurationError(
+        `MYANMYANPAY_${environment}_CONFIGURATION_INVALID`,
+        `MyanMyanPay ${environment.toLowerCase()} configuration is disabled or incomplete.`,
+        { environment, missing: readiness.missing }
+    );
+    const names = variableNames(environment);
+    return Object.freeze({
+        environment,
         enabled: true,
-        appId: text(env.MYANMYANPAY_SANDBOX_APP_ID),
-        publishableKey: text(env.MYANMYANPAY_SANDBOX_PUBLISHABLE_KEY),
-        secretKey: text(env.MYANMYANPAY_SANDBOX_SECRET_KEY),
-        apiBaseUrl: API_BASE_URL,
+        appId: text(env[names.appId]),
+        publishableKey: text(env[names.publishableKey]),
+        secretKey: text(env[names.secretKey]),
+        apiBaseUrl: environment === ENVIRONMENTS.PRODUCTION ? PRODUCTION_API_BASE_URL : SANDBOX_API_BASE_URL,
         callbackUrl: CALLBACK_URL
     });
 }
 
-module.exports = Object.freeze({ ENVIRONMENT, CALLBACK_URL, API_BASE_URL, MyanMyanPayConfigurationError, inspectMyanMyanPayConfiguration, loadMyanMyanPayConfiguration });
+module.exports = Object.freeze({
+    ENVIRONMENT, ENVIRONMENTS, CALLBACK_URL, API_BASE_URL, SANDBOX_API_BASE_URL, PRODUCTION_API_BASE_URL,
+    MyanMyanPayConfigurationError, normalizeEnvironment, selectedEnvironment, exactApiBaseUrl,
+    inspectMyanMyanPayConfiguration, inspectMyanMyanPayEnvironments, loadMyanMyanPayConfiguration
+});

@@ -113,7 +113,7 @@ function verifyRouteAndFrontendContracts() {
     includes("frontend/js/admin-payments.js", "operatorPaymentStatus", "Operator rows must derive status from authoritative readiness.");
     includes("frontend/js/admin-payments.js", 'label: "Disabled"', "Configured readiness must remain distinct from enabled storefront state.");
     includes("frontend/js/admin-payments.js", 'state.textContent = "Unsaved"', "Row toggles must expose unsaved local state.");
-    includes("frontend/admin.html", "/js/admin-payments.js?v=20260929-myanmyanpay-sandbox-admin", "Admin must publish the MyanMyanPay payment controller under a fresh versioned asset URL.");
+    includes("frontend/admin.html", "/js/admin-payments.js?v=20260930-myanmyanpay-production-ready", "Admin must publish the MyanMyanPay payment controller under a fresh versioned asset URL.");
     includes("frontend/js/admin-payments.js", "showPaymentInfrastructureSurface", "Infrastructure details must remain available behind one secondary surface.");
     includes("frontend/js/admin-payments.js", "renderPaymentInfrastructureCards", "Card readiness must remain available in the infrastructure surface.");
     includes("frontend/js/admin-payments.js", "rawSecretsReturned", "Frontend must consume safe credential/security projection.");

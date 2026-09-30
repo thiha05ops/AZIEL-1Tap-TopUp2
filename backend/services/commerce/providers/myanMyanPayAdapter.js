@@ -20,16 +20,18 @@ function createMyanMyanPayAdapter(options = {}) {
     const configuration = options.configuration || {};
     const client = options.client || {};
     const providerOrderIdFactory = options.providerOrderIdFactory || createMyanMyanPayProviderOrderId;
+    const environment = text(configuration.environment).toUpperCase();
+    const supportedEnvironment = ["SANDBOX", "PRODUCTION"].includes(environment);
 
     async function prepareAttempt() {
         const providerReference = text(providerOrderIdFactory());
         if (!isMyanMyanPayProviderOrderId(providerReference)) throw fail("MyanMyanPay provider order ID generation failed.", "provider_reference");
-        return { providerReference, safeMetadata: { environment: "SANDBOX", appId: configuration.appId, paymentMethodId: METHOD } };
+        return { providerReference, safeMetadata: { environment, appId: configuration.appId, paymentMethodId: METHOD } };
     }
 
     async function createPayment({ intent = {}, attempt = {} } = {}) {
         const amount = Number(intent.amount);
-        if (configuration.enabled !== true || configuration.environment !== "SANDBOX") throw fail("MyanMyanPay sandbox is unavailable.", "configuration");
+        if (configuration.enabled !== true || !supportedEnvironment) throw fail("MyanMyanPay is unavailable.", "configuration");
         if (text(intent.currency).toUpperCase() !== "MMK" || !Number.isSafeInteger(amount) || amount <= 0) throw fail("MyanMyanPay requires a positive integer MMK amount.", "amount");
         const orderId = text(attempt.providerReference);
         if (!isMyanMyanPayProviderOrderId(orderId)) throw fail("MyanMyanPay provider order ID is missing or invalid.", "provider_reference");
@@ -54,7 +56,7 @@ function createMyanMyanPayAdapter(options = {}) {
             currency: "MMK",
             qr: { type: "MYANMYANPAY_MMQR", mode: "provider_generated", payload: qrPayload, image: await QRCode.toDataURL(qrPayload, { errorCorrectionLevel: "M", margin: 2, width: 360 }) },
             paymentInstructions: { type: "MYANMYANPAY_MMQR", title: "MyanMyanPay / MMQR", reference: orderId, steps: ["Scan the MMQR", "Pay the exact amount", "Wait for payment confirmation"], requiresReceiptUpload: false, receiptUploadEnabled: false, slipRequired: false, confirmationMode: "provider_webhook" },
-            safeMetadata: { environment: "SANDBOX", appId: configuration.appId, vendorQrRefId: text(response.vendorQrRefId), paymentMethodId: METHOD }
+            safeMetadata: { environment, appId: configuration.appId, vendorQrRefId: text(response.vendorQrRefId), paymentMethodId: METHOD }
         };
     }
 
@@ -62,7 +64,7 @@ function createMyanMyanPayAdapter(options = {}) {
         const attemptId = text(attempt.attemptId);
         const providerOrderId = text(attempt.providerReference);
         const amount = Number(attempt.amount ?? intent.amount);
-        if (configuration.enabled !== true || configuration.environment !== "SANDBOX") throw fail("MyanMyanPay sandbox is unavailable.", "configuration");
+        if (configuration.enabled !== true || !supportedEnvironment) throw fail("MyanMyanPay is unavailable.", "configuration");
         if (text(attempt.provider) !== PROVIDER || text(attempt.paymentMethodId || attempt.paymentMethod) !== METHOD || text(attempt.paymentChannel) !== "MYANMYANPAY_MMQR") throw fail("MyanMyanPay reconciliation identity mismatch.", "identity");
         if (!attemptId || !isMyanMyanPayProviderOrderId(providerOrderId) || text(attempt.orderId) !== text(intent.orderId) || text(attempt.currency || intent.currency).toUpperCase() !== "MMK" || !Number.isSafeInteger(amount) || amount <= 0) throw fail("MyanMyanPay reconciliation binding is invalid.", "identity");
         let response;
@@ -97,7 +99,7 @@ function createMyanMyanPayAdapter(options = {}) {
             currency: "MMK",
             qr,
             paymentInstructions: qr ? { type: "MYANMYANPAY_MMQR", title: "MyanMyanPay / MMQR", reference: providerOrderId, steps: ["Scan the MMQR", "Pay the exact amount", "Wait for payment confirmation"], requiresReceiptUpload: false, receiptUploadEnabled: false, slipRequired: false, confirmationMode: "provider_webhook" } : null,
-            safeMetadata: { environment: "SANDBOX", appId: configuration.appId, vendorQrRefId: text(response.vendorQrRefId), paymentMethodId: METHOD }
+            safeMetadata: { environment, appId: configuration.appId, vendorQrRefId: text(response.vendorQrRefId), paymentMethodId: METHOD }
         };
     }
 
@@ -106,7 +108,7 @@ function createMyanMyanPayAdapter(options = {}) {
         const mapped = STATUS[rawStatus];
         if (!mapped) throw fail("Unknown MyanMyanPay callback status.");
         if (trustedOperational !== true || text(providerEvent.provider) !== PROVIDER || text(attempt.provider) !== PROVIDER) throw fail("MyanMyanPay provider binding mismatch.");
-        if (text(providerEvent.environment) !== "SANDBOX" || text(attempt.safeMetadata?.environment) !== "SANDBOX") throw fail("MyanMyanPay environment binding mismatch.");
+        if (!supportedEnvironment || text(providerEvent.environment).toUpperCase() !== environment || text(attempt.safeMetadata?.environment).toUpperCase() !== environment) throw fail("MyanMyanPay environment binding mismatch.");
         if (text(providerEvent.appId) !== text(attempt.safeMetadata?.appId)) throw fail("MyanMyanPay application binding mismatch.");
         if (text(providerEvent.callbackUrl) && text(providerEvent.callbackUrl) !== text(configuration.callbackUrl)) throw fail("MyanMyanPay callback URL binding mismatch.");
         if (!isMyanMyanPayProviderOrderId(attempt.providerReference) || text(providerEvent.providerReference) !== text(attempt.providerReference)) throw fail("MyanMyanPay order reference mismatch.");
@@ -128,7 +130,7 @@ function createMyanMyanPayAdapter(options = {}) {
             amount: Number(providerEvent.amount),
             currency: "MMK",
             occurredAt: providerEvent.occurredAt,
-            safeMetadata: { verificationMethod: "MMPAY_SDK_SIGNATURE_NONCE", environment: "SANDBOX", vendor: text(providerEvent.vendor), method: "QR", condition: text(providerEvent.condition), vendorQrRefId }
+            safeMetadata: { verificationMethod: "MMPAY_SDK_SIGNATURE_NONCE", environment, vendor: text(providerEvent.vendor), method: "QR", condition: text(providerEvent.condition), vendorQrRefId }
         };
     }
 
@@ -143,7 +145,7 @@ function createMyanMyanPayAdapter(options = {}) {
         return { provider: PROVIDER, providerReference: text(attempt.providerReference), providerTransactionId: text(attempt.providerTransactionId || attempt.providerReference), status: "CANCELLED", amount: Number(attempt.amount), currency: "MMK", rawProviderStatus: "CANCELLED" };
     }
 
-    return createProviderAdapter({ providerId: PROVIDER, displayName: "MyanMyanPay MMQR", version: "1", supportedCurrencies: ["MMK"], supportedPaymentMethods: [METHOD], supportedCapabilities: [CAPABILITIES.CREATE_PAYMENT, CAPABILITIES.QUERY_PAYMENT, CAPABILITIES.REFRESH_PAYMENT, CAPABILITIES.CANCEL_PAYMENT, CAPABILITIES.WEBHOOK, CAPABILITIES.QR_CODE], environment: "sandbox", handlers: { prepareAttempt, createPayment, queryPayment, refreshPayment: queryPayment, cancelPayment, handleProviderEvent } });
+    return createProviderAdapter({ providerId: PROVIDER, displayName: "MyanMyanPay MMQR", version: "1", supportedCurrencies: ["MMK"], supportedPaymentMethods: [METHOD], supportedCapabilities: [CAPABILITIES.CREATE_PAYMENT, CAPABILITIES.QUERY_PAYMENT, CAPABILITIES.REFRESH_PAYMENT, CAPABILITIES.CANCEL_PAYMENT, CAPABILITIES.WEBHOOK, CAPABILITIES.QR_CODE], environment: environment.toLowerCase(), handlers: { prepareAttempt, createPayment, queryPayment, refreshPayment: queryPayment, cancelPayment, handleProviderEvent } });
 }
 
 module.exports = Object.freeze({ createMyanMyanPayAdapter, MYANMYANPAY_PROVIDER_ID: PROVIDER, MYANMYANPAY_METHOD_ID: METHOD });

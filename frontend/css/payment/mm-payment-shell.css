@@ -27,6 +27,16 @@
 .mm-payment-shell--mmqr > .checkout-feedback strong { display: inline-flex; align-items: center; gap: 8px; color: var(--text-primary); }
 .mm-payment-shell--mmqr > .checkout-feedback strong::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--primary); box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary) 14%, transparent); }
 .mm-payment-shell--mmqr > .checkout-feedback span { color: var(--text-muted); font-size: 13px; }
+.mm-payment-shell__provider-attribution {
+    margin-top: -10px !important;
+    color: var(--text-muted);
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1.4;
+    text-align: center;
+    letter-spacing: .01em;
+}
+
 .mm-payment-shell__detail-section { display: grid; gap: 6px; }
 .mm-payment-shell__details { display: grid; }
 .mm-payment-shell__account-name { order: 1; }

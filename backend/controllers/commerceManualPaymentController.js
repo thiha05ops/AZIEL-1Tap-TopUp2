@@ -286,9 +286,9 @@ function createCommerceManualPaymentController(options = {}) {
             const attemptId = String(req.params.attemptId || "").trim();
             let result = null;
             try {
-                if (req.body?.confirmation !== "RECONCILE_MYANMYANPAY_SANDBOX" || Object.keys(req.body || {}).some(key => key !== "confirmation")) {
+                if (req.body?.confirmation !== "RECONCILE_MYANMYANPAY" || Object.keys(req.body || {}).some(key => key !== "confirmation")) {
                     await writeAdminAudit({ actor: req.admin, req, action: ADMIN_AUDIT_ACTIONS.MYANMYANPAY_RECONCILIATION, resourceType: "PaymentAttempt", resourceId: attemptId, metadata: { success: false, outcome: "CONFIRMATION_REJECTED" } }).catch(() => null);
-                    return res.status(400).json({ success: false, code: "MYANMYANPAY_RECONCILIATION_CONFIRMATION_REQUIRED", message: "Explicit MyanMyanPay Sandbox reconciliation confirmation is required." });
+                    return res.status(400).json({ success: false, code: "MYANMYANPAY_RECONCILIATION_CONFIRMATION_REQUIRED", message: "Explicit MyanMyanPay reconciliation confirmation is required." });
                 }
                 result = await service.reconcileMyanMyanPayPayment({ attemptId, actor: req.admin });
                 await writeAdminAudit({

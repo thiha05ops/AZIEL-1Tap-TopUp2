@@ -2,7 +2,7 @@
 
 const mongoose = require("mongoose");
 const User = require("../../models/User");
-const { inspectMyanMyanPayConfiguration } = require("./myanMyanPayConfiguration");
+const { inspectMyanMyanPayConfiguration, inspectMyanMyanPayEnvironments } = require("./myanMyanPayConfiguration");
 
 const CUSTOMER_ID_PATTERN = /^AZU-[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{10}$/;
 const CUSTOMER_ID_SEARCH_PATTERN = /^AZU-[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{0,10}$/;
@@ -105,26 +105,37 @@ async function resolveStoredTesters(values, options = {}) {
     });
 }
 
-async function projectSandboxSettings(method, options = {}) {
-    const configuration = inspectMyanMyanPayConfiguration(options.env || process.env);
+async function projectMyanMyanPaySettings(method, options = {}) {
+    const env = options.env || process.env;
+    const configuration = inspectMyanMyanPayConfiguration(env);
+    const environments = inspectMyanMyanPayEnvironments(env);
     const identity = canonicalIdentity(method);
     const stored = await resolveStoredTesters(method.myanMyanPayAuthorizedTestUserIds, options);
-    const approval = method.myanMyanPaySandboxTestApproved === true;
+    const sandboxApproval = method.myanMyanPaySandboxTestApproved === true;
+    const productionApproval = method.myanMyanPayProductionTestApproved === true;
+    const productionTestVerified = method.myanMyanPayProductionTestVerified === true;
+    const approval = configuration.environment === "PRODUCTION" ? productionApproval : sandboxApproval;
+    const goLiveApproved = method.myanMyanPayGoLiveApproved === true;
     const blockers = [];
     if (!identity.valid) blockers.push("canonical payment method identity");
-    if (!configuration.appIdConfigured) blockers.push("sandbox App ID");
-    if (!configuration.publishableKeyConfigured) blockers.push("sandbox publishable key");
-    if (!configuration.secretKeyConfigured) blockers.push("sandbox secret key");
-    if (!configuration.apiBaseUrlConfigured) blockers.push("sandbox HTTPS API base URL");
-    if (!approval) blockers.push("sandbox test approval");
+    const label = configuration.environment === "PRODUCTION" ? "production" : "sandbox";
+    if (!configuration.appIdConfigured) blockers.push(`${label} App ID`);
+    if (!configuration.publishableKeyConfigured) blockers.push(`${label} publishable key`);
+    if (!configuration.secretKeyConfigured) blockers.push(`${label} secret key`);
+    if (!configuration.apiBaseUrlConfigured) blockers.push(`${label} HTTPS API base URL`);
+    if (!approval) blockers.push(`${label} test approval`);
     if (!stored.testers.length) blockers.push("authorized tester");
     if (stored.missingTesterCount) blockers.push("unresolved stored tester");
     return Object.freeze({
         environment: configuration.environment,
         identity,
         activationState: String(method.myanMyanPayActivationState || "DISABLED"),
-        sandboxTestApproved: approval,
+        sandboxTestApproved: sandboxApproval,
+        productionTestApproved: productionApproval,
+        productionTestVerified,
+        goLiveApproved,
         configuration,
+        environments,
         callback: Object.freeze({
             method: "POST",
             url: configuration.callbackUrl,
@@ -135,9 +146,12 @@ async function projectSandboxSettings(method, options = {}) {
         authorizedTesters: stored.testers,
         missingTesterCount: stored.missingTesterCount,
         testOnlyReady: blockers.length === 0,
+        publicReady: identity.valid && environments.production.configured && productionApproval && productionTestVerified && goLiveApproved,
         blockers: Object.freeze(blockers)
     });
 }
+
+const projectSandboxSettings = projectMyanMyanPaySettings;
 
 module.exports = Object.freeze({
     CUSTOMER_ID_PATTERN,
@@ -149,5 +163,6 @@ module.exports = Object.freeze({
     findTesterCandidates,
     resolveTesterCustomerIds,
     resolveStoredTesters,
+    projectMyanMyanPaySettings,
     projectSandboxSettings
 });

@@ -107,9 +107,10 @@ function envStatusFromProcess(providerCode = "", environment = "TEST") {
     }
     if (code === "MYANMYANPAY") {
         const { inspectMyanMyanPayConfiguration } = require("./myanmyanpay/myanMyanPayConfiguration");
-        const readiness = inspectMyanMyanPayConfiguration();
+        const providerEnvironment = environment === "LIVE" || environment === "PRODUCTION" ? "PRODUCTION" : "SANDBOX";
+        const readiness = inspectMyanMyanPayConfiguration(process.env, { environment: providerEnvironment });
         return {
-            environment: "SANDBOX",
+            environment: providerEnvironment,
             enabled: readiness.configured,
             publicKeyConfigured: readiness.publishableKeyConfigured,
             secretKeyConfigured: readiness.secretKeyConfigured,
@@ -376,7 +377,7 @@ async function getPaymentInfrastructureSnapshot(methods = []) {
                 supportedRails: ["MYANMYANPAY_MMQR"],
                 adapterName: "myanmyanpay",
                 enabled: true,
-                environments: [envStatusFromProcess("MYANMYANPAY", "TEST")]
+                environments: [envStatusFromProcess("MYANMYANPAY", "TEST"), envStatusFromProcess("MYANMYANPAY", "LIVE")]
             }
         ].map(projectProvider);
     if (!providers.some(provider => String(provider.providerCode || "").toUpperCase() === "MYANMYANPAY")) {
@@ -388,7 +389,7 @@ async function getPaymentInfrastructureSnapshot(methods = []) {
             supportedRails: ["MYANMYANPAY_MMQR"],
             adapterName: "myanmyanpay",
             enabled: true,
-            environments: [envStatusFromProcess("MYANMYANPAY", "TEST")]
+            environments: [envStatusFromProcess("MYANMYANPAY", "TEST"), envStatusFromProcess("MYANMYANPAY", "LIVE")]
         }));
     }
     const myanMyanPayProvider = providers.find(provider => String(provider.providerCode || "").toUpperCase() === "MYANMYANPAY");
@@ -398,7 +399,7 @@ async function getPaymentInfrastructureSnapshot(methods = []) {
         myanMyanPayProvider.supportedCurrencies = ["MMK"];
         myanMyanPayProvider.supportedRails = ["MYANMYANPAY_MMQR"];
         myanMyanPayProvider.adapterName = "myanmyanpay";
-        myanMyanPayProvider.environments = [safeProviderEnvironmentStatus(envStatusFromProcess("MYANMYANPAY", "TEST"))];
+        myanMyanPayProvider.environments = [safeProviderEnvironmentStatus(envStatusFromProcess("MYANMYANPAY", "TEST")), safeProviderEnvironmentStatus(envStatusFromProcess("MYANMYANPAY", "LIVE"))];
     }
     const regions = railsByRegion(methods);
     regions.forEach(region => {

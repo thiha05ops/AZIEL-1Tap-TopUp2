@@ -138,6 +138,12 @@
                 status.replaceChildren(waiting, document.createElement("br"), automatic);
             } else status.textContent = t("payment.providerQrUnavailable", "Payment QR is unavailable. Do not send payment; return to checkout and try again.");
             shell.append(status);
+
+            const providerAttribution = document.createElement("p");
+            providerAttribution.className = "mm-payment-shell__provider-attribution";
+            providerAttribution.textContent = "Payment Powered by MyanMyanPay";
+            shell.append(providerAttribution);
+
             mount.replaceChildren(shell);
             return;
         }

@@ -10,7 +10,7 @@ const PROVIDER_ADAPTERS = Object.freeze({
         partialRefundCapability: false,
         webhookRequired: true,
         customerAvailable: false,
-        contractReadiness: Object.freeze({ environment: "SANDBOX", customerExposure: "TEST_ONLY" }),
+        contractReadiness: Object.freeze({ environments: ["SANDBOX", "PRODUCTION"], customerExposure: "ACTIVATION_CONTROLLED", settlementAuthority: "AUTHENTICATED_CALLBACK" }),
         methods: Object.freeze(["createPayment", "handleProviderEvent", "cancelPayment"])
     }),
     dinger: Object.freeze({

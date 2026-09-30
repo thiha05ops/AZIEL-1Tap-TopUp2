@@ -121,7 +121,7 @@ async function loadAdminPaymentMethods() {
             .filter(method => String(method.key || "").toLowerCase() === "myanmyanpay_mmqr")
             .map(async method => {
                 try {
-                    const settings = await adminFetch(`/api/admin/payment-methods/${encodeURIComponent(method._id)}/myanmyanpay-sandbox-settings`);
+                    const settings = await adminFetch(`/api/admin/payment-methods/${encodeURIComponent(method._id)}/myanmyanpay-settings`);
                     method.myanMyanPaySandboxSettings = settings?.success ? settings.settings : null;
                 } catch (_) {
                     method.myanMyanPaySandboxSettings = null;
@@ -852,24 +852,30 @@ function myanMyanPayStatusRow(label, configured) {
 
 function renderMyanMyanPayActivation(method = {}) {
     const settings = method.myanMyanPaySandboxSettings;
-    if (!settings) return `<section class="payment-operator-section"><h5>MyanMyanPay Sandbox</h5><p class="payment-operator-toggle-blocker">Authoritative sandbox settings are unavailable. Activation is disabled.</p></section>`;
+    if (!settings) return `<section class="payment-operator-section"><h5>MyanMyanPay</h5><p class="payment-operator-toggle-blocker">Authoritative settings are unavailable. Activation is disabled.</p></section>`;
     const configuration = settings.configuration || {};
     const identity = settings.identity || { valid: false, checks: {} };
     const testers = Array.isArray(settings.authorizedTesters) ? settings.authorizedTesters : [];
     const results = adminMyanMyanPayTesterResults.get(String(method._id)) || [];
     const draft = adminMyanMyanPayActivationDrafts.get(String(method._id)) || {};
-    const state = draft.activationState || (settings.activationState === "TEST_ONLY" ? "TEST_ONLY" : "DISABLED");
+    const environment = String(settings.environment || configuration.environment || "SANDBOX").toUpperCase();
+    const state = draft.activationState || (["TEST_ONLY", "PUBLIC"].includes(settings.activationState) ? settings.activationState : "DISABLED");
     const sandboxTestApproved = draft.sandboxTestApproved ?? settings.sandboxTestApproved === true;
+    const productionTestApproved = draft.productionTestApproved ?? settings.productionTestApproved === true;
+    const productionTestVerified = draft.productionTestVerified ?? settings.productionTestVerified === true;
+    const goLiveApproved = draft.goLiveApproved ?? settings.goLiveApproved === true;
+    const selectedTestApproved = environment === "PRODUCTION" ? productionTestApproved : sandboxTestApproved;
     const blockers = [
         !identity.valid && "canonical identity invalid",
-        !configuration.configured && "sandbox configuration incomplete",
-        !sandboxTestApproved && "sandbox testing not approved",
+        !configuration.configured && `${environment.toLowerCase()} configuration incomplete`,
+        !selectedTestApproved && `${environment.toLowerCase()} testing not approved`,
         testers.length === 0 && "authorized tester required",
         Number(settings.missingTesterCount || 0) > 0 && "stored tester reference missing"
     ].filter(Boolean);
     const selectedReady = blockers.length === 0;
-    return `<section class="payment-operator-section payment-myanmyanpay-activation"><h5>MyanMyanPay Sandbox</h5>
-        <div class="payment-mmp-identity"><dl><div><dt>Provider</dt><dd>MyanMyanPay</dd></div><div><dt>Method</dt><dd>MMQR</dd></div><div><dt>Environment</dt><dd>SANDBOX</dd></div></dl></div>
+    const publicReady = settings.publicReady === true;
+    return `<section class="payment-operator-section payment-myanmyanpay-activation"><h5>MyanMyanPay ${escapeAdminHTML(environment)}</h5>
+        <div class="payment-mmp-identity"><dl><div><dt>Provider</dt><dd>MyanMyanPay</dd></div><div><dt>Method</dt><dd>MMQR</dd></div><div><dt>Environment</dt><dd>${escapeAdminHTML(environment)}</dd></div></dl></div>
         ${identity.valid ? "" : `<p class="payment-operator-toggle-blocker">Canonical identity is invalid. Activation is unavailable.</p>`}
         <details class="payment-operator-advanced"><summary>Advanced identity</summary><div class="payment-operator-advanced-body"><dl><div><dt>Method key</dt><dd>${escapeAdminHTML(method.key || "-")}</dd></div><div><dt>Provider</dt><dd>${escapeAdminHTML(method.provider || "-")}</dd></div><div><dt>Payment channel</dt><dd>${escapeAdminHTML(method.paymentChannel || "-")}</dd></div></dl></div></details>
         <h6>Configuration</h6><ul class="payment-mmp-checklist">
@@ -879,15 +885,17 @@ function renderMyanMyanPayActivation(method = {}) {
             ${myanMyanPayStatusRow("HTTPS API Base URL", configuration.apiBaseUrlConfigured)}
         </ul>
         <h6>Webhook</h6><p><code>POST ${escapeAdminHTML(settings.callback?.url || configuration.callbackUrl || "")}</code></p><p class="payment-section-help">Route implemented. Callback authentication is required. Only the authenticated server callback is authoritative for settlement.</p>
-        ${paymentOperatorField("Activation", "PUBLIC is unavailable in the sandbox-only implementation", `<select class="pm-mmp-activation" ${identity.valid ? "" : "disabled"}><option value="DISABLED" ${state === "DISABLED" ? "selected" : ""}>Disabled</option><option value="TEST_ONLY" ${state === "TEST_ONLY" ? "selected" : ""}>Test only</option></select><div class="payment-mmp-public-locked">PUBLIC — unavailable</div>`)}
-        <label class="payment-mmp-approval"><input class="pm-mmp-test-approved" type="checkbox" ${sandboxTestApproved ? "checked" : ""} ${identity.valid ? "" : "disabled"}> Sandbox test authorization approved</label>
+        ${paymentOperatorField("Activation", "PUBLIC remains locked until Production readiness and go-live approval are complete", `<select class="pm-mmp-activation" ${identity.valid ? "" : "disabled"}><option value="DISABLED" ${state === "DISABLED" ? "selected" : ""}>Disabled</option><option value="TEST_ONLY" ${state === "TEST_ONLY" ? "selected" : ""}>Restricted test</option><option value="PUBLIC" ${state === "PUBLIC" ? "selected" : ""} ${publicReady ? "" : "disabled"}>Public</option></select>${publicReady ? "" : `<div class="payment-mmp-public-locked">PUBLIC — locked</div>`}`)}
+        <label class="payment-mmp-approval"><input class="pm-mmp-test-approved" type="checkbox" ${selectedTestApproved ? "checked" : ""} ${identity.valid ? "" : "disabled"}> ${escapeAdminHTML(environment)} controlled test approved</label>
+        ${environment === "PRODUCTION" ? `<label class="payment-mmp-approval"><input class="pm-mmp-go-live-approved" type="checkbox" ${goLiveApproved ? "checked" : ""} ${identity.valid ? "" : "disabled"}> Production go-live approval recorded</label>` : ""}
+        ${environment === "PRODUCTION" ? `<label class="payment-mmp-approval"><input class="pm-mmp-production-test-verified" type="checkbox" ${productionTestVerified ? "checked" : ""} ${identity.valid ? "" : "disabled"}> Controlled Production E2E evidence verified</label>` : ""}
         <h6>Authorized Test Accounts</h6>
         <div class="payment-mmp-tester-search"><input class="pm-mmp-tester-query" type="search" placeholder="AZU-XXXXXXXXXX" autocomplete="off" ${identity.valid ? "" : "disabled"}><button class="admin-small-btn" type="button" data-action="search-mmp-tester" data-id="${escapeAdminHTML(method._id)}" ${identity.valid ? "" : "disabled"}>Search</button></div>
         <div class="payment-mmp-tester-results">${results.map(tester => `<button type="button" data-action="add-mmp-tester" data-id="${escapeAdminHTML(method._id)}" data-customer-id="${escapeAdminHTML(tester.customerId)}"><strong>${escapeAdminHTML(tester.customerId)}</strong><span>${escapeAdminHTML(tester.username)} · ${escapeAdminHTML(tester.email)}</span></button>`).join("")}</div>
         <div class="payment-mmp-selected-testers">${testers.map(tester => `<div><span><strong>${escapeAdminHTML(tester.customerId)}</strong><small>${escapeAdminHTML(tester.username)} · ${escapeAdminHTML(tester.email)}</small></span><button type="button" data-action="remove-mmp-tester" data-id="${escapeAdminHTML(method._id)}" data-customer-id="${escapeAdminHTML(tester.customerId)}">Remove</button></div>`).join("") || `<p class="payment-section-help">No authorized tester selected.</p>`}</div>
         ${settings.missingTesterCount ? `<p class="payment-operator-toggle-blocker">${Number(settings.missingTesterCount)} stored tester reference(s) no longer resolve.</p>` : ""}
         <p class="payment-section-help payment-mmp-readiness">${selectedReady ? "TEST_ONLY readiness complete." : `Blocked: ${escapeAdminHTML(blockers.join(", ") || "complete all requirements")}.`}</p>
-        <button class="admin-primary-btn pm-mmp-save" type="button" data-action="save-mmp-activation" data-id="${escapeAdminHTML(method._id)}" ${identity.valid && (state !== "TEST_ONLY" || selectedReady) ? "" : "disabled"}>Apply sandbox activation</button>
+        <button class="admin-primary-btn pm-mmp-save" type="button" data-action="save-mmp-activation" data-id="${escapeAdminHTML(method._id)}" ${identity.valid && (state !== "TEST_ONLY" || selectedReady) && (state !== "PUBLIC" || publicReady) ? "" : "disabled"}>Apply MyanMyanPay activation</button>
     </section>`;
 }
 
@@ -952,7 +960,7 @@ function renderAdminPaymentMethods(methods) {
             <header class="payment-operator-header"><div><h2>Payments</h2><p>Manage how customers pay in each market.</p></div><div><button class="admin-secondary-btn" type="button" data-action="open-payment-infrastructure">Infrastructure</button><button class="admin-primary-btn payment-operator-add-btn" type="button" data-action="add-payment-method"><span class="payment-add-full">+ Add payment method</span><span class="payment-add-short">+ Add</span></button></div></header>
             <div class="payment-operator-region" role="tablist" aria-label="Payment region"><button class="${region === "TH" ? "active" : ""}" data-operator-region="TH">Thailand</button><button class="${region === "MM" ? "active" : ""}" data-operator-region="MM">Myanmar</button></div>
             <div class="payment-operator-filters" aria-label="Payment status filters">${[["all", "All"], ["ready", "Ready"], ["needs_setup", "Needs setup"], ["disabled", "Disabled"]].map(([key, label]) => `<button class="${adminPaymentStatusFilter === key ? "active" : ""}" data-payment-status-filter="${key}">${label}</button>`).join("")}</div>
-            <div class="payment-operator-layout"><section class="payment-operator-list"><div class="payment-operator-columns"><span>Payment method</span><span>Type</span><span>Status</span><span>Enabled</span><span></span></div>${filtered.map(method => { const status = operatorPaymentStatus(method); const type = operatorPaymentType(method); const id = String(method._id); const draft = adminPaymentEnabledDrafts.get(id); const enabled = draft === undefined ? method.enabled === true : draft; const key = String(method.key || "").toLowerCase(); const controlled = ["dinger_ayapay_qr", "dinger_wavepay_pin", "myanmyanpay_mmqr"].includes(key) || method.myanMyanPayIdentityWarning === true; const blocked = status.key === "needs_setup" || controlled; const controlledTitle = key === "myanmyanpay_mmqr" || method.myanMyanPayIdentityWarning === true ? "Use the MyanMyanPay sandbox activation control" : "Use the Dinger activation control"; return `<div class="payment-operator-row ${id === adminSelectedPaymentMethodId ? "is-selected" : ""}" data-payment-row="${escapeAdminHTML(id)}" tabindex="0"><div class="payment-operator-method"><img src="${escapeAdminHTML(method.logoUrl || getAdminPaymentLogo(method))}" alt=""><span><strong>${escapeAdminHTML(method.method || method.key)}</strong><small>${escapeAdminHTML(getRegionLabel(method.region))}</small></span></div><div class="payment-operator-type"><strong>${escapeAdminHTML(type.label)}</strong><small>${escapeAdminHTML(type.description)}</small></div><span class="payment-operator-status is-${status.key}">${escapeAdminHTML(status.label)}</span><label class="payment-operator-toggle${draft !== undefined ? " has-draft" : ""}" title="${controlled ? controlledTitle : blocked ? "Complete setup before enabling" : "Enabled state is saved with Save changes"}"><input type="checkbox" role="switch" aria-label="${escapeAdminHTML(`Enable ${method.method || method.key}`)}" aria-checked="${enabled ? "true" : "false"}" data-payment-row-toggle="${escapeAdminHTML(id)}" ${enabled ? "checked" : ""} ${blocked ? "disabled" : ""}><span class="payment-operator-switch-track" aria-hidden="true"><span class="payment-operator-switch-thumb"></span></span><small class="payment-operator-toggle-state">${draft !== undefined ? "Unsaved" : ""}</small></label><button class="payment-operator-more" data-payment-row-menu="${escapeAdminHTML(id)}" aria-label="More actions">•••</button></div>`; }).join("") || `<div class="admin-list-empty">No payment methods match this filter.</div>`}</section>
+            <div class="payment-operator-layout"><section class="payment-operator-list"><div class="payment-operator-columns"><span>Payment method</span><span>Type</span><span>Status</span><span>Enabled</span><span></span></div>${filtered.map(method => { const status = operatorPaymentStatus(method); const type = operatorPaymentType(method); const id = String(method._id); const draft = adminPaymentEnabledDrafts.get(id); const enabled = draft === undefined ? method.enabled === true : draft; const key = String(method.key || "").toLowerCase(); const controlled = ["dinger_ayapay_qr", "dinger_wavepay_pin", "myanmyanpay_mmqr"].includes(key) || method.myanMyanPayIdentityWarning === true; const blocked = status.key === "needs_setup" || controlled; const controlledTitle = key === "myanmyanpay_mmqr" || method.myanMyanPayIdentityWarning === true ? "Use the MyanMyanPay activation control" : "Use the Dinger activation control"; return `<div class="payment-operator-row ${id === adminSelectedPaymentMethodId ? "is-selected" : ""}" data-payment-row="${escapeAdminHTML(id)}" tabindex="0"><div class="payment-operator-method"><img src="${escapeAdminHTML(method.logoUrl || getAdminPaymentLogo(method))}" alt=""><span><strong>${escapeAdminHTML(method.method || method.key)}</strong><small>${escapeAdminHTML(getRegionLabel(method.region))}</small></span></div><div class="payment-operator-type"><strong>${escapeAdminHTML(type.label)}</strong><small>${escapeAdminHTML(type.description)}</small></div><span class="payment-operator-status is-${status.key}">${escapeAdminHTML(status.label)}</span><label class="payment-operator-toggle${draft !== undefined ? " has-draft" : ""}" title="${controlled ? controlledTitle : blocked ? "Complete setup before enabling" : "Enabled state is saved with Save changes"}"><input type="checkbox" role="switch" aria-label="${escapeAdminHTML(`Enable ${method.method || method.key}`)}" aria-checked="${enabled ? "true" : "false"}" data-payment-row-toggle="${escapeAdminHTML(id)}" ${enabled ? "checked" : ""} ${blocked ? "disabled" : ""}><span class="payment-operator-switch-track" aria-hidden="true"><span class="payment-operator-switch-thumb"></span></span><small class="payment-operator-toggle-state">${draft !== undefined ? "Unsaved" : ""}</small></label><button class="payment-operator-more" data-payment-row-menu="${escapeAdminHTML(id)}" aria-label="More actions">•••</button></div>`; }).join("") || `<div class="admin-list-empty">No payment methods match this filter.</div>`}</section>
             ${selected && adminPaymentEditorOpen ? `<aside class="payment-operator-editor"><div class="payment-operator-editor-head"><img src="${escapeAdminHTML(selectedLogo)}" alt=""><div><h3>${escapeAdminHTML(selected.method)}</h3><p>${escapeAdminHTML(getRegionLabel(selected.region))} · ${escapeAdminHTML(selectedStatus.label)}</p></div><button data-action="close-payment-editor" aria-label="Close editor">×</button></div><div class="payment-method-card payment-operator-editor-root" data-id="${escapeAdminHTML(selected._id)}" data-key="${escapeAdminHTML(selected.key)}" data-region="${escapeAdminHTML(selected.region)}" data-configuration-kind="${escapeAdminHTML(selected.configurationKind || "MANUAL_QR")}" data-legacy-thai-bank="${isLegacyThailandBankAdminMethod(selected) ? "true" : "false"}">${renderOperatorPaymentEditor({...selected, enabled: selectedDraft === undefined ? selected.enabled : selectedDraft})}</div></aside>` : ""}
             </div>
         </div>`;
@@ -1374,7 +1382,7 @@ function renderPaymentInfrastructureWebhooks(infra = {}) {
         <div class="payment-provider-grid">
             ${(infra.providers || []).map(provider => (provider.environments || []).map(env => String(provider.providerCode || "").toUpperCase() === "MYANMYANPAY" ? `
                 <article class="payment-provider-card">
-                    <strong>MyanMyanPay · SANDBOX</strong>
+                    <strong>MyanMyanPay · ${escapeAdminHTML(env.environment || "-")}</strong>
                     <span class="payment-infra-status ${env.webhook?.authenticationImplemented ? "ready" : "not_configured"}">${env.webhook?.authenticationImplemented ? "AUTHENTICATION IMPLEMENTED" : "NOT CONFIGURED"}</span>
                     <dl><div><dt>Endpoint</dt><dd>${escapeAdminHTML(env.webhook?.endpoint || "-")}</dd></div><div><dt>Method</dt><dd>POST</dd></div><div><dt>Authority</dt><dd>Authenticated server callback only</dd></div><div><dt>Replay protection</dt><dd>${env.webhook?.replayProtectionReady ? "Ready" : "Configuration required"}</dd></div></dl>
                 </article>` : `
@@ -2717,7 +2725,10 @@ function captureMyanMyanPayActivationDraft(card) {
     if (!card?.dataset.id) return;
     adminMyanMyanPayActivationDrafts.set(String(card.dataset.id), {
         activationState: card.querySelector(".pm-mmp-activation")?.value || "DISABLED",
-        sandboxTestApproved: card.querySelector(".pm-mmp-test-approved")?.checked === true
+        sandboxTestApproved: card.querySelector(".pm-mmp-test-approved")?.checked === true,
+        productionTestApproved: card.querySelector(".pm-mmp-test-approved")?.checked === true,
+        productionTestVerified: card.querySelector(".pm-mmp-production-test-verified")?.checked === true,
+        goLiveApproved: card.querySelector(".pm-mmp-go-live-approved")?.checked === true
     });
 }
 
@@ -2730,7 +2741,8 @@ function refreshMyanMyanPayActivationButton(card) {
     const state = card.querySelector(".pm-mmp-activation")?.value || "DISABLED";
     const approved = card.querySelector(".pm-mmp-test-approved")?.checked === true;
     const testers = settings.authorizedTesters || [];
-    button.disabled = settings.identity?.valid !== true || (state === "TEST_ONLY" && (!settings.configuration?.configured || !approved || testers.length === 0 || Number(settings.missingTesterCount || 0) > 0));
+    const publicReady = settings.environment === "PRODUCTION" && settings.configuration?.configured === true && approved && card.querySelector(".pm-mmp-production-test-verified")?.checked === true && card.querySelector(".pm-mmp-go-live-approved")?.checked === true;
+    button.disabled = settings.identity?.valid !== true || (state === "TEST_ONLY" && (!settings.configuration?.configured || !approved || testers.length === 0 || Number(settings.missingTesterCount || 0) > 0)) || (state === "PUBLIC" && !publicReady);
 }
 
 async function searchMyanMyanPayTester(id) {
@@ -2776,21 +2788,26 @@ async function saveMyanMyanPayActivation(id) {
     const settings = method?.myanMyanPaySandboxSettings;
     if (!card || !settings?.identity?.valid) return void showAdminToast?.("MyanMyanPay canonical identity is invalid", "error");
     const activationState = card.querySelector(".pm-mmp-activation")?.value || "DISABLED";
-    if (!["DISABLED", "TEST_ONLY"].includes(activationState)) return void showAdminToast?.("Unsupported activation state", "error");
+    if (!["DISABLED", "TEST_ONLY", "PUBLIC"].includes(activationState)) return void showAdminToast?.("Unsupported activation state", "error");
     const authorizedTesterCustomerIds = (settings.authorizedTesters || []).map(tester => tester.customerId);
     try {
-        const data = await adminFetch(`/api/admin/payment-methods/${encodeURIComponent(id)}/myanmyanpay-sandbox-activation`, {
+        const environment = String(settings.environment || settings.configuration?.environment || "SANDBOX").toUpperCase();
+        const approved = card.querySelector(".pm-mmp-test-approved")?.checked === true;
+        const data = await adminFetch(`/api/admin/payment-methods/${encodeURIComponent(id)}/myanmyanpay-activation`, {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
                 activationState,
-                sandboxTestApproved: card.querySelector(".pm-mmp-test-approved")?.checked === true,
+                sandboxTestApproved: environment === "SANDBOX" ? approved : settings.sandboxTestApproved === true,
+                productionTestApproved: environment === "PRODUCTION" ? approved : settings.productionTestApproved === true,
+                productionTestVerified: card.querySelector(".pm-mmp-production-test-verified")?.checked === true,
+                goLiveApproved: card.querySelector(".pm-mmp-go-live-approved")?.checked === true,
                 authorizedTesterCustomerIds
             })
         });
         if (!data?.success) return void showAdminToast?.(data?.message || "MyanMyanPay activation failed", "error");
         adminMyanMyanPayActivationDrafts.delete(String(id));
-        showAdminToast?.("MyanMyanPay sandbox activation updated", "success");
+        showAdminToast?.("MyanMyanPay activation updated", "success");
         await loadAdminPaymentMethods();
     } catch (_) {
         showAdminToast?.("MyanMyanPay activation failed", "error");

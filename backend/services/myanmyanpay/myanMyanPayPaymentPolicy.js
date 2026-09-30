@@ -10,7 +10,10 @@ function myanMyanPayAccessDecision(method = {}, user = {}, env = process.env) {
     const readiness = inspectMyanMyanPayConfiguration(env);
     const authorized = Boolean(userId(user)) && (method.myanMyanPayAuthorizedTestUserIds || []).some(id => text(id) === userId(user));
     const state = text(method.myanMyanPayActivationState).toUpperCase() || "DISABLED";
-    const allowed = isMyanMyanPayMethod(method) && method.enabled === true && state === "TEST_ONLY" && method.myanMyanPaySandboxTestApproved === true && authorized && readiness.enabled && readiness.configured;
-    return Object.freeze({ allowed, state, readiness, reason: allowed ? "" : state !== "TEST_ONLY" ? "disabled" : !authorized ? "test_user_required" : "technical_readiness" });
+    const testApproved = readiness.environment === "PRODUCTION" ? method.myanMyanPayProductionTestApproved === true : method.myanMyanPaySandboxTestApproved === true;
+    const testOnlyAllowed = state === "TEST_ONLY" && testApproved && authorized;
+    const publicAllowed = state === "PUBLIC" && readiness.environment === "PRODUCTION" && method.myanMyanPayProductionTestApproved === true && method.myanMyanPayProductionTestVerified === true && method.myanMyanPayGoLiveApproved === true;
+    const allowed = isMyanMyanPayMethod(method) && method.enabled === true && readiness.enabled && readiness.configured && (testOnlyAllowed || publicAllowed);
+    return Object.freeze({ allowed, state, environment: readiness.environment, authorized, testApproved, publicReady: readiness.environment === "PRODUCTION" && readiness.configured && method.myanMyanPayProductionTestApproved === true && method.myanMyanPayProductionTestVerified === true && method.myanMyanPayGoLiveApproved === true, readiness, reason: allowed ? "" : state === "DISABLED" ? "disabled" : state === "TEST_ONLY" && !authorized ? "test_user_required" : state === "PUBLIC" ? "public_not_ready" : "technical_readiness" });
 }
 module.exports = Object.freeze({ METHOD, PROVIDER, isMyanMyanPayMethod, myanMyanPayAccessDecision });

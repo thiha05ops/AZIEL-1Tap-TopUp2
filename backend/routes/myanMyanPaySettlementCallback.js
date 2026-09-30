@@ -3,6 +3,7 @@
 const crypto = require("crypto");
 const express = require("express");
 const rateLimit = require("express-rate-limit");
+const PaymentAttempt = require("../models/PaymentAttempt");
 const { loadMyanMyanPayConfiguration } = require("../services/myanmyanpay/myanMyanPayConfiguration");
 const { createMyanMyanPayClient } = require("../services/myanmyanpay/myanMyanPayClient");
 const { isMyanMyanPayProviderOrderId } = require("../services/myanmyanpay/myanMyanPayProviderOrderId");
@@ -21,8 +22,16 @@ function validateCallback(body) {
     return result;
 }
 
-function eventId(result) {
-    return `myanmyanpay:sandbox:${crypto.createHash("sha256").update([result.orderId, result.transactionRefId, result.vendorQrRefId, result.status].join("\0"), "utf8").digest("hex")}`;
+function eventId(result, environment = "SANDBOX") {
+    return `myanmyanpay:${text(environment).toLowerCase()}:${crypto.createHash("sha256").update([result.orderId, result.transactionRefId, result.vendorQrRefId, result.status].join("\0"), "utf8").digest("hex")}`;
+}
+
+async function resolveAttemptEnvironment(orderId, options = {}) {
+    const findAttempt = options.findAttempt || (providerReference => PaymentAttempt.findOne({ provider: "MYANMYANPAY", providerReference }).select("provider safeMetadata.environment").lean());
+    const attempt = await findAttempt(orderId);
+    const environment = text(attempt?.safeMetadata?.environment).toUpperCase();
+    if (!attempt || !["SANDBOX", "PRODUCTION"].includes(environment)) throw Object.assign(new Error("Payment attempt not found."), { code: "MYANMYANPAY_CALLBACK_ATTEMPT_NOT_FOUND", httpStatus: 404 });
+    return environment;
 }
 
 function createMyanMyanPaySettlementCallbackRouter(options = {}) {
@@ -31,7 +40,10 @@ function createMyanMyanPaySettlementCallbackRouter(options = {}) {
     const parser = express.json({ limit: MAX_BODY_BYTES, strict: true, type: "application/json" });
     router.post("/payment", limiter, (req, res, next) => req.is("application/json") ? parser(req, res, next) : res.status(415).json({ received: false, code: "MYANMYANPAY_CONTENT_TYPE_UNSUPPORTED" }), async (req, res) => {
         try {
-            const configuration = options.configuration || loadMyanMyanPayConfiguration(options.env);
+            const untrustedOrderId = text(req.body?.orderId);
+            if (!isMyanMyanPayProviderOrderId(untrustedOrderId)) throw Object.assign(new Error("Invalid callback order."), { code: "MYANMYANPAY_CALLBACK_INVALID", httpStatus: 400 });
+            const environment = options.configuration?.environment || await resolveAttemptEnvironment(untrustedOrderId, options);
+            const configuration = options.configuration || loadMyanMyanPayConfiguration(options.env, { environment });
             const nonce = text(req.get("X-Mmpay-Nonce"));
             const signature = text(req.get("X-Mmpay-Signature"));
             if (!nonce || !signature) return res.status(401).json({ received: false, code: "MYANMYANPAY_CALLBACK_AUTH_MISSING" });
@@ -41,7 +53,7 @@ function createMyanMyanPaySettlementCallbackRouter(options = {}) {
             const result = validateCallback(req.body);
             if (result.appId && result.appId !== configuration.appId) throw Object.assign(new Error("Application mismatch."), { code: "MYANMYANPAY_APPLICATION_MISMATCH", httpStatus: 409 });
             const service = options.paymentService || createManualPaymentApplicationService(options.paymentServiceOptions || {});
-            const settlement = await service.applyMyanMyanPayCallback({ result, environment: "SANDBOX", appId: configuration.appId, providerEventId: eventId(result) });
+            const settlement = await service.applyMyanMyanPayCallback({ result, environment, appId: configuration.appId, providerEventId: eventId(result, environment) });
             return res.status(200).json({ received: true, duplicate: settlement?.metadata?.duplicate === true });
         } catch (error) {
             const status = Number(error.httpStatus || error.statusCode || 0);
@@ -52,4 +64,4 @@ function createMyanMyanPaySettlementCallbackRouter(options = {}) {
     router.use((error, req, res, next) => error ? res.status(error.type === "entity.too.large" ? 413 : 400).json({ received: false, code: error.type === "entity.too.large" ? "MYANMYANPAY_CALLBACK_BODY_TOO_LARGE" : "MYANMYANPAY_CALLBACK_JSON_INVALID" }) : next());
     return router;
 }
-module.exports = Object.freeze({ MAX_BODY_BYTES, validateCallback, eventId, createMyanMyanPaySettlementCallbackRouter });
+module.exports = Object.freeze({ MAX_BODY_BYTES, validateCallback, eventId, resolveAttemptEnvironment, createMyanMyanPaySettlementCallbackRouter });

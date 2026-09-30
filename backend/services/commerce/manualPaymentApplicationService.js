@@ -600,8 +600,10 @@ function createManualPaymentApplicationService(dependencies = {}) {
         if (normalizeString(attempt.provider) !== MYANMYANPAY_PROVIDER_ID || method !== "myanmyanpay_mmqr" || normalizeString(attempt.paymentChannel) !== "MYANMYANPAY_MMQR" || normalizeString(attempt.currency) !== "MMK" || orderCurrency !== "MMK" || Number(attempt.amount) !== orderAmount || normalizeString(attempt.orderId) !== normalizeString(order.orderId)) {
             throw appError(ERROR_CODES.UNSUPPORTED_PAYMENT_METHOD, "Payment attempt is not a canonical MyanMyanPay MMQR payment.", 422, "reconciliation");
         }
-        const configuration = await deps.myanMyanPayConfigurationProvider();
-        if (configuration.enabled !== true || configuration.environment !== "SANDBOX") throw appError(ERROR_CODES.PROVIDER_UNAVAILABLE, "MyanMyanPay Sandbox reconciliation is unavailable.", 503, "reconciliation");
+        const attemptEnvironment = normalizeUpper(attempt.safeMetadata?.environment);
+        if (!["SANDBOX", "PRODUCTION"].includes(attemptEnvironment)) throw appError(ERROR_CODES.PROVIDER_UNAVAILABLE, "MyanMyanPay reconciliation environment is unavailable.", 503, "reconciliation");
+        const configuration = await deps.myanMyanPayConfigurationProvider(process.env, { environment: attemptEnvironment });
+        if (configuration.enabled !== true || configuration.environment !== attemptEnvironment) throw appError(ERROR_CODES.PROVIDER_UNAVAILABLE, "MyanMyanPay reconciliation is unavailable.", 503, "reconciliation");
         const client = createMyanMyanPayClient(configuration, deps.providerOptions.myanMyanPayClientOptions || {});
         const adapter = createMyanMyanPayAdapter({ configuration, client, ...(deps.providerOptions.myanMyanPayAdapterOptions || {}) });
         const observed = await adapter.queryPayment({
@@ -663,7 +665,7 @@ function createManualPaymentApplicationService(dependencies = {}) {
                 qrRecovered = recoveringQr;
             }
             if (currentAttemptStatus !== targetStatus) {
-                currentAttempt = await deps.paymentAttemptRepository.updateStatus({ attemptId, fromStatuses: [currentAttemptStatus], toStatus: targetStatus, changedAt, reason: "MyanMyanPay Sandbox reconciliation", transactionContext }, paymentOptions);
+                currentAttempt = await deps.paymentAttemptRepository.updateStatus({ attemptId, fromStatuses: [currentAttemptStatus], toStatus: targetStatus, changedAt, reason: "MyanMyanPay reconciliation", transactionContext }, paymentOptions);
                 stateChanged = true;
             }
             const currentPaymentStatus = normalizeString(currentOrder.paymentStatus || currentOrder.payment?.status || "unpaid").toLowerCase();

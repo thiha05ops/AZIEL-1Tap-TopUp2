@@ -215,7 +215,7 @@ function paymentMethodReadiness(method = {}) {
         if (String(method.key || "").toLowerCase() === "myanmyanpay_mmqr") {
             const { inspectMyanMyanPayConfiguration } = require("./myanmyanpay/myanMyanPayConfiguration");
             const readiness = inspectMyanMyanPayConfiguration();
-            if (!readiness.enabled) missing.push("MyanMyanPay sandbox enabled");
+            if (!readiness.enabled) missing.push(`MyanMyanPay ${String(readiness.environment || "selected environment").toLowerCase()} enabled`);
             missing.push(...readiness.missing.map(item => `MyanMyanPay ${item}`));
         }
         return { ready: missing.length === 0, missing };

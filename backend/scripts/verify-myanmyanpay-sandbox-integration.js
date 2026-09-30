@@ -362,7 +362,7 @@ assert.strictEqual(myanMyanPayAccessDecision(method, { id: "user-1" }, env).allo
 
     function reconciliationHarness(providerResponse) {
         const state = {
-            attempt: { attemptId: "PAY-RECON-1", orderId: "AZL-RECON-1", subjectType: "COMMERCE_ORDER", subjectId: "AZL-RECON-1", ownerId: "user-1", owner: { type: "USER", userId: "user-1" }, provider: "MYANMYANPAY", paymentMethod: "myanmyanpay_mmqr", paymentMethodId: "myanmyanpay_mmqr", paymentChannel: "MYANMYANPAY_MMQR", confirmationMode: "provider_webhook", amount: 34740, currency: "MMK", region: "MM", status: "INITIATING", providerReference: PROVIDER_ORDER_ID, providerTransactionId: "", qr: null },
+            attempt: { attemptId: "PAY-RECON-1", orderId: "AZL-RECON-1", subjectType: "COMMERCE_ORDER", subjectId: "AZL-RECON-1", ownerId: "user-1", owner: { type: "USER", userId: "user-1" }, provider: "MYANMYANPAY", paymentMethod: "myanmyanpay_mmqr", paymentMethodId: "myanmyanpay_mmqr", paymentChannel: "MYANMYANPAY_MMQR", confirmationMode: "provider_webhook", amount: 34740, currency: "MMK", region: "MM", status: "INITIATING", providerReference: PROVIDER_ORDER_ID, providerTransactionId: "", qr: null, safeMetadata: { environment: "SANDBOX", appId: "APP-TEST" } },
             order: { orderId: "AZL-RECON-1", status: "pending_payment", paymentStatus: "unpaid", payment: { provider: "MYANMYANPAY", paymentMethodId: "myanmyanpay_mmqr", paymentChannel: "MYANMYANPAY_MMQR", status: "unpaid" }, commercial: { amount: 34740, totalAmount: 34740, currency: "MMK", region: "MM" } },
             calls: { get: 0, pay: 0, setReference: 0, attemptStatus: 0, orderPayment: 0, orderStatus: 0, createAttempt: 0, createOrder: 0, fulfillment: 0 }
         };
@@ -515,16 +515,17 @@ assert.strictEqual(myanMyanPayAccessDecision(method, { id: "user-1" }, env).allo
     assert(paymentPageHtmlSource.includes("payment-page-runtime.js?v=20260930-mmqr-brand-1") && paymentPageHtmlSource.includes("mm-payment-shell.js?v=20260930-mmqr-brand-1") && paymentPageHtmlSource.includes("mm-payment-shell.css?v=20260930-mmqr-brand-1"), "payment page must load the MMQR presentation assets with a fresh deployment version");
     assert(paymentRouteSource.includes('requireAdminPermission(PERMISSIONS.PAYMENT_METHODS_MANAGE)'), "tester lookup remains payment-management authorized");
     assert(paymentRouteSource.includes('authorizedTesterCustomerIds'), "activation must accept customer-facing tester IDs");
-    assert(paymentRouteSource.includes('if (!["DISABLED", "TEST_ONLY"].includes(state))'), "PUBLIC must remain rejected");
+    assert(paymentRouteSource.includes('MYANMYANPAY_PUBLIC_NOT_READY') && paymentRouteSource.includes('decision.publicReady'), "PUBLIC must fail closed behind Production readiness");
     assert(paymentRouteSource.includes('MYANMYANPAY_CANONICAL_IDENTITY_INVALID'), "canonical identity must fail closed");
     assert(adminPaymentSource.includes('myanmyanpay_mmqr: { key: "myanmyanpay_mmqr"'), "Admin provider catalog must include MyanMyanPay");
-    assert(adminPaymentSource.includes('Use the MyanMyanPay sandbox activation control'), "generic enable toggle must remain locked");
-    assert(adminPaymentSource.includes('PUBLIC — unavailable'), "PUBLIC must be visibly unavailable");
+    assert(adminPaymentSource.includes('Use the MyanMyanPay activation control'), "generic enable toggle must remain locked");
+    assert(adminPaymentSource.includes('PUBLIC — locked'), "PUBLIC must remain visibly locked until ready");
     assert(adminPaymentSource.includes('authorizedTesterCustomerIds'), "Admin activation must submit customer IDs, not ObjectIds");
     assert(adminUsersSource.includes('{ customerId: { $regex:'), "Admin Users must search customerId");
     const commerceRoutesSource = fs.readFileSync(path.join(root, "backend/routes/commerceManualPaymentRoutes.js"), "utf8");
     assert(commerceRoutesSource.includes('"/admin/payment-attempts/:attemptId/myanmyanpay-reconcile"'), "Admin reconciliation route must remain registered");
     assert(commerceRoutesSource.includes("requireAdminPermission(PERMISSIONS.ORDERS_MANAGE)"), "Admin reconciliation must require order-management permission");
+    assert(mmPaymentShellSource.includes('providerAttribution.textContent = "Payment Powered by MyanMyanPay"'), "mandatory MyanMyanPay attribution must remain exact and unlocalized");
     const myanMyanPayEngineBranch = paymentEngineSource.slice(
         paymentEngineSource.indexOf("if (isMyanMyanPaySelection(selectedPayment, orderData))"),
         paymentEngineSource.indexOf("if (isDingerSelection(selectedPayment, orderData))")

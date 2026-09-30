@@ -40,10 +40,13 @@ const paymentMethodSchema = new mongoose.Schema(
 
         myanMyanPayActivationState: {
             type: String,
-            enum: ["DISABLED", "TEST_ONLY"],
+            enum: ["DISABLED", "TEST_ONLY", "PUBLIC"],
             default: "DISABLED"
         },
         myanMyanPaySandboxTestApproved: { type: Boolean, default: false },
+        myanMyanPayProductionTestApproved: { type: Boolean, default: false },
+        myanMyanPayProductionTestVerified: { type: Boolean, default: false },
+        myanMyanPayGoLiveApproved: { type: Boolean, default: false },
         myanMyanPayAuthorizedTestUserIds: { type: [String], default: [] },
 
         accountName: {
