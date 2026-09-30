@@ -57,6 +57,7 @@ const { createPromptPayQr } = require("../services/promptPayQrService");
 const { createAuthoritativeTopup, WalletTopupApplicationError } = require("../services/walletTopupApplicationService");
 const { createManualPaymentApplicationService, ManualPaymentApplicationError } = require("../services/commerce/manualPaymentApplicationService");
 const { settlePaidWalletTopup } = require("../services/walletTopupSettlementService");
+const { isMyanMyanPayMethod, myanMyanPayAccessDecision } = require("../services/myanmyanpay/myanMyanPayPaymentPolicy");
 const {
     startCustomerWalletCheckout,
     CustomerWalletCheckoutError
@@ -132,6 +133,15 @@ function isAutoPromptPayMethod(method = {}) {
     );
 }
 
+function isCanonicalMyanMyanPayWalletMethod(method = {}) {
+    return isMyanMyanPayMethod(method) &&
+        normalizeMethod(method.provider) === "myanmyanpaymmqr" &&
+        String(method.paymentChannel || "").trim().toUpperCase() === "MYANMYANPAY_MMQR" &&
+        String(method.confirmationMode || "").trim().toLowerCase() === "provider_webhook" &&
+        String(method.paymentType || "").trim().toLowerCase() === "auto" &&
+        String(method.region || "").trim().toUpperCase() === "MM";
+}
+
 function isManualDynamicPromptPayMethod(method = {}) {
     const key = normalizeMethod(method.key);
     const provider = normalizeMethod(method.provider);
@@ -185,7 +195,7 @@ function isWalletFundingMethodEligible(method = {}) {
     const type = String(method.paymentType || "manual").toLowerCase();
     const provider = String(method.provider || "").toLowerCase();
     if (type === "wallet" || provider === "wallet" || normalizeMethod(method.key) === "wallet") return false;
-    if (type === "auto") return isAutoPromptPayMethod(method);
+    if (type === "auto") return isAutoPromptPayMethod(method) || isCanonicalMyanMyanPayWalletMethod(method);
     if (isVerifiedDynamicWalletMethod(method) || isManualDynamicPromptPayMethod(method)) return true;
     if (!isManualLikePaymentMethod(method)) return false;
     return Boolean(getMethodQrImage(method)) && Boolean(method.accountName && method.accountNumber);
@@ -257,7 +267,9 @@ function assertManualIntentUsable(intent) {
 
 function createPaymentSnapshot(methodPresentation = {}) {
     const confirmationMode = String(methodPresentation.confirmationMode || "").trim();
-    const provider = confirmationMode === "thunder_truewallet_slip"
+    const provider = isCanonicalMyanMyanPayWalletMethod(methodPresentation)
+        ? "MYANMYANPAY"
+        : confirmationMode === "thunder_truewallet_slip"
         ? "THUNDER_TRUEWALLET"
         : confirmationMode === "thunder_slip"
             ? "THUNDER_PROMPTPAY"
@@ -686,8 +698,17 @@ async function createWalletNotification(req, topup, title, message, type = "wall
 
 router.post("/wallet/topups", authMiddleware, async (req, res) => {
     try {
-        const resolved = await resolveWalletPaymentMethod({ paymentMethod: req.body?.paymentMethod, region: "TH", currency: "THB" });
-        if (!["thunder_slip", "thunder_truewallet_slip"].includes(String(resolved.method.confirmationMode || ""))) {
+        const requestedRegion = normalizeWalletRegion(req.body?.region, req.body?.currency);
+        const requestedCurrency = requestedRegion === "TH" ? "THB" : "MMK";
+        const resolved = await resolveWalletPaymentMethod({ paymentMethod: req.body?.paymentMethod, region: requestedRegion, currency: requestedCurrency });
+        const isMyanMyanPay = isCanonicalMyanMyanPayWalletMethod(resolved.method);
+        if (isMyanMyanPay && myanMyanPayAccessDecision(resolved.method, req.user).allowed !== true) {
+            const error = new Error("MyanMyanPay is not available for this account.");
+            error.statusCode = 403;
+            error.code = "MYANMYANPAY_ACCESS_DENIED";
+            throw error;
+        }
+        if (!isMyanMyanPay && !["thunder_slip", "thunder_truewallet_slip"].includes(String(resolved.method.confirmationMode || ""))) {
             const error = new Error("Selected payment method is not available for verified wallet top-up.");
             error.statusCode = 422;
             throw error;
@@ -695,6 +716,8 @@ router.post("/wallet/topups", authMiddleware, async (req, res) => {
         const presentation = projectWalletPaymentMethod(resolved.method);
         const result = await createAuthoritativeTopup({
             amount: req.body?.amount,
+            region: resolved.region,
+            currency: requestedCurrency,
             paymentMethod: resolved.method.key,
             paymentProvider: createPaymentSnapshot({ ...presentation, ...resolved.method }).provider,
             paymentSnapshot: createPaymentSnapshot({ ...presentation, ...resolved.method })

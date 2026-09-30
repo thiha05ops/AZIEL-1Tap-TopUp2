@@ -1,7 +1,7 @@
 "use strict";
 
 const WalletTopup = require("../../models/WalletTopup");
-const { assertThWalletTopup } = require("../walletTopupPolicy");
+const { assertWalletTopup } = require("../walletTopupPolicy");
 
 function text(value) { return String(value || "").trim(); }
 function clone(value) { return value === undefined ? undefined : structuredClone(value); }
@@ -43,7 +43,7 @@ function createWalletTopupPayableSubjectAdapter(dependencies = {}) {
     function getPaymentSnapshot(subject = {}) { return clone(subject.paymentSnapshot || {}); }
 
     function assertPayable(subject = {}) {
-        assertThWalletTopup({ amount: subject.amount, currency: subject.currency, region: subject.region });
+        assertWalletTopup({ amount: subject.amount, currency: subject.currency, region: subject.region });
         if (!subject.customerUserId) throw error("PAYMENT_FORBIDDEN", "Wallet top-up has no authenticated owner authority.", { stage: "subject" });
         if (["paid", "completed", "approved", "rejected", "cancelled"].includes(text(subject.status).toLowerCase()) ||
             ["paid", "cancelled"].includes(text(subject.paymentStatus).toLowerCase()) || text(subject.settlementStatus).toLowerCase() === "credited") {

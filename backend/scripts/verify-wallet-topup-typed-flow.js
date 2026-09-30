@@ -4,7 +4,7 @@ const assert = require("assert");
 const fs = require("fs");
 const path = require("path");
 const WalletTopup = require("../models/WalletTopup");
-const { normalizeThbTopupAmount, assertThWalletTopup } = require("../services/walletTopupPolicy");
+const { normalizeThbTopupAmount, normalizeMmkTopupAmount, assertThWalletTopup, assertMmWalletTopup } = require("../services/walletTopupPolicy");
 const { createAuthoritativeTopup } = require("../services/walletTopupApplicationService");
 const { createWalletTopupSettlementService } = require("../services/walletTopupSettlementService");
 
@@ -17,6 +17,10 @@ async function phase3() {
         assert.throws(() => normalizeThbTopupAmount(invalid));
     }
     assert.deepStrictEqual(assertThWalletTopup({ amount: 100, currency: "THB", region: "TH" }), { amount: 100, currency: "THB", region: "TH" });
+    assert.strictEqual(normalizeMmkTopupAmount("1000"), 1000);
+    assert.deepStrictEqual(assertMmWalletTopup({ amount: 1000, currency: "MMK", region: "MM" }), { amount: 1000, currency: "MMK", region: "MM" });
+    for (const invalid of [999, "1000.5", "1,000", "1e3", -1000]) assert.throws(() => normalizeMmkTopupAmount(invalid));
+    assert.throws(() => assertMmWalletTopup({ amount: 1000, currency: "THB", region: "MM" }), error => error.code === "WALLET_TOPUP_MARKET_INVALID");
 
     const records = [];
     const model = {
@@ -32,6 +36,12 @@ async function phase3() {
     assert.strictEqual(retry.idempotent, true);
     await assert.rejects(() => createAuthoritativeTopup({ amount: 300, paymentMethod: "promptpay" }, context, { model }), error => error.code === "WALLET_TOPUP_IDEMPOTENCY_CONFLICT");
     assert.strictEqual(records.length, 1);
+    const mmContext = { user: { id: "507f1f77bcf86cd799439012", username: "mm-user", email: "mm@example.com" }, idempotencyKey: "create-mm-1" };
+    const mm = await createAuthoritativeTopup({ amount: 1000, region: "MM", currency: "MMK", paymentMethod: "myanmyanpay_mmqr", paymentProvider: "MYANMYANPAY", paymentSnapshot: { paymentMethodId: "myanmyanpay_mmqr", provider: "MYANMYANPAY", paymentChannel: "MYANMYANPAY_MMQR", confirmationMode: "provider_webhook" } }, mmContext, { model });
+    assert.strictEqual(mm.topup.region, "MM");
+    assert.strictEqual(mm.topup.currency, "MMK");
+    assert.strictEqual(mm.topup.amount, 1000);
+    assert.strictEqual(mm.topup.paymentProvider, "MYANMYANPAY");
 }
 
 async function phase6() {

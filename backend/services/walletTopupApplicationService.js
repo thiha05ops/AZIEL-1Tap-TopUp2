@@ -2,7 +2,7 @@
 
 const crypto = require("crypto");
 const WalletTopup = require("../models/WalletTopup");
-const { assertThWalletTopup } = require("./walletTopupPolicy");
+const { assertWalletTopup } = require("./walletTopupPolicy");
 
 class WalletTopupApplicationError extends Error {
     constructor(code, message, statusCode = 400) {
@@ -24,7 +24,11 @@ function authenticatedUser(user = {}) {
 
 async function createAuthoritativeTopup(input = {}, context = {}, dependencies = {}) {
     const owner = authenticatedUser(context.user);
-    const policy = assertThWalletTopup({ amount: input.amount, region: "TH", currency: "THB" });
+    const policy = assertWalletTopup({
+        amount: input.amount,
+        region: input.region || "TH",
+        currency: input.currency || (String(input.region || "TH").toUpperCase() === "MM" ? "MMK" : "THB")
+    });
     const paymentMethod = text(input.paymentMethod).toLowerCase();
     if (!paymentMethod || paymentMethod === "wallet") throw new WalletTopupApplicationError("WALLET_TOPUP_METHOD_INVALID", "Select a valid payment method.", 422);
     const idempotencyKey = text(context.idempotencyKey);

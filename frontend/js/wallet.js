@@ -269,6 +269,19 @@ function isPromptPayPayment(payment) {
     );
 }
 
+function isMyanMyanPayWalletPayment(payment = {}) {
+    return normalizePaymentKey(payment.raw || payment.key) === "myanmyanpaymmqr" &&
+        normalizePaymentKey(payment.provider) === "myanmyanpaymmqr" &&
+        payment.paymentType === "auto";
+}
+
+function safeWalletResponseMessage(response, data = {}) {
+    const message = typeof data.message === "string" ? data.message.trim() : "";
+    return response?.status >= 400 && response.status < 500 && message && message.length <= 180
+        ? message
+        : "";
+}
+
 function isManualDynamicPromptPayWalletMethod(method = {}) {
     const type = normalizePaymentKey(method.paymentType || "");
     const provider = normalizePaymentKey(method.provider || "");
@@ -925,11 +938,11 @@ async function submitTopup() {
         }
 
         showLoading(true);
-        if (region !== "TH") {
+        if (region !== "TH" && !isMyanMyanPayWalletPayment(payment)) {
             await submitLegacyWalletTopup({ user, amount, payment, paymentMethod, provider, currency, region });
             return;
         }
-        const creationFingerprint = `${amount}:${paymentMethod}`;
+        const creationFingerprint = `${region}:${currency}:${amount}:${paymentMethod}`;
         if (walletTopupCreationRequest.fingerprint !== creationFingerprint) {
             walletTopupCreationRequest = {
                 fingerprint: creationFingerprint,
@@ -944,14 +957,16 @@ async function submitTopup() {
             },
             body: JSON.stringify({
                 amount,
-                paymentMethod
+                paymentMethod,
+                region,
+                currency
             })
         });
 
-        const data = await res.json();
+        const data = await res.json().catch(() => ({}));
 
-        if (!data.success) {
-            showWalletToast(data.message || wt("walletCreateFailed", "Create wallet payment failed."), "error");
+        if (!res.ok || !data.success) {
+            showWalletToast(safeWalletResponseMessage(res, data) || wt("serverError", "Server error"), "error");
             return;
         }
 
@@ -965,7 +980,7 @@ async function submitTopup() {
         });
         const attemptData = await attemptRes.json().catch(() => ({}));
         if (!attemptRes.ok || attemptData.success === false) {
-            showWalletToast(attemptData.message || wt("walletCreateFailed", "Create wallet payment failed."), "error");
+            showWalletToast(safeWalletResponseMessage(attemptRes, attemptData) || wt("serverError", "Server error"), "error");
             return;
         }
         const typedPayment = attemptData.payment || {};
@@ -985,7 +1000,7 @@ async function submitTopup() {
                 accountName: typedPayment.paymentInstructions?.accountName || payment.accountName,
                 accountNumber: typedPayment.paymentInstructions?.accountNumber || payment.accountNumber,
                 qrImage: typedPayment.qr?.image || payment.qrImage,
-                slipRequired: true,
+                slipRequired: typedPayment.paymentInstructions?.requiresReceiptUpload === true,
                 enableSaveQr: typedPayment.paymentInstructions?.enableSaveQr === true || payment.enableSaveQr === true,
                 enableOpenApp: payment.enableOpenApp === true,
                 enableChecklist: payment.enableChecklist === true,
@@ -1002,7 +1017,7 @@ async function submitTopup() {
 
     } catch (error) {
         console.log("Wallet create error:", error);
-        showWalletToast(wt("serverError", "Server error"), "error");
+        showWalletToast(error?.safeCustomerMessage || wt("serverError", "Server error"), "error");
     } finally {
         showLoading(false);
 
@@ -1026,7 +1041,11 @@ async function submitLegacyWalletTopup({ user, amount, payment, paymentMethod, p
         body: JSON.stringify({ username: user.username, amount, currency, region, paymentMethod })
     });
     const data = await res.json().catch(() => ({}));
-    if (!res.ok || data.success === false) throw new Error(data.message || "Create wallet payment failed.");
+    if (!res.ok || data.success === false) {
+        const error = new Error("Wallet top-up request failed.");
+        error.safeCustomerMessage = safeWalletResponseMessage(res, data);
+        throw error;
+    }
     if (promptPay) {
         openWalletQrModal(data, { amount, currency, paymentMethod });
         startPaymentStatusPolling(data.topupId);
@@ -1096,6 +1115,7 @@ function openWalletManualModal(data, info) {
     const deepLink = info.deepLink || "";
     const confirmationMode = String(data.confirmationMode || info.method?.confirmationMode || "");
     const providerCode = String(data.provider || info.provider || "").toUpperCase();
+    const myanMyanPay = providerCode === "MYANMYANPAY";
     const trueWallet = confirmationMode === "thunder_truewallet_slip" || providerCode === "THUNDER_TRUEWALLET";
     const thunderVerified = trueWallet || confirmationMode === "thunder_slip" || providerCode === "THUNDER_PROMPTPAY";
 
@@ -1123,7 +1143,9 @@ function openWalletManualModal(data, info) {
         qrMode: info.qrMode || "",
         dynamicQr: info.dynamicQr || null,
         expiresAt: data.expiresAt || "",
-        instructions: trueWallet
+        instructions: myanMyanPay
+            ? wt("wallet.myanmyanpay.instructions", "Scan the MMQR and pay the exact amount. Your wallet updates after payment is confirmed.")
+            : trueWallet
             ? wt("payment.truewallet.instructions", "Scan this QR with TrueMoney, pay the exact amount, then upload the transfer slip.")
             : thunderVerified
                 ? wt("payment.thunder.instructions", "Pay the fixed amount, then upload the slip for automatic verification.")
