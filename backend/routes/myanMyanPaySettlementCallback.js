@@ -34,34 +34,43 @@ async function resolveAttemptEnvironment(orderId, options = {}) {
     return environment;
 }
 
+async function handleMyanMyanPaySettlementCallback(req, res, options = {}) {
+    try {
+        if (!Buffer.isBuffer(req.body) || req.body.length === 0) throw Object.assign(new Error("Raw callback body is unavailable."), { code: "MYANMYANPAY_CALLBACK_RAW_BODY_MISSING", httpStatus: 400 });
+        const payload = req.body.toString("utf8");
+        let body;
+        try {
+            body = JSON.parse(payload);
+        } catch (_) {
+            throw Object.assign(new Error("Invalid callback JSON."), { code: "MYANMYANPAY_CALLBACK_JSON_INVALID", httpStatus: 400 });
+        }
+        const untrustedOrderId = text(body?.orderId);
+        if (!isMyanMyanPayProviderOrderId(untrustedOrderId)) throw Object.assign(new Error("Invalid callback order."), { code: "MYANMYANPAY_CALLBACK_INVALID", httpStatus: 400 });
+        const environment = options.configuration?.environment || await resolveAttemptEnvironment(untrustedOrderId, options);
+        const configuration = options.configuration || loadMyanMyanPayConfiguration(options.env, { environment });
+        const nonce = text(req.get("X-Mmpay-Nonce"));
+        const signature = text(req.get("X-Mmpay-Signature"));
+        if (!nonce || !signature) return res.status(401).json({ received: false, code: "MYANMYANPAY_CALLBACK_AUTH_MISSING" });
+        const client = options.client || createMyanMyanPayClient(configuration);
+        await client.verifyAndListen(payload, nonce, signature);
+        const result = validateCallback(body);
+        if (result.appId && result.appId !== configuration.appId) throw Object.assign(new Error("Application mismatch."), { code: "MYANMYANPAY_APPLICATION_MISMATCH", httpStatus: 409 });
+        const service = options.paymentService || createManualPaymentApplicationService(options.paymentServiceOptions || {});
+        const settlement = await service.applyMyanMyanPayCallback({ result, environment, appId: configuration.appId, providerEventId: eventId(result, environment) });
+        return res.status(200).json({ received: true, duplicate: settlement?.metadata?.duplicate === true });
+    } catch (error) {
+        const status = Number(error.httpStatus || error.statusCode || 0);
+        const clientError = status >= 400 && status < 500;
+        return res.status(clientError ? status : 503).json({ received: false, code: text(error.code || (clientError ? "MYANMYANPAY_CALLBACK_REJECTED" : "MYANMYANPAY_CALLBACK_PROCESSING_UNCERTAIN")) });
+    }
+}
+
 function createMyanMyanPaySettlementCallbackRouter(options = {}) {
     const router = express.Router();
     const limiter = options.limiter || rateLimit({ windowMs: 60_000, limit: 60, standardHeaders: true, legacyHeaders: false });
-    const parser = express.json({ limit: MAX_BODY_BYTES, strict: true, type: "application/json" });
-    router.post("/payment", limiter, (req, res, next) => req.is("application/json") ? parser(req, res, next) : res.status(415).json({ received: false, code: "MYANMYANPAY_CONTENT_TYPE_UNSUPPORTED" }), async (req, res) => {
-        try {
-            const untrustedOrderId = text(req.body?.orderId);
-            if (!isMyanMyanPayProviderOrderId(untrustedOrderId)) throw Object.assign(new Error("Invalid callback order."), { code: "MYANMYANPAY_CALLBACK_INVALID", httpStatus: 400 });
-            const environment = options.configuration?.environment || await resolveAttemptEnvironment(untrustedOrderId, options);
-            const configuration = options.configuration || loadMyanMyanPayConfiguration(options.env, { environment });
-            const nonce = text(req.get("X-Mmpay-Nonce"));
-            const signature = text(req.get("X-Mmpay-Signature"));
-            if (!nonce || !signature) return res.status(401).json({ received: false, code: "MYANMYANPAY_CALLBACK_AUTH_MISSING" });
-            const payload = JSON.stringify(req.body);
-            const client = options.client || createMyanMyanPayClient(configuration);
-            await client.verifyAndListen(payload, nonce, signature);
-            const result = validateCallback(req.body);
-            if (result.appId && result.appId !== configuration.appId) throw Object.assign(new Error("Application mismatch."), { code: "MYANMYANPAY_APPLICATION_MISMATCH", httpStatus: 409 });
-            const service = options.paymentService || createManualPaymentApplicationService(options.paymentServiceOptions || {});
-            const settlement = await service.applyMyanMyanPayCallback({ result, environment, appId: configuration.appId, providerEventId: eventId(result, environment) });
-            return res.status(200).json({ received: true, duplicate: settlement?.metadata?.duplicate === true });
-        } catch (error) {
-            const status = Number(error.httpStatus || error.statusCode || 0);
-            const clientError = status >= 400 && status < 500;
-            return res.status(clientError ? status : 503).json({ received: false, code: text(error.code || (clientError ? "MYANMYANPAY_CALLBACK_REJECTED" : "MYANMYANPAY_CALLBACK_PROCESSING_UNCERTAIN")) });
-        }
-    });
+    const parser = express.raw({ limit: MAX_BODY_BYTES, type: "application/json" });
+    router.post("/payment", limiter, (req, res, next) => req.is("application/json") ? parser(req, res, next) : res.status(415).json({ received: false, code: "MYANMYANPAY_CONTENT_TYPE_UNSUPPORTED" }), (req, res) => handleMyanMyanPaySettlementCallback(req, res, options));
     router.use((error, req, res, next) => error ? res.status(error.type === "entity.too.large" ? 413 : 400).json({ received: false, code: error.type === "entity.too.large" ? "MYANMYANPAY_CALLBACK_BODY_TOO_LARGE" : "MYANMYANPAY_CALLBACK_JSON_INVALID" }) : next());
     return router;
 }
-module.exports = Object.freeze({ MAX_BODY_BYTES, validateCallback, eventId, resolveAttemptEnvironment, createMyanMyanPaySettlementCallbackRouter });
+module.exports = Object.freeze({ MAX_BODY_BYTES, validateCallback, eventId, resolveAttemptEnvironment, handleMyanMyanPaySettlementCallback, createMyanMyanPaySettlementCallbackRouter });

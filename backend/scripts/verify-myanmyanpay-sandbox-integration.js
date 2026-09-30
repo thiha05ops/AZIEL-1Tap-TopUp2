@@ -13,7 +13,7 @@ const { createMyanMyanPayProviderOrderId, isMyanMyanPayProviderOrderId } = requi
 const { createMyanMyanPayAdapter } = require("../services/commerce/providers/myanMyanPayAdapter");
 const { createManualPaymentApplicationService } = require("../services/commerce/manualPaymentApplicationService");
 const { isMyanMyanPayMethod, myanMyanPayAccessDecision } = require("../services/myanmyanpay/myanMyanPayPaymentPolicy");
-const { validateCallback, eventId } = require("../routes/myanMyanPaySettlementCallback");
+const { validateCallback, eventId, handleMyanMyanPaySettlementCallback } = require("../routes/myanMyanPaySettlementCallback");
 const {
     canonicalIdentity,
     findTesterCandidates,
@@ -27,6 +27,21 @@ const paymentMethodsRoute = require("../routes/paymentMethods");
 
 const PROVIDER_ORDER_ID = "0123456789ABCDEF";
 const SECOND_PROVIDER_ORDER_ID = "FEDCBA9876543210";
+
+async function invokeRawCallback(body, headers, options) {
+    let statusCode = 200;
+    let responseBody;
+    const req = {
+        body: Buffer.isBuffer(body) ? body : Buffer.from(body || "", "utf8"),
+        get(name) { return headers[String(name).toLowerCase()] || ""; }
+    };
+    const res = {
+        status(value) { statusCode = value; return this; },
+        json(value) { responseBody = value; return value; }
+    };
+    await handleMyanMyanPaySettlementCallback(req, res, options);
+    return { status: statusCode, data: responseBody };
+}
 
 assert.strictEqual(isMyanMyanPayProviderOrderId(PROVIDER_ORDER_ID), true);
 assert.strictEqual(PROVIDER_ORDER_ID.length, 16);
@@ -895,9 +910,10 @@ assert.strictEqual(myanMyanPayAccessDecision(method, { id: "user-1" }, env).allo
     assert.throws(() => validateCallback({ ...callback, status: "UNKNOWN" }));
     assert.throws(() => validateCallback({ ...callback, orderId: "paymentAttempt-1790691957504-f9776f58" }), "callback lookup must reject a PaymentAttempt ID in place of the provider order ID");
 
+    let sdkListenCalls = 0;
     class FakeSdk extends EventEmitter {
         _generateSignature(payload, nonce) { return crypto.createHmac("sha256", "sdk-test").update(`${nonce}.${payload}`).digest("hex"); }
-        async listen(payload) { this.emit("tx:success", JSON.parse(payload)); return this; }
+        async listen(payload) { sdkListenCalls += 1; this.emit("tx:success", JSON.parse(payload)); return this; }
     }
     const sdk = new FakeSdk();
     const client = createMyanMyanPayClient(configuration, { sdk });
@@ -906,6 +922,65 @@ assert.strictEqual(myanMyanPayAccessDecision(method, { id: "user-1" }, env).allo
     await assert.rejects(() => client.verifyAndListen(payload, "", signature), /authentication failed/);
     await assert.rejects(() => client.verifyAndListen(payload, "different-nonce", signature), /authentication failed/);
     await assert.rejects(() => client.verifyAndListen(payload, nonce, "bad"), /authentication failed/);
+    assert.strictEqual(sdkListenCalls, 1, "signature mismatches must be rejected before SDK listen can reach its unsafe mismatch logger");
+
+    const exactRawPayload = ` {\n  "status" : "SUCCESS",\n  "orderId" : "${PROVIDER_ORDER_ID}", "amount" : 1500,\n  "currency" : "MMK", "vendor" : "KBZPay", "method" : "QR",\n  "condition" : "PRISTINE", "transactionRefId" : "TX-RAW-1", "vendorQrRefId" : "QR-RAW-1"\n } `;
+    const reorderedPayload = `{"vendorQrRefId":"QR-RAW-1","transactionRefId":"TX-RAW-1","condition":"PRISTINE","method":"QR","vendor":"KBZPay","currency":"MMK","amount":1500,"orderId":"${PROVIDER_ORDER_ID}","status":"SUCCESS"}`;
+    const verifiedRawPayloads = [];
+    const settledBodies = [];
+    const seenCallbackEvents = new Set();
+    let settlementMutations = 0;
+    const callbackOptions = {
+        configuration,
+        client: {
+            async verifyAndListen(value, nonceValue, signatureValue) {
+                assert.strictEqual(nonceValue, "raw-nonce");
+                assert.strictEqual(signatureValue, "raw-signature");
+                verifiedRawPayloads.push(value);
+                return JSON.parse(value);
+            }
+        },
+        paymentService: {
+            async applyMyanMyanPayCallback(input) {
+                settlementMutations += 1;
+                settledBodies.push(input.result);
+                const duplicate = seenCallbackEvents.has(input.providerEventId);
+                seenCallbackEvents.add(input.providerEventId);
+                return { metadata: { duplicate } };
+            }
+        }
+    };
+    const headers = { "x-mmpay-nonce": "raw-nonce", "x-mmpay-signature": "raw-signature" };
+    const first = await invokeRawCallback(exactRawPayload, headers, callbackOptions);
+    assert.deepStrictEqual(first, { status: 200, data: { received: true, duplicate: false } });
+    assert.strictEqual(verifiedRawPayloads[0], exactRawPayload, "verification must receive the exact whitespace and key order sent on the wire");
+    assert.strictEqual(settledBodies[0].orderId, PROVIDER_ORDER_ID, "the independently parsed callback body must remain available to settlement validation");
+
+    const duplicate = await invokeRawCallback(reorderedPayload, headers, callbackOptions);
+    assert.deepStrictEqual(duplicate, { status: 200, data: { received: true, duplicate: true } }, "canonical callback replay identity must remain unchanged across JSON formatting differences");
+    assert.strictEqual(verifiedRawPayloads[1], reorderedPayload, "a reordered payload must not be reconstructed before verification");
+
+    const beforeFailures = settlementMutations;
+    const missingRaw = await invokeRawCallback("", headers, callbackOptions);
+    assert.strictEqual(missingRaw.status, 400);
+    assert.strictEqual(missingRaw.data.code, "MYANMYANPAY_CALLBACK_RAW_BODY_MISSING");
+    const missingNonce = await invokeRawCallback(reorderedPayload, { "x-mmpay-signature": "raw-signature" }, callbackOptions);
+    assert.deepStrictEqual(missingNonce, { status: 401, data: { received: false, code: "MYANMYANPAY_CALLBACK_AUTH_MISSING" } });
+    const missingSignature = await invokeRawCallback(reorderedPayload, { "x-mmpay-nonce": "raw-nonce" }, callbackOptions);
+    assert.deepStrictEqual(missingSignature, { status: 401, data: { received: false, code: "MYANMYANPAY_CALLBACK_AUTH_MISSING" } });
+    const invalidJson = await invokeRawCallback(`{"orderId":"${PROVIDER_ORDER_ID}"`, headers, callbackOptions);
+    assert.strictEqual(invalidJson.status, 400);
+    assert.strictEqual(invalidJson.data.code, "MYANMYANPAY_CALLBACK_JSON_INVALID");
+    assert.strictEqual(settlementMutations, beforeFailures, "missing authentication, missing raw bytes, and invalid JSON must cause zero settlement mutation");
+
+    let rejectedSettlementMutations = 0;
+    const rejected = await invokeRawCallback(reorderedPayload, { "x-mmpay-nonce": "raw-nonce", "x-mmpay-signature": "invalid-signature" }, {
+        configuration,
+        client: { async verifyAndListen() { throw Object.assign(new Error("verification failed"), { code: "MYANMYANPAY_CALLBACK_SIGNATURE_INVALID", httpStatus: 401 }); } },
+        paymentService: { async applyMyanMyanPayCallback() { rejectedSettlementMutations += 1; } }
+    });
+    assert.deepStrictEqual(rejected, { status: 401, data: { received: false, code: "MYANMYANPAY_CALLBACK_SIGNATURE_INVALID" } });
+    assert.strictEqual(rejectedSettlementMutations, 0, "failed SDK verification must cause zero settlement mutation");
 
     let captured;
     const service = createManualPaymentApplicationService({ paymentOrchestrator: { async handleProviderEvent(input) { captured = input; return { paymentStatus: "paid", metadata: {} }; } } });
