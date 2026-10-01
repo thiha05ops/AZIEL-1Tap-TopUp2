@@ -70,7 +70,7 @@ body.auth-page {
   content: "1Tap Shop";
   position: absolute;
   left: 2px;
-  top: 42px;
+  top: 56px;
   font-size: 13px;
   font-weight: 800;
   letter-spacing: .8px;
@@ -81,6 +81,7 @@ body.auth-page {
   position: relative;
   z-index: 2;
   display: inline-flex;
+  padding-bottom: 22px;
   text-decoration: none;
   color: #fff;
 }
@@ -95,6 +96,22 @@ body.auth-page {
 
 .auth-mobile-logo {
   display: none;
+}
+
+.auth-mobile-logo .auth-logo-light {
+  display: none;
+}
+
+body.theme-dark .auth-mobile-logo .auth-logo-dark,
+body.dark .auth-mobile-logo .auth-logo-dark,
+html.theme-dark .auth-mobile-logo .auth-logo-dark {
+  display: none;
+}
+
+body.theme-dark .auth-mobile-logo .auth-logo-light,
+body.dark .auth-mobile-logo .auth-logo-light,
+html.theme-dark .auth-mobile-logo .auth-logo-light {
+  display: block;
 }
 
 .auth-brand-content {
@@ -172,7 +189,8 @@ body.auth-page {
 
 .auth-card-head h2 {
   margin: 0;
-  font-size: 32px;
+  color: var(--az-text);
+  font-size: clamp(28px, 7vw, 32px);
   letter-spacing: -1px;
 }
 
@@ -189,6 +207,10 @@ body.auth-page {
   background: var(--az-soft);
   padding: 10px 13px;
   border-radius: 999px;
+}
+
+.auth-switch-top {
+  display: none;
 }
 
 .auth-label {
@@ -231,11 +253,23 @@ body.auth-page {
 }
 
 .password-eye {
+  width: 34px;
+  height: 34px;
   border: none;
   background: transparent;
+  display: grid;
+  place-items: center;
   cursor: pointer;
-  font-size: 16px;
-  opacity: .75;
+  color: var(--az-muted);
+  font-size: 15px;
+  flex-shrink: 0;
+  pointer-events: auto;
+  position: relative;
+  z-index: 20;
+}
+
+.password-eye:hover {
+  color: var(--az-primary);
 }
 
 .auth-row {
@@ -308,6 +342,8 @@ body.auth-page {
 }
 
 .google-btn {
+  box-sizing: border-box;
+  width: 100%;
   min-width: 0;
   height: 52px;
   border-radius: 16px;
@@ -318,8 +354,11 @@ body.auth-page {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
+  gap: 12px;
+  font-family: inherit;
+  font-size: 15px;
   font-weight: 900;
+  white-space: nowrap;
 }
 
 
@@ -416,33 +455,17 @@ body.auth-page {
     margin-top: 20px;
   }
 
+}
+
+@media (max-width: 340px) {
+  .auth-card {
+    padding: 20px;
+  }
+
   .auth-row {
     align-items: flex-start;
     flex-direction: column;
   }
-}
-
-.password-eye {
-  width: 34px;
-  height: 34px;
-
-  border: none;
-  background: transparent;
-
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  cursor: pointer;
-
-  color: var(--az-muted);
-  font-size: 15px;
-
-  flex-shrink: 0;
-}
-
-.password-eye:hover {
-  color: var(--az-primary);
 }
 
 .auth-brand-panel::before {
@@ -481,40 +504,6 @@ body.auth-page {
   font-size: 15px;
 }
 
-.password-eye {
-  width: 34px;
-  height: 34px;
-  border: none;
-  background: transparent;
-  display: grid;
-  place-items: center;
-  color: var(--az-muted);
-  cursor: pointer;
-  font-size: 15px;
-  flex-shrink: 0;
-}
-
-.password-eye:hover {
-  color: var(--az-primary);
-}
-
-.google-btn {
-  height: 52px;
-  border-radius: 16px;
-  border: 1px solid var(--az-border);
-  background: var(--az-card-solid);
-  color: var(--az-text);
-  text-decoration: none;
-
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-
-  font-weight: 900;
-  white-space: nowrap;
-}
-
 .google-icon {
   width: 22px;
   height: 22px;
@@ -541,12 +530,6 @@ body.auth-page {
 
 .google-btn span {
   color: var(--az-text) !important;
-}
-
-.password-eye {
-  pointer-events: auto !important;
-  position: relative !important;
-  z-index: 20 !important;
 }
 
 #togglePassword {
