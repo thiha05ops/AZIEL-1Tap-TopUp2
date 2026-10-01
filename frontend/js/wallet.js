@@ -2,6 +2,7 @@
 // AZIEL Wallet V3.1 - PromptPay QR + Manual App/Slip Flow
 
 let walletPollingTimer = null;
+let walletPollingGeneration = 0;
 let walletCountdownTimer = null;
 let walletSocketReady = false;
 let walletHistoryItems = [];
@@ -1217,9 +1218,18 @@ function openWalletManualModal(data, info) {
             return thunderVerified ? { status: verified ? "verified" : "submitted" } : true;
         },
         onClose: () => {
+            if (myanMyanPay) stopWalletPolling();
             activeWalletManualIntent = null;
         }
     });
+
+    if (myanMyanPay && activeWalletManualIntent.topupId && activeWalletManualIntent.attemptId) {
+        window.PaymentCheckoutSheet.setMessage(
+            "",
+            wt("wallet.myanmyanpay.waiting", "Waiting for payment... Payment is confirmed automatically. No receipt upload required.")
+        );
+        startTypedWalletStatusPolling(activeWalletManualIntent.topupId, activeWalletManualIntent.attemptId);
+    }
 }
 
 function closeWalletManualModal() {
@@ -1422,7 +1432,69 @@ function startPaymentStatusPolling(topupId) {
     }, 3000);
 }
 
+function startTypedWalletStatusPolling(topupId, attemptId) {
+    if (!topupId || !attemptId) return;
+
+    stopWalletPolling();
+    const generation = walletPollingGeneration;
+
+    const poll = async () => {
+        try {
+            const res = await fetch(
+                walletApiUrl(`/api/wallet/topups/${encodeURIComponent(topupId)}`),
+                {
+                    headers: AZIEL.authHeaders?.() || {},
+                    credentials: "same-origin",
+                    cache: "no-store"
+                }
+            );
+            const data = await res.json().catch(() => ({}));
+            if (generation !== walletPollingGeneration) return;
+            const topup = data?.topup || {};
+            const payment = data?.payment || {};
+            const identityMatches =
+                data?.success === true &&
+                String(topup.topupId || "") === String(topupId) &&
+                String(topup.paymentAttemptId || "") === String(attemptId) &&
+                String(payment.attemptId || "") === String(attemptId) &&
+                String(payment.provider || "").toUpperCase() === "MYANMYANPAY";
+
+            if (identityMatches) {
+                const topupStatus = String(topup.status || "").toLowerCase();
+                const paymentStatus = String(topup.paymentStatus || payment.paymentStatus || "").toLowerCase();
+                const settlementStatus = String(topup.settlementStatus || "").toLowerCase();
+
+                if (settlementStatus === "credited" || topupStatus === "completed") {
+                    stopWalletPolling();
+                    window.PaymentCheckoutSheet?.close?.("payment-confirmed");
+                    await loadWallet();
+                    showSubmitSuccessModal();
+                    resetTopupForm();
+                    return;
+                }
+
+                if (["failed", "cancelled", "expired"].includes(paymentStatus) || ["failed", "cancelled", "expired"].includes(topupStatus)) {
+                    stopWalletPolling();
+                    window.PaymentCheckoutSheet?.setMessage?.(
+                        "error",
+                        wt("wallet.paymentNotCompleted", "Payment was not completed. Please start a new wallet top-up.")
+                    );
+                    return;
+                }
+            }
+        } catch (error) {
+            console.log("Wallet payment status polling error:", error);
+        }
+
+        if (generation !== walletPollingGeneration) return;
+        walletPollingTimer = setTimeout(poll, 3000);
+    };
+
+    walletPollingTimer = setTimeout(poll, 3000);
+}
+
 function stopWalletPolling() {
+    walletPollingGeneration += 1;
     if (walletPollingTimer) {
         clearInterval(walletPollingTimer);
         walletPollingTimer = null;

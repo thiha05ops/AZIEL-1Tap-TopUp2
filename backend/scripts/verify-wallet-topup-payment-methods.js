@@ -47,7 +47,7 @@ function verifyBackendWalletEligibility() {
     includes(file, "const { createPromptPayQr } = require(\"../services/promptPayQrService\")", "Wallet backend must reuse the canonical PromptPay QR service.");
     includes(file, "function isManualDynamicPromptPayMethod", "Wallet backend must explicitly recognize manual dynamic PromptPay.");
     includes(file, "function isWalletFundingMethodEligible", "Wallet backend must centrally enforce wallet funding eligibility.");
-    includes(file, "if (type === \"auto\") return isAutoPromptPayMethod(method);", "Automatic wallet methods must remain explicitly gated.");
+    includes(file, "if (type === \"auto\") return isAutoPromptPayMethod(method) || isCanonicalMyanMyanPayWalletMethod(method);", "Automatic wallet methods must remain explicitly gated.");
     includes(file, "function isVerifiedDynamicWalletMethod", "Wallet backend must explicitly recognize verified dynamic wallet funding methods.");
     includes(file, "[\"promptpay\", \"thunderpromptpay\"].includes(provider)", "Wallet backend must recognize the normalized Thunder PromptPay provider.");
     includes(file, "key === \"truewallet\"", "Wallet backend must recognize TrueMoney Wallet funding.");

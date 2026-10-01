@@ -1029,9 +1029,9 @@
         modal.classList.toggle("is-desktop-promptpay", isDesktopFlow);
         modal.classList.toggle("is-thunder-auto-slip", autoSubmitReceipt);
 
-        if (nav) nav.hidden = !isMobileFlow || autoSubmitReceipt;
+        if (nav) nav.hidden = !isMobileFlow || autoSubmitReceipt || !activeState.requiresSlip;
         if (continueBtn) {
-            continueBtn.hidden = !isMobileFlow || step !== "qr" || autoSubmitReceipt;
+            continueBtn.hidden = !isMobileFlow || step !== "qr" || autoSubmitReceipt || !activeState.requiresSlip;
             continueBtn.disabled = activeState.expired === true || isRecoveryExpired(activeState);
             continueBtn.textContent = t("payment_transfer_completed", "I've completed the transfer");
             continueBtn.onclick = () => {
@@ -1040,7 +1040,7 @@
             };
         }
         if (backBtn) {
-            backBtn.hidden = !isMobileFlow || step !== "receipt" || autoSubmitReceipt;
+            backBtn.hidden = !isMobileFlow || step !== "receipt" || autoSubmitReceipt || !activeState.requiresSlip;
             backBtn.disabled = activeState.expired === true || isRecoveryExpired(activeState);
             backBtn.textContent = t("payment_back_to_qr", "Back to QR");
             backBtn.onclick = () => setMobilePromptPayStep("qr");
@@ -1050,8 +1050,8 @@
             summary.hidden = !isMobileFlow || step !== "receipt";
             if (isMobileFlow && step === "receipt") renderMobileReceiptSummary(modal, activeState);
         }
-        if (submit) submit.hidden = autoSubmitReceipt || (isMobileFlow && step !== "receipt");
-        if (!isMobileFlow && submit) submit.hidden = autoSubmitReceipt || (activeState.requiresSlip && !activeState.transferConfirmed);
+        if (submit) submit.hidden = !activeState.requiresSlip || autoSubmitReceipt || (isMobileFlow && step !== "receipt");
+        if (!isMobileFlow && submit) submit.hidden = !activeState.requiresSlip || autoSubmitReceipt || !activeState.transferConfirmed;
         if (!isMobileFlow && receipt) receipt.hidden = !activeState.requiresSlip || !activeState.transferConfirmed;
         if (!isMobileFlow && summary) summary.hidden = true;
         if (!isMobileFlow && chooser) {

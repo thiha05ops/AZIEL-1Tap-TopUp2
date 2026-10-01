@@ -43,6 +43,7 @@ assert.strictEqual(myanMyanPayAccessDecision({ ...method, myanMyanPayActivationS
 
 const route = read("backend/routes/wallet.js");
 const frontend = read("frontend/js/wallet.js");
+const checkoutSheet = read("frontend/js/payment/payment-checkout-sheet.js");
 const adapter = read("backend/services/commerce/walletTopupPayableSubjectAdapter.js");
 const orchestrator = read("backend/services/commerce/paymentOrchestrator.js");
 const application = read("backend/services/commerce/manualPaymentApplicationService.js");
@@ -59,6 +60,18 @@ for (const token of [
 assert(frontend.includes('!isMyanMyanPayWalletPayment(payment)'), "non-TH MyanMyanPay must bypass the legacy route");
 assert(frontend.includes('paymentMethod,\n                region,\n                currency'), "typed creation must send market selection for server validation");
 assert(frontend.includes('typedPayment.paymentInstructions?.requiresReceiptUpload === true'), "MMQR must not require a receipt");
+assert(checkoutSheet.includes('submit.hidden = !activeState.requiresSlip'), "receipt-free provider payments must hide the manual verification action");
+assert(checkoutSheet.includes('continueBtn.hidden = !isMobileFlow || step !== "qr" || autoSubmitReceipt || !activeState.requiresSlip'), "receipt-free provider payments must hide the mobile manual-confirmation action");
+assert(frontend.includes('startTypedWalletStatusPolling(activeWalletManualIntent.topupId, activeWalletManualIntent.attemptId)'), "MMQR wallet checkout must start authoritative status observation");
+assert(frontend.includes('/api/wallet/topups/${encodeURIComponent(topupId)}'), "MMQR status observation must use the authenticated typed top-up endpoint");
+assert(frontend.includes('credentials: "same-origin"'), "MMQR status observation must preserve session authentication");
+assert(frontend.includes('cache: "no-store"'), "MMQR status observation must bypass stale status caches");
+assert(frontend.includes('"Waiting for payment... Payment is confirmed automatically. No receipt upload required."'), "MMQR must show automatic pending-payment guidance");
+const typedPoll = frontend.slice(frontend.indexOf("function startTypedWalletStatusPolling"), frontend.indexOf("function stopWalletPolling"));
+assert(!/method:\s*["']POST["']/.test(typedPoll), "MMQR observation must remain read-only");
+assert(!/markPaid|creditWallet|settlePaidWalletTopup/.test(typedPoll), "browser polling must not claim payment or wallet-credit authority");
+assert(typedPoll.includes('settlementStatus === "credited" || topupStatus === "completed"'), "wallet success UI must wait for authoritative server-side credit completion");
+assert(checkoutSheet.includes('if (!isMobileFlow && submit) submit.hidden = !activeState.requiresSlip || autoSubmitReceipt || !activeState.transferConfirmed;'), "receipt-required desktop flows must retain transfer-confirmation gating");
 assert(frontend.includes('safeWalletResponseMessage'), "bounded 4xx messages must be supported");
 assert(frontend.includes('wt("serverError", "Server error")'), "unknown/network failures must remain generic");
 assert(adapter.includes("assertWalletTopup"), "wallet payable subject must use multi-market authoritative policy");
