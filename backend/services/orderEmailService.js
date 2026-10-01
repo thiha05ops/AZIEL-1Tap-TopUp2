@@ -6,6 +6,7 @@ const MediaAsset = require("../models/MediaAsset");
 const User = require("../models/User");
 const {
     classifyTransportError,
+    getEmailProvider,
     hashRecipient,
     maskEmail,
     sendEmail
@@ -446,7 +447,7 @@ async function acquireOrderEmailThread({ commerceOrderId, deliveryKey, recipient
     return thread;
 }
 
-async function acquireDelivery({ deliveryKey, messageType, orderId, recipient, thread }) {
+async function acquireDelivery({ deliveryKey, messageType, orderId, recipient, thread, transport }) {
     const staleBefore = new Date(Date.now() - STALE_PENDING_MS);
     const ownsRoot = String(thread.rootDeliveryKey) === deliveryKey;
     const rfcMessageId = ownsRoot ? String(thread.rootMessageId) : generateRfcMessageId();
@@ -474,7 +475,7 @@ async function acquireDelivery({ deliveryKey, messageType, orderId, recipient, t
                     threadRootMessageId: String(thread.rootMessageId),
                     inReplyTo,
                     references,
-                    transport: "gmail_smtp"
+                    transport
                 },
                 $set: {
                     status: "pending",
@@ -545,6 +546,7 @@ async function deliverOrderEmail(order, eventType) {
 
     const deliveryKey = `${order.orderId}:${eventType}`;
     const recipientHash = hashRecipient(recipient);
+    const transport = getEmailProvider();
     const thread = await acquireOrderEmailThread({
         commerceOrderId: order.orderId,
         deliveryKey,
@@ -555,7 +557,8 @@ async function deliverOrderEmail(order, eventType) {
         messageType: eventType,
         orderId: order.orderId,
         recipient,
-        thread
+        thread,
+        transport
     });
 
     if (!delivery) {
@@ -570,7 +573,6 @@ async function deliverOrderEmail(order, eventType) {
             text: message.text,
             messageType: eventType,
             operation: "order.lifecycle.email",
-            transportProvider: "gmail_smtp",
             messageId: delivery.rfcMessageId,
             inReplyTo: delivery.inReplyTo,
             references: delivery.references
