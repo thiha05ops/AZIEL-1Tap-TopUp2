@@ -232,11 +232,55 @@ body.light .az-payment-sheet {
 }
 
 .az-payment-sheet__qr {
+    position: relative;
     display: grid;
     place-items: center;
     gap: 10px;
     margin: 18px 0 10px;
 }
+
+.az-payment-sheet__qr.is-mmqr-expired img {
+    filter: blur(8px) grayscale(1);
+    opacity: .16;
+    pointer-events: none;
+    user-select: none;
+}
+
+.az-payment-sheet__mmqr-expired-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    display: grid;
+    place-content: center;
+    justify-items: center;
+    gap: 8px;
+    padding: 20px;
+    border-radius: 16px;
+    background: rgba(9, 8, 20, .96);
+    color: #fff;
+    text-align: center;
+    pointer-events: auto;
+}
+
+.az-payment-sheet__mmqr-expired-overlay[hidden],
+.az-payment-sheet__mmqr-expired-state[hidden] { display: none !important; }
+
+.az-payment-sheet__mmqr-warning-icon {
+    width: 34px;
+    height: 34px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    background: #f5b942;
+    color: #17101f;
+    font-size: 21px;
+    font-weight: 950;
+}
+
+.az-payment-sheet__mmqr-expired-overlay strong { font-size: 18px; }
+.az-payment-sheet__mmqr-expired-overlay span:last-child { max-width: 230px; font-size: 13px; line-height: 1.45; }
+.az-payment-sheet__mmqr-expired-state { display: grid; justify-items: center; gap: 12px; margin: 4px 0 16px; text-align: center; }
+.az-payment-sheet__mmqr-expired-state p { margin: 0; white-space: pre-line; color: var(--az-pay-sheet-instruction); font-size: 13px; line-height: 1.55; }
 
 .az-payment-sheet__qr[hidden],
 .az-payment-sheet__receipt[hidden],

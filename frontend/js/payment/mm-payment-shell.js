@@ -4,23 +4,16 @@
         return Object.entries(params).reduce((result, [name, replacement]) => result.replaceAll(`{${name}}`, String(replacement)), translated);
     };
     const value = (...items) => items.find(item => item !== undefined && item !== null && String(item).trim()) || "";
-    const MYANMYANPAY_QR_WINDOW_MS = 15 * 60 * 1000;
     let myanMyanPayCountdownInterval = null;
     let myanMyanPayCountdownClear = null;
     let myanMyanPayCountdownObserver = null;
 
     function countdownState(initiatedAt, now = Date.now()) {
-        const initiatedAtMs = new Date(initiatedAt).getTime();
-        const nowMs = Number(now);
-        if (!initiatedAt || !Number.isFinite(initiatedAtMs) || !Number.isFinite(nowMs)) return Object.freeze({ valid: false, expired: false, remainingSeconds: 0, deadlineMs: 0 });
-        const deadlineMs = initiatedAtMs + MYANMYANPAY_QR_WINDOW_MS;
-        const remainingSeconds = Math.max(0, Math.ceil((deadlineMs - nowMs) / 1000));
-        return Object.freeze({ valid: true, expired: remainingSeconds === 0, remainingSeconds, deadlineMs });
+        return window.AZIEL_MYANMYANPAY_QR_LIFECYCLE?.state?.(initiatedAt, now) || Object.freeze({ valid: false, expired: false, remainingSeconds: 0, deadlineMs: 0 });
     }
 
     function formatCountdown(seconds) {
-        const safe = Math.max(0, Math.floor(Number(seconds) || 0));
-        return `${String(Math.floor(safe / 60)).padStart(2, "0")}:${String(safe % 60).padStart(2, "0")}`;
+        return window.AZIEL_MYANMYANPAY_QR_LIFECYCLE?.format?.(seconds) || "00:00";
     }
 
     function stopMyanMyanPayCountdown() {
@@ -33,30 +26,25 @@
 
     function startMyanMyanPayCountdown(node, initiatedAt, options = {}) {
         stopMyanMyanPayCountdown();
-        const now = typeof options.now === "function" ? options.now : Date.now;
-        const schedule = options.setInterval || window.setInterval.bind(window);
-        const clear = options.clearInterval || window.clearInterval.bind(window);
-        const render = () => {
-            if (node.isConnected === false) { stopMyanMyanPayCountdown(); return null; }
-            const state = countdownState(initiatedAt, now());
-            if (!state.valid) {
-                node.textContent = t("payment.mmqrTimerUnavailable", "Payment time unavailable");
-                node.classList?.add?.("is-unavailable");
-                stopMyanMyanPayCountdown();
-                return state;
-            }
-            node.classList?.toggle?.("is-expired", state.expired);
-            node.textContent = state.expired
-                ? `${t("payment_qr_expires_in", "Expires in")} 00:00 · ${t("waitingPayment", "Waiting for payment")}`
-                : `${t("payment_qr_expires_in", "Expires in")} ${formatCountdown(state.remainingSeconds)}`;
-            if (state.expired) stopMyanMyanPayCountdown();
-            return state;
-        };
-        const initialState = render();
-        if (initialState?.valid && !initialState.expired) {
-            myanMyanPayCountdownClear = clear;
-            myanMyanPayCountdownInterval = schedule(render, 1000);
-        }
+        const lifecycle = window.AZIEL_MYANMYANPAY_QR_LIFECYCLE;
+        if (!lifecycle) return stopMyanMyanPayCountdown;
+        myanMyanPayCountdownClear = stop => stop?.();
+        myanMyanPayCountdownInterval = lifecycle.start({
+            createdAt: initiatedAt,
+            now: options.now,
+            setInterval: options.setInterval,
+            clearInterval: options.clearInterval,
+            onTick(state) {
+                if (node.isConnected === false) { stopMyanMyanPayCountdown(); return; }
+                node.classList?.toggle?.("is-expired", state.expired);
+                node.textContent = state.valid && !state.expired
+                    ? lifecycle.text("payWithin", { time: lifecycle.format(state.remainingSeconds) })
+                    : "00:00";
+                options.onTick?.(state);
+            },
+            onLocaleChange: options.onLocaleChange,
+            onExpire: options.onExpire
+        });
         return stopMyanMyanPayCountdown;
     }
 
@@ -154,12 +142,24 @@
             const qr = document.createElement("img"); qr.className = "mm-payment-shell__qr"; qr.src = qrSource; qr.alt = myanMyanPay ? t("payment.mmqrCode", "MMQR payment QR code") : t("payment.qrCode", "Payment QR code");
             qrSection.append(qrLabel, qr);
             if (myanMyanPay) {
+                const lifecycle = window.AZIEL_MYANMYANPAY_QR_LIFECYCLE;
                 countdown = document.createElement("p"); countdown.className = "mm-payment-shell__countdown"; countdown.setAttribute("role", "timer"); countdown.setAttribute("aria-live", "polite");
                 qrLabel.after(countdown);
+                const expiredOverlay = document.createElement("div"); expiredOverlay.className = "mm-payment-shell__expired-overlay"; expiredOverlay.hidden = true; expiredOverlay.setAttribute("role", "status");
+                const warningIcon = document.createElement("span"); warningIcon.className = "mm-payment-shell__warning-icon"; warningIcon.setAttribute("aria-hidden", "true"); warningIcon.textContent = "!";
+                const expiredTitle = document.createElement("strong"); expiredTitle.textContent = lifecycle?.text("expiredTitle") || "QR Expired";
+                const expiredWarning = document.createElement("span"); expiredWarning.textContent = lifecycle?.text("expiredWarning") || "Do not make a payment using this QR.";
+                expiredOverlay.append(warningIcon, expiredTitle, expiredWarning); qrSection.append(expiredOverlay);
                 const save = document.createElement("button"); save.type = "button"; save.className = "mm-payment-shell__save-qr"; save.innerHTML = '<i class="fa-solid fa-download" aria-hidden="true"></i><span>Save QR</span>';
                 save.addEventListener("click", () => saveDisplayedQr(qrSource, value(session.commerceOrderId, session.orderId, order.commerceOrderId, order.orderId)));
-                const compatibility = document.createElement("p"); compatibility.className = "mm-payment-shell__compatibility"; compatibility.textContent = t("payment.mmqrCompatibility", "Scan with an MMQR-supported banking or payment app.");
-                qrSection.append(save, compatibility);
+                const compatibility = document.createElement("p"); compatibility.className = "mm-payment-shell__compatibility"; compatibility.textContent = lifecycle?.text("activeInstruction") || "Scan and complete your payment before the timer ends.\nYour payment will be confirmed automatically.";
+                const warning = document.createElement("p"); warning.className = "mm-payment-shell__expiry-warning"; warning.textContent = lifecycle?.text("activeWarning") || "Do not make a payment after the timer reaches 00:00.";
+                const expiredState = document.createElement("div"); expiredState.className = "mm-payment-shell__expired-state"; expiredState.hidden = true;
+                const explanation = document.createElement("p"); explanation.textContent = lifecycle?.text("expiredExplanation") || "This payment QR has expired.\nPayments made using an expired QR will not be accepted by AZIEL.";
+                const fresh = document.createElement("a"); fresh.className = "primary-commerce-action"; fresh.href = "/checkout"; fresh.textContent = lifecycle?.text("startNewPayment") || "Start New Payment";
+                fresh.addEventListener("click", () => { stopMyanMyanPayCountdown(); sessionStorage.removeItem("azielPaymentPageSession"); sessionStorage.removeItem("azielProductCheckoutDraft"); });
+                expiredState.append(explanation, fresh); qrSection.append(save, compatibility, warning, expiredState);
+                qrSection._mmqrExpiryView = { qr, save, compatibility, warning, expiredOverlay, expiredState };
             }
             shell.append(qrSection);
         }
@@ -210,7 +210,30 @@
 
             mount.replaceChildren(shell);
             if (countdown) {
-                startMyanMyanPayCountdown(countdown, value(session.initiatedAt, session.paymentInitiatedAt));
+                const view = shell.querySelector(".mm-payment-shell__qr-section")?._mmqrExpiryView;
+                startMyanMyanPayCountdown(countdown, value(session.initiatedAt, session.paymentInitiatedAt), {
+                    onLocaleChange(current) {
+                        countdown.textContent = current.valid && !current.expired ? lifecycle.text("payWithin", { time: lifecycle.format(current.remainingSeconds) }) : "00:00";
+                        expiredTitle.textContent = lifecycle.text("expiredTitle");
+                        expiredWarning.textContent = lifecycle.text("expiredWarning");
+                        compatibility.textContent = lifecycle.text("activeInstruction");
+                        warning.textContent = lifecycle.text("activeWarning");
+                        explanation.textContent = lifecycle.text("expiredExplanation");
+                        fresh.textContent = lifecycle.text("startNewPayment");
+                    },
+                    onExpire() {
+                        const section = countdown.closest(".mm-payment-shell__qr-section");
+                        section?.classList.add("is-mmqr-expired");
+                        if (view) {
+                            view.expiredOverlay.hidden = false;
+                            view.expiredState.hidden = false;
+                            view.save.hidden = true;
+                            view.compatibility.hidden = true;
+                            view.warning.hidden = true;
+                        }
+                        status.hidden = true;
+                    }
+                });
                 if (typeof MutationObserver === "function") {
                     myanMyanPayCountdownObserver = new MutationObserver(() => { if (!countdown.isConnected) stopMyanMyanPayCountdown(); });
                     myanMyanPayCountdownObserver.observe(mount, { childList: true });
@@ -258,5 +281,5 @@
             } catch (error) { message.textContent = error.message || t("payment.submitFailed", "Submission failed. Please try again."); lock.release(); }
         });
     }
-    window.AZIEL_MM_PAYMENT_SHELL = Object.freeze({ supports, show, _test: Object.freeze({ countdownState, formatCountdown, startMyanMyanPayCountdown, stopMyanMyanPayCountdown, durationMs: MYANMYANPAY_QR_WINDOW_MS }) });
+    window.AZIEL_MM_PAYMENT_SHELL = Object.freeze({ supports, show, _test: Object.freeze({ countdownState, formatCountdown, startMyanMyanPayCountdown, stopMyanMyanPayCountdown, durationMs: window.AZIEL_MYANMYANPAY_QR_LIFECYCLE?.VALIDITY_MS }) });
 })();

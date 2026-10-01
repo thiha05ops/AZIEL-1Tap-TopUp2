@@ -569,6 +569,7 @@ assert.strictEqual(myanMyanPayAccessDecision(method, { id: "user-1" }, env).allo
     const paymentEngineSource = fs.readFileSync(path.join(root, "frontend/js/payment/payment-engine.js"), "utf8");
     const paymentPageHtmlSource = fs.readFileSync(path.join(root, "frontend/payment.html"), "utf8");
     const mmPaymentShellSource = fs.readFileSync(path.join(root, "frontend/js/payment/mm-payment-shell.js"), "utf8");
+    const mmqrLifecycleSource = fs.readFileSync(path.join(root, "frontend/js/payment/myanmyanpay-qr-lifecycle.js"), "utf8");
     const paymentPageRuntimeSource = fs.readFileSync(path.join(root, "frontend/js/payment-page-runtime.js"), "utf8");
     const orderRouteSource = fs.readFileSync(path.join(root, "backend/routes/order.js"), "utf8");
     const customerCheckoutSource = fs.readFileSync(path.join(root, "backend/services/commerce/customerManualPaymentCheckoutService.js"), "utf8");
@@ -631,7 +632,7 @@ assert.strictEqual(myanMyanPayAccessDecision(method, { id: "user-1" }, env).allo
     assert(!/expiresAt|expiry|ttl|validUntil/i.test(sdkTypesSource), "installed MyanMyanPay SDK response contract must not be treated as supplying an authoritative expiry when it does not");
     assert(paymentAttemptModelSource.includes("createdAt: { type: Date, required: true, immutable: true }"), "MMQR timer authority must be the persisted immutable PaymentAttempt creation timestamp");
     assert(customerCheckoutSource.includes('initiatedAt: payment.initiatedAt || ""'), "customer session must preserve the server-projected PaymentAttempt initiation timestamp");
-    assert(paymentPageHtmlSource.includes("payment-page-runtime.js?v=20261001-mmqr-cookie-status-1") && paymentPageHtmlSource.includes("mm-payment-shell.js?v=20260930-mmqr-timer-1") && paymentPageHtmlSource.includes("mm-payment-shell.css?v=20260930-mmqr-timer-1"), "payment page must load the cache-busted status runtime without changing the MMQR timer assets");
+    assert(paymentPageHtmlSource.includes("payment-page-runtime.js?v=20261001-mmqr-cookie-status-1") && paymentPageHtmlSource.includes("myanmyanpay-qr-lifecycle.js?v=20261001-mmqr-expiry-1") && paymentPageHtmlSource.includes("mm-payment-shell.js?v=20261001-mmqr-expiry-1") && paymentPageHtmlSource.includes("mm-payment-shell.css?v=20261001-mmqr-expiry-1"), "payment page must load the cache-busted status runtime and shared MMQR expiry assets");
 
     function paymentStatusHarness(responses = [], options = {}) {
         const timers = [];
@@ -828,15 +829,18 @@ assert.strictEqual(myanMyanPayAccessDecision(method, { id: "user-1" }, env).allo
     assert(!mmPaymentShellSource.includes("/assets/payment/mmqr-logo.svg") && !mmPaymentShellSource.includes("MMQR_LOGO_ASSET"), "customer MMQR presentation must not retain an invented logo asset path");
     assert(mmPaymentShellSource.includes('"Pay with MMQR"') && mmPaymentShellSource.includes('"Scan the MMQR"'), "MMQR must be the primary customer-facing payment identity");
     assert(!mmPaymentShellSource.includes('"Pay with MyanMyanPay / MMQR"'), "provider implementation name must not be the primary customer-facing heading");
-    assert(mmPaymentShellSource.includes("Scan with an MMQR-supported banking or payment app."), "MMQR presentation must use generic compatibility copy without an invented app list");
+    assert(mmqrLifecycleSource.includes("Scan and complete your payment before the timer ends."), "MMQR presentation must explain the active validity window");
     assert(mmPaymentShellSource.includes("saveDisplayedQr(qrSource") && mmPaymentShellSource.includes("download.href = qrSource") && !mmPaymentShellSource.includes("fetch(qrSource"), "Save QR must download the displayed provider QR without provider or regeneration calls");
     assert(mmPaymentShellSource.includes("!myanMyanPay && deepLink"), "MyanMyanPay presentation must not expose deep-link behavior");
-    assert(mmPaymentShellSource.includes("Waiting for payment") && mmPaymentShellSource.includes("We'll confirm your payment automatically."), "MyanMyanPay waiting presentation must remain automatic and callback-authoritative");
+    assert(mmqrLifecycleSource.includes("Your payment will be confirmed automatically."), "MyanMyanPay presentation must remain automatic and callback-authoritative");
     const shellWindow = {
         AZIEL_LOCALE: { t(key, fallback) { return fallback; } },
+        AZIEL_I18N: { getLang() { return "en"; } },
         addEventListener() {}, setInterval() { throw new Error("real timer must not run in verifier"); }, clearInterval() {}
     };
-    vm.runInNewContext(mmPaymentShellSource, { window: shellWindow, document: {}, Date, MutationObserver: undefined });
+    const shellDocument = { documentElement: { lang: "en" } };
+    vm.runInNewContext(mmqrLifecycleSource, { window: shellWindow, document: shellDocument, Date, Object });
+    vm.runInNewContext(mmPaymentShellSource, { window: shellWindow, document: shellDocument, sessionStorage: { removeItem() {} }, Date, MutationObserver: undefined });
     const timer = shellWindow.AZIEL_MM_PAYMENT_SHELL._test;
     const initiatedAt = "2026-09-30T00:00:00.000Z";
     const initiatedAtMs = new Date(initiatedAt).getTime();
@@ -855,7 +859,7 @@ assert.strictEqual(myanMyanPayAccessDecision(method, { id: "user-1" }, env).allo
         setInterval(callback, delay) { assert.strictEqual(delay, 1000); scheduledCount += 1; scheduledTick = callback; return 19; },
         clearInterval(id) { assert.strictEqual(id, 19); clearedCount += 1; }
     });
-    assert.strictEqual(timerNode.textContent, "Expires in 15:00");
+    assert.strictEqual(timerNode.textContent, "Pay within 15:00");
     assert.strictEqual(scheduledCount, 1, "only one countdown interval may be scheduled");
     timer.startMyanMyanPayCountdown(timerNode, initiatedAt, {
         now: () => nowMs,
@@ -866,13 +870,16 @@ assert.strictEqual(myanMyanPayAccessDecision(method, { id: "user-1" }, env).allo
     assert.strictEqual(clearedCount, 1, "starting a replacement countdown must clear the prior interval");
     nowMs += 10 * 60 * 1000;
     scheduledTick();
-    assert.strictEqual(timerNode.textContent, "Expires in 05:00", "timer ticks must derive from absolute time rather than decrementing memory");
+    assert.strictEqual(timerNode.textContent, "Pay within 05:00", "timer ticks must derive from absolute time rather than decrementing memory");
     nowMs += 20 * 60 * 1000;
     scheduledTick();
-    assert.strictEqual(timerNode.textContent, "Expires in 00:00 · Waiting for payment");
+    assert.strictEqual(timerNode.textContent, "00:00");
     assert(classNames.has("is-expired"));
     assert.strictEqual(clearedCount, 2, "elapsed UI timer must clean its interval");
     assert(!/fetch\s*\(|cancel(?:Payment)?\s*\(|paymentStatus\s*=|orderStatus\s*=/.test(mmPaymentShellSource), "MMQR timer shell must contain no network, cancellation, or authoritative-state mutation path");
+    assert(mmPaymentShellSource.includes('fresh.href = "/checkout"') && mmPaymentShellSource.includes('sessionStorage.removeItem("azielPaymentPageSession")'), "expired Commerce MMQR must explicitly return to fresh checkout without retrying the old attempt");
+    assert(mmPaymentShellSource.includes('section?.classList.add("is-mmqr-expired")') && mmPaymentShellSource.includes("view.expiredOverlay.hidden = false"), "expired Commerce MMQR must activate the anti-scan shell");
+    assert(!mmPaymentShellSource.includes("Generate New QR") && !mmPaymentShellSource.includes("resumeOrRetryManualPayment"), "expired Commerce MMQR must not expose in-place QR replacement");
     assert(mmPaymentShellSource.includes("Payment QR is unavailable. Do not send payment"), "missing provider QR must fail visibly");
     const myanMyanPayPresentationBranch = mmPaymentShellSource.slice(mmPaymentShellSource.indexOf("if (isMyanMyanPay(staged)) {", mmPaymentShellSource.indexOf("const deepLink")), mmPaymentShellSource.indexOf("const receiptEnabled"));
     assert(!myanMyanPayPresentationBranch.includes("submitReceipt") && !myanMyanPayPresentationBranch.includes("Submit Payment"), "MyanMyanPay presentation must expose no manual submission action");

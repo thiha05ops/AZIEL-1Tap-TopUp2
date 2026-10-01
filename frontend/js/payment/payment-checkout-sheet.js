@@ -5,6 +5,7 @@
     let activeState = null;
     const DYNAMIC_PROMPTPAY_QR_VERSION = "promptpay-emv-merchant-proxy-v2";
     let qrExpiryTimer = null;
+    let myanMyanPayExpiryStop = null;
     const recoveryOpenCounters = {
         open: 0,
         normalize: 0,
@@ -59,10 +60,19 @@
 
                     <figure id="azPaymentSheetQrWrap" class="az-payment-sheet__qr" hidden>
                         <img id="azPaymentSheetQrImage" alt="Payment QR">
+                        <div id="azPaymentSheetMmqrExpiredOverlay" class="az-payment-sheet__mmqr-expired-overlay" role="status" hidden>
+                            <span class="az-payment-sheet__mmqr-warning-icon" aria-hidden="true">!</span>
+                            <strong id="azPaymentSheetMmqrExpiredTitle">QR Expired</strong>
+                            <span id="azPaymentSheetMmqrExpiredWarning">Do not make a payment using this QR.</span>
+                        </div>
                         <figcaption id="azPaymentSheetQrFallback" hidden>QR image unavailable. Use the account details above.</figcaption>
                         <button type="button" id="azPaymentSheetRetryQr" class="az-payment-sheet__action" hidden>Retry QR</button>
                         <small id="azPaymentSheetQrDiagnostic" hidden></small>
                     </figure>
+                    <div id="azPaymentSheetMmqrExpiredState" class="az-payment-sheet__mmqr-expired-state" hidden>
+                        <p id="azPaymentSheetMmqrExpiredExplanation"></p>
+                        <button type="button" id="azPaymentSheetMmqrFreshAction" class="az-payment-sheet__action">Start New Top-up</button>
+                    </div>
 
                     <div id="azPaymentSheetActions" class="az-payment-sheet__actions" hidden>
                         <button type="button" id="azPaymentSheetSaveQr" class="az-payment-sheet__action" hidden>Save QR</button>
@@ -317,6 +327,72 @@
             el.hidden = true;
             el.textContent = "";
         }
+    }
+
+    function isMyanMyanPayMmqr(options = {}) {
+        return String(options.provider || "").toUpperCase() === "MYANMYANPAY" &&
+            String(options.paymentChannel || "").toUpperCase() === "MYANMYANPAY_MMQR" &&
+            String(options.confirmationMode || "").toLowerCase() === "provider_webhook" &&
+            options.requiresSlip === false;
+    }
+
+    function clearMyanMyanPayExpiry() {
+        myanMyanPayExpiryStop?.();
+        myanMyanPayExpiryStop = null;
+    }
+
+    function startMyanMyanPayExpiry(options = {}) {
+        clearMyanMyanPayExpiry();
+        const lifecycle = window.AZIEL_MYANMYANPAY_QR_LIFECYCLE;
+        if (!lifecycle || !isMyanMyanPayMmqr(options)) return;
+        const modal = document.getElementById("azPaymentCheckoutSheet");
+        const qrWrap = modal?.querySelector("#azPaymentSheetQrWrap");
+        const timer = modal?.querySelector("#azPaymentSheetQrExpiry");
+        const overlay = modal?.querySelector("#azPaymentSheetMmqrExpiredOverlay");
+        const expiredState = modal?.querySelector("#azPaymentSheetMmqrExpiredState");
+        const freshAction = modal?.querySelector("#azPaymentSheetMmqrFreshAction");
+        const instructions = modal?.querySelector("#azPaymentSheetInstructions");
+        const actions = modal?.querySelector("#azPaymentSheetActions");
+        if (!qrWrap || !timer || !overlay || !expiredState || !freshAction) return;
+
+        const renderCopy = () => {
+            if (instructions && !qrWrap.classList.contains("is-mmqr-expired")) instructions.textContent = `${lifecycle.text("activeInstruction")}\n${lifecycle.text("activeWarning")}`;
+            freshAction.textContent = lifecycle.text("startNewTopup");
+            modal.querySelector("#azPaymentSheetMmqrExpiredTitle").textContent = lifecycle.text("expiredTitle");
+            modal.querySelector("#azPaymentSheetMmqrExpiredWarning").textContent = lifecycle.text("expiredWarning");
+            modal.querySelector("#azPaymentSheetMmqrExpiredExplanation").textContent = lifecycle.text("expiredExplanation");
+        };
+        qrWrap.classList.remove("is-mmqr-expired");
+        overlay.hidden = true;
+        expiredState.hidden = true;
+        timer.hidden = false;
+        renderCopy();
+        freshAction.onclick = () => {
+            clearMyanMyanPayExpiry();
+            options.onStartFresh?.();
+        };
+
+        myanMyanPayExpiryStop = lifecycle.start({
+            createdAt: options.initiatedAt,
+            onTick(current) {
+                timer.textContent = current.valid
+                    ? (current.expired ? "00:00" : lifecycle.text("payWithin", { time: lifecycle.format(current.remainingSeconds) }))
+                    : lifecycle.text("payWithin", { time: "00:00" });
+            },
+            onLocaleChange(current) {
+                renderCopy();
+                timer.textContent = current.valid && !current.expired
+                    ? lifecycle.text("payWithin", { time: lifecycle.format(current.remainingSeconds) })
+                    : "00:00";
+            },
+            onExpire() {
+                qrWrap.classList.add("is-mmqr-expired");
+                overlay.hidden = false;
+                expiredState.hidden = false;
+                if (actions) actions.hidden = true;
+                if (instructions) instructions.hidden = true;
+            }
+        });
     }
 
     function startQrExpiryCountdown(expiresAt) {
@@ -1180,7 +1256,9 @@
             clearActiveDynamicQr();
             return;
         }
-        if (sourceType === "dynamic_response") {
+        if (isMyanMyanPayMmqr(activeState || {})) {
+            clearQrExpiryCountdown();
+        } else if (sourceType === "dynamic_response") {
             setActiveDynamicQr(createActiveDynamicQr(activeState || {}, {
                 qrImage: qr,
                 qrPayload: payload,
@@ -2071,6 +2149,7 @@
         activeState.completedChecklistActions?.forEach?.(action => updateChecklist(action));
         setMessage("", options.error || "");
         modal.classList.add("show");
+        if (isMyanMyanPayMmqr(activeState)) startMyanMyanPayExpiry(activeState);
         if (!window.AZIEL_PAYMENT_PAGE_MODE) {
             document.body.classList.add("az-payment-sheet-open");
             modal.querySelector("[data-role='close']")?.focus();
@@ -2852,6 +2931,7 @@
         modal?.classList.remove("show");
         document.body.classList.remove("az-payment-sheet-open");
         clearQrExpiryCountdown();
+        clearMyanMyanPayExpiry();
         activeState?.onClose?.(reason);
         checkoutDevLog("CHECKOUT_CLOSE_2", {
             attemptId: closeDetail?.attemptId || "",

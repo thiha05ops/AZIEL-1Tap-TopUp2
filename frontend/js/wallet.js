@@ -1141,6 +1141,10 @@ function openWalletManualModal(data, info) {
         accountNumber,
         reference,
         qrImageUrl: qrImage,
+        provider: providerCode,
+        paymentChannel: data.paymentChannel || info.method?.paymentChannel || "",
+        confirmationMode,
+        initiatedAt: data.initiatedAt || "",
         qrMode: info.qrMode || "",
         dynamicQr: info.dynamicQr || null,
         expiresAt: data.expiresAt || "",
@@ -1220,13 +1224,18 @@ function openWalletManualModal(data, info) {
         onClose: () => {
             if (myanMyanPay) stopWalletPolling();
             activeWalletManualIntent = null;
+        },
+        onStartFresh: () => {
+            window.PaymentCheckoutSheet?.close?.("start-new-topup");
+            resetTopupForm();
+            document.querySelector(".wallet-topup-card")?.scrollIntoView?.({ behavior: "smooth", block: "start" });
         }
     });
 
     if (myanMyanPay && activeWalletManualIntent.topupId && activeWalletManualIntent.attemptId) {
         window.PaymentCheckoutSheet.setMessage(
             "",
-            wt("wallet.myanmyanpay.waiting", "Waiting for payment... Payment is confirmed automatically. No receipt upload required.")
+            wt("wallet.myanmyanpay.waiting", "Your payment will be confirmed automatically.")
         );
         startTypedWalletStatusPolling(activeWalletManualIntent.topupId, activeWalletManualIntent.attemptId);
     }
