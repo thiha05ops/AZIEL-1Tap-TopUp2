@@ -4,8 +4,10 @@
 window.AZIEL_GAME_FLOW?.init({
     game: "PUBG Mobile Royale Pass Pack",
     gameKey: "pubgrp",
+    productCode: "pubgrp",
     userIdSelector: "#userId",
     zoneIdSelector: "",
     zoneRequired: false,
+    accountFields: window.AZIEL_GAME_INPUT_CONTRACTS?.forProduct("pubgrp")?.accountFields,
     pendingReturnUrl: "/games/pubg-rp"
 });

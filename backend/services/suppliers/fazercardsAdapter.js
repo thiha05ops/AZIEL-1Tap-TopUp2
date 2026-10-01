@@ -135,6 +135,9 @@ function createFazerCardsAdapter(options = {}) {
 
     function normalizeValidation(payload = {}, fallback = {}) {
         const data = payload.data || payload;
+        if (typeof data?.valid !== "boolean") {
+            throw new FazerCardsAdapterError("FAZERCARDS_VALIDATION_RESPONSE_INVALID", "FazerCards returned an invalid player-validation response.", { retryable: true });
+        }
         const valid = data.valid === true;
         return {
             valid,

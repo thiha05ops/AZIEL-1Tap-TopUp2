@@ -270,6 +270,7 @@ function configureDatabaseApplication(mongoConnection) {
     ["catalog", "homeBanners", "campaigns", "promos", "coupons", "sitePlacements", "configurationRegistry", "websiteRuntime"].forEach(route =>
         app.use("/api", require(`./routes/${route}`))
     );
+    app.use("/api", require("./routes/playerIdentityValidation"));
     app.use("/api", require("./routes/commerceManualPaymentRoutes")());
 
     app.use("/api", (err, req, res, next) => {

@@ -51,8 +51,8 @@ function buildFazerCardsValidationFields(productCode, input = {}) {
         return { player_id: playerId, zone_id: zoneId };
     }
     if (product === "freefire") return buildFazerCardsOrderFields(product, input);
-    if (product === "hok") return buildFazerCardsOrderFields(product, input);
-    return buildFazerCardsOrderFields(product, input);
+    if (product === "pubg") return buildFazerCardsOrderFields(product, input);
+    throw new FazerCardsInputError("FAZERCARDS_VALIDATION_CONTRACT_NOT_CONFIGURED", "FazerCards player validation is not configured for this product.");
 }
 
 function hasFazerCardsInputContract(productCode) {

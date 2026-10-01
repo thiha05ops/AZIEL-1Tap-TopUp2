@@ -1927,3 +1927,28 @@
   font-size: 10.5px;
   font-weight: 700;
 }
+
+/* Optional pre-check of game-account identity. Provider availability never gates checkout. */
+.az-product-detail .player-validation-status {
+  margin-top: 10px;
+  min-height: 18px;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.az-product-detail .player-validation-status[hidden] {
+  display: none !important;
+}
+
+.az-product-detail .player-validation-status[data-state="checking"] {
+  color: var(--text-muted);
+}
+
+.az-product-detail .player-validation-status[data-state="valid"] {
+  color: var(--success);
+}
+
+.az-product-detail .player-validation-status[data-state="invalid"] {
+  color: var(--danger, #ef4444);
+}

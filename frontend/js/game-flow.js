@@ -43,7 +43,15 @@
                 ...DEFAULTS,
                 ...config
             },
-            hasAutoScrolledToBuy: false
+            hasAutoScrolledToBuy: false,
+            playerValidation: {
+                timer: null,
+                controller: null,
+                sequence: 0,
+                signature: "",
+                completedSignature: "",
+                capabilitySupported: null
+            }
         };
 
         onReady(() => setup(flow));
@@ -55,6 +63,7 @@
         if (buyBtn) buyBtn.innerText = buyBtn.innerText || "Continue To Payment";
 
         bindFieldEvents(flow);
+        bindPlayerIdentityValidation(flow);
         bindFlowEvents(flow);
         bindBuyButton(flow);
         initMobilePackagePanel(flow);
@@ -83,6 +92,244 @@
                 updateSummary(flow);
             }));
         });
+    }
+
+    function playerValidationEnabled(flow) {
+        return flow.playerValidation?.capabilitySupported === true;
+    }
+
+    function shouldCachePlayerValidationResult(response, data, validation) {
+        return response?.ok === true && data?.success === true && validation?.available === true;
+    }
+
+    function getPlayerValidationFields(flow) {
+        const fields = getAccountFieldDefinitions(flow).map(field => ({
+            field,
+            input: getEl(field.selector)
+        }));
+        const inputs = fields.map(item => item.input).filter(Boolean);
+
+        return {
+            fields,
+            anchorInput: inputs[inputs.length - 1] || null
+        };
+    }
+
+    function ensurePlayerValidationStatus(flow) {
+        const { anchorInput } = getPlayerValidationFields(flow);
+        const accountCard = anchorInput?.closest(".form-card");
+
+        if (!accountCard) return null;
+
+        let status = accountCard.querySelector("[data-player-validation-status]");
+
+        if (!status) {
+            status = document.createElement("div");
+            status.className = "player-validation-status";
+            status.dataset.playerValidationStatus = "";
+            status.setAttribute("role", "status");
+            status.setAttribute("aria-live", "polite");
+            status.hidden = true;
+            accountCard.appendChild(status);
+        }
+
+        return status;
+    }
+
+    function renderPlayerValidationStatus(flow, state, message = "") {
+        const status = ensurePlayerValidationStatus(flow);
+        if (!status) return;
+
+        status.dataset.state = state || "";
+
+        if (!message) {
+            status.textContent = "";
+            status.hidden = true;
+            return;
+        }
+
+        status.textContent = message;
+        status.hidden = false;
+    }
+
+    function cancelPlayerValidation(flow, { clear = true } = {}) {
+        const state = flow.playerValidation;
+        if (!state) return;
+
+        if (state.timer) {
+            clearTimeout(state.timer);
+            state.timer = null;
+        }
+
+        if (state.controller) {
+            state.controller.abort();
+            state.controller = null;
+        }
+
+        state.sequence += 1;
+        state.signature = "";
+
+        if (clear) renderPlayerValidationStatus(flow, "", "");
+    }
+
+    function schedulePlayerIdentityValidation(flow) {
+        if (!playerValidationEnabled(flow)) return;
+
+        const { fields } = getPlayerValidationFields(flow);
+
+        if (!fields.length || fields.some(item => !item.input)) {
+            cancelPlayerValidation(flow);
+            return;
+        }
+
+        const accountFields = fields.map(({ field, input }) => ({
+            key: String(field.key || "").trim(),
+            value: String(input?.value || "").trim()
+        }));
+
+        if (
+            fields.some(({ field }) => !validateAccountField(field).valid) ||
+            accountFields.some((item, index) => fields[index].field.required && !item.value)
+        ) {
+            cancelPlayerValidation(flow);
+            return;
+        }
+
+        const productCode = String(
+            flow.config.productCode ||
+            flow.config.gameKey ||
+            ""
+        ).trim();
+
+        const signature = JSON.stringify([productCode, accountFields]);
+
+        if (
+            flow.playerValidation.completedSignature === signature ||
+            (
+                flow.playerValidation.signature === signature &&
+                (flow.playerValidation.timer || flow.playerValidation.controller)
+            )
+        ) {
+            return;
+        }
+
+        cancelPlayerValidation(flow, { clear: false });
+        flow.playerValidation.signature = signature;
+
+        flow.playerValidation.timer = setTimeout(async () => {
+            flow.playerValidation.timer = null;
+
+            const sequence = ++flow.playerValidation.sequence;
+            const controller = new AbortController();
+            flow.playerValidation.controller = controller;
+
+            renderPlayerValidationStatus(
+                flow,
+                "checking",
+                "Checking player…"
+            );
+
+            try {
+                const response = await fetch("/api/player-identity/validate", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Accept": "application/json"
+                    },
+                    credentials: "same-origin",
+                    signal: controller.signal,
+                    body: JSON.stringify({
+                        productCode,
+                        accountFields
+                    })
+                });
+
+                const data = await response.json().catch(() => ({}));
+
+                if (
+                    sequence !== flow.playerValidation.sequence ||
+                    flow.playerValidation.signature !== signature
+                ) {
+                    return;
+                }
+
+                const validation = data?.validation;
+
+                if (shouldCachePlayerValidationResult(response, data, validation)) {
+                    flow.playerValidation.completedSignature = signature;
+                }
+
+                if (!response.ok || !data?.success || !validation) {
+                    renderPlayerValidationStatus(flow, "", "");
+                    return;
+                }
+
+                if (validation.available !== true) {
+                    renderPlayerValidationStatus(flow, "", "");
+                    return;
+                }
+
+                if (validation.valid === true) {
+                    const playerName = String(validation.playerName || "").trim();
+                    const region = String(validation.region || "").trim();
+                    const verifiedMessage = playerName && region
+                        ? `✓ ${playerName} · Region: ${region}`
+                        : playerName
+                            ? `✓ ${playerName}`
+                            : region
+                                ? `✓ Player verified · Region: ${region}`
+                                : "✓ Player verified";
+
+                    renderPlayerValidationStatus(
+                        flow,
+                        "valid",
+                        verifiedMessage
+                    );
+                    return;
+                }
+
+                renderPlayerValidationStatus(
+                    flow,
+                    "invalid",
+                    "Player ID or account information is invalid."
+                );
+            } catch (error) {
+                if (error?.name !== "AbortError") {
+                    renderPlayerValidationStatus(flow, "", "");
+                }
+            } finally {
+                if (sequence === flow.playerValidation.sequence) {
+                    flow.playerValidation.controller = null;
+                }
+            }
+        }, 500);
+    }
+
+    async function bindPlayerIdentityValidation(flow) {
+        const { fields } = getPlayerValidationFields(flow);
+        fields.map(item => item.input).filter(Boolean).forEach(input => {
+            ["input", "change"].forEach(eventName => {
+                input.addEventListener(eventName, () => {
+                    schedulePlayerIdentityValidation(flow);
+                });
+            });
+        });
+
+        const productCode = String(flow.config.productCode || flow.config.gameKey || "").trim();
+        if (!productCode) return;
+        try {
+            const response = await fetch(`/api/player-identity/capability?productCode=${encodeURIComponent(productCode)}`, {
+                method: "GET",
+                headers: { "Accept": "application/json" },
+                credentials: "same-origin",
+                cache: "no-store"
+            });
+            const data = await response.json().catch(() => ({}));
+            flow.playerValidation.capabilitySupported = response.ok && data?.success === true && data?.capability?.supported === true;
+        } catch (_) {
+            flow.playerValidation.capabilitySupported = false;
+        }
+        if (playerValidationEnabled(flow)) schedulePlayerIdentityValidation(flow);
     }
 
     function bindFlowEvents(flow) {
