@@ -363,6 +363,7 @@ function toSafePaymentView({ order = {}, attempt = {}, paymentResult = null, adm
         attemptId: source.attemptId || attempt.attemptId || "",
         paymentStatus: normalizeString(source.paymentStatus || attempt.status || order.paymentStatus).toLowerCase(),
         provider: normalizeString(attempt.provider || order.payment?.provider || source.provider),
+        paymentChannel: normalizeString(attempt.paymentChannel || order.payment?.paymentChannel || source.paymentChannel),
         confirmationMode: normalizeString(attempt.confirmationMode || instructions?.confirmationMode || order.payment?.metadata?.confirmationMode),
         paymentMethod: normalizeString(attempt.paymentMethod || attempt.paymentMethodId || order.payment?.paymentMethodId),
         region: normalizeString(attempt.region || order.commercial?.region).toUpperCase(),

@@ -6,6 +6,7 @@ const path = require("path");
 const { PRODUCTION_API_BASE_URL } = require("../services/myanmyanpay/myanMyanPayConfiguration");
 const { myanMyanPayAccessDecision } = require("../services/myanmyanpay/myanMyanPayPaymentPolicy");
 const { assertMmWalletTopup, assertThWalletTopup } = require("../services/walletTopupPolicy");
+const { createManualPaymentApplicationService } = require("../services/commerce/manualPaymentApplicationService");
 
 const ROOT = path.resolve(__dirname, "../..");
 const read = file => fs.readFileSync(path.join(ROOT, file), "utf8");
@@ -41,6 +42,35 @@ assert.strictEqual(myanMyanPayAccessDecision({ ...method, myanMyanPayActivationS
 assert.strictEqual(myanMyanPayAccessDecision({ ...method, myanMyanPayActivationState: "TEST_ONLY" }, { id: TEST_USER_ID }, env).allowed, true);
 assert.strictEqual(myanMyanPayAccessDecision({ ...method, myanMyanPayActivationState: "PUBLIC" }, { id: "public-user" }, env).allowed, true);
 
+const persistedInitiatedAt = "2026-10-01T04:05:06.000Z";
+const safeWalletPayment = createManualPaymentApplicationService().toSafePaymentView({
+    order: {
+        topupId: "WALLET-MMQR-EXPIRY-TEST",
+        payment: { provider: "WRONG_ORDER_PROVIDER", paymentChannel: "WRONG_ORDER_CHANNEL" }
+    },
+    attempt: {
+        attemptId: "paymentAttempt-wallet-mmqr-expiry-test",
+        subjectType: "WALLET_TOPUP",
+        subjectId: "WALLET-MMQR-EXPIRY-TEST",
+        status: "PENDING",
+        provider: "MYANMYANPAY",
+        paymentChannel: "MYANMYANPAY_MMQR",
+        confirmationMode: "provider_webhook",
+        paymentMethod: "myanmyanpay_mmqr",
+        amount: 1000,
+        currency: "MMK",
+        region: "MM",
+        createdAt: persistedInitiatedAt,
+        paymentInstructions: { requiresReceiptUpload: false, confirmationMode: "provider_webhook" }
+    },
+    paymentResult: { paymentChannel: "WRONG_RESULT_CHANNEL" }
+});
+assert.strictEqual(safeWalletPayment.provider, "MYANMYANPAY", "typed Wallet initiation must expose the persisted provider");
+assert.strictEqual(safeWalletPayment.paymentChannel, "MYANMYANPAY_MMQR", "typed Wallet initiation must expose the attempt's persisted channel before fallback sources");
+assert.strictEqual(safeWalletPayment.confirmationMode, "provider_webhook", "typed Wallet initiation must expose webhook confirmation mode");
+assert.strictEqual(safeWalletPayment.initiatedAt, persistedInitiatedAt, "typed Wallet initiation timestamp must remain PaymentAttempt.createdAt");
+assert.strictEqual(safeWalletPayment.paymentInstructions.requiresReceiptUpload, false, "typed Wallet MMQR presentation must remain receipt-free");
+
 const route = read("backend/routes/wallet.js");
 const frontend = read("frontend/js/wallet.js");
 const checkoutSheet = read("frontend/js/payment/payment-checkout-sheet.js");
@@ -62,6 +92,16 @@ for (const token of [
 assert(frontend.includes('!isMyanMyanPayWalletPayment(payment)'), "non-TH MyanMyanPay must bypass the legacy route");
 assert(frontend.includes('paymentMethod,\n                region,\n                currency'), "typed creation must send market selection for server validation");
 assert(frontend.includes('typedPayment.paymentInstructions?.requiresReceiptUpload === true'), "MMQR must not require a receipt");
+assert(frontend.includes('paymentChannel: data.paymentChannel || info.method?.paymentChannel || ""'), "Wallet must pass the authoritative typed payment channel into the checkout presentation");
+assert(frontend.includes('confirmationMode,'), "Wallet must pass the typed confirmation mode into the checkout presentation");
+assert(frontend.includes('initiatedAt: data.initiatedAt || ""'), "Wallet must pass the persisted initiation timestamp into the expiry lifecycle");
+assert(application.includes('paymentChannel: normalizeString(attempt.paymentChannel || order.payment?.paymentChannel || source.paymentChannel)'), "safe payment projection must prefer the persisted PaymentAttempt channel");
+for (const token of [
+    'String(options.provider || "").toUpperCase() === "MYANMYANPAY"',
+    'String(options.paymentChannel || "").toUpperCase() === "MYANMYANPAY_MMQR"',
+    'String(options.confirmationMode || "").toLowerCase() === "provider_webhook"',
+    'options.requiresSlip === false'
+]) assert(checkoutSheet.includes(token), `strict Wallet MMQR lifecycle identity missing ${token}`);
 assert(checkoutSheet.includes('submit.hidden = !activeState.requiresSlip'), "receipt-free provider payments must hide the manual verification action");
 assert(checkoutSheet.includes('continueBtn.hidden = !isMobileFlow || step !== "qr" || autoSubmitReceipt || !activeState.requiresSlip'), "receipt-free provider payments must hide the mobile manual-confirmation action");
 assert(frontend.includes('startTypedWalletStatusPolling(activeWalletManualIntent.topupId, activeWalletManualIntent.attemptId)'), "MMQR wallet checkout must start authoritative status observation");
