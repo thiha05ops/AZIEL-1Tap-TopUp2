@@ -1287,7 +1287,7 @@ function ensureCatalogMerchandisingModal() {
             </header>
 
             <div class="catalog-merch-modal-content">
-                <section class="catalog-merch-modal-section catalog-package-image-section">
+                <section class="catalog-merch-modal-section catalog-package-image-section" data-manage-package-section="media">
                     <div class="catalog-merch-modal-section-head">
                         <span>Package image</span>
                         <h4>Customer artwork</h4>
@@ -1305,7 +1305,7 @@ function ensureCatalogMerchandisingModal() {
                     </div>
                 </section>
 
-                <section class="catalog-merch-modal-section">
+                <section class="catalog-merch-modal-section" data-manage-package-section="public">
                     <div class="catalog-merch-modal-section-head">
                         <span>Public state</span>
                         <h4 data-manage-package-public-state>Loading…</h4>
@@ -1313,11 +1313,11 @@ function ensureCatalogMerchandisingModal() {
                     </div>
                 </section>
 
-                <section class="catalog-merch-modal-section">
+                <section class="catalog-merch-modal-section" data-manage-package-section="supplier">
                     <div class="catalog-merch-modal-section-head">
                         <span>Fulfillment supplier</span>
                         <h4 data-manage-package-selection-state>Loading supplier candidates…</h4>
-                        <p>This records the Storefront decision. Checkout routing will use it only after a later rollout phase.</p>
+                        <p>Choose the supplier route for this package. Checkout routing will use it only after a later rollout phase.</p>
                     </div>
                     <div class="catalog-supplier-candidate-list" data-manage-package-candidates></div>
                     <label class="catalog-supplier-reason">
@@ -1326,7 +1326,6 @@ function ensureCatalogMerchandisingModal() {
                     </label>
                     <div class="catalog-supplier-save-row">
                         <span data-manage-package-supplier-dirty>No unsaved supplier change</span>
-                        <button type="button" class="admin-primary-btn" data-save-package-supplier disabled>Save Changes</button>
                     </div>
                 </section>
 
@@ -1347,7 +1346,7 @@ function ensureCatalogMerchandisingModal() {
                     </div>
                 </section>
 
-                <section class="catalog-merch-modal-section">
+                <section class="catalog-merch-modal-section" data-manage-package-section="price">
                     <div class="catalog-merch-modal-section-head">
                         <span>Customer price</span>
                         <h4 data-manage-package-customer-price>—</h4>
@@ -1452,6 +1451,9 @@ function ensureCatalogMerchandisingModal() {
                             Higher priority wins when multiple packages are eligible for the same product.
                         </small>
                     </label>
+                    <div class="catalog-merch-secondary-save">
+                        <button type="button" class="admin-secondary-btn" data-save-merch-modal>Save offer presentation</button>
+                    </div>
                 </section>
             </div>
 
@@ -1467,9 +1469,10 @@ function ensureCatalogMerchandisingModal() {
                 <button
                     type="button"
                     class="admin-primary-btn"
-                    data-save-merch-modal
+                    data-save-package-supplier
+                    disabled
                 >
-                    Save Offer
+                    Save supplier
                 </button>
             </footer>
         </div>
@@ -1485,6 +1488,23 @@ function ensureCatalogMerchandisingModal() {
     });
 
     document.body.appendChild(modal);
+    const content = modal.querySelector(".catalog-merch-modal-content");
+    const supplierSection = modal.querySelector('[data-manage-package-section="supplier"]');
+    const priceSection = modal.querySelector('[data-manage-package-section="price"]');
+    const mediaSection = modal.querySelector('[data-manage-package-section="media"]');
+    if (content && supplierSection && priceSection && mediaSection) {
+        content.prepend(supplierSection);
+        supplierSection.after(priceSection);
+        priceSection.after(mediaSection);
+        const publicSection = modal.querySelector('[data-manage-package-section="public"]');
+        if (publicSection) publicSection.hidden = true;
+        const advanced = document.createElement("details");
+        advanced.className = "catalog-manage-advanced";
+        advanced.innerHTML = '<summary>Offer presentation</summary><div class="catalog-manage-advanced-body"></div>';
+        const advancedBody = advanced.querySelector("div");
+        [...content.children].filter(node => node.classList.contains("catalog-merch-price-summary") || (node.classList.contains("catalog-merch-modal-section") && !node.dataset.managePackageSection)).forEach(node => advancedBody.appendChild(node));
+        content.appendChild(advanced);
+    }
 }
 
 function closeCatalogMerchandisingModal() {
@@ -1507,9 +1527,52 @@ async function loadPackageSupplierCandidateData(product, pkg, { refresh = false 
 }
 
 function formatCandidateCost(cost = {}) {
-    return Number.isFinite(Number(cost.amount))
-        ? `${Number(cost.amount).toLocaleString(undefined, { maximumFractionDigits: 6 })} ${cost.currency || ""}`.trim()
+    const valid = cost.amount !== null && cost.amount !== undefined && cost.amount !== "" && Number.isFinite(Number(cost.amount));
+    return valid
+        ? `${Number(cost.amount).toLocaleString(undefined, { maximumFractionDigits: 6 })} ${cost.currency || ""}${cost.stale === true || cost.state === "STALE" ? " · stale" : ""}`.trim()
         : "Cost unavailable";
+}
+
+function candidateOperatorStatus(candidate = {}) {
+    const blockers = candidate.readiness?.blockerCodes || [];
+    if (candidate.readiness?.selectable === true) return "Ready";
+    if (blockers.includes("MAPPING_DISABLED") || blockers.includes("MAPPING_ARCHIVED")) return "Mapping disabled";
+    if (blockers.includes("MAPPING_EXECUTION_NOT_API") || blockers.includes("SUPPLIER_ADAPTER_NOT_READY") || blockers.includes("PROVIDER_FEATURE_GATE_OFF")) return "Not configured for API fulfillment";
+    if (blockers.includes("FULFILLMENT_ELIGIBILITY_UNKNOWN") || blockers.includes("CUSTOMER_MARKET_NOT_ELIGIBLE")) return "Customer-market eligibility unverified";
+    if (blockers.includes("SUPPLIER_OFFER_NOT_ACTIVE") || blockers.includes("SUPPLIER_AVAILABILITY_NOT_CONFIRMED")) return "Supplier offer unavailable";
+    if (candidate.cost?.amount == null) return "Cost unavailable";
+    return "Mapping unavailable";
+}
+
+function renderSupplierMappingRow(candidate, repeatedSupplier = false) {
+    const providerProduct = candidate.providerIdentity?.productCode || "";
+    const providerPackage = candidate.providerIdentity?.packageCode || "";
+    const providerIdentity = [providerProduct, providerPackage].filter(Boolean).join(" / ");
+    const status = candidateOperatorStatus(candidate);
+    const formattedCost = formatCandidateCost(candidate.cost);
+    const costLabel = formattedCost === "Cost unavailable" ? formattedCost : `Cost ${formattedCost}`;
+    const account = `${candidate.supplierMarket === "GLOBAL" ? "Global" : candidate.supplierMarket || "Unknown"} account`;
+    const technical = [
+        `Mapping ${candidate.supplierMappingId}`,
+        candidate.offer?.offerId ? `Offer ${candidate.offer.offerId}` : "",
+        `Role ${candidate.productionRole || candidate.readiness?.legacyProductionRole || "DISABLED"}`,
+        ...(candidate.readiness?.blockerCodes || [])
+    ].filter(Boolean);
+    return `<label class="catalog-supplier-candidate ${candidate.readiness.selectable ? "" : "is-disabled"}">
+        <input type="radio" name="manage-package-supplier" value="${escapeHtml(candidate.supplierMappingId)}" ${candidate.readiness.selectable ? "" : "disabled"} ${candidate.selected ? "checked" : ""}>
+        <span class="catalog-supplier-candidate-body">
+            <span class="catalog-supplier-candidate-head"><strong>${escapeHtml(candidate.supplier.name)}</strong><span class="catalog-supplier-status">${escapeHtml(candidate.selected ? "Selected" : status)}</span></span>
+            <small>${escapeHtml(account)}${repeatedSupplier && providerIdentity ? ` · ${escapeHtml(providerIdentity)}` : ""}</small>
+            ${!repeatedSupplier && providerIdentity ? `<small class="catalog-supplier-provider">${escapeHtml(providerIdentity)}</small>` : ""}
+            <small>${escapeHtml(costLabel)}${candidate.selected && status !== "Ready" ? ` · ${escapeHtml(status)}` : ""}</small>
+            <details class="catalog-supplier-technical"><summary>Technical details</summary><span>${escapeHtml(technical.join(" · "))}</span></details>
+        </span>
+    </label>`;
+}
+
+function candidateRouteLabel(candidate = {}) {
+    const identity = [candidate.providerIdentity?.productCode, candidate.providerIdentity?.packageCode].filter(Boolean).join(" / ");
+    return `${candidate.supplier?.name || "Unknown supplier"} · ${candidate.supplierMarket || "Unknown"} account${identity ? ` · ${identity}` : ""}`;
 }
 
 function storefrontPackageState(data = {}) {
@@ -1527,6 +1590,7 @@ function renderPackageSupplierSummary(container, data = {}) {
     if (!container) return;
     const selected = (data.candidates || []).find(item => item.selected);
     const state = storefrontPackageState(data);
+    modal.querySelector("#catalogMerchModalSubtitle").textContent = `${marketName} · ${state}`;
     container.innerHTML = `
         <span>Fulfillment supplier</span>
         <strong>${escapeHtml(selected?.supplier?.name || "Selection required")}</strong>
@@ -1592,18 +1656,12 @@ function renderManagePackageCandidates(modal, data = {}) {
     modal.querySelector("[data-manage-package-selection-state]").textContent = selected
         ? selected.supplier.name
         : "Supplier selection required";
-    modal.querySelector("[data-manage-package-candidates]").innerHTML = candidates.length ? candidates.map(candidate => {
-        const cost = formatCandidateCost(candidate.cost);
-        const sameCurrency = String(candidate.cost?.currency || "").trim().toUpperCase() === String(selected?.cost?.currency || "").trim().toUpperCase();
-        const difference = Number(selected?.cost?.amount) - Number(candidate.cost?.amount);
-        const cheaper = selected && sameCurrency && Number.isFinite(difference) && difference > 0
-            ? `${difference.toFixed(4)} ${candidate.cost.currency || ""} cheaper`
-            : "";
-        return `<label class="catalog-supplier-candidate ${candidate.readiness.selectable ? "" : "is-disabled"}">
-            <input type="radio" name="manage-package-supplier" value="${escapeHtml(candidate.supplierMappingId)}" ${candidate.readiness.selectable ? "" : "disabled"} ${candidate.selected ? "checked" : ""}>
-            <span><strong>${escapeHtml(candidate.supplier.name)}</strong><small>${escapeHtml(cost)} · ${escapeHtml(candidate.readiness.summary)} · ${escapeHtml(candidate.availability.state)}</small><small>Supplier account market: ${escapeHtml(candidate.supplierMarket || "Unknown")}${cheaper ? ` · ${escapeHtml(cheaper)}` : ""}</small></span>
-        </label>`;
-    }).join("") : `<div class="catalog-empty-state"><strong>No mapped suppliers</strong><span>No supplier candidate is configured for this package.</span></div>`;
+    const supplierCounts = candidates.reduce((counts, candidate) => counts.set(candidate.supplier.supplierId, (counts.get(candidate.supplier.supplierId) || 0) + 1), new Map());
+    const usable = candidates.filter(candidate => candidate.readiness?.selectable === true);
+    const unavailable = candidates.filter(candidate => candidate.readiness?.selectable !== true);
+    const candidateMarkup = usable.map(candidate => renderSupplierMappingRow(candidate, supplierCounts.get(candidate.supplier.supplierId) > 1)).join("");
+    const unavailableMarkup = unavailable.length ? `<details class="catalog-supplier-unavailable"><summary>Unavailable mappings (${unavailable.length})</summary><div>${unavailable.map(candidate => renderSupplierMappingRow(candidate, supplierCounts.get(candidate.supplier.supplierId) > 1)).join("")}</div></details>` : "";
+    modal.querySelector("[data-manage-package-candidates]").innerHTML = candidates.length ? `${candidateMarkup || '<div class="catalog-empty-state"><strong>No usable mappings</strong><span>Review unavailable mappings below.</span></div>'}${unavailableMarkup}` : `<div class="catalog-empty-state"><strong>No mapped suppliers</strong><span>No supplier candidate is configured for this package.</span></div>`;
     const state = storefrontPackageState(data);
     modal.querySelector("[data-manage-package-public-state]").textContent = `${state} · Customer market: ${marketName}`;
     modal.querySelector("[data-manage-package-public-detail]").textContent = data.publication?.blockers?.length
@@ -1647,7 +1705,7 @@ async function saveManagePackageSupplier(product, pkg, modal) {
     const marketName = data.customerMarket === "MM" ? "Myanmar" : "Thailand";
     const confirmed = await confirmCatalogAction({
         title: "Change fulfillment supplier?",
-        message: `${pkg.name || pkg.packageCode}\nCustomer market: ${marketName}\n\n${previous ? `${previous.supplier.name}\n${formatCandidateCost(previous.cost)}` : "No explicit supplier selected"}\n\n→\n\n${next.supplier.name}\n${formatCandidateCost(next.cost)}\n\nCustomer price\n${price ? `${Number(price.amount).toLocaleString()} ${price.currency}` : "No published price"}\n\nCustomer price will not change.\n\nThis decision will apply to future routing only after the routing authority is enabled in a later rollout phase.`,
+        message: `${pkg.name || pkg.packageCode}\nCustomer market: ${marketName}\n\n${previous ? `${candidateRouteLabel(previous)}\n${formatCandidateCost(previous.cost)}` : "No explicit supplier selected"}\n\n→\n\n${candidateRouteLabel(next)}\n${formatCandidateCost(next.cost)}\n\nCustomer price\n${price ? `${Number(price.amount).toLocaleString()} ${price.currency}` : "No published price"}\n\nCustomer price will not change.\n\nThis decision will apply to future routing only after the routing authority is enabled in a later rollout phase.`,
         confirmText: "Change Supplier"
     });
     if (!confirmed) return;
@@ -1921,8 +1979,6 @@ function openCatalogMerchandisingModal(product, pkg) {
             );
 
             if (!result?.success) return;
-
-            closeCatalogMerchandisingModal();
 
             selectedCatalogProduct =
                 result.product || selectedCatalogProduct;

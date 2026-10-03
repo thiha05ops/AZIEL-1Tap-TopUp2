@@ -37,9 +37,10 @@ function normalizeCustomerMarket(value) {
 function costProjection(mapping = {}, offer = null, now = Date.now()) {
     const authority = mapping.supplierCostAuthority || {};
     const offerCost = offer?.supplierCost || {};
-    const amount = Number.isFinite(Number(authority.rawSupplierCost))
-        ? Number(authority.rawSupplierCost)
-        : Number.isFinite(Number(offerCost.amount)) ? Number(offerCost.amount) : null;
+    const validAmount = value => value !== null && value !== undefined && value !== "" && Number.isFinite(Number(value));
+    const authorityHasAmount = validAmount(authority.rawSupplierCost);
+    const offerHasAmount = validAmount(offerCost.amount);
+    const amount = authorityHasAmount ? Number(authority.rawSupplierCost) : offerHasAmount ? Number(offerCost.amount) : null;
     const currency = upper(authority.supplierCurrency || offerCost.currency);
     const capturedAt = authority.capturedAt || offerCost.observedAt || null;
     const capturedTime = capturedAt ? new Date(capturedAt).getTime() : NaN;
@@ -50,7 +51,8 @@ function costProjection(mapping = {}, offer = null, now = Date.now()) {
         currency,
         capturedAt,
         stale,
-        source: clean(authority.source || (offerCost.amount != null ? "supplier_catalog_offer" : ""))
+        source: clean(authorityHasAmount ? authority.source : offerHasAmount ? "supplier_catalog_offer" : authority.source),
+        state: amount == null ? "UNAVAILABLE" : stale ? "STALE" : "CURRENT"
     };
 }
 
@@ -115,6 +117,15 @@ function evaluatePackageSupplierCandidates({ productCode, packageCode, customerM
             supplierMappingId: objectId(mapping),
             supplier: { supplierId: objectId(supplier || mapping.supplierId), supplierCode: upper(supplier?.supplierCode || mapping.supplierCode), name: clean(supplier?.name || mapping.supplierCode) },
             supplierMarket: upper(mapping.region),
+            productionRole: upper(mapping.productionRole || "DISABLED"),
+            providerIdentity: {
+                productCode: clean(mapping.supplierProductCode),
+                packageCode: clean(mapping.supplierPackageCode)
+            },
+            offer: {
+                offerId: objectId(offer || mapping.supplierCatalogOfferId),
+                label: clean(offer?.name || offer?.displayName || offer?.supplierOfferCode || mapping.supplierPackageCode)
+            },
             cost: costProjection(mapping, offer),
             availability: { state: upper(availability?.state || "UNKNOWN"), observedAt: availability?.observedAt || null, staleAt: availability?.staleAt || null },
             readiness: { selectable: blockerCodes.length === 0, summary: readinessSummary(blockerCodes), blockerCodes, legacyProductionRole: upper(mapping.productionRole || "DISABLED") },

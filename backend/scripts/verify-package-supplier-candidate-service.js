@@ -2,7 +2,7 @@
 
 const assert = require("assert");
 const mongoose = require("mongoose");
-const { createPackageSupplierCandidateService } = require("../services/packageSupplierCandidateService");
+const { costProjection, createPackageSupplierCandidateService } = require("../services/packageSupplierCandidateService");
 
 const id = () => new mongoose.Types.ObjectId();
 const supplierA = id(), supplierB = id(), supplierC = id();
@@ -44,10 +44,19 @@ service({ productCode: "game", packageCode: "PACK", customerMarket: "TH" }).then
     const backup = result.candidates.find(item => item.supplierMappingId === String(mappingB));
     assert.strictEqual(backup.readiness.legacyProductionRole, "BACKUP");
     assert.strictEqual(backup.readiness.selectable, true, "BACKUP must be selectable when intrinsically ready");
+    assert.strictEqual(backup.productionRole, "BACKUP");
+    assert.deepStrictEqual(backup.providerIdentity, { productCode: "P", packageCode: "B" });
+    assert.strictEqual(backup.offer.offerId, String(offerB));
     const disabled = result.candidates.find(item => item.supplierMappingId === String(mappingC));
     assert.strictEqual(disabled.readiness.selectable, false);
     assert(disabled.readiness.blockerCodes.includes("MAPPING_DISABLED"));
     assert(disabled.readiness.blockerCodes.includes("SUPPLIER_AVAILABILITY_NOT_CONFIRMED"));
     assert.strictEqual(result.publication.state, "PUBLISHED");
+    assert.strictEqual(costProjection({ supplierCostAuthority: { rawSupplierCost: null } }, { supplierCost: { amount: 7, currency: "USD", observedAt: new Date() } }).amount, 7);
+    for (const missing of [null, undefined, "", "not-a-number", Infinity]) {
+        assert.strictEqual(costProjection({ supplierCostAuthority: { rawSupplierCost: missing } }, { supplierCost: { amount: null } }).amount, null);
+    }
+    assert.strictEqual(costProjection({ supplierCostAuthority: { rawSupplierCost: 0, supplierCurrency: "USD", capturedAt: new Date(), source: "explicit" } }).amount, 0);
+    assert.strictEqual(costProjection({ supplierCostAuthority: { rawSupplierCost: null } }, { supplierCost: { amount: null } }).state, "UNAVAILABLE");
     console.log("PASS read-only candidate projection and non-primary intrinsic readiness");
 }).catch(error => { console.error(error); process.exitCode = 1; });
