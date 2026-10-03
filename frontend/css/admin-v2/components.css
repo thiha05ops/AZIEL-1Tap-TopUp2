@@ -3810,18 +3810,24 @@
 }
 .catalog-supplier-candidate>input{margin:0;width:15px;height:15px;align-self:start;margin-top:3px}
 .catalog-supplier-candidate:has(input:checked){border-color:color-mix(in srgb,var(--admin-accent) 55%,var(--v2-border));background:color-mix(in srgb,var(--admin-accent) 9%,var(--v2-surface))}
+.catalog-supplier-candidate:not(.is-disabled):hover{border-color:color-mix(in srgb,var(--admin-accent) 35%,var(--v2-border));background:color-mix(in srgb,var(--admin-accent) 5%,var(--v2-subtle))}
+.catalog-supplier-candidate:has(input:focus-visible){outline:2px solid color-mix(in srgb,var(--admin-accent) 75%,white);outline-offset:2px}
 .catalog-supplier-candidate.is-disabled{opacity:.7;background:transparent}
 .catalog-supplier-candidate strong,.catalog-supplier-candidate small{display:block}
 .catalog-supplier-candidate small{margin-top:2px;color:var(--v2-text-muted);font-size:11px;line-height:1.35}
 .catalog-supplier-candidate-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.catalog-supplier-badges{display:flex;align-items:center;justify-content:flex-end;gap:5px;flex-wrap:wrap}
 .catalog-supplier-status{flex:none;padding:2px 7px;border-radius:999px;background:var(--v2-surface);color:var(--v2-text-muted);font-size:10px;font-weight:700}
-.catalog-supplier-candidate:has(input:checked) .catalog-supplier-status{color:var(--admin-accent)}
+.catalog-supplier-status.is-selected,.catalog-supplier-candidate:has(input:checked) .catalog-supplier-status.is-selected{color:var(--admin-accent)}
+.catalog-supplier-cost{display:flex!important;align-items:center;justify-content:space-between;gap:10px}
+.catalog-supplier-cost>span:last-child{flex:none;color:var(--v2-text-muted);font-weight:700}
 .catalog-supplier-provider{opacity:.8}
 .catalog-supplier-technical{margin-top:5px;color:var(--v2-text-muted);font-size:10px}
 .catalog-supplier-technical summary{cursor:pointer;width:max-content}
 .catalog-supplier-technical span{display:block;margin-top:4px;overflow-wrap:anywhere;line-height:1.4}
 .catalog-supplier-unavailable{margin-top:7px;border-top:1px solid var(--v2-border);padding-top:7px}
 .catalog-supplier-unavailable>summary,.catalog-manage-advanced>summary{cursor:pointer;color:var(--v2-text-muted);font-size:12px;font-weight:700;list-style-position:inside}
+.catalog-manage-advanced>summary [data-manage-package-advanced-dirty]{margin-left:8px;color:var(--admin-warning,#f5b942);font-size:10px;font-weight:700}
 .catalog-supplier-unavailable>div{display:grid;gap:7px;margin-top:8px}
 .catalog-supplier-reason{display:grid;gap:6px;margin-top:14px;color:var(--v2-text-muted);font-size:12px}
 .catalog-supplier-reason input{width:100%}

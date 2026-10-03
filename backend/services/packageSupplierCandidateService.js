@@ -122,6 +122,12 @@ function evaluatePackageSupplierCandidates({ productCode, packageCode, customerM
                 productCode: clean(mapping.supplierProductCode),
                 packageCode: clean(mapping.supplierPackageCode)
             },
+            eligibility: {
+                mode: clean(mapping.fulfillmentEligibility?.mode || "UNKNOWN"),
+                allowedCustomerMarkets: Array.isArray(mapping.fulfillmentEligibility?.allowedCustomerMarkets) ? mapping.fulfillmentEligibility.allowedCustomerMarkets.map(upper) : [],
+                evidenceCode: clean(mapping.fulfillmentEligibility?.evidenceCode),
+                verifiedAt: mapping.fulfillmentEligibility?.verifiedAt || null
+            },
             offer: {
                 offerId: objectId(offer || mapping.supplierCatalogOfferId),
                 label: clean(offer?.name || offer?.displayName || offer?.supplierOfferCode || mapping.supplierPackageCode)

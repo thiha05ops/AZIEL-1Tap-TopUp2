@@ -47,6 +47,8 @@ service({ productCode: "game", packageCode: "PACK", customerMarket: "TH" }).then
     assert.strictEqual(backup.productionRole, "BACKUP");
     assert.deepStrictEqual(backup.providerIdentity, { productCode: "P", packageCode: "B" });
     assert.strictEqual(backup.offer.offerId, String(offerB));
+    assert.deepStrictEqual(backup.eligibility.allowedCustomerMarkets, ["TH", "MM"]);
+    assert.strictEqual(backup.eligibility.evidenceCode, "PROVIDER_CONFIRMED");
     const disabled = result.candidates.find(item => item.supplierMappingId === String(mappingC));
     assert.strictEqual(disabled.readiness.selectable, false);
     assert(disabled.readiness.blockerCodes.includes("MAPPING_DISABLED"));
