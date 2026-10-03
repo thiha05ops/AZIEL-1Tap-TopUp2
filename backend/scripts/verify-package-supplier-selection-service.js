@@ -1,6 +1,8 @@
 "use strict";
 
 const assert = require("assert");
+const fs = require("fs");
+const path = require("path");
 const mongoose = require("mongoose");
 const { createPackageSupplierSelectionService } = require("../services/packageSupplierSelectionService");
 
@@ -34,9 +36,22 @@ const availability = [ids.offerA, ids.offerB].map(offerId => ({ supplierCatalogO
 const selections = [];
 const audits = [];
 const untouched = { price: 149, publication: "PUBLIC", storeSelection: "UNCHANGED", orders: 2, attempts: 3 };
+const transactionSession = { transaction: true };
+let auditFailure = null;
 
-function query(value) {
-    return { session() { return this; }, lean: async () => value };
+function query(value, initialSession = null) {
+    let boundSession = initialSession;
+    return {
+        session(session) {
+            assert.strictEqual(session, transactionSession, "every transaction query must use the transaction session");
+            boundSession = session;
+            return this;
+        },
+        lean: async () => {
+            assert.strictEqual(boundSession, transactionSession, "transaction query must be session-bound before execution");
+            return value;
+        }
+    };
 }
 function same(a, b) { return String(a) === String(b); }
 const models = {
@@ -51,22 +66,40 @@ const models = {
             const row = selections.find(item => item.productCode === filter.productCode && item.packageCode === filter.packageCode && item.customerMarket === filter.customerMarket);
             return query(row ? { ...row } : null);
         },
-        create: async docs => {
+        create: async (docs, options) => {
+            assert.strictEqual(options?.session, transactionSession, "selection create must use the transaction session");
             const row = { _id: id(), ...docs[0] };
             selections.push(row);
             return [{ toObject: () => ({ ...row }) }];
         },
-        findOneAndUpdate: (filter, update) => query((() => {
-            const row = selections.find(item => same(item._id, filter._id) && item.decisionVersion === filter.decisionVersion);
-            if (!row) return null;
-            Object.assign(row, update.$set);
-            return { ...row };
-        })())
+        findOneAndUpdate: (filter, update, options) => {
+            assert.strictEqual(options?.session, transactionSession, "selection update must use the transaction session");
+            return query((() => {
+                const row = selections.find(item => same(item._id, filter._id) && item.decisionVersion === filter.decisionVersion);
+                if (!row) return null;
+                Object.assign(row, update.$set);
+                return { ...row };
+            })(), options.session);
+        }
     }
 };
 const service = createPackageSupplierSelectionService(models, {
-    transaction: callback => callback({ transaction: true }),
-    writeAdminAudit: async event => { assert.strictEqual(event.session.transaction, true); audits.push(event); },
+    transaction: async callback => {
+        const selectionSnapshot = selections.map(row => ({ ...row }));
+        const auditLength = audits.length;
+        try {
+            return await callback(transactionSession);
+        } catch (error) {
+            selections.splice(0, selections.length, ...selectionSnapshot);
+            audits.splice(auditLength);
+            throw error;
+        }
+    },
+    writeAdminAudit: async event => {
+        assert.strictEqual(event.session, transactionSession, "audit write must use the selection transaction session");
+        if (auditFailure) throw auditFailure;
+        audits.push(event);
+    },
     getSupplierAdapter: () => ({ isConfigured: () => true, isAutoFulfillmentEnabled: () => true })
 });
 const actor = { id: id(), username: "owner", role: "OWNER" };
@@ -76,6 +109,9 @@ async function rejectsCode(promise, code) {
 }
 
 (async () => {
+    const serviceSource = fs.readFileSync(path.join(__dirname, "../services/packageSupplierSelectionService.js"), "utf8");
+    assert(!serviceSource.includes("Promise.all("), "supplier-selection transaction must not parallelize session-bound operations");
+
     const before = JSON.stringify(untouched);
     const created = await call("TH", ids.mappingA, null);
     assert.strictEqual(created.changed, true);
@@ -115,6 +151,18 @@ async function rejectsCode(promise, code) {
     const savedAvailability = availability.splice(availability.findIndex(item => same(item.supplierCatalogOfferId, ids.offerA)), 1)[0];
     await rejectsCode(call("MM", ids.mappingA, 1), "SUPPLIER_NOT_AVAILABLE");
     availability.push(savedAvailability);
+
+    const beforeAuditFailure = { ...selections.find(item => item.customerMarket === "MM") };
+    const auditCountBeforeFailure = audits.length;
+    auditFailure = new Error("simulated audit failure");
+    await assert.rejects(call("MM", ids.mappingB, 1), error => error === auditFailure);
+    auditFailure = null;
+    const afterAuditFailure = selections.find(item => item.customerMarket === "MM");
+    assert.strictEqual(afterAuditFailure.supplierMappingId, beforeAuditFailure.supplierMappingId, "simulated transaction must roll back selection when audit fails");
+    assert.strictEqual(afterAuditFailure.decisionVersion, beforeAuditFailure.decisionVersion, "simulated transaction must roll back decisionVersion when audit fails");
+    assert.strictEqual(audits.length, auditCountBeforeFailure, "failed audit must not leave an audit event");
+
     assert.strictEqual(JSON.stringify(untouched), before, "price/publication/store/order/attempt state must remain untouched");
-    console.log("PASS selection create/change/version/stale/idempotency/validation/market independence/audit/zero side effects");
+    console.log("PASS selection create/change/version/stale/idempotency/validation/market independence/session contract/simulated rollback/audit/zero side effects");
+    console.log("NOTE rollback coverage uses the fake transaction harness; a real replica-set integration test is still required to prove MongoDB rollback behavior");
 })().catch(error => { console.error(error); process.exitCode = 1; });

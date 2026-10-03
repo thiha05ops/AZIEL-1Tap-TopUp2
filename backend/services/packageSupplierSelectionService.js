@@ -121,12 +121,10 @@ function createPackageSupplierSelectionService(models = {}, dependencies = {}) {
         if (!mongoose.Types.ObjectId.isValid(supplierMappingId)) throw new PackageSupplierSelectionError("SUPPLIER_MAPPING_NOT_FOUND", "Supplier mapping not found.", 404);
 
         return transaction(async session => {
-            const [product, pkg, mapping, current] = await Promise.all([
-                lean(M.Product.findOne({ productCode, deletedAt: null }), session),
-                lean(M.Package.findOne({ productCode, packageCode, deletedAt: null }), session),
-                lean(M.Mapping.findById(supplierMappingId), session),
-                lean(M.Selection.findOne({ productCode, packageCode, customerMarket }), session)
-            ]);
+            const product = await lean(M.Product.findOne({ productCode, deletedAt: null }), session);
+            const pkg = await lean(M.Package.findOne({ productCode, packageCode, deletedAt: null }), session);
+            const mapping = await lean(M.Mapping.findById(supplierMappingId), session);
+            const current = await lean(M.Selection.findOne({ productCode, packageCode, customerMarket }), session);
             if (!product) throw new PackageSupplierSelectionError("PRODUCT_NOT_FOUND", "Product not found.", 404);
             if (!pkg) throw new PackageSupplierSelectionError("PACKAGE_NOT_FOUND", "Package not found.", 404);
             if (!mapping) throw new PackageSupplierSelectionError("SUPPLIER_MAPPING_NOT_FOUND", "Supplier mapping not found.", 404);
@@ -142,10 +140,8 @@ function createPackageSupplierSelectionService(models = {}, dependencies = {}) {
             const supplier = await lean(M.Supplier.findById(mapping.supplierId), session);
             if (!supplier) throw new PackageSupplierSelectionError("SUPPLIER_NOT_AVAILABLE", "Supplier not found.", 409);
             if (supplier.enabled !== true) throw new PackageSupplierSelectionError("SUPPLIER_DISABLED", "Supplier is disabled.", 409);
-            const [offer, availability] = await Promise.all([
-                mapping.supplierCatalogOfferId ? lean(M.Offer.findById(mapping.supplierCatalogOfferId), session) : null,
-                mapping.supplierCatalogOfferId ? lean(M.Availability.findOne({ supplierCatalogOfferId: mapping.supplierCatalogOfferId }), session) : null
-            ]);
+            const offer = mapping.supplierCatalogOfferId ? await lean(M.Offer.findById(mapping.supplierCatalogOfferId), session) : null;
+            const availability = mapping.supplierCatalogOfferId ? await lean(M.Availability.findOne({ supplierCatalogOfferId: mapping.supplierCatalogOfferId }), session) : null;
             const blockers = candidateBlockers({ mapping, supplier, offer, availability, customerMarket, adapter: adapterFor(supplier) });
             if (blockers.length) throw stableSelectionError(blockers);
             const proposedCost = costProjection(mapping, offer);
