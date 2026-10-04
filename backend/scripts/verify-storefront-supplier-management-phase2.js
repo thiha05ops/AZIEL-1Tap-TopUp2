@@ -41,6 +41,9 @@ assert(selectionService.includes("candidateBlockers({"), "write validation must 
 assert(selectionService.includes("customerPriceChanged: false") && selectionService.includes("publicationChanged: false"));
 assert(checkout.includes("const resolveCheckoutRouteSnapshot = createRoutingAuthority();"));
 assert(fulfillment.includes("async function startFulfillmentForOrder"));
-assert(!checkout.includes("PackageSupplierSelection"));
+assert(checkout.includes("PackageSupplierSelection.findOne"), "future selected authority must read one explicit package/customer-market selection");
+assert(checkout.includes("FULFILLMENT_ROUTING_MODES.SELECTED") && checkout.includes("FULFILLMENT_ROUTING_MODES.SHADOW"), "selected routing must remain explicitly mode-gated");
+assert(read("backend/config/fulfillmentRoutingMode.js").includes("if (!configured) return FULFILLMENT_ROUTING_MODES.LEGACY_REGION"), "default routing must remain legacy");
+assert(checkout.includes("return includeDiagnostics ? { ...legacy, diagnostics } : legacy"), "shadow must return the legacy customer route");
 assert(!fulfillment.includes("PackageSupplierSelection"));
 console.log("PASS Phase 2 API/drawer/stale/image and checkout/fulfillment boundary verification");

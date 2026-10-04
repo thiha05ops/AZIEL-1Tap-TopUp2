@@ -3,7 +3,9 @@
 const FULFILLMENT_ROUTING_MODES = Object.freeze({
     LEGACY_REGION: "LEGACY_REGION",
     DUAL_READ: "DUAL_READ",
-    ELIGIBILITY_PRIMARY: "ELIGIBILITY_PRIMARY"
+    SHADOW: "SHADOW",
+    ELIGIBILITY_PRIMARY: "ELIGIBILITY_PRIMARY",
+    SELECTED: "SELECTED"
 });
 
 function resolveFulfillmentRoutingMode(env = process.env) {

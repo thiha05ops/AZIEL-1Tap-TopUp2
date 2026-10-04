@@ -52,6 +52,7 @@ const { StoreCatalogSelectionError, listStoreCatalogSelections, saveStoreCatalog
 const { StorePackageActivationError, inspectStorePackageActivation, activateStorePackage } = require("../services/storePackageActivationService");
 const { SupplierInputContractReviewError, context: getInputContractReview, approve: approveInputContract } = require("../services/supplierCatalog/supplierInputContractReviewService");
 const { SupplierRoutePreparationError, generateSupplierRoutePreparationPlan, applySupplierRoutePreparationPlan } = require("../services/supplierCatalog/supplierRoutePreparationService");
+const { SupplierProductOnboardingError, onboardSupplierProduct } = require("../services/supplierCatalog/supplierProductOnboardingService");
 
 function sendFulfillmentError(res, error) {
     if (error instanceof FulfillmentError || error?.name === "FinancialIntegrityError") {
@@ -91,6 +92,7 @@ function sendActivationError(res,error){if(error instanceof AdminProductActivati
 function sendStorePackageActivationError(res,error){if(error instanceof StorePackageActivationError)return res.status(error.statusCode||400).json({success:false,code:error.code,message:error.message,details:error.details||{}});console.log("Store package activation error:",error?.code||error?.name||"STORE_PACKAGE_ACTIVATION_FAILED");return res.status(500).json({success:false,code:"STORE_PACKAGE_ACTIVATION_FAILED",message:"Store package activation failed."})}
 function sendSourcePreparationError(res,error){if(error instanceof ProductSourcePreparationError)return res.status(error.statusCode||400).json({success:false,code:error.code,message:error.message,details:error.details||{}});console.log("Product source preparation error:",error?.code||error?.name||"PRODUCT_SOURCE_PREPARATION_FAILED");return res.status(500).json({success:false,code:"PRODUCT_SOURCE_PREPARATION_FAILED",message:"Product source preparation failed."})}
 function sendSupplierRoutePreparationError(res,error){if(error instanceof SupplierRoutePreparationError)return res.status(error.statusCode||409).json({success:false,code:error.code,message:error.message,details:error.details||{}});console.log("Supplier route preparation error:",error?.code||error?.name||"SUPPLIER_ROUTE_PREPARATION_FAILED");return res.status(500).json({success:false,code:"SUPPLIER_ROUTE_PREPARATION_FAILED",message:"Supplier route preparation failed."})}
+function sendSupplierProductOnboardingError(res,error){if(error instanceof SupplierProductOnboardingError||error instanceof ReconciliationError)return res.status(error.statusCode||409).json({success:false,code:error.code,message:error.message,details:error.details||{}});console.log("Supplier product onboarding error:",error?.code||error?.name||"SUPPLIER_PRODUCT_ONBOARDING_FAILED");return res.status(500).json({success:false,code:"SUPPLIER_PRODUCT_ONBOARDING_FAILED",message:"Supplier product onboarding failed."})}
 function sanitizeStoreSelectionErrorMessage(message) {
     return String(message || "")
         .replace(/(mongodb(?:\+srv)?:\/\/)[^@\s]+@/gi, "$1[REDACTED]@")
@@ -175,6 +177,7 @@ router.get("/admin/supplier-catalog/products/:id", adminMiddleware, requireAdmin
     try { res.set("Cache-Control", "no-store"); return res.json({ success: true, ...(await getAdminSupplierCatalogProduct(req.params.id)) }); }
     catch (error) { return sendSupplierCatalogReadError(res, error); }
 });
+router.post("/admin/supplier-catalog/products/:id/onboard",adminMiddleware,requireAdminPermission(PERMISSIONS.SUPPLIER_CATALOG_RECONCILE),async(req,res)=>{try{return res.status(200).json({success:true,...await onboardSupplierProduct({...req.body,supplierCatalogProductId:req.params.id},{actor:req.admin,requestId:req.id||req.headers["x-request-id"]||""})})}catch(error){return sendSupplierProductOnboardingError(res,error)}});
 router.get("/admin/supplier-catalog/products/:id/input-contract",adminMiddleware,requireAdminPermission(PERMISSIONS.SUPPLIERS_READ),async(req,res)=>{try{res.set("Cache-Control","no-store");return res.json({success:true,review:await getInputContractReview(req.params.id)})}catch(error){return sendInputContractError(res,error)}});
 router.post("/admin/supplier-catalog/products/:id/input-contract/approve",adminMiddleware,requireAdminPermission(PERMISSIONS.OWNER_ROUTING_MANAGE),async(req,res)=>{try{return res.status(201).json({success:true,...await approveInputContract(req.params.id,req.body,{actor:req.admin,req})})}catch(error){return sendInputContractError(res,error)}});
 

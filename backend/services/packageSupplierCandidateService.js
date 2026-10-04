@@ -11,6 +11,8 @@ const SupplierProductMapping = require("../models/SupplierProductMapping");
 const { getSupplierAdapter } = require("./supplierAdapterRegistry");
 const { supplierCapabilityProductCode } = require("./fulfillmentCapabilityService");
 const { validateFulfillmentEligibility } = require("./supplierFulfillmentEligibilityService");
+const { READINESS_MODES, assessMappingReadiness } = require("./supplierMappingReadinessService");
+const { resolveFulfillmentRoutingMode, FULFILLMENT_ROUTING_MODES } = require("../config/fulfillmentRoutingMode");
 
 class PackageSupplierCandidateError extends Error {
     constructor(code, message, statusCode = 400) {
@@ -57,37 +59,7 @@ function costProjection(mapping = {}, offer = null, now = Date.now()) {
 }
 
 function candidateBlockers({ mapping = {}, supplier = null, offer = null, availability = null, customerMarket = "", adapter = null } = {}) {
-    const blockers = [];
-    const readiness = mapping.mappingMetadata?.readiness || {};
-    const eligibility = validateFulfillmentEligibility(mapping.fulfillmentEligibility);
-    if (mapping.archivedAt) blockers.push("MAPPING_ARCHIVED");
-    if (mapping.enabled !== true) blockers.push("MAPPING_DISABLED");
-    if (upper(mapping.executionMode) !== "API") blockers.push("MAPPING_EXECUTION_NOT_API");
-    if (!clean(mapping.supplierProductCode) || !clean(mapping.supplierPackageCode)) blockers.push("EXACT_MAPPING_INCOMPLETE");
-    if (!supplier || supplier.enabled !== true || upper(supplier.mode) !== "API") blockers.push("SUPPLIER_NOT_API_READY");
-    if (readiness.supplierMapped !== true) blockers.push("SUPPLIER_MAPPING_NOT_READY");
-    if (readiness.pricingReady !== true) blockers.push("PRICING_NOT_READY");
-    if (readiness.inputReady !== true) blockers.push("INPUT_NOT_READY");
-    if (readiness.fulfillmentReady !== true) blockers.push("FULFILLMENT_NOT_READY");
-    if (!eligibility.valid) blockers.push(...eligibility.errors);
-    else if (eligibility.value.mode === "UNKNOWN") blockers.push("FULFILLMENT_ELIGIBILITY_UNKNOWN");
-    else if (eligibility.value.mode === "CUSTOMER_MARKET_ALLOWLIST" && !eligibility.value.allowedCustomerMarkets.includes(customerMarket)) blockers.push("CUSTOMER_MARKET_NOT_ELIGIBLE");
-    const offerMatches = offer && objectId(offer) === objectId(mapping.supplierCatalogOfferId) &&
-        objectId(offer.supplierId) === objectId(mapping.supplierId) &&
-        clean(offer.supplierProductCode) === clean(mapping.supplierProductCode) &&
-        clean(offer.supplierOfferCode) === clean(mapping.supplierPackageCode) &&
-        upper(offer.catalogLifecycleState) === "ACTIVE";
-    if (!offerMatches) blockers.push("SUPPLIER_OFFER_NOT_ACTIVE");
-    const availabilityCurrent = availability && objectId(availability.supplierCatalogOfferId) === objectId(mapping.supplierCatalogOfferId) &&
-        upper(availability.state) === "AVAILABLE" &&
-        (!availability.staleAt || new Date(availability.staleAt).getTime() > Date.now());
-    if (!availabilityCurrent) blockers.push("SUPPLIER_AVAILABILITY_NOT_CONFIRMED");
-    if (!adapter?.isConfigured?.()) blockers.push("SUPPLIER_ADAPTER_NOT_READY");
-    let gateEnabled = false;
-    try { gateEnabled = adapter?.isAutoFulfillmentEnabled?.(supplierCapabilityProductCode(mapping, { supplierCode: supplier?.supplierCode || mapping.supplierCode })) === true; }
-    catch { gateEnabled = false; }
-    if (!gateEnabled) blockers.push("PROVIDER_FEATURE_GATE_OFF");
-    return [...new Set(blockers)].sort();
+    return assessMappingReadiness({ mode: READINESS_MODES.NEW_ORDER_SELECTABLE, mapping, supplier, offer, availability, customerMarket, adapter }).blockers;
 }
 
 function readinessSummary(blockers = []) {
@@ -143,7 +115,9 @@ function evaluatePackageSupplierCandidates({ productCode, packageCode, customerM
     if (pkg.deletedAt) publicationBlockers.push("PACKAGE_DELETED");
     if (pkg.enabled === false) publicationBlockers.push("PACKAGE_DISABLED");
     if (!price || price.enabled === false || !Number.isFinite(Number(price.amount)) || Number(price.amount) <= 0) publicationBlockers.push("NO_VALID_PRICE");
-    if (!candidates.some(item => item.readiness.selectable)) publicationBlockers.push("FULFILLMENT_NOT_READY");
+    const selectedAuthority = resolveFulfillmentRoutingMode() === FULFILLMENT_ROUTING_MODES.SELECTED;
+    if (selectedAuthority && !selection) publicationBlockers.push("PACKAGE_SUPPLIER_SELECTION_REQUIRED");
+    if (selectedAuthority ? !candidates.some(item => item.selected && item.readiness.selectable) : !candidates.some(item => item.readiness.selectable)) publicationBlockers.push("FULFILLMENT_NOT_READY");
     const published = publication?.published === true;
     return {
         package: { productCode: normalizedProduct, packageCode: normalizedPackage, name: pkg.name, iconUrl: iconAsset?.secureUrl || iconAsset?.url || "", iconAltText: iconAsset?.altText || "", updatedAt: pkg.updatedAt || null },

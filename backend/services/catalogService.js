@@ -7,6 +7,12 @@ const Supplier = require("../models/Supplier");
 const PackageInventoryState = require("../models/PackageInventoryState");
 const PackageMarketPublication = require("../models/PackageMarketPublication");
 const StoreCatalogSelection = require("../models/StoreCatalogSelection");
+const PackageSupplierSelection = require("../models/PackageSupplierSelection");
+const SupplierCatalogOffer = require("../models/SupplierCatalogOffer");
+const SupplierOfferAvailability = require("../models/SupplierOfferAvailability");
+const { getSupplierAdapter } = require("./supplierAdapterRegistry");
+const { READINESS_MODES, assessMappingReadiness } = require("./supplierMappingReadinessService");
+const { FULFILLMENT_ROUTING_MODES, resolveFulfillmentRoutingMode } = require("../config/fulfillmentRoutingMode");
 const { getCanonicalProduct, isCanonicalProductCode, resolveCanonicalProductRoute } = require("../catalog/canonicalOperationalCatalog");
 const {
     REGION_CURRENCIES,
@@ -44,6 +50,26 @@ class CatalogError extends Error {
 
 const productIndex = new Map();
 const aliasIndex = new Map();
+
+function applySelectedPublicPurchasability(projection, rawPackages, mappings, suppliers, selections, publications, offers, availabilityRows, customerMarket) {
+    const market = String(customerMarket || "TH").trim().toUpperCase();
+    const packageByCode = new Map(rawPackages.map(pkg => [String(pkg.packageCode).toUpperCase(), pkg]));
+    const mappingById = new Map(mappings.map(mapping => [String(mapping._id), mapping]));
+    const supplierById = new Map(suppliers.map(supplier => [String(supplier._id), supplier]));
+    const selectionByCode = new Map(selections.filter(row => row.customerMarket === market).map(row => [String(row.packageCode).toUpperCase(), row]));
+    const publicationByCode = new Map(publications.filter(row => row.customerMarket === market).map(row => [String(row.packageCode).toUpperCase(), row]));
+    const offerById = new Map(offers.map(offer => [String(offer._id), offer]));
+    const availabilityByOffer = new Map(availabilityRows.map(row => [String(row.supplierCatalogOfferId), row]));
+    for (const pkg of projection.packages || []) {
+        const code = String(pkg.packageCode || "").toUpperCase(), selection = selectionByCode.get(code), mapping = mappingById.get(String(selection?.supplierMappingId || "")), supplier = mapping ? supplierById.get(String(mapping.supplierId)) : null;
+        const assessment = assessMappingReadiness({ mode: READINESS_MODES.PUBLIC_PURCHASABLE, mapping: mapping || {}, supplier, offer: mapping ? offerById.get(String(mapping.supplierCatalogOfferId)) : null, availability: mapping ? availabilityByOffer.get(String(mapping.supplierCatalogOfferId)) : null, customerMarket: market, adapter: supplier ? getSupplierAdapter(supplier) : null, pkg: packageByCode.get(code), publication: publicationByCode.get(code), selection });
+        if (!assessment.ready) {
+            pkg.fulfillmentRegions = { ...(pkg.fulfillmentRegions || {}), [market]: false };
+            pkg.selectedSupplierBlockers = assessment.blockers;
+        }
+    }
+    return projection;
+}
 
 catalog.products.forEach(product => {
     const normalizedProductCode = normalizeProductCode(product.productCode);
@@ -957,6 +983,7 @@ function toStaticPublicCatalog({ includeDisabled = true } = {}) {
 
 async function toDatabasePublicCatalog({ includeDisabled = true, includeAssetProjection = false, includeAdminPricing = false, customerMarket = "TH", publicationProjectionMode } = {}) {
     const mode = publicationProjectionMode || publicationMode();
+    const selectedAuthority = resolveFulfillmentRoutingMode() === FULFILLMENT_ROUTING_MODES.SELECTED;
     const storeSelectionExplicit = storeCatalogSelectionMode() === "EXPLICIT";
     const [products, packages, mappings, inventoryStates, enabledSuppliers, publications, storeSelections] = await Promise.all([
         CatalogProduct.find().sort({ sortOrder: 1, productCode: 1 }).lean(),
@@ -969,6 +996,17 @@ async function toDatabasePublicCatalog({ includeDisabled = true, includeAssetPro
     ]);
     const enabledSupplierIds = new Set(enabledSuppliers.map(item => String(item._id)));
     const activeMappings = mappings.filter(item => enabledSupplierIds.has(String(item.supplierId)));
+    let packageSupplierSelections = [], selectedOffers = [], selectedAvailability = [];
+    if (selectedAuthority) {
+        packageSupplierSelections = await PackageSupplierSelection.find({ customerMarket: String(customerMarket).toUpperCase() }).lean();
+        const selectedMappingIds = packageSupplierSelections.map(row => row.supplierMappingId);
+        const selectedMappings = activeMappings.filter(row => selectedMappingIds.some(id => String(id) === String(row._id)));
+        const offerIds = selectedMappings.map(row => row.supplierCatalogOfferId).filter(Boolean);
+        [selectedOffers, selectedAvailability] = await Promise.all([
+            SupplierCatalogOffer.find({ _id: { $in: offerIds } }).lean(),
+            SupplierOfferAvailability.find({ supplierCatalogOfferId: { $in: offerIds } }).lean()
+        ]);
+    }
     const mediaMap = await loadMediaAssetMap(products, packages);
 
     const legacyProducts = products
@@ -989,6 +1027,7 @@ async function toDatabasePublicCatalog({ includeDisabled = true, includeAssetPro
                 enabledSuppliers
             );
             applyPackageFulfillmentReadiness(projection, activeMappings.filter(item => item.productCode === product.productCode), inventoryStates, enabledSuppliers);
+            if (selectedAuthority) applySelectedPublicPurchasability(projection, productPackages, activeMappings.filter(item => item.productCode === product.productCode), enabledSuppliers, packageSupplierSelections.filter(item => item.productCode === product.productCode), publications.filter(item => item.productCode === product.productCode), selectedOffers, selectedAvailability, customerMarket);
             applyCustomerInputContract(projection, activeMappings.filter(item => item.productCode === product.productCode));
             if (!includeAdminPricing) applyPublicPackageEligibility(projection, customerMarket);
             if (includeAdminPricing) applyPublicationMetadata(projection, publications, customerMarket);
@@ -1016,6 +1055,7 @@ async function toDatabasePublicCatalog({ includeDisabled = true, includeAssetPro
             const productMappings = activeMappings.filter(item => item.productCode === product.productCode);
             const productInventory = inventoryStates.filter(item => sourcePackages.some(pkg => String(pkg._id) === String(item.packageRef) || pkg.packageCode === item.packageCode));
             applyPackageFulfillmentReadiness(projection, productMappings, productInventory, enabledSuppliers);
+            if (selectedAuthority) applySelectedPublicPurchasability(projection, sourcePackages, productMappings, enabledSuppliers, packageSupplierSelections.filter(item => item.productCode === product.productCode), recordsByProduct.get(product.productCode) || [], selectedOffers, selectedAvailability, customerMarket);
             applyCustomerInputContract(projection, productMappings);
             applyPublicationMetadata(projection, recordsByProduct.get(product.productCode) || [], customerMarket);
             projection.packages = explicitPublishedPackages(projection);
@@ -1829,6 +1869,7 @@ async function listPublicExclusiveOffers(options = {}) {
 module.exports = {
     listPublicExclusiveOffers,
     applyPackageFulfillmentReadiness,
+    applySelectedPublicPurchasability,
     applyCustomerInputContract,
     applyAdminProductionAttribution,
     applyAdminSupplierSupport,

@@ -248,6 +248,14 @@ function projectActivation(data, { search = "", productCode = "", supplierMarket
     const normalizedSupplierMarket = upper(supplierMarket);
     const requestedSellingRegions = commerceSellingRegionsFrom(sellingRegions || customerMarkets || customerMarket, "TH");
     const market = requestedSellingRegions[0] || "TH";
+    const offersBySupplierProduct = new Map();
+    for (const offer of data.offers) {
+        const productId = id(offer.supplierCatalogProductId);
+        if (!offersBySupplierProduct.has(productId)) offersBySupplierProduct.set(productId, []);
+        offersBySupplierProduct.get(productId).push(offer);
+    }
+    const mappedSupplierProductIdentities = new Set(data.mappings.map(mapping => `${id(mapping.supplierId)}|${clean(mapping.supplierProductCode)}`));
+    const mappedOfferIdentities = new Set(data.mappings.map(mapping => id(mapping.supplierCatalogOfferId)).filter(Boolean));
 
     if (!normalizedProduct) {
         const publishedKeys = new Set(data.publications.filter(item => item.published === true).map(item => key(lower(item.productCode), upper(item.packageCode))));
@@ -269,7 +277,14 @@ function projectActivation(data, { search = "", productCode = "", supplierMarket
         return {
             authority: { catalog: "CatalogProduct/CatalogPackage", route: "SupplierProductMapping.productionRole", cost: "SupplierProductMapping.supplierCostAuthority", pricing: "Daily Pricing/Pricing Engine", input: "SupplierCatalogProduct + mapping readiness", fulfillment: "supplier eligibility route resolver", publication: "PackageMarketPublication" },
             projectionMode: "NAVIGATION", customerMarket: market, commerceMarketSupported: COMMERCE_MARKETS.includes(market), products,
-            markets: [], packages: [], automaticFailover: false, automaticPublicRepricing: false
+            markets: [], packages: [], supplierInventory: data.supplierProducts.map(item => ({
+                supplierCatalogProductId: id(item), supplierId: id(item.supplierId), supplierProductCode: clean(item.supplierProductCode),
+                supplierCode: upper(supplierById.get(id(item.supplierId))?.supplierCode), supplierName: supplierById.get(id(item.supplierId))?.name || "",
+                displayName: item.displayName || item.rawName || item.supplierProductCode, supplierMarket: upper(item.supplierMarketCode), lifecycleState: item.supportState,
+                mapped: mappedSupplierProductIdentities.has(`${id(item.supplierId)}|${clean(item.supplierProductCode)}`),
+                onboardingState: (() => { const rows = offersBySupplierProduct.get(id(item)) || [], mapped = rows.filter(offer => mappedOfferIdentities.has(id(offer))).length, review = rows.filter(offer => !mappedOfferIdentities.has(id(offer)) && offer.reconciliationState !== "EXACT_CANONICAL_MATCH").length; return review ? (mapped ? "PARTIALLY_PREPARED" : "NEEDS_REVIEW") : mapped === rows.length && rows.length ? "PREPARED" : "NOT_ADDED"; })(),
+                offers: (offersBySupplierProduct.get(id(item)) || []).map(offer => ({ supplierCatalogOfferId: id(offer), supplierOfferCode: offer.supplierOfferCode, displayName: offer.supplierOfferName || offer.rawName || offer.supplierOfferCode, reconciliationState: offer.reconciliationState, lifecycleState: offer.catalogLifecycleState, availability: availabilityByOffer.get(id(offer))?.state || "UNKNOWN", mapped: mappedOfferIdentities.has(id(offer)), fulfillmentReady: false }))
+            })), automaticFailover: false, automaticPublicRepricing: false
         };
     }
 
@@ -372,12 +387,16 @@ function createAdminProductActivationService(models = {}) {
         const productCode = lower(query.productCode);
         const supplierMarket = upper(query.supplierMarket);
         if (!productCode) {
-            const [products, mappings, publications] = await Promise.all([
+            const [products, mappings, publications, supplierProducts, offers, suppliers, availability] = await Promise.all([
                 lean(M.CatalogProduct.find({ deletedAt: null }).select("productCode name enabled commerceState publicDiscoveryEnabled catalogCategory metadata"), session),
-                lean(M.Mapping.find({ archivedAt: null }).select("productCode packageCode supplierCode region"), session),
-                lean(M.Publication.find({ published: true }).select("productCode packageCode customerMarket published decisionVersion decisionNote"), session)
+                lean(M.Mapping.find({ archivedAt: null }).select("productCode packageCode supplierId supplierCode supplierProductCode supplierCatalogOfferId region"), session),
+                lean(M.Publication.find({ published: true }).select("productCode packageCode customerMarket published decisionVersion decisionNote"), session),
+                lean(M.SupplierProduct.find({}).select("_id supplierId supplierProductCode supplierMarketCode displayName rawName"), session),
+                lean(M.Offer.find({}).select("_id supplierId supplierCatalogProductId supplierOfferCode supplierOfferName rawName reconciliationState catalogLifecycleState"), session),
+                lean(M.Supplier.find({}).select("_id supplierCode name enabled mode"), session),
+                lean(M.Availability.find({}).select("supplierCatalogOfferId state coverageComplete evidenceCode staleAt"), session)
             ]);
-            return { products, packages: [], suppliers: [], mappings, offers: [], supplierProducts: [], availability: [], publications };
+            return { products, packages: [], suppliers, mappings, offers, supplierProducts, availability, publications };
         }
         const mappingFilter = { productCode, archivedAt: null };
         if (supplierMarket) mappingFilter.region = supplierMarket;
