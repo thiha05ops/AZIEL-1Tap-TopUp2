@@ -201,8 +201,12 @@ function createSupplierRoutePreparationService({ repos = defaultRepos(), adapter
     async function load(request, session = null) {
         const mapping = await repos.mappingById(request.mappingId, session);
         if (!mapping) return { mapping: null, supplier: null, supplierProduct: null, offer: null, availability: null, canonicalProduct: null, canonicalPackages: [] };
-        const [supplier, offer, canonicalProduct, canonicalPackages] = await Promise.all([repos.supplierById(mapping.supplierId, session), repos.offerById(mapping.supplierCatalogOfferId, session), repos.canonicalProduct(mapping.productCode, session), repos.canonicalPackages(mapping.productCode, mapping.packageCode, session)]);
-        const [supplierProduct, availability] = await Promise.all([offer ? repos.productById(offer.supplierCatalogProductId, session) : null, offer ? repos.availabilityByOffer(offer._id, session) : null]);
+        const supplier = await repos.supplierById(mapping.supplierId, session);
+        const offer = await repos.offerById(mapping.supplierCatalogOfferId, session);
+        const canonicalProduct = await repos.canonicalProduct(mapping.productCode, session);
+        const canonicalPackages = await repos.canonicalPackages(mapping.productCode, mapping.packageCode, session);
+        const supplierProduct = offer ? await repos.productById(offer.supplierCatalogProductId, session) : null;
+        const availability = offer ? await repos.availabilityByOffer(offer._id, session) : null;
         return { mapping, supplier, supplierProduct, offer, availability, canonicalProduct, canonicalPackages };
     }
 

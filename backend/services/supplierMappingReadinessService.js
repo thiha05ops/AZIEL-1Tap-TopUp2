@@ -45,7 +45,7 @@ function assessMappingReadiness({ mode, mapping = {}, supplier = null, offer = n
     else if (mode !== READINESS_MODES.FROZEN_ORDER_EXECUTABLE && eligibility.value.mode === "CUSTOMER_MARKET_ALLOWLIST" && !eligibility.value.allowedCustomerMarkets.includes(upper(customerMarket))) blockers.push("CUSTOMER_MARKET_NOT_ELIGIBLE");
 
     if (mode !== READINESS_MODES.FROZEN_ORDER_EXECUTABLE) {
-        if (readiness.pricingReady !== true) blockers.push("PRICING_NOT_READY");
+        if (mode === READINESS_MODES.PUBLIC_PURCHASABLE && readiness.pricingReady !== true) blockers.push("PRICING_NOT_READY");
         const offerMatches = offer && objectId(offer) === objectId(mapping.supplierCatalogOfferId) && objectId(offer.supplierId) === objectId(mapping.supplierId) && clean(offer.supplierProductCode) === clean(mapping.supplierProductCode) && clean(offer.supplierOfferCode) === clean(mapping.supplierPackageCode) && upper(offer.catalogLifecycleState) === "ACTIVE";
         if (!offerMatches) blockers.push("SUPPLIER_OFFER_NOT_ACTIVE");
         const availabilityCurrent = availability && objectId(availability.supplierCatalogOfferId) === objectId(mapping.supplierCatalogOfferId) && upper(availability.state) === "AVAILABLE" && (!availability.staleAt || new Date(availability.staleAt).getTime() > Date.now());

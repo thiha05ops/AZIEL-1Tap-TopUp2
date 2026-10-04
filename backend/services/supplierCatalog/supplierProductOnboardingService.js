@@ -14,6 +14,7 @@ const AdminAuditLog = require("../../models/AdminAuditLog");
 const { getSupplierAdapter } = require("../supplierAdapterRegistry");
 const { READINESS_MODES, assessMappingReadiness } = require("../supplierMappingReadinessService");
 const reconciliation = require("./supplierCatalogReconciliationService");
+const routePreparation = require("./supplierRoutePreparationService");
 
 const clean = value => String(value == null ? "" : value).trim();
 const upper = value => clean(value).toUpperCase();
@@ -43,6 +44,7 @@ function classifyOffer(offer, targetPackage) {
 function createSupplierProductOnboardingService(dependencies = {}) {
     const M = { Supplier: dependencies.Supplier || Supplier, Product: dependencies.Product || SupplierCatalogProduct, Offer: dependencies.Offer || SupplierCatalogOffer, Availability: dependencies.Availability || SupplierOfferAvailability, Mapping: dependencies.Mapping || SupplierProductMapping, CatalogProduct: dependencies.CatalogProduct || CatalogProduct, CatalogPackage: dependencies.CatalogPackage || CatalogPackage, Selection: dependencies.Selection || PackageSupplierSelection, Audit: dependencies.Audit || AdminAuditLog };
     const reconcile = dependencies.reconciliation || reconciliation;
+    const prepareRoute = dependencies.routePreparation || routePreparation;
     const adapterResolver = dependencies.adapterResolver || getSupplierAdapter;
     const connection = dependencies.connection || mongoose.connection;
     const lean = query => query.lean();
@@ -108,14 +110,35 @@ function createSupplierProductOnboardingService(dependencies = {}) {
                 }
             }
             if (mapping) {
+                const initialReadiness = assessMappingReadiness({ mode: READINESS_MODES.NEW_ORDER_SELECTABLE, mapping, supplier, offer, availability: availabilityByOffer.get(id(offer)), customerMarket: markets[0], adapter: adapterResolver(supplier) });
+                const existingContract = mapping.mappingMetadata?.fulfillmentContract;
+                const intentionallyDisabled = action === "REUSED_MAPPING" && mapping.enabled === false && !mapping.mappingMetadata?.reconciliationDecision && !mapping.mappingMetadata?.technicalPreparation;
+                if (!initialReadiness.ready && !intentionallyDisabled) {
+                    try {
+                        const plan = await prepareRoute.generateSupplierRoutePreparationPlan({ mappingId: id(mapping), customerMarkets: markets });
+                        if (plan.outcome === "FULFILLMENT_READY" && plan.proposedChanges) {
+                            if (existingContract && existingContract.fingerprint && plan.proposedChanges.fulfillmentContract?.fingerprint !== existingContract.fingerprint) {
+                                blockers.push("ADOPTION_REVIEW_REQUIRED");
+                            } else {
+                                const prepared = await prepareRoute.applySupplierRoutePreparationPlan(plan, { actor: context.actor, confirmed: true });
+                                mapping = await lean(M.Mapping.findById(prepared.mappingId || mapping._id));
+                                action = prepared.idempotentReplay ? "REUSED_PREPARATION" : `${action || "REUSED_MAPPING"}_ROUTE_PREPARED`;
+                            }
+                        } else blockers.push(...(plan.blockers || []));
+                    } catch (error) { blockers.push(error.code || "PREPARATION_FAILED"); }
+                } else if (intentionallyDisabled) blockers.push("ADOPTION_REVIEW_REQUIRED");
                 const readiness = assessMappingReadiness({ mode: READINESS_MODES.NEW_ORDER_SELECTABLE, mapping, supplier, offer, availability: availabilityByOffer.get(id(offer)), customerMarket: markets[0], adapter: adapterResolver(supplier) });
-                blockers = readiness.blockers;
+                blockers = [...blockers, ...readiness.blockers];
+                if (intentionallyDisabled) blockers.push("ADOPTION_REVIEW_REQUIRED");
             }
-            const state = mapping ? (blockers.length ? "NEEDS_SETUP" : "READY") : classification === "AMBIGUOUS" ? "NEEDS_REVIEW" : "BLOCKED";
+            blockers = [...new Set(blockers)].sort();
+            const onlyEnablement = mapping && mapping.enabled !== true && blockers.every(code => code === "MAPPING_DISABLED");
+            const technicallyPrepared = Boolean(mapping?.mappingMetadata?.technicalPreparation);
+            const state = mapping ? (!blockers.length ? "READY" : onlyEnablement && technicallyPrepared ? "NEEDS_ENABLEMENT" : "NEEDS_SETUP") : classification === "AMBIGUOUS" ? "NEEDS_REVIEW" : "BLOCKED";
             outcomes.push({ supplierCatalogOfferId: id(offer), supplierOfferCode: offer.supplierOfferCode, supplierOfferName: offer.supplierOfferName || offer.rawName, classification, state, action: action || "NONE", mappingId: id(mapping), canonical: mapping ? { productCode: mapping.productCode, packageCode: mapping.packageCode } : evidence, blockers: [...new Set(blockers)].sort(), reviewUrl: state === "NEEDS_REVIEW" ? `/api/admin/supplier-catalog/offers/${id(offer)}/reconciliation` : "" });
         }
         const counts = key => outcomes.filter(row => row.action === key || row.state === key).length;
-        const summary = { total: outcomes.length, reusedMappings: counts("REUSED_MAPPING") + counts("REUSED_DECISION"), autoLinked: counts("AUTO_LINKED"), autoCreated: counts("AUTO_CREATED"), ready: counts("READY"), needsReview: counts("NEEDS_REVIEW"), blocked: counts("BLOCKED"), needsSetup: counts("NEEDS_SETUP") };
+        const summary = { total: outcomes.length, reusedMappings: counts("REUSED_MAPPING") + counts("REUSED_DECISION") + counts("REUSED_PREPARATION"), autoLinked: counts("AUTO_LINKED"), autoCreated: counts("AUTO_CREATED"), ready: counts("READY"), needsReview: counts("NEEDS_REVIEW"), blocked: counts("BLOCKED"), needsSetup: counts("NEEDS_SETUP"), needsEnablement: counts("NEEDS_ENABLEMENT") };
         const state = summary.needsReview || summary.blocked ? (summary.ready || summary.needsSetup || summary.reusedMappings || summary.autoLinked || summary.autoCreated ? "PARTIALLY_PREPARED" : "NEEDS_REVIEW") : "PREPARED";
         return { product: { supplierCatalogProductId: id(product), supplierId: id(supplier), supplierCode: supplier.supplierCode, supplierProductCode: product.supplierProductCode, name: product.displayName || product.rawName, supplierMarket: product.supplierMarketCode, onboardingState: state }, customerMarkets: markets, summary, offers: outcomes, safety: { publicationWrites: 0, customerPriceWrites: 0, packageSupplierSelectionWrites: 0, commerceOrderWrites: 0, fulfillmentAttemptWrites: 0, supplierExecutionCalls: 0 } };
     }
