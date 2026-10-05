@@ -14,9 +14,10 @@ const AdminAuditLog = require("../../models/AdminAuditLog");
 const SupplierCatalogReconciliationDecision = require("../../models/SupplierCatalogReconciliationDecision");
 const { getSupplierAdapter } = require("../supplierAdapterRegistry");
 const { READINESS_MODES, assessMappingReadiness } = require("../supplierMappingReadinessService");
-const reconciliation = require("./supplierCatalogReconciliationService");
+const reconciliationModule = require("./supplierCatalogReconciliationService");
 const routePreparation = require("./supplierRoutePreparationService");
 const { assessCanonicalEquivalenceProof } = require("./canonicalEquivalenceProofService");
+const canonicalProductAuthorityModule = require("./supplierCanonicalProductAuthorityService");
 
 const clean = value => String(value == null ? "" : value).trim();
 const upper = value => clean(value).toUpperCase();
@@ -45,7 +46,8 @@ function classifyOffer(offer, targetPackage) {
 
 function createSupplierProductOnboardingService(dependencies = {}) {
     const M = { Supplier: dependencies.Supplier || Supplier, Product: dependencies.Product || SupplierCatalogProduct, Offer: dependencies.Offer || SupplierCatalogOffer, Availability: dependencies.Availability || SupplierOfferAvailability, Mapping: dependencies.Mapping || SupplierProductMapping, Decision: dependencies.Decision || SupplierCatalogReconciliationDecision, CatalogProduct: dependencies.CatalogProduct || CatalogProduct, CatalogPackage: dependencies.CatalogPackage || CatalogPackage, Selection: dependencies.Selection || PackageSupplierSelection, Audit: dependencies.Audit || AdminAuditLog };
-    const reconcile = dependencies.reconciliation || reconciliation;
+    const canonicalProductAuthority = dependencies.canonicalProductAuthority || canonicalProductAuthorityModule;
+    const reconcile = dependencies.reconciliation || reconciliationModule.createSupplierCatalogReconciliationService({ mutationsEnabled: () => canonicalProductAuthority.mutationsEnabled() === true });
     const prepareRoute = dependencies.routePreparation || routePreparation;
     const adapterResolver = dependencies.adapterResolver || getSupplierAdapter;
     const connection = dependencies.connection || mongoose.connection;
@@ -54,25 +56,6 @@ function createSupplierProductOnboardingService(dependencies = {}) {
         const assessments = markets.map(customerMarket => assessMappingReadiness({ mode: READINESS_MODES.NEW_ORDER_SELECTABLE, mapping, supplier, offer, availability, customerMarket, adapter: adapterResolver(supplier) }));
         return { ready: assessments.every(item => item.ready), blockers: [...new Set(assessments.flatMap(item => item.blockers))].sort() };
     };
-
-    async function prepareCanonicalProduct(product, actor, requestId) {
-        const authority = product.metadata?.onboardingCanonicalProduct;
-        const productCode = lower(authority?.productCode);
-        if (!productCode || authority?.authoritative !== true) return null;
-        const existing = await lean(M.CatalogProduct.findOne({ productCode }));
-        if (existing) return existing;
-        const session = await connection.startSession();
-        try {
-            let created;
-            await session.withTransaction(async () => {
-                const replay = await M.CatalogProduct.findOne({ productCode }).session(session).lean();
-                if (replay) { created = replay; return; }
-                created = (await M.CatalogProduct.create([{ productCode, name: clean(authority.name || product.displayName || product.rawName || productCode), enabled: false, commerceState: "HIDDEN", publicDiscoveryEnabled: false, homepageEnabled: false, supportedRegions: [], source: "admin", metadata: { preparedFromSupplierCatalogProductId: id(product), onboardingPrepared: true } }], { session }))[0].toObject();
-                await M.Audit.create([{ actorAdminId: actor?.id || actor?._id || null, actorUsernameSnapshot: actor?.username || "", actorRoleSnapshot: actor?.role || "", action: "SUPPLIER_PRODUCT_CANONICAL_PREPARED", resourceType: "CatalogProduct", resourceId: productCode, requestId, metadata: { supplierCatalogProductId: id(product), publicDiscoveryEnabled: false, commerceState: "HIDDEN" } }], { session });
-            });
-            return created;
-        } finally { await session.endSession(); }
-    }
 
     async function onboardSupplierProduct(input = {}, context = {}) {
         if (input.confirmed !== true) throw new SupplierProductOnboardingError("ONBOARDING_CONFIRMATION_REQUIRED", "Explicit Add to AZIEL confirmation is required.");
@@ -90,7 +73,21 @@ function createSupplierProductOnboardingService(dependencies = {}) {
             lean(M.Mapping.find({ supplierId: product.supplierId, $or: [{ supplierCatalogOfferId: { $in: offerIds } }, { supplierProductCode: product.supplierProductCode, region: product.supplierMarketCode }] })),
             lean(M.Decision.find({ supplierCatalogOfferId: { $in: offerIds }, isCurrent: true }))
         ]);
-        await prepareCanonicalProduct(product, context.actor, context.requestId || "");
+        let canonicalAuthority = product.metadata?.onboardingCanonicalProduct || null;
+        const mappedProductCodes = [...new Set(mappings.map(item => lower(item.productCode)).filter(Boolean))];
+        const exactEvidenceProductCodes = [...new Set(offers.filter(item => upper(item.reconciliationState) === "EXACT_CANONICAL_MATCH").map(item => canonicalEvidence(item)?.productCode).filter(Boolean))];
+        const provenExistingCode = mappedProductCodes.length === 1 ? mappedProductCodes[0] : !mappedProductCodes.length && exactEvidenceProductCodes.length === 1 ? exactEvidenceProductCodes[0] : "";
+        let canonicalProduct = canonicalAuthority?.productCode ? await lean(M.CatalogProduct.findOne({ productCode: lower(canonicalAuthority.productCode), deletedAt: null })) : await lean(M.CatalogProduct.findOne({ "metadata.preparedFromSupplierCatalogProductId": id(product), deletedAt: null }));
+        if (!canonicalProduct && provenExistingCode) canonicalProduct = await lean(M.CatalogProduct.findOne({ productCode: provenExistingCode, deletedAt: null }));
+        if (!canonicalProduct && input.canonicalProductApproval?.confirmed === true) {
+            const approved = await canonicalProductAuthority.authorize({ ...input.canonicalProductApproval, supplierCatalogProductId: id(product), approvedOffers: input.offerApprovals || [] }, context);
+            canonicalProduct = approved.canonicalProduct;
+            canonicalAuthority = approved.authority || { authoritative: true, productCode: canonicalProduct.productCode };
+        }
+        if (!canonicalProduct) throw new SupplierProductOnboardingError("CANONICAL_PRODUCT_AUTHORITY_REQUIRED", "This product is new to AZIEL. Owner confirmation is required before packages can be prepared.", 409, { onboardingPlanRequired: true });
+        const effectiveOfferApprovals = (input.offerApprovals || []).length ? input.offerApprovals : canonicalAuthority?.approvedOffers || [];
+        const approvedOfferLocks = new Map(effectiveOfferApprovals.map(item => [clean(item.supplierCatalogOfferId), item.expectedSource]));
+        const boundedNewProductApproval = input.canonicalProductApproval?.confirmed === true || canonicalAuthority?.authorityType === "OWNER_CREATE_NEW_CANONICAL_PRODUCT";
         const availabilityByOffer = new Map(availability.map(row => [id(row.supplierCatalogOfferId), row]));
         const decisionByOffer = new Map(decisions.map(row => [id(row.supplierCatalogOfferId), row]));
         const outcomes = [];
@@ -100,7 +97,8 @@ function createSupplierProductOnboardingService(dependencies = {}) {
             let classification = mapping ? "PROVEN_SAME" : "";
             const evidence = canonicalEvidence(offer);
             const targetPackage = evidence ? await lean(M.CatalogPackage.findOne({ productCode: evidence.productCode, packageCode: evidence.packageCode, deletedAt: null }).select("_id productCode packageCode name enabled prices metadata")) : null;
-            const assessed = classifyOffer(offer, targetPackage);
+            const explicitlyApprovedNew = boundedNewProductApproval && approvedOfferLocks.has(id(offer)) && upper(offer.catalogLifecycleState) === "ACTIVE" && ["NO_CANONICAL_PACKAGE", "UNREVIEWED"].includes(upper(offer.reconciliationState));
+            const assessed = explicitlyApprovedNew ? { classification: "PROVEN_NEW", blockers: [] } : classifyOffer(offer, targetPackage);
             let equivalenceConflict = false;
             let blockers;
             if (mapping) {
@@ -116,9 +114,9 @@ function createSupplierProductOnboardingService(dependencies = {}) {
             }
             if (!mapping && ["PROVEN_SAME", "PROVEN_NEW"].includes(classification)) {
                 try {
-                    const expectedSource = reconcile.sourceLock({ offer, product, availability: availabilityByOffer.get(id(offer)) });
+                    const expectedSource = approvedOfferLocks.get(id(offer)) || reconcile.sourceLock({ offer, product, availability: availabilityByOffer.get(id(offer)) });
                     const decisionType = classification === "PROVEN_SAME" ? "LINK_TO_EXISTING_CANONICAL_PACKAGE" : "CREATE_CANONICAL_PACKAGE_AND_LINK";
-                    const result = await reconcile.decide({ supplierCatalogOfferId: id(offer), decisionType, confirmed: true, canonicalPackageId: targetPackage?._id, canonicalProductCode: evidence?.productCode || lower(offer.reconciliationEvidence?.canonicalProductCode), canonicalPackageName: clean(offer.supplierOfferName || offer.rawName), region: upper(product.supplierMarketCode), reasonCode: "ADMIN_ADD_TO_AZIEL", reviewNotes: "Deterministic supplier-product onboarding", expectedSource, requestIdempotencyKey: hash(`${clean(input.requestIdempotencyKey || "onboard")}|${id(product)}|${id(offer)}|${decisionType}`) }, { actor: context.actor, requestId: context.requestId || "" });
+                    const result = await reconcile.decide({ supplierCatalogOfferId: id(offer), decisionType, confirmed: true, canonicalPackageId: targetPackage?._id, canonicalProductCode: evidence?.productCode || lower(offer.reconciliationEvidence?.canonicalProductCode) || lower(canonicalProduct.productCode), canonicalPackageName: clean(offer.supplierOfferName || offer.rawName), region: upper(product.supplierMarketCode), reasonCode: "ADMIN_ADD_TO_AZIEL", reviewNotes: "Bounded deterministic supplier-product onboarding", expectedSource, requestIdempotencyKey: hash(`${clean(input.requestIdempotencyKey || "onboard")}|${id(product)}|${id(offer)}|${decisionType}`) }, { actor: context.actor, requestId: context.requestId || "" });
                     mapping = result.mapping;
                     action = result.idempotentReplay ? "REUSED_DECISION" : classification === "PROVEN_SAME" ? "AUTO_LINKED" : "AUTO_CREATED";
                 } catch (error) {

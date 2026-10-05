@@ -67,6 +67,7 @@ ok(projection.supplierInventory[0].offers[0].availability === "AVAILABLE", "safe
 ok(!JSON.stringify(projection).match(/rawSnapshot|credential|password|secret|apiKey/i), "no raw or credential leakage");
 
 const service = source("backend/services/supplierCatalog/supplierProductOnboardingService.js");
+const productAuthority = source("backend/services/supplierCatalog/supplierCanonicalProductAuthorityService.js");
 const route = source("backend/routes/supplier.js");
 const ui = source("frontend/js/admin-add-product-wizard.js");
 const routePreparationSource = source("backend/services/supplierCatalog/supplierRoutePreparationService.js");
@@ -78,7 +79,7 @@ for (const [needle, label] of [
     ["commerceOrderWrites: 0", "no order"], ["fulfillmentAttemptWrites: 0", "no attempt"], ["supplierExecutionCalls: 0", "no supplier execution"],
     ["commerceState: \"HIDDEN\"", "new product hidden"], ["publicDiscoveryEnabled: false", "new product not discoverable"], ["enabled: false", "new product disabled"],
     ["requestIdempotencyKey", "retry identity required"], ["CURRENT_DECISION_CONFLICT", "concurrent decision handled"], ["DUPLICATE_MAPPING_CONFLICT", "duplicate mapping handled"]
-]) ok(service.includes(needle), label);
+]) ok((service + productAuthority).includes(needle), label);
 ok(!service.includes("CommerceOrder.create"), "no CommerceOrder creation");
 ok(!service.includes("FulfillmentAttempt.create"), "no FulfillmentAttempt creation");
 ok(!service.includes("PackageSupplierSelection.create"), "no selection creation");
