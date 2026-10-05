@@ -41,6 +41,9 @@ const select = { ...direct, supplierCode: "FAZERCARDS", protocol: "FAZERCARDS_TO
 ] };
 select.fingerprint = contractFingerprint(select);
 assert.deepStrictEqual(buildFieldsFromContract(select, { playerId: "P1", accountFields: [{ key: "server", value: "asia" }] }), { player_id: "P1", server: "asia" });
+const optionalSelect = { ...select, fields: select.fields.map(field => field.customerField === "server" ? { ...field, required: false } : field) };
+optionalSelect.fingerprint = contractFingerprint(optionalSelect);
+assert.deepStrictEqual(buildFieldsFromContract(optionalSelect, { playerId: "P1" }), { player_id: "P1" });
 assert.throws(() => buildFieldsFromContract(select, { playerId: "P1", accountFields: [{ key: "server", value: "forged" }] }), error => error.code === "FAZERCARDS_INPUT_CONSTRAINT_FAILED");
 assert.throws(() => buildFieldsFromContract(select, { playerId: "P1", accountFields: [{ key: "server", value: "asia" }, { key: "undeclared", value: "forged" }] }), error => error.code === "SUPPLIER_UNDECLARED_INPUT");
 assert.deepStrictEqual(publicCustomerInputContract(select).fields[1].options, [{ label: "America", value: "america" }, { label: "Asia", value: "asia" }]);

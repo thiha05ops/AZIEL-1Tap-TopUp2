@@ -106,12 +106,15 @@ function createWonddAdapter(options = {}) {
             completenessEvidence: "SINGLE_RESPONSE_COMPLETENESS_UNPROVEN",
             rows: rows.map(row => ({
                 serviceid: clean(row.serviceid),
+                servicecode: clean(row.servicecode),
                 packcode: clean(row.packcode),
                 name: clean(row.name),
                 point: row.point == null ? null : Number(row.point),
                 amount: Number(row.amount),
                 discount: Number(row.discount),
-                netpricedealer: Number(row.netpricedealer)
+                netpricedealer: Number(row.netpricedealer),
+                inputSchema: row.input_schema || row.inputSchema || row.required_fields || row.fields || null,
+                noCustomerInput: row.no_customer_input === true || row.noCustomerInput === true
             })),
             packageCount: rows.length
         };
