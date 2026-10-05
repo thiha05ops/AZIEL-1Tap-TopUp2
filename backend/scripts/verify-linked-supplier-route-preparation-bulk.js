@@ -231,22 +231,21 @@ async function generateSnapshotPlan(fixture) {
     assert.strictEqual(validCanonical.sourceLock.canonical.productId, "canonical-product-active");
     assert.deepStrictEqual(validCanonical.sourceLock.canonical.packageIds, ["canonical-package-active"]);
 
-    const commercialPrimaryRegionChange = await generateSnapshotPlan(canonicalParityFixture({ mappingRegion: "TH", productionRole: "PRIMARY" }));
-    assert.strictEqual(commercialPrimaryRegionChange.outcome, "REVIEW_REQUIRED", "Technical preparation must not migrate an existing commercial PRIMARY route across regions.");
-    assert(commercialPrimaryRegionChange.blockers.includes("COMMERCIAL_ROUTE_REGION_CHANGE_REQUIRES_OWNER_REVIEW"));
-    assert.strictEqual(commercialPrimaryRegionChange.proposedChanges, null);
+    const commercialPrimaryRegionPreserved = await generateSnapshotPlan(canonicalParityFixture({ mappingRegion: "TH", productionRole: "PRIMARY" }));
+    assert.strictEqual(commercialPrimaryRegionPreserved.outcome, "FULFILLMENT_READY", "An established route market remains authoritative when catalog market evidence is broader.");
+    assert.strictEqual(commercialPrimaryRegionPreserved.proposedChanges.region, "TH", "Technical preparation must not migrate an existing commercial PRIMARY route across regions.");
 
     const deletedProduct = await generateSnapshotPlan(canonicalParityFixture({ productDeleted: true }));
     assert.strictEqual(deletedProduct.outcome, "MISSING_CANONICAL_LINK", "Deleted canonical product cannot become WOULD_PREPARE.");
     assert.strictEqual(deletedProduct.sourceLock.canonical.productId, "");
     assert.deepStrictEqual(deletedProduct.sourceLock.canonical.packageIds, ["canonical-package-active"]);
-    assert(deletedProduct.blockers.includes("MISSING_CANONICAL_LINK"));
+    assert(deletedProduct.blockers.includes("CANONICAL_PRODUCT_MISSING"));
 
     const deletedPackage = await generateSnapshotPlan(canonicalParityFixture({ packageDeleted: true }));
     assert.strictEqual(deletedPackage.outcome, "MISSING_CANONICAL_LINK", "Deleted canonical package cannot become WOULD_PREPARE.");
     assert.strictEqual(deletedPackage.sourceLock.canonical.productId, "canonical-product-active");
     assert.deepStrictEqual(deletedPackage.sourceLock.canonical.packageIds, []);
-    assert(deletedPackage.blockers.includes("MISSING_CANONICAL_LINK"));
+    assert(deletedPackage.blockers.includes("CANONICAL_PACKAGE_MISSING"));
 
     const productRemoved = await generateSnapshotPlan(canonicalParityFixture({ includeActiveProduct: false }));
     const packageRemoved = await generateSnapshotPlan(canonicalParityFixture({ includeActivePackage: false }));

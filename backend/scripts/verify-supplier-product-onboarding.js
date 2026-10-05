@@ -99,11 +99,12 @@ ok(service.includes("generateSupplierRoutePreparationPlan"), "onboarding invokes
 ok(service.includes("applySupplierRoutePreparationPlan"), "deterministic route preparation uses existing apply authority");
 ok(service.includes("M.Mapping.findById(prepared.mappingId"), "mapping is re-read after preparation");
 ok(service.match(/assessMappingReadiness/g).length >= 2, "readiness is re-evaluated after preparation");
-ok(service.includes("intentionallyDisabled"), "existing intentionally disabled mappings are not silently reconfigured");
+ok(!service.includes("intentionallyDisabled") && service.includes("generateSupplierRoutePreparationPlan"), "exact disabled mappings use the bounded route-preparation authority instead of a generic adoption-review rejection");
 ok(service.includes("existingContract") && service.includes("fingerprint"), "explicit contract is not replaced by weaker evidence");
 ok(Object.keys(WIZARD_STATES).join(",") === "READY,PREPARABLE,NEEDS_ATTENTION,UNAVAILABLE", "one authoritative four-state wizard contract");
 ok(wizardStateFor({ mapping: exactMapping, classification: "PROVEN_SAME", blockers: [] }) === WIZARD_STATES.READY, "selectable exact mapping is READY");
 ok(wizardStateFor({ mapping: { ...exactMapping, mappingMetadata: { technicalPreparation: { authority: "test" } } }, classification: "PROVEN_SAME", blockers: ["MAPPING_DISABLED"] }) === WIZARD_STATES.PREPARABLE, "safe prepared disabled mapping is PREPARABLE without claiming execution readiness");
+ok(wizardStateFor({ mapping: { ...exactMapping, mappingMetadata: { technicalPreparation: { authority: "test" } } }, classification: "PROVEN_SAME", blockers: ["MAPPING_DISABLED", "MAPPING_NOT_PRIMARY", "PROVIDER_FEATURE_GATE_OFF"] }) === WIZARD_STATES.PREPARABLE, "live activation controls remain distinct from technical preparation");
 ok(wizardStateFor({ mapping: null, classification: "PROVEN_NEW", blockers: [] }) === WIZARD_STATES.PREPARABLE, "bounded exact new offer is PREPARABLE");
 ok(wizardStateFor({ mapping: null, classification: "AMBIGUOUS", blockers: ["CANONICAL_EQUIVALENCE_REVIEW_REQUIRED"] }) === WIZARD_STATES.NEEDS_ATTENTION, "ambiguous identity needs attention");
 ok(wizardStateFor({ mapping: exactMapping, classification: "PROVEN_SAME", blockers: ["CUSTOMER_MARKET_NOT_ELIGIBLE"] }) === WIZARD_STATES.UNAVAILABLE, "unsupported customer market is unavailable");

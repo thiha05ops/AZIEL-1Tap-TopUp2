@@ -192,7 +192,7 @@ function discoveryAssessment({ mapping, mappingIsDurable = true, supplier, suppl
     if (!markets.length) blockers.push("CUSTOMER_MARKET_REQUIRED");
     if (markets.some(market => !COMMERCE_MARKETS.includes(market))) blockers.push("CUSTOMER_MARKET_ELIGIBILITY_UNPROVEN");
     const { proposed, fulfillmentContract } = discoveryMappingCandidate({ mapping, supplier, supplierProduct, offer });
-    if (!fulfillmentContract?.fields?.length) blockers.push("INPUT_CONTRACT_UNRESOLVED");
+    if (!fulfillmentContract || (!fulfillmentContract.fields?.length && fulfillmentContract.noCustomerInput !== true)) blockers.push("INPUT_CONTRACT_UNRESOLVED");
     let adapter = null, adapterConfigured = false, autoFulfillmentEnabled = false, processorSupported = false;
     const adapterResolver = dependencies.adapterResolver || getSupplierAdapter;
     try { adapter = supplier ? adapterResolver(supplier) : null; } catch { adapter = null; }

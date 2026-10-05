@@ -23,7 +23,7 @@ function memoryRepositories() {
     ok(stage.products.some(x=>x.supplierProductCode==="9622"),"serviceid product identity");
     ok(stage.offers.some(x=>x.supplierProductCode==="9622"&&x.supplierOfferCode==="ML00086"),"packcode offer identity");
     const mlbb=stage.products.find(x=>x.supplierProductCode==="9622"); ok(mlbb.metadata.transactionalServiceCode==="mlbb"&&mlbb.supplierProductCode!==mlbb.metadata.transactionalServiceCode,"serviceid distinct from serviceCode");
-    ok(mlbb.metadata.serviceCodeAuthority==="WONDD_CATALOG_CONFIG","confirmed serviceCode authority");
+    ok(mlbb.metadata.serviceCodeAuthority==="WONDD_CATALOG_CONFIG_LEGACY","confirmed legacy serviceCode authority");
     const bcm=stage.products.find(x=>x.supplierProductCode==="9604"); ok(bcm.metadata.transactionalServiceCode===""&&bcm.metadata.serviceCodeAuthority==="UNRESOLVED","unknown serviceCode not inferred");
     ok(stage.products.every(x=>x.supplierMarketCode==="UNSPECIFIED"),"markets default unspecified");
     ok(stage.offers.every(x=>x.supplierCost.currency==="THB")&&stage.products.every(x=>x.supplierMarketCode!=="TH"),"THB does not infer TH");
@@ -31,6 +31,8 @@ function memoryRepositories() {
     ok(stage.offers.every(x=>x.availability.state==="AVAILABLE"&&x.availability.evidenceCode==="WONDD_PACKAGE_LISTED"),"positive rows available");
     const plan=svc.planMutations(stage); ok(plan.missing.length===0&&plan.coverageState==="PARTIAL","absence remains unknown under unproven completeness");
     const duplicate=await svc.stageCatalog({reader:fixture.reader({rows:[fixture.rows[0],fixture.rows[0]]}),supplierId:"s",observedAt}); ok(duplicate.errors.some(x=>x.code==="DUPLICATE_PROVIDER_IDENTITY")&&duplicate.offers.length===1,"duplicate rejected");
+    const future=await svc.stageCatalog({reader:fixture.reader({rows:[{serviceid:"9999",servicecode:"future_game",packcode:"FUTURE01",name:"Future 100 Credits",netpricedealer:10}]}),supplierId:"s",observedAt});
+    ok(future.products[0].supportState==="SUPPORTED"&&future.products[0].metadata.transactionalServiceCode==="future_game"&&future.products[0].metadata.serviceCodeAuthority==="WONDD_SUPPLIER_CATALOG","future native protocol product uses exact supplier execution identity without product-specific code");
     const malformed=await svc.stageCatalog({reader:fixture.reader({rows:[...fixture.rows,{serviceid:"",packcode:"X",name:"Bad",netpricedealer:1}]}),supplierId:"s",observedAt}); ok(malformed.errors.some(x=>x.code==="MALFORMED_OFFER")&&malformed.offers.length===fixture.rows.length,"malformed row isolated");
     const partialPlan=svc.planMutations(malformed,{offers:[{supplierProductCode:"9999",supplierOfferCode:"OLD",availability:{state:"AVAILABLE"}}]}); ok(partialPlan.missing.length===0&&partialPlan.coverageState==="PARTIAL","partial blocks missing transitions");
     ok(stage.offers.filter(x=>x.reconciliationState==="EXACT_CANONICAL_MATCH").length===3,"exact mapping by confirmed identity");

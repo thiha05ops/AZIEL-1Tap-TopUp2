@@ -135,7 +135,7 @@ function createWonddAdapter(options = {}) {
         const serviceCode = clean(input.serviceCode).toLowerCase();
         const packCode = clean(input.packCode);
         const gameId = clean(input.gameId);
-        if (!Object.values(CONFIRMED_SERVICE_CODES).some(code => code.toLowerCase() === serviceCode)) throw new WonddAdapterError("WONDD_SERVICE_MAPPING_INVALID", "WonDD servicecode is not supplier-confirmed.", { category: "CONFIGURATION" });
+        if (!/^[a-z0-9_-]{1,80}$/i.test(serviceCode)) throw new WonddAdapterError("WONDD_SERVICE_MAPPING_INVALID", "WonDD servicecode is invalid.", { category: "CONFIGURATION" });
         if (!packCode) throw new WonddAdapterError("WONDD_PACKAGE_MAPPING_MISSING", "A verified WonDD packcode mapping is required.", { category: "CONFIGURATION" });
         const productCode = clean(input.productCode || Object.keys(CONFIRMED_SERVICE_CODES).find(key => CONFIRMED_SERVICE_CODES[key].toLowerCase() === serviceCode)).toLowerCase();
         validateBuiltGameId(productCode, gameId);

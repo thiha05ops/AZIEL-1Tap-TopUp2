@@ -106,7 +106,7 @@ function defaultRepos() {
     };
 }
 
-function createSupplierCanonicalProductAuthorityService({ repos = defaultRepos(), gate = mutationsEnabled, clock = () => new Date() } = {}) {
+function createSupplierCanonicalProductAuthorityService({ repos = defaultRepos(), gate = mutationsEnabled, clock = () => new Date(), routePlanner = null } = {}) {
     const concurrencyCodes = new Set([11000, 112, 244, 251]);
     function isConcurrentMongoFailure(error) {
         const labels = Array.isArray(error?.errorLabels) ? error.errorLabels : [];
@@ -147,7 +147,7 @@ function createSupplierCanonicalProductAuthorityService({ repos = defaultRepos()
         if (!audit) throw new SupplierCanonicalProductAuthorityError("CANONICAL_PRODUCT_AUTHORITY_AUDIT_MISSING", "Canonical product authority exists without its mandatory creation audit.", 409);
         return { canonicalProduct: prior, authority, idempotentReplay: true, concurrentReplay: true };
     }
-    async function plan(productId) {
+    async function plan(productId, options = {}) {
         const product = await repos.productById(productId, null);
         if (!product) throw new SupplierCanonicalProductAuthorityError("SUPPLIER_CATALOG_PRODUCT_NOT_FOUND", "Persisted supplier catalog product was not found.", 404);
         const offers = await repos.offersByProduct(product._id, null);
@@ -164,12 +164,35 @@ function createSupplierCanonicalProductAuthorityService({ repos = defaultRepos()
         const proposedProductCode = lower(authority?.productCode || existing?.productCode || deterministicProductCode(product));
         const collision = await repos.canonicalByCode(proposedProductCode, null);
         const collisionConflict = Boolean(collision && id(collision.metadata?.preparedFromSupplierCatalogProductId) !== id(product));
+        const mappingByOffer = new Map(mappings.filter(item => id(item.supplierCatalogOfferId)).map(item => [id(item.supplierCatalogOfferId), item]));
+        const requestedMarkets = [...new Set((options.customerMarkets || []).map(value => clean(value).toUpperCase()).filter(value => ["TH", "MM"].includes(value)))].sort();
+        const projectedOffers = [];
+        for (const offer of offers) {
+            const baseState = offerWizardState(offer), mapping = mappingByOffer.get(id(offer));
+            let state = baseState, disposition = offerDisposition(offer), blockers = [];
+            if (mapping && clean(offer.catalogLifecycleState).toUpperCase() === "ACTIVE" && clean(offer.reconciliationState).toUpperCase() === "EXACT_CANONICAL_MATCH") {
+                if (routePlanner && requestedMarkets.length) {
+                    const routePlan = await routePlanner({ mappingId: id(mapping), customerMarkets: requestedMarkets });
+                    blockers = [...new Set(routePlan.blockers || [])].sort();
+                    const readiness = mapping.mappingMetadata?.readiness || {};
+                    const liveReady = mapping.enabled === true && clean(mapping.productionRole).toUpperCase() === "PRIMARY" && readiness.inputReady === true && readiness.validationReady === true && readiness.fulfillmentReady === true;
+                    state = routePlan.outcome === "FULFILLMENT_READY" ? (liveReady ? "READY" : "PREPARABLE") : "NEEDS_ATTENTION";
+                    disposition = routePlan.outcome === "FULFILLMENT_READY" ? "READY_TO_PREPARE" : "REVIEW_REQUIRED";
+                } else {
+                    blockers = mapping.mappingMetadata?.technicalPreparation ? ["MAPPING_DISABLED"] : ["TECHNICAL_PREPARATION_REQUIRED"];
+                    state = mapping.mappingMetadata?.technicalPreparation ? "PREPARABLE" : "NEEDS_ATTENTION";
+                    disposition = mapping.mappingMetadata?.technicalPreparation ? "READY_TO_PREPARE" : "REVIEW_REQUIRED";
+                }
+            } else if (baseState === "NEEDS_ATTENTION") blockers = ["CANONICAL_EQUIVALENCE_REVIEW_REQUIRED"];
+            if (baseState === "UNAVAILABLE") blockers = ["SUPPLIER_OFFER_NOT_ACTIVE"];
+            projectedOffers.push({ supplierCatalogOfferId: id(offer), supplierOfferCode: offer.supplierOfferCode, name: clean(offer.supplierOfferName || offer.rawName || offer.supplierOfferCode), state, disposition, blockers, mappingId: id(mapping), sourceLock: reconciliationSourceLock({ offer, product, availability: availabilityByOffer.get(id(offer)) }) });
+        }
         return {
             capability: { mutationEnabled: gate() === true, ownerConfirmationRequired: true },
             product: { supplierCatalogProductId: id(product), name: clean(product.displayName || product.rawName || product.supplierProductCode), supplierId: id(product.supplierId), catalogNamespace: product.catalogNamespace, supplierProductCode: product.supplierProductCode, supplierMarket: product.supplierMarketCode, sourceLock: sourceLock(product) },
             canonical: { exists: Boolean(existing), productCode: existing?.productCode || proposedProductCode, name: existing?.name || clean(product.displayName || product.rawName || product.supplierProductCode), collisionConflict },
             state: identityConflict ? "CANONICAL_PRODUCT_IDENTITY_CONFLICT" : existing ? "EXISTING_CANONICAL_PRODUCT" : collisionConflict ? "CANONICAL_PRODUCT_CODE_CONFLICT" : "NEW_TO_AZIEL",
-            offers: offers.map(offer => ({ supplierCatalogOfferId: id(offer), supplierOfferCode: offer.supplierOfferCode, name: clean(offer.supplierOfferName || offer.rawName || offer.supplierOfferCode), state: offerWizardState(offer), disposition: offerDisposition(offer), sourceLock: reconciliationSourceLock({ offer, product, availability: availabilityByOffer.get(id(offer)) }) }))
+            offers: projectedOffers
         };
     }
 
@@ -240,5 +263,5 @@ function createSupplierCanonicalProductAuthorityService({ repos = defaultRepos()
     return { plan, authorize, sourceLock, validateSourceLock, deterministicProductCode, offerLock, offerDisposition, offerWizardState, mutationsEnabled: gate, isConcurrentMongoFailure, recoverConcurrentAuthority };
 }
 
-const service = createSupplierCanonicalProductAuthorityService();
+const service = createSupplierCanonicalProductAuthorityService({ routePlanner: require("./supplierRoutePreparationService").generateSupplierRoutePreparationPlan });
 module.exports = Object.freeze({ SupplierCanonicalProductAuthorityError, createSupplierCanonicalProductAuthorityService, sourceLock, validateSourceLock, deterministicProductCode, offerLock, offerDisposition, offerWizardState, mutationsEnabled, plan: service.plan, authorize: service.authorize });

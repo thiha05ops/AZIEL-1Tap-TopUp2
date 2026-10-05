@@ -2,6 +2,7 @@ const {
     CUSTOMER_MARKETS,
     validateFulfillmentEligibility
 } = require("../supplierFulfillmentEligibilityService");
+const { verifiedMappingContract } = require("../suppliers/fazercardsFulfillmentContractService");
 
 const ORDER_SNAPSHOT_RUNTIME_VERSION = "2.5.2";
 const ORDER_SNAPSHOT_SPECIFICATION_VERSION = "2.5.2";
@@ -459,6 +460,11 @@ function normalizeSupplierRouteSnapshot(route, quote) {
             throw new OrderSnapshotRuntimeError(ORDER_SNAPSHOT_ERROR_CODES.INVALID_FULFILMENT_INPUT, "Supplier API route requires exact provider identity.", { stage: "fulfilment-route" });
         }
         normalized.eligibility = clonePlain(eligibility.value);
+    }
+    if (normalized.routeType !== "MANUAL_ADMIN" && route.fulfillmentContract) {
+        const contract = verifiedMappingContract({ supplierCode: normalized.supplierCode, supplierProductCode: normalized.supplierProductCode, mappingMetadata: { fulfillmentContract: route.fulfillmentContract } });
+        if (!contract) throw new OrderSnapshotRuntimeError(ORDER_SNAPSHOT_ERROR_CODES.INVALID_FULFILMENT_INPUT, "Supplier route customer-information contract is invalid.", { stage: "fulfilment-route" });
+        normalized.fulfillmentContract = clonePlain(contract);
     }
     return normalized;
 }
