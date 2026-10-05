@@ -39,12 +39,14 @@ for (const [overrides, blocker, label] of [
     [{ mapping: { supplierId: "wrong" } }, "SUPPLIER_IDENTITY_CONFLICT", "supplier identity mismatch"],
     [{ mapping: { supplierProductCode: "WRONG" } }, "SUPPLIER_PRODUCT_IDENTITY_CONFLICT", "native product mismatch"],
     [{ mapping: { supplierPackageCode: "WRONG" } }, "SUPPLIER_OFFER_IDENTITY_CONFLICT", "native offer mismatch"],
-    [{ mapping: { region: "MM" } }, "SUPPLIER_MARKET_IDENTITY_CONFLICT", "market contradiction"],
     [{ canonicalProduct: null }, "CANONICAL_PRODUCT_MISSING", "canonical product missing"],
     [{ canonicalPackages: [] }, "CANONICAL_PACKAGE_MISSING", "canonical package missing"],
     [{ canonicalPackages: [{ ...canonicalPackage, packageCode: "WRONG" }] }, "CANONICAL_PACKAGE_IDENTITY_CONFLICT", "wrong canonical package"],
     [{ mapping: { archivedAt: new Date() } }, "MAPPING_ARCHIVED", "archived mapping"]
 ]) ok(!proof(overrides).proven && proof(overrides).blockers.includes(blocker), label + " fails closed");
+ok(assessCanonicalEquivalenceProof({ supplierProduct: { ...supplierProduct, supplierMarketCode: "UNKNOWN" }, offer: { ...exact, reconciliationState: "UNRECONCILED", reconciliationEvidence: {} }, mapping: exactMapping, canonicalProduct, canonicalPackages: [canonicalPackage] }).proven, "UNKNOWN catalog market can coexist with exact TH mapping");
+ok(assessCanonicalEquivalenceProof({ supplierProduct: { ...supplierProduct, supplierMarketCode: "GLOBAL" }, offer: { ...exact, reconciliationState: "UNRECONCILED", reconciliationEvidence: {} }, mapping: exactMapping, canonicalProduct, canonicalPackages: [canonicalPackage] }).proven, "GLOBAL catalog market can coexist with exact TH mapping");
+ok(assessCanonicalEquivalenceProof({ supplierProduct: { ...supplierProduct, supplierMarketCode: "GLOBAL" }, offer: { ...exact, reconciliationState: "UNRECONCILED", reconciliationEvidence: {} }, mapping: { ...exactMapping, region: "MM" }, canonicalProduct, canonicalPackages: [canonicalPackage] }).proven, "GLOBAL catalog market can coexist with exact MM mapping");
 ok(!proof({ canonicalPackages: [canonicalPackage, { ...canonicalPackage, _id: "p2" }] }).proven, "contradictory active canonical authority requires review");
 ok(!proof({ decision: { ...approvedLink, sourceOfferHash: "stale" } }).proven && proof({ decision: { ...approvedLink, sourceOfferHash: "stale" } }).blockers.includes("RECONCILIATION_DECISION_SOURCE_STALE"), "stale decision requires review");
 ok(proof({ decision: approvedLink, offer: { reconciliationState: "AMBIGUOUS" } }).proven, "mutable reconciliation state does not invalidate exact durable decision");
@@ -105,6 +107,13 @@ ok(assessMappingReadiness({ mode: READINESS_MODES.NEW_ORDER_SELECTABLE, mapping:
 const publicAssessment = assessMappingReadiness({ mode: READINESS_MODES.PUBLIC_PURCHASABLE, mapping: technical, supplier, offer: exact, availability, customerMarket: "TH", adapter, pkg: { enabled: true, prices: {} }, publication: { published: true }, selection: { supplierMappingId: technical._id } });
 ok(publicAssessment.blockers.includes("PRICING_NOT_READY") && publicAssessment.blockers.includes("NO_VALID_PRICE"), "PUBLIC_PURCHASABLE retains commercial pricing checks");
 ok(assessMappingReadiness({ mode: READINESS_MODES.NEW_ORDER_SELECTABLE, mapping: technical, supplier, offer: exact, availability, customerMarket: "MM", adapter }).blockers.includes("CUSTOMER_MARKET_NOT_ELIGIBLE"), "TH eligibility does not imply MM readiness");
+const globalEligibility = { ...technical, fulfillmentEligibility: { ...technical.fulfillmentEligibility, mode: "GLOBAL", allowedCustomerMarkets: [] } };
+ok(!assessMappingReadiness({ mode: READINESS_MODES.NEW_ORDER_SELECTABLE, mapping: globalEligibility, supplier, offer: exact, availability, customerMarket: "TH", adapter }).blockers.includes("CUSTOMER_MARKET_NOT_ELIGIBLE"), "GLOBAL eligibility permits supported TH market");
+ok(!assessMappingReadiness({ mode: READINESS_MODES.NEW_ORDER_SELECTABLE, mapping: globalEligibility, supplier, offer: exact, availability, customerMarket: "MM", adapter }).blockers.includes("CUSTOMER_MARKET_NOT_ELIGIBLE"), "GLOBAL eligibility permits supported MM market");
+const unknownEligibility = { ...technical, fulfillmentEligibility: { ...technical.fulfillmentEligibility, mode: "UNKNOWN", allowedCustomerMarkets: [] } };
+ok(assessMappingReadiness({ mode: READINESS_MODES.NEW_ORDER_SELECTABLE, mapping: unknownEligibility, supplier, offer: exact, availability, customerMarket: "TH", adapter }).blockers.includes("FULFILLMENT_ELIGIBILITY_UNKNOWN"), "UNKNOWN eligibility remains fail closed");
+ok(service.includes("continuation") && service.includes("preparedCount") && service.includes("exceptionCount"), "onboarding exposes sanitized wizard continuation");
+ok(service.includes("markets.map(customerMarket") && service.includes("assessments.every(item => item.ready)"), "every requested customer market must pass readiness");
 ok(ui.includes("row.blockers") && ui.includes("apwBlockerLabel"), "frontend renders sanitized blocker codes");
 ok(!routePreparationSource.includes("Promise.all"), "route-preparation session reads remain sequential");
 

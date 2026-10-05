@@ -107,10 +107,10 @@ function sourceLock(state, runtime) {
 }
 
 function deterministicSupplierMarket(state = {}) {
+    const mappingMarket = normalizeSupplierMarket(state.mapping?.region) || upper(state.mapping?.region);
+    if (mappingMarket && !["UNKNOWN", "UNSPECIFIED"].includes(mappingMarket)) return mappingMarket;
     const market = normalizeSupplierMarket(state.supplierProduct?.supplierMarketCode) || upper(state.supplierProduct?.supplierMarketCode);
     if (market && !["UNKNOWN", "UNSPECIFIED"].includes(market)) return market;
-    const mappingMarket = upper(state.mapping?.region);
-    if (["TH", "MM"].includes(mappingMarket)) return mappingMarket;
     if (!market || ["UNKNOWN", "UNSPECIFIED"].includes(market)) return "";
     return market;
 }

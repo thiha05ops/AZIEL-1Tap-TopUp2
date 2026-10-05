@@ -45,7 +45,7 @@ for (const [change, blocker] of [
 ]) assert(assessPreCommercialFulfillmentReadiness({ ...readyInput, ...change }).blockers.includes(blocker), blocker);
 
 function fixtures({ failAudit = false } = {}) {
-    const state = { mapping: { ...mapping, executionMode: "MANUAL", fulfillmentEligibility: { mode: "UNKNOWN", allowedCustomerMarkets: [], evidenceCode: "", evidenceSource: "", verifiedAt: null, version: 1 }, mappingMetadata: { readiness: { supplierMapped: true, pricingReady: false, inputReady: false, validationReady: false, fulfillmentReady: false, storefrontReady: false } } }, supplier: { ...supplier }, supplierProduct: { ...supplierProduct }, offer: { ...offer, reconciliationState: "AMBIGUOUS", reconciliationEvidence: {} }, availability: { ...availability }, canonicalProduct: { ...canonicalProduct }, canonicalPackages: [{ ...canonicalPackage }], audits: [], updates: 0 };
+    const state = { mapping: { ...mapping, region: "TH", executionMode: "MANUAL", fulfillmentEligibility: { mode: "UNKNOWN", allowedCustomerMarkets: [], evidenceCode: "", evidenceSource: "", verifiedAt: null, version: 1 }, mappingMetadata: { readiness: { supplierMapped: true, pricingReady: false, inputReady: false, validationReady: false, fulfillmentReady: false, storefrontReady: false } } }, supplier: { ...supplier }, supplierProduct: { ...supplierProduct, supplierMarketCode: "GLOBAL" }, offer: { ...offer, reconciliationState: "AMBIGUOUS", reconciliationEvidence: {} }, availability: { ...availability }, canonicalProduct: { ...canonicalProduct }, canonicalPackages: [{ ...canonicalPackage }], audits: [], updates: 0 };
     const repos = {
         transaction: async fn => {
             const snapshot = structuredClone(state);
@@ -76,6 +76,7 @@ function fixtures({ failAudit = false } = {}) {
     const plan = await service.generatePlan({ mappingId: "m1", customerMarkets: ["TH"] });
     assert.strictEqual(plan.outcome, OUTCOMES.FULFILLMENT_READY);
     assert.strictEqual(plan.sourceLock.canonicalEquivalence.source, "EXACT_MAPPING");
+    assert.strictEqual(plan.proposedChanges.region, "TH", "Catalog market classification must not rewrite established mapping route scope.");
     assert.strictEqual(plan.proposedChanges.executionMode, "API");
     assert.strictEqual(plan.safety.enabledWrites, 0);
     assert.strictEqual(plan.safety.roleWrites, 0);

@@ -50,6 +50,10 @@ function createSupplierProductOnboardingService(dependencies = {}) {
     const adapterResolver = dependencies.adapterResolver || getSupplierAdapter;
     const connection = dependencies.connection || mongoose.connection;
     const lean = query => query.lean();
+    const assessRequestedMarkets = ({ mapping, supplier, offer, availability, markets }) => {
+        const assessments = markets.map(customerMarket => assessMappingReadiness({ mode: READINESS_MODES.NEW_ORDER_SELECTABLE, mapping, supplier, offer, availability, customerMarket, adapter: adapterResolver(supplier) }));
+        return { ready: assessments.every(item => item.ready), blockers: [...new Set(assessments.flatMap(item => item.blockers))].sort() };
+    };
 
     async function prepareCanonicalProduct(product, actor, requestId) {
         const authority = product.metadata?.onboardingCanonicalProduct;
@@ -125,7 +129,7 @@ function createSupplierProductOnboardingService(dependencies = {}) {
                 }
             }
             if (mapping && !equivalenceConflict) {
-                const initialReadiness = assessMappingReadiness({ mode: READINESS_MODES.NEW_ORDER_SELECTABLE, mapping, supplier, offer, availability: availabilityByOffer.get(id(offer)), customerMarket: markets[0], adapter: adapterResolver(supplier) });
+                const initialReadiness = assessRequestedMarkets({ mapping, supplier, offer, availability: availabilityByOffer.get(id(offer)), markets });
                 const existingContract = mapping.mappingMetadata?.fulfillmentContract;
                 const intentionallyDisabled = action === "REUSED_MAPPING" && mapping.enabled === false && !mapping.mappingMetadata?.reconciliationDecision && !mapping.mappingMetadata?.technicalPreparation;
                 if (!initialReadiness.ready && !intentionallyDisabled) {
@@ -142,7 +146,7 @@ function createSupplierProductOnboardingService(dependencies = {}) {
                         } else blockers.push(...(plan.blockers || []));
                     } catch (error) { blockers.push(error.code || "PREPARATION_FAILED"); }
                 } else if (intentionallyDisabled) blockers.push("ADOPTION_REVIEW_REQUIRED");
-                const readiness = assessMappingReadiness({ mode: READINESS_MODES.NEW_ORDER_SELECTABLE, mapping, supplier, offer, availability: availabilityByOffer.get(id(offer)), customerMarket: markets[0], adapter: adapterResolver(supplier) });
+                const readiness = assessRequestedMarkets({ mapping, supplier, offer, availability: availabilityByOffer.get(id(offer)), markets });
                 blockers = [...blockers, ...readiness.blockers];
                 if (intentionallyDisabled) blockers.push("ADOPTION_REVIEW_REQUIRED");
             }
@@ -150,12 +154,22 @@ function createSupplierProductOnboardingService(dependencies = {}) {
             const onlyEnablement = mapping && mapping.enabled !== true && blockers.every(code => code === "MAPPING_DISABLED");
             const technicallyPrepared = Boolean(mapping?.mappingMetadata?.technicalPreparation);
             const state = equivalenceConflict ? "NEEDS_REVIEW" : mapping ? (!blockers.length ? "READY" : onlyEnablement && technicallyPrepared ? "NEEDS_ENABLEMENT" : "NEEDS_SETUP") : classification === "AMBIGUOUS" ? "NEEDS_REVIEW" : "BLOCKED";
-            outcomes.push({ supplierCatalogOfferId: id(offer), supplierOfferCode: offer.supplierOfferCode, supplierOfferName: offer.supplierOfferName || offer.rawName, classification, state, action: action || "NONE", mappingId: id(mapping), canonical: mapping ? { productCode: mapping.productCode, packageCode: mapping.packageCode } : evidence, blockers: [...new Set(blockers)].sort(), reviewUrl: state === "NEEDS_REVIEW" ? `/api/admin/supplier-catalog/offers/${id(offer)}/reconciliation` : "" });
+            outcomes.push({ supplierCatalogOfferId: id(offer), supplierOfferCode: offer.supplierOfferCode, supplierOfferName: offer.supplierOfferName || offer.rawName, classification, state, action: action || "NONE", mappingId: id(mapping), supplierMarket: upper(mapping?.region), canonical: mapping ? { productCode: mapping.productCode, packageCode: mapping.packageCode } : evidence, blockers: [...new Set(blockers)].sort(), reviewUrl: state === "NEEDS_REVIEW" ? `/api/admin/supplier-catalog/offers/${id(offer)}/reconciliation` : "" });
         }
         const counts = key => outcomes.filter(row => row.action === key || row.state === key).length;
         const summary = { total: outcomes.length, reusedMappings: counts("REUSED_MAPPING") + counts("REUSED_DECISION") + counts("REUSED_PREPARATION"), autoLinked: counts("AUTO_LINKED"), autoCreated: counts("AUTO_CREATED"), ready: counts("READY"), needsReview: counts("NEEDS_REVIEW"), blocked: counts("BLOCKED"), needsSetup: counts("NEEDS_SETUP"), needsEnablement: counts("NEEDS_ENABLEMENT") };
         const state = summary.needsReview || summary.blocked ? (summary.ready || summary.needsSetup || summary.reusedMappings || summary.autoLinked || summary.autoCreated ? "PARTIALLY_PREPARED" : "NEEDS_REVIEW") : "PREPARED";
-        return { product: { supplierCatalogProductId: id(product), supplierId: id(supplier), supplierCode: supplier.supplierCode, supplierProductCode: product.supplierProductCode, name: product.displayName || product.rawName, supplierMarket: product.supplierMarketCode, onboardingState: state }, customerMarkets: markets, summary, offers: outcomes, safety: { publicationWrites: 0, customerPriceWrites: 0, packageSupplierSelectionWrites: 0, commerceOrderWrites: 0, fulfillmentAttemptWrites: 0, supplierExecutionCalls: 0 } };
+        const prepared = outcomes.filter(row => row.mappingId && ["READY", "NEEDS_ENABLEMENT"].includes(row.state) && row.canonical?.productCode && row.canonical?.packageCode && row.supplierMarket);
+        const productCodes = [...new Set(prepared.map(row => lower(row.canonical.productCode)))];
+        const supplierMarkets = [...new Set(prepared.map(row => upper(row.supplierMarket)))];
+        const continuation = {
+            canContinue: prepared.length > 0 && productCodes.length === 1 && supplierMarkets.length === 1,
+            productCode: productCodes.length === 1 ? productCodes[0] : "",
+            supplierId: id(supplier), supplierMarket: supplierMarkets.length === 1 ? supplierMarkets[0] : "",
+            mappingIds: prepared.map(row => row.mappingId), packageCodes: [...new Set(prepared.map(row => upper(row.canonical.packageCode)))].sort(),
+            preparedCount: prepared.length, exceptionCount: outcomes.filter(row => row.state === "NEEDS_REVIEW").length
+        };
+        return { product: { supplierCatalogProductId: id(product), supplierId: id(supplier), supplierCode: supplier.supplierCode, supplierProductCode: product.supplierProductCode, name: product.displayName || product.rawName, supplierMarket: product.supplierMarketCode, onboardingState: state }, customerMarkets: markets, summary, continuation, offers: outcomes, safety: { publicationWrites: 0, customerPriceWrites: 0, packageSupplierSelectionWrites: 0, commerceOrderWrites: 0, fulfillmentAttemptWrites: 0, supplierExecutionCalls: 0 } };
     }
     return { onboardSupplierProduct };
 }

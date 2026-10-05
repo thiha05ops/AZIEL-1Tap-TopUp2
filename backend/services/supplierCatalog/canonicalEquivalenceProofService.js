@@ -1,7 +1,5 @@
 "use strict";
 
-const { normalizeSupplierMarket } = require("../../constants/supplierMarkets");
-
 const clean = value => String(value == null ? "" : value).trim();
 const upper = value => clean(value).toUpperCase();
 const lower = value => clean(value).toLowerCase();
@@ -28,15 +26,12 @@ function decisionBlockers({ decision, supplierProduct, offer, mapping, canonical
 function mappingBlockers({ supplierProduct, offer, mapping, canonicalProduct, canonicalPackages = [] }) {
     if (!mapping) return ["CANONICAL_EQUIVALENCE_MAPPING_MISSING"];
     const packages = canonicalPackages.filter(Boolean);
-    const supplierMarket = normalizeSupplierMarket(supplierProduct?.supplierMarketCode) || upper(supplierProduct?.supplierMarketCode);
-    const mappingMarket = normalizeSupplierMarket(mapping.region) || upper(mapping.region);
     const blockers = [];
     if (mapping.archivedAt) blockers.push("MAPPING_ARCHIVED");
     if (id(mapping.supplierId) !== id(offer?.supplierId) || id(mapping.supplierId) !== id(supplierProduct?.supplierId)) blockers.push("SUPPLIER_IDENTITY_CONFLICT");
     if (id(mapping.supplierCatalogOfferId) !== id(offer)) blockers.push("SUPPLIER_CATALOG_OFFER_IDENTITY_CONFLICT");
     if (clean(mapping.supplierProductCode) !== clean(offer?.supplierProductCode) || clean(mapping.supplierProductCode) !== clean(supplierProduct?.supplierProductCode)) blockers.push("SUPPLIER_PRODUCT_IDENTITY_CONFLICT");
     if (clean(mapping.supplierPackageCode) !== clean(offer?.supplierOfferCode)) blockers.push("SUPPLIER_OFFER_IDENTITY_CONFLICT");
-    if (!supplierMarket || !mappingMarket || supplierMarket !== mappingMarket) blockers.push("SUPPLIER_MARKET_IDENTITY_CONFLICT");
     if (!canonicalProduct || lower(canonicalProduct.productCode) !== lower(mapping.productCode)) blockers.push("CANONICAL_PRODUCT_MISSING");
     if (packages.length !== 1) blockers.push(packages.length ? "AMBIGUOUS_CANONICAL_IDENTITY" : "CANONICAL_PACKAGE_MISSING");
     const canonicalPackage = packages[0];
