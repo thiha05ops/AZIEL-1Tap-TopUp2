@@ -193,10 +193,9 @@ function assessPreCommercialFulfillmentReadiness({
     if (!markets.length) blockers.push("CUSTOMER_MARKET_REQUIRED");
     const eligibility = validateFulfillmentEligibility(mapping?.fulfillmentEligibility);
     if (!eligibility.valid || eligibility.value.mode === "UNKNOWN") blockers.push("CUSTOMER_MARKET_ELIGIBILITY_UNPROVEN");
-    if (!fulfillmentContract?.fields?.length) blockers.push("INPUT_CONTRACT_UNRESOLVED");
+    if (!fulfillmentContract || (!fulfillmentContract.fields?.length && fulfillmentContract.noCustomerInput !== true)) blockers.push("INPUT_CONTRACT_UNRESOLVED");
     if (String(mapping?.executionMode || "").toUpperCase() !== "API" || processorSupported !== true) blockers.push("PROTOCOL_UNSUPPORTED");
     if (adapterConfigured !== true) blockers.push("SUPPLIER_ADAPTER_NOT_READY");
-    if (autoFulfillmentEnabled !== true) blockers.push("SUPPLIER_AUTO_FULFILLMENT_DISABLED");
     const readiness = mapping?.mappingMetadata?.readiness || {};
     if (readiness.supplierMapped !== true) blockers.push("SUPPLIER_MAPPING_NOT_READY");
     if (readiness.inputReady !== true) blockers.push("INPUT_NOT_READY");
@@ -218,7 +217,8 @@ function assessPreCommercialFulfillmentReadiness({
             availabilityObservedAt: availability?.observedAt || null,
             availabilityComplete: availability?.coverageComplete === true
         },
-        ignoredCommercialState: ["enabled", "productionRole", "pricingReady", "storefrontReady", "retailPrice", "publication"]
+        ignoredCommercialState: ["enabled", "productionRole", "pricingReady", "storefrontReady", "retailPrice", "publication"],
+        activationBlockers: autoFulfillmentEnabled === true ? [] : ["SUPPLIER_AUTO_FULFILLMENT_DISABLED"]
     };
 }
 

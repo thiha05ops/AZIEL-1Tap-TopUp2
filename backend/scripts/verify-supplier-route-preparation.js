@@ -5,7 +5,7 @@ const assert = require("assert");
 const fs = require("fs");
 const path = require("path");
 const { assessPreCommercialFulfillmentReadiness } = require("../services/fulfillmentCapabilityService");
-const { createSupplierRoutePreparationService, OUTCOMES, outcomeFor } = require("../services/supplierCatalog/supplierRoutePreparationService");
+const { createSupplierRoutePreparationService, OUTCOMES, outcomeFor, contractFromCurrentSupplierCatalog, proposedMapping, supportsPreparationProtocol } = require("../services/supplierCatalog/supplierRoutePreparationService");
 
 const hash = character => character.repeat(64);
 const now = new Date("2026-09-03T00:00:00.000Z");
@@ -28,11 +28,25 @@ assert.strictEqual(mapping.mappingMetadata.readiness.storefrontReady, false);
 assert.deepStrictEqual(canonicalPackage.prices, {});
 assert.deepStrictEqual(ready.ignoredCommercialState, ["enabled", "productionRole", "pricingReady", "storefrontReady", "retailPrice", "publication"]);
 assert.strictEqual(ready.evidence.supplierCatalogOfferId, "o1");
+const gatedPreparation = assessPreCommercialFulfillmentReadiness({ ...readyInput, autoFulfillmentEnabled: false });
+assert.strictEqual(gatedPreparation.ready, true, "The live execution gate must not block technical preparation.");
+assert.deepStrictEqual(gatedPreparation.activationBlockers, ["SUPPLIER_AUTO_FULFILLMENT_DISABLED"]);
 assert.strictEqual(outcomeFor([]), OUTCOMES.FULFILLMENT_READY);
 assert.strictEqual(outcomeFor(["STALE_OR_WRONG_OFFER_LINKAGE"]), OUTCOMES.REVIEW_REQUIRED);
 assert.strictEqual(outcomeFor(["SUPPLIER_UNSUPPORTED"]), OUTCOMES.UNSUPPORTED);
 assert.strictEqual(outcomeFor(["MARKET_UNRESOLVED"]), OUTCOMES.MARKET_UNRESOLVED);
 assert.strictEqual(outcomeFor(["AVAILABILITY_UNPROVEN"]), OUTCOMES.AVAILABILITY_UNPROVEN);
+const wonddMapping = { ...mapping, supplierCode: "WONDD", productCode: "heartopia", supplierProductCode: "9624", supplierPackageCode: "HTP00020", supplierCatalogOfferId: "wo1" };
+const wonddSupplier = { ...supplier, supplierCode: "WONDD" };
+const wonddProduct = { ...supplierProduct, _id: "wsp1", supplierProductCode: "9624", metadata: { transactionalServiceCode: "HTP" }, normalizedInputContract: { fields: [{ name: "userId", providerField: "gameid", transformationId: "DIRECT", required: true }] } };
+const wonddOffer = { ...offer, _id: "wo1", supplierCatalogProductId: "wsp1", supplierProductCode: "9624", supplierOfferCode: "HTP00020" };
+const wonddContract = contractFromCurrentSupplierCatalog({ mapping: wonddMapping, supplier: wonddSupplier, supplierProduct: wonddProduct, offer: wonddOffer });
+assert.strictEqual(wonddContract.supplierProductCode, "9624", "Durable catalog identity must remain the WonDD service ID.");
+assert.strictEqual(wonddContract.transactionalServiceCode, "HTP", "Transactional service code must remain separate from catalog identity.");
+assert.strictEqual(proposedMapping(wonddMapping, { mapping: wonddMapping, supplier: wonddSupplier, supplierProduct: wonddProduct, offer: wonddOffer }, { customerMarkets: ["TH"] }, { fulfillmentContract: wonddContract }).supplierProductCode, "9624", "Preparation must not rewrite durable catalog identity to the execution code.");
+assert.strictEqual(supportsPreparationProtocol(wonddMapping, wonddSupplier, wonddProduct), true, "Known WonDD service/product protocol must be recognized independently from live activation.");
+assert.strictEqual(contractFromCurrentSupplierCatalog({ mapping: wonddMapping, supplier: wonddSupplier, supplierProduct: { ...wonddProduct, normalizedInputContract: {} }, offer: wonddOffer }), null, "Missing structured input evidence must remain fail-closed.");
+assert.strictEqual(contractFromCurrentSupplierCatalog({ mapping: { ...wonddMapping, supplierProductCode: "9623" }, supplier: wonddSupplier, supplierProduct: wonddProduct, offer: wonddOffer }), null, "True supplier identity contradictions must remain fail-closed.");
 for (const [change, blocker] of [
     [{ mapping: null }, "MISSING_MAPPING"],
     [{ offer: { ...offer, _id: "wrong" } }, "STALE_OR_WRONG_OFFER_LINKAGE"],

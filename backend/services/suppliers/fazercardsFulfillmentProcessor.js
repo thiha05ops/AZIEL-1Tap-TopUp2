@@ -97,8 +97,10 @@ function createFazerCardsFulfillmentProcessor(deps = {}) {
         if (!order) throw Object.assign(new Error("CommerceOrder not found."), { code: "ORDER_NOT_FOUND" });
         const customerMarket = String(order.commercial?.region || order.product?.region || order.region || "").trim().toUpperCase();
         validateFazerCardsMapping(mapping, { customerMarket });
-        const contract = verifiedMappingContract(mapping);
-        if (contract) {
+        const frozenContract = order.fulfilment?.routeSnapshot?.fulfillmentContract || order.quoteSnapshot?.supplierRouteSnapshot?.fulfillmentContract;
+        const mappingValue = typeof mapping.toObject === "function" ? mapping.toObject() : mapping;
+        const contract = frozenContract ? verifiedMappingContract({ ...mappingValue, mappingMetadata: { ...(mappingValue.mappingMetadata || {}), fulfillmentContract: frozenContract } }) : verifiedMappingContract(mappingValue);
+        if (contract && !frozenContract) {
             const offer = await CatalogOffer.findById(mapping.supplierCatalogOfferId).lean();
             const supplierProduct = offer ? await CatalogProduct.findById(offer.supplierCatalogProductId).lean() : null;
             if (!offer || !supplierProduct || String(offer.catalogLifecycleState || "").toUpperCase() !== "ACTIVE" || !mappingContractMatchesSupplierCatalog(mapping, supplierProduct)) throw Object.assign(new Error("FazerCards supplier input contract changed and requires Owner re-review."), { code: "FAZERCARDS_INPUT_CONTRACT_STALE" });
@@ -106,7 +108,7 @@ function createFazerCardsFulfillmentProcessor(deps = {}) {
         const fields = contract
             ? buildFieldsFromContract(contract, order.fulfilment?.input || {})
             : buildFazerCardsFields(mapping.productCode, order.fulfilment?.input || {});
-        attempt.supplierRequest = { ...(attempt.supplierRequest || {}), submissionState: "SUBMISSION_IN_FLIGHT", submissionStartedAt: new Date(), categoryId: mapping.supplierProductCode, offerId: mapping.supplierPackageCode, fields: maskFazerCardsFields(fields), providerIdempotencyKey: attempt.idempotencyKey };
+        attempt.supplierRequest = { ...(attempt.supplierRequest || {}), submissionState: "SUBMISSION_IN_FLIGHT", submissionStartedAt: new Date(), categoryId: mapping.supplierProductCode, offerId: mapping.supplierPackageCode, fields: maskFazerCardsFields(fields), inputContractFingerprint: contract?.fingerprint || "LEGACY_COMPATIBILITY", providerIdempotencyKey: attempt.idempotencyKey };
         await attempt.save();
         let result;
         try { result = await adapter.submitTopup({ categoryId: mapping.supplierProductCode, offerId: mapping.supplierPackageCode, fields, idempotencyKey: attempt.idempotencyKey, productCode: mapping.productCode }); }

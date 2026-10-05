@@ -14,7 +14,7 @@ const SupplierCatalogReconciliationDecision = require("../../models/SupplierCata
 const { canonicalJson } = require("./supplierCatalogNormalization");
 const { getSupplierAdapter } = require("../supplierAdapterRegistry");
 const { supportsMapping } = require("../suppliers/supplierFulfillmentDispatcher");
-const { contractFromSupplierCatalog, verifiedMappingContract } = require("../suppliers/fazercardsFulfillmentContractService");
+const { contractFromSupplierCatalog, contractFingerprint, verifiedMappingContract } = require("../suppliers/fazercardsFulfillmentContractService");
 const { assessPreCommercialFulfillmentReadiness, supplierCapabilityProductCode } = require("../fulfillmentCapabilityService");
 const { normalizeSupplierMarket } = require("../../constants/supplierMarkets");
 const { assessCanonicalEquivalenceProof } = require("./canonicalEquivalenceProofService");
@@ -58,7 +58,7 @@ function normalizeRequest(input = {}) {
 function outcomeFor(blockers = []) {
     if (!blockers.length) return OUTCOMES.FULFILLMENT_READY;
     if (blockers.includes("MISSING_MAPPING")) return OUTCOMES.MISSING_MAPPING;
-    if (blockers.some(code => ["MISSING_CANONICAL_LINK", "AMBIGUOUS_CANONICAL_IDENTITY"].includes(code))) return blockers.includes("AMBIGUOUS_CANONICAL_IDENTITY") ? OUTCOMES.REVIEW_REQUIRED : OUTCOMES.MISSING_CANONICAL_LINK;
+    if (blockers.some(code => ["MISSING_CANONICAL_LINK", "CANONICAL_PRODUCT_MISSING", "CANONICAL_PACKAGE_MISSING", "AMBIGUOUS_CANONICAL_IDENTITY"].includes(code))) return blockers.includes("AMBIGUOUS_CANONICAL_IDENTITY") ? OUTCOMES.REVIEW_REQUIRED : OUTCOMES.MISSING_CANONICAL_LINK;
     if (blockers.some(code => ["STALE_OR_WRONG_OFFER_LINKAGE", "SUPPLIER_IDENTITY_MISMATCH", "CANONICAL_EQUIVALENCE_REVIEW_REQUIRED"].includes(code))) return OUTCOMES.REVIEW_REQUIRED;
     if (blockers.includes("COMMERCIAL_ROUTE_REGION_CHANGE_REQUIRES_OWNER_REVIEW")) return OUTCOMES.REVIEW_REQUIRED;
     if (blockers.includes("MARKET_UNRESOLVED")) return OUTCOMES.MARKET_UNRESOLVED;
@@ -117,41 +117,38 @@ function deterministicSupplierMarket(state = {}) {
 
 function supplierExecutionProductCode(mapping = {}, supplier = {}, supplierProduct = {}, offer = {}) {
     const supplierCode = upper(supplier?.supplierCode || mapping?.supplierCode);
-    if (supplierCode === "WONDD") return clean(supplierProduct?.metadata?.transactionalServiceCode) || clean(mapping?.supplierProductCode);
+    if (supplierCode === "WONDD") return clean(offer?.metadata?.normalizedInputContract?.transactionalServiceCode) || clean(supplierProduct?.normalizedInputContract?.transactionalServiceCode) || clean(supplierProduct?.metadata?.transactionalServiceCode);
     return clean(offer?.supplierProductCode) || clean(supplierProduct?.supplierProductCode) || clean(mapping?.supplierProductCode);
+}
+
+function supplierCatalogProductCode(mapping = {}, supplierProduct = {}, offer = {}) {
+    return clean(supplierProduct?.supplierProductCode) || clean(offer?.supplierProductCode) || clean(mapping?.supplierProductCode);
+}
+
+function supportsPreparationProtocol(mapping = {}, supplier = {}, supplierProduct = {}) {
+    const supplierCode = upper(supplier?.supplierCode || mapping?.supplierCode);
+    if (supplierCode !== "WONDD") return supportsMapping(mapping);
+    try {
+        const nativeProductCode = supplierCatalogProductCode(mapping, supplierProduct);
+        const executionCode = clean(supplierProduct?.metadata?.transactionalServiceCode) || supplierExecutionProductCode(mapping, supplier, supplierProduct);
+        return clean(mapping.supplierProductCode) === nativeProductCode && /^[A-Za-z0-9_-]{1,80}$/.test(executionCode);
+    } catch { return false; }
 }
 
 function contractFromCurrentSupplierCatalog({ mapping = {}, supplier = {}, offer = {}, supplierProduct = {} } = {}) {
     const supplierCode = upper(supplier?.supplierCode || mapping?.supplierCode);
     if (supplierCode === "FAZERCARDS") return contractFromSupplierCatalog({ mapping, offer, supplierProduct });
-    if (supplierCode !== "WONDD" || !offer || !supplierProduct) return null;
-    const executionProductCode = supplierExecutionProductCode(mapping, supplier, supplierProduct, offer);
-    const exact = clean(mapping.supplierCatalogOfferId) === clean(offer._id) &&
-        clean(offer.supplierCatalogProductId) === clean(supplierProduct._id) &&
-        clean(mapping.supplierProductCode) === executionProductCode &&
-        clean(mapping.supplierPackageCode) === clean(offer.supplierOfferCode) &&
-        upper(offer.catalogLifecycleState) === "ACTIVE" &&
-        upper(supplierProduct.supportState) === "SUPPORTED";
-    const fields = exact && Array.isArray(supplierProduct.normalizedInputContract?.fields)
-        ? supplierProduct.normalizedInputContract.fields.map(item => ({ customerField: clean(item.customerField || item.azielField || item.name), providerField: clean(item.providerField || item.name), required: item.required !== false, type: clean(item.type || "text").toLowerCase() })).filter(item => item.customerField && item.providerField)
-        : [];
-    if (!fields.length) return null;
-    const contract = {
-        version: 1,
-        supplierCode: "WONDD",
-        protocol: "WONDD_GAME_ID_TOPUP",
-        supplierProductCode: executionProductCode,
-        sourceSupplierCatalogProductId: clean(supplierProduct._id),
-        sourceHash: clean(supplierProduct.rawSnapshotHash),
-        fields
-    };
-    return { ...contract, fingerprint: sha({ supplierProductCode: contract.supplierProductCode, sourceHash: contract.sourceHash, fields: contract.fields }) };
+    if (supplierCode !== "WONDD") return null;
+    const contract = contractFromSupplierCatalog({ mapping, offer, supplierProduct, supplierCode: "WONDD" });
+    if (!contract) return null;
+    const withExecutionIdentity = { ...contract, transactionalServiceCode: supplierExecutionProductCode(mapping, supplier, supplierProduct, offer) };
+    return { ...withExecutionIdentity, fingerprint: contractFingerprint(withExecutionIdentity) };
 }
 
 function proposedMapping(mapping, state, request, runtime) {
     const readiness = mapping.mappingMetadata?.readiness || {};
     const supplierMarket = deterministicSupplierMarket(state) || upper(mapping.region);
-    const productCode = supplierExecutionProductCode(mapping, state.supplier, state.supplierProduct, state.offer);
+    const productCode = supplierCatalogProductCode(mapping, state.supplierProduct, state.offer);
     return {
         ...mapping,
         region: supplierMarket,
@@ -175,7 +172,7 @@ function assessExistingPreparedRoute(state = {}, customerMarkets = [], dependenc
     let adapterConfigured = false, autoFulfillmentEnabled = false, processorSupported = false;
     try { adapterConfigured = adapter?.isConfigured?.() === true; } catch { adapterConfigured = false; }
     try { autoFulfillmentEnabled = adapter?.isAutoFulfillmentEnabled?.(supplierCapabilityProductCode(mapping, state.supplier, state.supplierProduct)) === true; } catch { autoFulfillmentEnabled = false; }
-    try { processorSupported = processorSupportResolver(mapping || {}) === true; } catch { processorSupported = false; }
+        try { processorSupported = upper(state.supplier?.supplierCode) === "WONDD" ? supportsPreparationProtocol(mapping || {}, state.supplier, state.supplierProduct) : processorSupportResolver(mapping || {}) === true; } catch { processorSupported = false; }
     const assessment = assessPreCommercialFulfillmentReadiness({ ...state, mapping, customerMarkets, fulfillmentContract, adapterConfigured, autoFulfillmentEnabled, processorSupported });
     const equivalenceProof = assessCanonicalEquivalenceProof(state);
     if (!equivalenceProof.proven) assessment.blockers.push(...equivalenceProof.blockers);
@@ -222,7 +219,7 @@ function createSupplierRoutePreparationService({ repos = defaultRepos(), adapter
         let adapterConfigured = false, autoFulfillmentEnabled = false, processorSupported = false;
         try { adapterConfigured = adapter?.isConfigured?.() === true; } catch { adapterConfigured = false; }
         try { autoFulfillmentEnabled = adapter?.isAutoFulfillmentEnabled?.(supplierCapabilityProductCode(mapping, state.supplier, state.supplierProduct)) === true; } catch { autoFulfillmentEnabled = false; }
-        try { processorSupported = processorSupportResolver(mapping) === true; } catch { processorSupported = false; }
+        try { processorSupported = upper(state.supplier?.supplierCode) === "WONDD" ? supportsPreparationProtocol(mapping, state.supplier, state.supplierProduct) : processorSupportResolver(mapping) === true; } catch { processorSupported = false; }
         return { fulfillmentContract, adapterConfigured, autoFulfillmentEnabled, processorSupported };
     }
 
@@ -235,7 +232,7 @@ function createSupplierRoutePreparationService({ repos = defaultRepos(), adapter
         const equivalenceProof = assessCanonicalEquivalenceProof(state);
         const adoptionState = adoptionStateFor({ ...state, equivalenceProof });
         if (!equivalenceProof.proven) {
-            const body = { artifactType: "SUPPLIER_ROUTE_PREPARATION_PLAN", schemaVersion: 1, request, adoptionState: ADOPTION_STATES.ADOPTION_REVIEW_REQUIRED, outcome: OUTCOMES.REVIEW_REQUIRED, blockers: equivalenceProof.blockers, sourceLock: sourceLock(state, {}), proposedChanges: null, safety: { enabledWrites: 0, roleWrites: 0, pricingWrites: 0, publicationWrites: 0, storefrontWrites: 0, supplierCalls: 0 } };
+            const body = { artifactType: "SUPPLIER_ROUTE_PREPARATION_PLAN", schemaVersion: 1, request, adoptionState: ADOPTION_STATES.ADOPTION_REVIEW_REQUIRED, outcome: outcomeFor(equivalenceProof.blockers), blockers: equivalenceProof.blockers, sourceLock: sourceLock(state, {}), proposedChanges: null, safety: { enabledWrites: 0, roleWrites: 0, pricingWrites: 0, publicationWrites: 0, storefrontWrites: 0, supplierCalls: 0 } };
             return { ...body, sourceLockHash: sha(body.sourceLock), planHash: sha(body) };
         }
         if (adoptionState !== ADOPTION_STATES.CURRENTLY_ADOPTED) {
@@ -298,4 +295,4 @@ function createSupplierRoutePreparationService({ repos = defaultRepos(), adapter
 }
 
 const service = createSupplierRoutePreparationService();
-module.exports = Object.freeze({ ACTION, ACTIVE_CANONICAL_QUERY, isActiveCanonicalRecord, OUTCOMES, ADOPTION_STATES, SupplierRoutePreparationError, normalizeRequest, outcomeFor, adoptionStateFor, sourceLock, contractFromCurrentSupplierCatalog, proposedMapping, assessExistingPreparedRoute, createSupplierRoutePreparationService, generateSupplierRoutePreparationPlan: service.generatePlan, applySupplierRoutePreparationPlan: service.applyPlan });
+module.exports = Object.freeze({ ACTION, ACTIVE_CANONICAL_QUERY, isActiveCanonicalRecord, OUTCOMES, ADOPTION_STATES, SupplierRoutePreparationError, normalizeRequest, outcomeFor, adoptionStateFor, sourceLock, supplierCatalogProductCode, supportsPreparationProtocol, contractFromCurrentSupplierCatalog, proposedMapping, assessExistingPreparedRoute, createSupplierRoutePreparationService, generateSupplierRoutePreparationPlan: service.generatePlan, applySupplierRoutePreparationPlan: service.applyPlan });

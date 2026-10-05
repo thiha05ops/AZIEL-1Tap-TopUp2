@@ -24,7 +24,7 @@ async function adapterContractTests() {
     const disabled = createWonddAdapter({ env: { WONDD_USERNAME: "configured", WONDD_PASSWORD: "configured" }, fetchImpl: async () => { calls += 1; return response({ errorcode: "00" }); } });
     const payload = disabled.buildTopupPayload({ serviceCode: "mlbb", packCode: "verified-pack", gameId: "123456789 1234" });
     assert.deepStrictEqual(payload, { method: "topup", servicecode: "mlbb", packcode: "verified-pack", gameid: "123456789 1234" });
-    assert.throws(() => disabled.buildTopupPayload({ serviceCode: "unconfirmed", packCode: "x", gameId: "1 2" }), error => error.code === "WONDD_SERVICE_MAPPING_INVALID");
+    assert.throws(() => disabled.buildTopupPayload({ serviceCode: "bad code!", packCode: "x", gameId: "1 2" }), error => error.code === "WONDD_SERVICE_MAPPING_INVALID");
     assert.throws(() => disabled.buildTopupPayload({ serviceCode: "mlbb", packCode: "", gameId: "1 2" }), error => error.code === "WONDD_PACKAGE_MAPPING_MISSING");
     const dry = disabled.dryRunTopup({ serviceCode: "mlbb", packCode: "verified-pack", gameId: "123456789 1234" });
     assert.strictEqual(dry.status, "DRY_RUN_VALID");

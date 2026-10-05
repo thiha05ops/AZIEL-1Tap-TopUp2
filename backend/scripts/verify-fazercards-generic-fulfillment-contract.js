@@ -170,7 +170,7 @@ const productionFiles = [
 ];
 productionFiles.forEach(file => assert(!read(file).includes('productCode === "afk-journey"'), `${file} must not whitelist AFK.`));
 assert(read("backend/routes/supplier.js").includes("/input-contract/approve"));
-assert(read("frontend/js/admin-supplier-catalog.js").includes("Never invent a provider API key"));
+assert(read("frontend/js/admin-supplier-catalog.js").includes("Configure customer information"));
 assert(!read("backend/services/suppliers/fazercardsAdapter.js").includes("replace(/[^A-Z0-9]+/g"), "FazerCards must not derive per-product environment keys.");
 
 console.log(JSON.stringify({
