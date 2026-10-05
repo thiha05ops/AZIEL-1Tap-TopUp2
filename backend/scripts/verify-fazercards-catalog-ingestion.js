@@ -1,6 +1,7 @@
 "use strict";
 const assert=require("assert"),fs=require("fs"),path=require("path"),mongoose=require("mongoose"),fixture=require("../fixtures/fazerCardsCatalogIngestionPhase2C"),svc=require("../services/supplierCatalog/providers/fazerCardsCatalogIngestionService"),{assertGenericStage}=require("./apply-fazercards-catalog-production");
 assert.deepStrictEqual(svc.exactProviderFields({fields:[{key:"user_id",label:"Account ID"}]}).map(field=>[field.customerField,field.providerField]),[["userId","user_id"]]);
+assert.deepStrictEqual(svc.exactProviderFields({fields:[{key:"server",label:"Server",type:"select",required:false,options:[{label:"Asia",value:"asia"}],min_length:2,max_length:12,pattern:"^[a-z]+$"}]}),[{customerField:"server",providerField:"server",required:false,label:"Server",type:"select",options:[{label:"Asia",value:"asia"}],constraints:{minLength:2,maxLength:12,pattern:"^[a-z]+$"},transformationId:"DIRECT",evidenceReference:"FAZERCARDS_OFFERS_RESPONSE_FIELDS"}]);
 assert.deepStrictEqual(svc.exactProviderFields({fields:[{label:"Account ID"}]}),[],"A human label cannot establish a provider key.");
 const serviceSource=fs.readFileSync(path.resolve(__dirname,"../services/supplierCatalog/providers/fazerCardsCatalogIngestionService.js"),"utf8"),applySource=fs.readFileSync(path.resolve(__dirname,"apply-fazercards-catalog-production.js"),"utf8");
 assert(!serviceSource.includes("CATEGORY_CONFIG")&&!applySource.includes("CATEGORY_CONFIG"),"Generic ingestion and production apply must not whitelist products.");
