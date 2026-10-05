@@ -76,6 +76,11 @@ function offerDisposition(offer = {}) {
     return safeNew ? "READY_TO_CREATE" : "REVIEW_REQUIRED";
 }
 
+function offerWizardState(offer = {}) {
+    if (clean(offer.catalogLifecycleState).toUpperCase() !== "ACTIVE") return "UNAVAILABLE";
+    return offerDisposition(offer) === "READY_TO_CREATE" ? "PREPARABLE" : "NEEDS_ATTENTION";
+}
+
 function defaultRepos() {
     const sessionize = (query, session) => session ? query.session(session) : query;
     return {
@@ -164,7 +169,7 @@ function createSupplierCanonicalProductAuthorityService({ repos = defaultRepos()
             product: { supplierCatalogProductId: id(product), name: clean(product.displayName || product.rawName || product.supplierProductCode), supplierId: id(product.supplierId), catalogNamespace: product.catalogNamespace, supplierProductCode: product.supplierProductCode, supplierMarket: product.supplierMarketCode, sourceLock: sourceLock(product) },
             canonical: { exists: Boolean(existing), productCode: existing?.productCode || proposedProductCode, name: existing?.name || clean(product.displayName || product.rawName || product.supplierProductCode), collisionConflict },
             state: identityConflict ? "CANONICAL_PRODUCT_IDENTITY_CONFLICT" : existing ? "EXISTING_CANONICAL_PRODUCT" : collisionConflict ? "CANONICAL_PRODUCT_CODE_CONFLICT" : "NEW_TO_AZIEL",
-            offers: offers.map(offer => ({ supplierCatalogOfferId: id(offer), supplierOfferCode: offer.supplierOfferCode, name: clean(offer.supplierOfferName || offer.rawName || offer.supplierOfferCode), disposition: offerDisposition(offer), sourceLock: reconciliationSourceLock({ offer, product, availability: availabilityByOffer.get(id(offer)) }) }))
+            offers: offers.map(offer => ({ supplierCatalogOfferId: id(offer), supplierOfferCode: offer.supplierOfferCode, name: clean(offer.supplierOfferName || offer.rawName || offer.supplierOfferCode), state: offerWizardState(offer), disposition: offerDisposition(offer), sourceLock: reconciliationSourceLock({ offer, product, availability: availabilityByOffer.get(id(offer)) }) }))
         };
     }
 
@@ -232,8 +237,8 @@ function createSupplierCanonicalProductAuthorityService({ repos = defaultRepos()
         }
     }
 
-    return { plan, authorize, sourceLock, validateSourceLock, deterministicProductCode, offerLock, offerDisposition, mutationsEnabled: gate, isConcurrentMongoFailure, recoverConcurrentAuthority };
+    return { plan, authorize, sourceLock, validateSourceLock, deterministicProductCode, offerLock, offerDisposition, offerWizardState, mutationsEnabled: gate, isConcurrentMongoFailure, recoverConcurrentAuthority };
 }
 
 const service = createSupplierCanonicalProductAuthorityService();
-module.exports = Object.freeze({ SupplierCanonicalProductAuthorityError, createSupplierCanonicalProductAuthorityService, sourceLock, validateSourceLock, deterministicProductCode, offerLock, offerDisposition, mutationsEnabled, plan: service.plan, authorize: service.authorize });
+module.exports = Object.freeze({ SupplierCanonicalProductAuthorityError, createSupplierCanonicalProductAuthorityService, sourceLock, validateSourceLock, deterministicProductCode, offerLock, offerDisposition, offerWizardState, mutationsEnabled, plan: service.plan, authorize: service.authorize });

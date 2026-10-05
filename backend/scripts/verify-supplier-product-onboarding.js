@@ -3,7 +3,7 @@
 const assert = require("assert");
 const fs = require("fs");
 const path = require("path");
-const { canonicalEvidence, classifyOffer } = require("../services/supplierCatalog/supplierProductOnboardingService");
+const { WIZARD_STATES, canonicalEvidence, classifyOffer, wizardStateFor } = require("../services/supplierCatalog/supplierProductOnboardingService");
 const { projectActivation } = require("../services/adminProductActivationService");
 const { resolveFulfillmentRoutingMode } = require("../config/fulfillmentRoutingMode");
 const { READINESS_MODES, assessMappingReadiness } = require("../services/supplierMappingReadinessService");
@@ -86,7 +86,7 @@ ok(!service.includes("PackageSupplierSelection.create"), "no selection creation"
 ok(!service.includes("submitTopup"), "no provider fulfillment call");
 ok(route.includes("/admin/supplier-catalog/products/:id/onboard"), "explicit Admin endpoint");
 ok(route.includes("SUPPLIER_CATALOG_RECONCILE"), "reconciliation permission enforced");
-ok(ui.includes("Add to AZIEL"), "Admin action available");
+ok(ui.includes("data-onboard-supplier-product") && ui.includes(">Select</button>"), "business-facing Admin selection action available");
 ok(ui.includes("confirmed:true"), "Admin confirmation sent");
 ok(ui.includes("openSupplierReconciliationReview"), "ambiguous review reuses reconciliation UI");
 ok(resolveFulfillmentRoutingMode({}) === "LEGACY_REGION", "legacy routing remains default");
@@ -101,7 +101,12 @@ ok(service.includes("M.Mapping.findById(prepared.mappingId"), "mapping is re-rea
 ok(service.match(/assessMappingReadiness/g).length >= 2, "readiness is re-evaluated after preparation");
 ok(service.includes("intentionallyDisabled"), "existing intentionally disabled mappings are not silently reconfigured");
 ok(service.includes("existingContract") && service.includes("fingerprint"), "explicit contract is not replaced by weaker evidence");
-ok(service.includes("NEEDS_ENABLEMENT"), "separate enablement authority is preserved");
+ok(Object.keys(WIZARD_STATES).join(",") === "READY,PREPARABLE,NEEDS_ATTENTION,UNAVAILABLE", "one authoritative four-state wizard contract");
+ok(wizardStateFor({ mapping: exactMapping, classification: "PROVEN_SAME", blockers: [] }) === WIZARD_STATES.READY, "selectable exact mapping is READY");
+ok(wizardStateFor({ mapping: { ...exactMapping, mappingMetadata: { technicalPreparation: { authority: "test" } } }, classification: "PROVEN_SAME", blockers: ["MAPPING_DISABLED"] }) === WIZARD_STATES.PREPARABLE, "safe prepared disabled mapping is PREPARABLE without claiming execution readiness");
+ok(wizardStateFor({ mapping: null, classification: "PROVEN_NEW", blockers: [] }) === WIZARD_STATES.PREPARABLE, "bounded exact new offer is PREPARABLE");
+ok(wizardStateFor({ mapping: null, classification: "AMBIGUOUS", blockers: ["CANONICAL_EQUIVALENCE_REVIEW_REQUIRED"] }) === WIZARD_STATES.NEEDS_ATTENTION, "ambiguous identity needs attention");
+ok(wizardStateFor({ mapping: exactMapping, classification: "PROVEN_SAME", blockers: ["CUSTOMER_MARKET_NOT_ELIGIBLE"] }) === WIZARD_STATES.UNAVAILABLE, "unsupported customer market is unavailable");
 const technical = { enabled: true, executionMode: "API", supplierProductCode: "HOK", supplierPackageCode: "60", supplierCatalogOfferId: "o1", supplierId: "s1", mappingMetadata: { readiness: { supplierMapped: true, inputReady: true, fulfillmentReady: true, pricingReady: false } }, fulfillmentEligibility: { mode: "CUSTOMER_MARKET_ALLOWLIST", allowedCustomerMarkets: ["TH"], evidenceCode: "PROVIDER_CONFIRMED", evidenceSource: "test", verifiedAt: new Date(), version: 1 } };
 const supplier = { _id: "s1", supplierCode: "TEST", enabled: true, mode: "API" }, adapter = { isConfigured: () => true, isAutoFulfillmentEnabled: () => true }, availability = { supplierCatalogOfferId: "o1", state: "AVAILABLE" };
 ok(assessMappingReadiness({ mode: READINESS_MODES.NEW_ORDER_SELECTABLE, mapping: technical, supplier, offer: exact, availability, customerMarket: "TH", adapter }).blockers.includes("PRICING_NOT_READY") === false, "NEW_ORDER_SELECTABLE ignores retail pricing readiness");
@@ -113,7 +118,9 @@ ok(!assessMappingReadiness({ mode: READINESS_MODES.NEW_ORDER_SELECTABLE, mapping
 ok(!assessMappingReadiness({ mode: READINESS_MODES.NEW_ORDER_SELECTABLE, mapping: globalEligibility, supplier, offer: exact, availability, customerMarket: "MM", adapter }).blockers.includes("CUSTOMER_MARKET_NOT_ELIGIBLE"), "GLOBAL eligibility permits supported MM market");
 const unknownEligibility = { ...technical, fulfillmentEligibility: { ...technical.fulfillmentEligibility, mode: "UNKNOWN", allowedCustomerMarkets: [] } };
 ok(assessMappingReadiness({ mode: READINESS_MODES.NEW_ORDER_SELECTABLE, mapping: unknownEligibility, supplier, offer: exact, availability, customerMarket: "TH", adapter }).blockers.includes("FULFILLMENT_ELIGIBILITY_UNKNOWN"), "UNKNOWN eligibility remains fail closed");
-ok(service.includes("continuation") && service.includes("preparedCount") && service.includes("exceptionCount"), "onboarding exposes sanitized wizard continuation");
+ok(service.includes("continuation") && service.includes("selectableCount") && service.includes("needsAttentionCount") && service.includes("unavailableCount"), "onboarding exposes sanitized four-state wizard continuation");
+ok(service.includes("WIZARD_STATE_INVARIANT_FAILED") && service.includes("summary.ready + summary.preparable + summary.needsAttention + summary.unavailable"), "state counts are guarded by an invariant");
+ok(service.includes("mutationsEnabled: () => canonicalProductAuthority.mutationsEnabled() === true"), "bounded onboarding uses only the dedicated default-off authority gate");
 ok(service.includes("markets.map(customerMarket") && service.includes("assessments.every(item => item.ready)"), "every requested customer market must pass readiness");
 ok(ui.includes("row.blockers") && ui.includes("apwBlockerLabel"), "frontend renders sanitized blocker codes");
 ok(!routePreparationSource.includes("Promise.all"), "route-preparation session reads remain sequential");

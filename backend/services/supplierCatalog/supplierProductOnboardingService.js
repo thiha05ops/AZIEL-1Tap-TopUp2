@@ -24,6 +24,8 @@ const upper = value => clean(value).toUpperCase();
 const lower = value => clean(value).toLowerCase();
 const id = value => clean(value?._id || value);
 const hash = value => crypto.createHash("sha256").update(clean(value)).digest("hex");
+const WIZARD_STATES = Object.freeze({ READY: "READY", PREPARABLE: "PREPARABLE", NEEDS_ATTENTION: "NEEDS_ATTENTION", UNAVAILABLE: "UNAVAILABLE" });
+const UNAVAILABLE_BLOCKERS = new Set(["SUPPLIER_OFFER_NOT_ACTIVE", "SUPPLIER_NOT_API_READY", "SUPPLIER_AVAILABILITY_NOT_CONFIRMED", "CUSTOMER_MARKET_NOT_ELIGIBLE"]);
 
 class SupplierProductOnboardingError extends Error {
     constructor(code, message, statusCode = 400, details = {}) { super(message); this.name = "SupplierProductOnboardingError"; this.code = code; this.statusCode = statusCode; this.details = details; }
@@ -44,6 +46,15 @@ function classifyOffer(offer, targetPackage) {
     return { classification: "AMBIGUOUS", blockers: ["CANONICAL_EQUIVALENCE_REVIEW_REQUIRED"] };
 }
 
+function wizardStateFor({ mapping, classification, blockers = [], equivalenceConflict = false } = {}) {
+    if (equivalenceConflict || classification === "AMBIGUOUS") return WIZARD_STATES.NEEDS_ATTENTION;
+    if (classification === "BLOCKED" || blockers.some(code => UNAVAILABLE_BLOCKERS.has(code))) return WIZARD_STATES.UNAVAILABLE;
+    if (mapping && blockers.length === 0) return WIZARD_STATES.READY;
+    if (mapping && mapping.mappingMetadata?.technicalPreparation && blockers.every(code => code === "MAPPING_DISABLED")) return WIZARD_STATES.PREPARABLE;
+    if (!mapping && ["PROVEN_SAME", "PROVEN_NEW"].includes(classification) && blockers.length === 0) return WIZARD_STATES.PREPARABLE;
+    return WIZARD_STATES.NEEDS_ATTENTION;
+}
+
 function createSupplierProductOnboardingService(dependencies = {}) {
     const M = { Supplier: dependencies.Supplier || Supplier, Product: dependencies.Product || SupplierCatalogProduct, Offer: dependencies.Offer || SupplierCatalogOffer, Availability: dependencies.Availability || SupplierOfferAvailability, Mapping: dependencies.Mapping || SupplierProductMapping, Decision: dependencies.Decision || SupplierCatalogReconciliationDecision, CatalogProduct: dependencies.CatalogProduct || CatalogProduct, CatalogPackage: dependencies.CatalogPackage || CatalogPackage, Selection: dependencies.Selection || PackageSupplierSelection, Audit: dependencies.Audit || AdminAuditLog };
     const canonicalProductAuthority = dependencies.canonicalProductAuthority || canonicalProductAuthorityModule;
@@ -59,6 +70,7 @@ function createSupplierProductOnboardingService(dependencies = {}) {
 
     async function onboardSupplierProduct(input = {}, context = {}) {
         if (input.confirmed !== true) throw new SupplierProductOnboardingError("ONBOARDING_CONFIRMATION_REQUIRED", "Explicit Add to AZIEL confirmation is required.");
+        if (upper(context.actor?.role) !== "OWNER") throw new SupplierProductOnboardingError("OWNER_ONBOARDING_REQUIRED", "Only the Owner can prepare a supplier product for AZIEL.", 403);
         const supplierProductId = clean(input.supplierCatalogProductId), markets = [...new Set((input.customerMarkets || [input.customerMarket || "TH"]).map(upper).filter(value => ["TH", "MM"].includes(value)))].sort();
         if (!supplierProductId || !markets.length) throw new SupplierProductOnboardingError("ONBOARDING_SCOPE_REQUIRED", "Supplier product and intended customer market are required.");
         const product = await lean(M.Product.findById(supplierProductId).select("_id supplierId catalogNamespace supplierProductCode supplierMarketCode displayName rawName supportState normalizedInputContract restrictions metadata rawSnapshotHash lastChangedAt sourceRevision"));
@@ -149,15 +161,15 @@ function createSupplierProductOnboardingService(dependencies = {}) {
                 if (intentionallyDisabled) blockers.push("ADOPTION_REVIEW_REQUIRED");
             }
             blockers = [...new Set(blockers)].sort();
-            const onlyEnablement = mapping && mapping.enabled !== true && blockers.every(code => code === "MAPPING_DISABLED");
-            const technicallyPrepared = Boolean(mapping?.mappingMetadata?.technicalPreparation);
-            const state = equivalenceConflict ? "NEEDS_REVIEW" : mapping ? (!blockers.length ? "READY" : onlyEnablement && technicallyPrepared ? "NEEDS_ENABLEMENT" : "NEEDS_SETUP") : classification === "AMBIGUOUS" ? "NEEDS_REVIEW" : "BLOCKED";
-            outcomes.push({ supplierCatalogOfferId: id(offer), supplierOfferCode: offer.supplierOfferCode, supplierOfferName: offer.supplierOfferName || offer.rawName, classification, state, action: action || "NONE", mappingId: id(mapping), supplierMarket: upper(mapping?.region), canonical: mapping ? { productCode: mapping.productCode, packageCode: mapping.packageCode } : evidence, blockers: [...new Set(blockers)].sort(), reviewUrl: state === "NEEDS_REVIEW" ? `/api/admin/supplier-catalog/offers/${id(offer)}/reconciliation` : "" });
+            const state = wizardStateFor({ mapping, classification, blockers, equivalenceConflict });
+            outcomes.push({ supplierCatalogOfferId: id(offer), supplierOfferCode: offer.supplierOfferCode, supplierOfferName: offer.supplierOfferName || offer.rawName, classification, state, selectable: [WIZARD_STATES.READY, WIZARD_STATES.PREPARABLE].includes(state), action: action || "NONE", mappingId: id(mapping), supplierMarket: upper(mapping?.region), canonical: mapping ? { productCode: mapping.productCode, packageCode: mapping.packageCode } : evidence, blockers: [...new Set(blockers)].sort(), reviewUrl: state === WIZARD_STATES.NEEDS_ATTENTION ? `/api/admin/supplier-catalog/offers/${id(offer)}/reconciliation` : "" });
         }
-        const counts = key => outcomes.filter(row => row.action === key || row.state === key).length;
-        const summary = { total: outcomes.length, reusedMappings: counts("REUSED_MAPPING") + counts("REUSED_DECISION") + counts("REUSED_PREPARATION"), autoLinked: counts("AUTO_LINKED"), autoCreated: counts("AUTO_CREATED"), ready: counts("READY"), needsReview: counts("NEEDS_REVIEW"), blocked: counts("BLOCKED"), needsSetup: counts("NEEDS_SETUP"), needsEnablement: counts("NEEDS_ENABLEMENT") };
-        const state = summary.needsReview || summary.blocked ? (summary.ready || summary.needsSetup || summary.reusedMappings || summary.autoLinked || summary.autoCreated ? "PARTIALLY_PREPARED" : "NEEDS_REVIEW") : "PREPARED";
-        const prepared = outcomes.filter(row => row.mappingId && ["READY", "NEEDS_ENABLEMENT"].includes(row.state) && row.canonical?.productCode && row.canonical?.packageCode && row.supplierMarket);
+        const actionCount = key => outcomes.filter(row => row.action === key || row.action.startsWith(`${key}_`)).length;
+        const stateCount = key => outcomes.filter(row => row.state === key).length;
+        const summary = { total: outcomes.length, selectable: outcomes.filter(row => row.selectable).length, ready: stateCount(WIZARD_STATES.READY), preparable: stateCount(WIZARD_STATES.PREPARABLE), needsAttention: stateCount(WIZARD_STATES.NEEDS_ATTENTION), unavailable: stateCount(WIZARD_STATES.UNAVAILABLE), reusedMappings: actionCount("REUSED_MAPPING") + actionCount("REUSED_DECISION") + actionCount("REUSED_PREPARATION"), created: actionCount("AUTO_CREATED"), linked: actionCount("AUTO_LINKED") };
+        if (summary.total !== summary.ready + summary.preparable + summary.needsAttention + summary.unavailable || summary.selectable !== summary.ready + summary.preparable) throw new SupplierProductOnboardingError("WIZARD_STATE_INVARIANT_FAILED", "Supplier package preparation state is internally inconsistent.", 500);
+        const state = summary.selectable ? (summary.needsAttention || summary.unavailable ? "PARTIALLY_AVAILABLE" : "AVAILABLE") : summary.needsAttention ? WIZARD_STATES.NEEDS_ATTENTION : WIZARD_STATES.UNAVAILABLE;
+        const prepared = outcomes.filter(row => row.mappingId && row.selectable && row.canonical?.productCode && row.canonical?.packageCode && row.supplierMarket);
         const productCodes = [...new Set(prepared.map(row => lower(row.canonical.productCode)))];
         const supplierMarkets = [...new Set(prepared.map(row => upper(row.supplierMarket)))];
         const continuation = {
@@ -165,7 +177,7 @@ function createSupplierProductOnboardingService(dependencies = {}) {
             productCode: productCodes.length === 1 ? productCodes[0] : "",
             supplierId: id(supplier), supplierMarket: supplierMarkets.length === 1 ? supplierMarkets[0] : "",
             mappingIds: prepared.map(row => row.mappingId), packageCodes: [...new Set(prepared.map(row => upper(row.canonical.packageCode)))].sort(),
-            preparedCount: prepared.length, exceptionCount: outcomes.filter(row => row.state === "NEEDS_REVIEW").length
+            preparedCount: prepared.length, selectableCount: summary.selectable, exceptionCount: summary.needsAttention, needsAttentionCount: summary.needsAttention, unavailableCount: summary.unavailable
         };
         return { product: { supplierCatalogProductId: id(product), supplierId: id(supplier), supplierCode: supplier.supplierCode, supplierProductCode: product.supplierProductCode, name: product.displayName || product.rawName, supplierMarket: product.supplierMarketCode, onboardingState: state }, customerMarkets: markets, summary, continuation, offers: outcomes, safety: { publicationWrites: 0, customerPriceWrites: 0, packageSupplierSelectionWrites: 0, commerceOrderWrites: 0, fulfillmentAttemptWrites: 0, supplierExecutionCalls: 0 } };
     }
@@ -173,4 +185,4 @@ function createSupplierProductOnboardingService(dependencies = {}) {
 }
 
 const service = createSupplierProductOnboardingService();
-module.exports = Object.freeze({ SupplierProductOnboardingError, canonicalEvidence, classifyOffer, createSupplierProductOnboardingService, onboardSupplierProduct: service.onboardSupplierProduct });
+module.exports = Object.freeze({ WIZARD_STATES, SupplierProductOnboardingError, canonicalEvidence, classifyOffer, wizardStateFor, createSupplierProductOnboardingService, onboardSupplierProduct: service.onboardSupplierProduct });

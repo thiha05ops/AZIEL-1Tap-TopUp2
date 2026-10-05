@@ -34,7 +34,8 @@ const service = createSupplierCanonicalProductAuthorityService({ repos, gate: ()
     const ok = (condition, message) => { assert.ok(condition, message); checks += 1; };
     const plan = await service.plan("sp1");
     ok(plan.state === "NEW_TO_AZIEL", "new product identified");
-    ok(plan.offers[0].disposition === "READY_TO_CREATE" && plan.offers[1].disposition === "REVIEW_REQUIRED", "bounded safe/ambiguous split");
+    ok(plan.offers[0].state === "PREPARABLE" && plan.offers[1].state === "NEEDS_ATTENTION", "bounded safe/ambiguous wizard split");
+    ok(plan.offers[0].disposition === "READY_TO_CREATE" && plan.offers[1].disposition === "REVIEW_REQUIRED", "internal authority disposition remains fail closed");
     ok(plan.canonical.productCode === deterministicProductCode(product), "deterministic code");
     const approvedOffers = [{ supplierCatalogOfferId: "o1", expectedSource: plan.offers[0].sourceLock }];
     const input = { supplierCatalogProductId: "sp1", confirmed: true, productCode: plan.canonical.productCode, name: plan.canonical.name, expectedSource: plan.product.sourceLock, approvedOffers, idempotencyKey: "new-game-1" };

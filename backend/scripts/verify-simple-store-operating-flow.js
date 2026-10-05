@@ -2,7 +2,7 @@
 "use strict";
 const assert=require("assert"),fs=require("fs"),path=require("path"),root=path.resolve(__dirname,"../.."),read=file=>fs.readFileSync(path.join(root,file),"utf8");
 const wizard=read("frontend/js/admin-add-product-wizard.js"),products=read("frontend/js/admin-guided-selling.js"),pricing=read("frontend/js/admin-pricing-engine.js"),selectionService=read("backend/services/storeCatalogSelectionService.js"),selectionModel=read("backend/models/StoreCatalogSelection.js"),catalog=read("backend/services/catalogService.js"),pricingService=read("backend/services/commerce/adminPricingControlCenterService.js"),routes=read("backend/routes/supplier.js");
-assert(wizard.includes("Where do you want to sell this product?")&&wizard.includes("sellingRegions:new Set()"),"Flow A must start with multi-select customer regions");
+assert(wizard.includes("Where do you want to sell?")&&wizard.includes("sellingRegions:new Set()")&&wizard.includes("data-wizard-region"),"Flow A must start with multi-select customer regions");
 assert(wizard.includes('sellingRegions=new Set(["TH","MM"])'),"New Add Product must default to both AZIEL commerce selling markets");
 assert(wizard.includes("&sellingRegions=${encodeURIComponent(markets)}"),"Add Product must send commerce selling regions under an explicit sellingRegions parameter.");
 assert(!wizard.includes("&customerMarkets=${encodeURIComponent(markets)}"),"Add Product must not label commerce selling regions as supplier/customer fulfillment markets.");
@@ -14,7 +14,7 @@ assert(!wizard.includes("/publication")&&!wizard.includes("workspace/preview")&&
 assert(selectionModel.includes("sellingRegions")&&selectionModel.includes("visibleRegions")&&selectionModel.includes("supplierProductMappingId"),"Store Catalog authority must reference exact mappings and independent customer regions");
 assert(selectionService.includes("STORE_SELECTION_SCOPE_MISMATCH")&&selectionService.includes("supplierMarket")&&selectionService.includes("mappingDeleted: false")&&selectionService.includes("historyDeleted: false"),"Selection scope/removal invariants are incomplete");
 assert(routes.includes("/admin/store-catalog-selections")&&routes.includes("CATALOG_MANAGE")&&routes.includes("writeAdminAudit"),"Store Catalog mutations require existing catalog authorization and audit");
-assert(pricingService.includes("StoreCatalogSelection")&&pricingService.includes("storeSelectionScoped")&&pricingService.includes("activeSelection")&&pricing.includes("Publish Changes")&&pricing.includes("Daily Pricing explicit Publish Changes decision"),"Flow B/C must use actual Store Catalog scope, Pricing Engine, and explicit publication");
+assert(pricingService.includes("StoreCatalogSelection.find")&&pricingService.includes("const selection = selections.find")&&pricing.includes("Publish All Changes")&&pricing.includes("Publish Selected"),"Flow B/C must use actual Store Catalog scope, Pricing Engine, and explicit publication");
 assert(pricing.includes("pricingSupplierSelect")&&pricing.includes('setAttribute("hidden","")'),"Normal Daily Pricing must not require supplier reselection");
 assert(products.includes("Selling Markets")&&products.includes("data-store-selling-region")&&products.includes("/selling-regions"),"Existing Store Catalog products must expose TH/MM selling-market control");
 assert(products.includes("Storefront Visibility")&&products.includes("data-store-region-visibility")&&products.includes("Remove from Product"),"Flow D/E controls are missing");
