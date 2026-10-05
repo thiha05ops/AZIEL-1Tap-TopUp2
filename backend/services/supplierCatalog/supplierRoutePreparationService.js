@@ -10,12 +10,14 @@ const SupplierProductMapping = require("../../models/SupplierProductMapping");
 const CatalogProduct = require("../../models/CatalogProduct");
 const CatalogPackage = require("../../models/CatalogPackage");
 const AdminAuditLog = require("../../models/AdminAuditLog");
+const SupplierCatalogReconciliationDecision = require("../../models/SupplierCatalogReconciliationDecision");
 const { canonicalJson } = require("./supplierCatalogNormalization");
 const { getSupplierAdapter } = require("../supplierAdapterRegistry");
 const { supportsMapping } = require("../suppliers/supplierFulfillmentDispatcher");
 const { contractFromSupplierCatalog, verifiedMappingContract } = require("../suppliers/fazercardsFulfillmentContractService");
 const { assessPreCommercialFulfillmentReadiness, supplierCapabilityProductCode } = require("../fulfillmentCapabilityService");
 const { normalizeSupplierMarket } = require("../../constants/supplierMarkets");
+const { assessCanonicalEquivalenceProof } = require("./canonicalEquivalenceProofService");
 
 const ACTION = "SUPPLIER_ROUTE_TECHNICALLY_PREPARED";
 const ACTIVE_CANONICAL_QUERY = Object.freeze({ deletedAt: null });
@@ -67,7 +69,7 @@ function outcomeFor(blockers = []) {
     return OUTCOMES.REVIEW_REQUIRED;
 }
 
-function adoptionStateFor({ mapping = null, offer = null, supplierProduct = null } = {}) {
+function adoptionStateFor({ mapping = null, offer = null, supplierProduct = null, equivalenceProof = null } = {}) {
     if (!mapping && !offer) return ADOPTION_STATES.NOT_ADOPTED;
     const reconciliation = upper(offer?.reconciliationState);
     const lifecycle = upper(offer?.catalogLifecycleState);
@@ -76,7 +78,7 @@ function adoptionStateFor({ mapping = null, offer = null, supplierProduct = null
         id(mapping.supplierCatalogOfferId) &&
         clean(mapping.supplierProductCode) &&
         clean(mapping.supplierPackageCode) &&
-        reconciliation === "EXACT_CANONICAL_MATCH" &&
+        equivalenceProof?.proven === true &&
         lifecycle === "ACTIVE" &&
         supportState === "SUPPORTED";
     if (hasCurrentMappingIntent) return ADOPTION_STATES.CURRENTLY_ADOPTED;
@@ -99,7 +101,8 @@ function sourceLock(state, runtime) {
         offer: { id: id(offer), code: clean(offer?.supplierOfferCode), lifecycle: upper(offer?.catalogLifecycleState), reconciliation: upper(offer?.reconciliationState), sourceRevision: clean(offer?.sourceRevision), sourceHash: clean(offer?.rawSnapshotHash), updatedAt: offer?.updatedAt || null },
         availability: { state: upper(availability?.state), coverageComplete: availability?.coverageComplete === true, observedAt: availability?.observedAt || null, updatedAt: availability?.updatedAt || null },
         canonical: { productId: id(canonicalProduct), productCode: clean(mapping?.productCode).toLowerCase(), packageIds: canonicalPackages.map(id).sort(), packageCode: upper(mapping?.packageCode), productUpdatedAt: canonicalProduct?.updatedAt || null, packageUpdatedAt: canonicalPackages[0]?.updatedAt || null },
-        runtime: { adapterConfigured: runtime.adapterConfigured === true, autoFulfillmentEnabled: runtime.autoFulfillmentEnabled === true, processorSupported: runtime.processorSupported === true, protocol: clean(runtime.fulfillmentContract?.protocol), contractFingerprint: clean(runtime.fulfillmentContract?.fingerprint) }
+        runtime: { adapterConfigured: runtime.adapterConfigured === true, autoFulfillmentEnabled: runtime.autoFulfillmentEnabled === true, processorSupported: runtime.processorSupported === true, protocol: clean(runtime.fulfillmentContract?.protocol), contractFingerprint: clean(runtime.fulfillmentContract?.fingerprint) },
+        canonicalEquivalence: { proven: runtime.equivalenceProof?.proven === true, source: clean(runtime.equivalenceProof?.source), decisionId: id(state.reconciliationDecision), decisionVersion: Number(state.reconciliationDecision?.decisionVersion || 0) }
     };
 }
 
@@ -174,7 +177,8 @@ function assessExistingPreparedRoute(state = {}, customerMarkets = [], dependenc
     try { autoFulfillmentEnabled = adapter?.isAutoFulfillmentEnabled?.(supplierCapabilityProductCode(mapping, state.supplier, state.supplierProduct)) === true; } catch { autoFulfillmentEnabled = false; }
     try { processorSupported = processorSupportResolver(mapping || {}) === true; } catch { processorSupported = false; }
     const assessment = assessPreCommercialFulfillmentReadiness({ ...state, mapping, customerMarkets, fulfillmentContract, adapterConfigured, autoFulfillmentEnabled, processorSupported });
-    if (state.offer && upper(state.offer.reconciliationState) !== "EXACT_CANONICAL_MATCH") assessment.blockers.push("CANONICAL_EQUIVALENCE_REVIEW_REQUIRED");
+    const equivalenceProof = assessCanonicalEquivalenceProof(state);
+    if (!equivalenceProof.proven) assessment.blockers.push(...equivalenceProof.blockers);
     assessment.blockers = [...new Set(assessment.blockers)].sort();
     assessment.ready = assessment.blockers.length === 0;
     return { ...assessment, outcome: outcomeFor(assessment.blockers), fulfillmentContract, adapterConfigured, autoFulfillmentEnabled, processorSupported };
@@ -192,6 +196,7 @@ function defaultRepos() {
         canonicalProduct: (value, session) => sessionize(CatalogProduct.findOne({ productCode: value, ...ACTIVE_CANONICAL_QUERY }), session).lean(),
         canonicalPackages: (productCode, packageCode, session) => sessionize(CatalogPackage.find({ productCode, packageCode, ...ACTIVE_CANONICAL_QUERY }), session).lean(),
         auditByPlanHash: (planHash, session) => sessionize(AdminAuditLog.findOne({ action: ACTION, "metadata.planHash": planHash }), session).lean(),
+        currentDecision: (offerId, session) => sessionize(SupplierCatalogReconciliationDecision.findOne({ supplierCatalogOfferId: offerId, isCurrent: true }), session).lean(),
         updateMapping: (mappingId, expectedUpdatedAt, update, session) => SupplierProductMapping.updateOne({ _id: mappingId, updatedAt: new Date(expectedUpdatedAt) }, { $set: update }, { session, runValidators: true }),
         createAudit: (document, session) => AdminAuditLog.create([document], { session })
     };
@@ -200,14 +205,15 @@ function defaultRepos() {
 function createSupplierRoutePreparationService({ repos = defaultRepos(), adapterResolver = getSupplierAdapter, processorSupportResolver = supportsMapping, clock = () => new Date() } = {}) {
     async function load(request, session = null) {
         const mapping = await repos.mappingById(request.mappingId, session);
-        if (!mapping) return { mapping: null, supplier: null, supplierProduct: null, offer: null, availability: null, canonicalProduct: null, canonicalPackages: [] };
+        if (!mapping) return { mapping: null, supplier: null, supplierProduct: null, offer: null, availability: null, canonicalProduct: null, canonicalPackages: [], reconciliationDecision: null };
         const supplier = await repos.supplierById(mapping.supplierId, session);
         const offer = await repos.offerById(mapping.supplierCatalogOfferId, session);
         const canonicalProduct = await repos.canonicalProduct(mapping.productCode, session);
         const canonicalPackages = await repos.canonicalPackages(mapping.productCode, mapping.packageCode, session);
         const supplierProduct = offer ? await repos.productById(offer.supplierCatalogProductId, session) : null;
         const availability = offer ? await repos.availabilityByOffer(offer._id, session) : null;
-        return { mapping, supplier, supplierProduct, offer, availability, canonicalProduct, canonicalPackages };
+        const reconciliationDecision = offer && typeof repos.currentDecision === "function" ? await repos.currentDecision(offer._id, session) : null;
+        return { mapping, supplier, supplierProduct, offer, availability, canonicalProduct, canonicalPackages, reconciliationDecision };
     }
 
     function runtimeFor(state, mapping) {
@@ -226,7 +232,12 @@ function createSupplierRoutePreparationService({ repos = defaultRepos(), adapter
             const body = { artifactType: "SUPPLIER_ROUTE_PREPARATION_PLAN", schemaVersion: 1, request, outcome: OUTCOMES.MISSING_MAPPING, blockers: ["MISSING_MAPPING"], sourceLock: sourceLock(state, {}), proposedChanges: null, safety: { enabledWrites: 0, roleWrites: 0, pricingWrites: 0, publicationWrites: 0, storefrontWrites: 0, supplierCalls: 0 } };
             return { ...body, sourceLockHash: sha(body.sourceLock), planHash: sha(body) };
         }
-        const adoptionState = adoptionStateFor(state);
+        const equivalenceProof = assessCanonicalEquivalenceProof(state);
+        const adoptionState = adoptionStateFor({ ...state, equivalenceProof });
+        if (!equivalenceProof.proven) {
+            const body = { artifactType: "SUPPLIER_ROUTE_PREPARATION_PLAN", schemaVersion: 1, request, adoptionState: ADOPTION_STATES.ADOPTION_REVIEW_REQUIRED, outcome: OUTCOMES.REVIEW_REQUIRED, blockers: equivalenceProof.blockers, sourceLock: sourceLock(state, {}), proposedChanges: null, safety: { enabledWrites: 0, roleWrites: 0, pricingWrites: 0, publicationWrites: 0, storefrontWrites: 0, supplierCalls: 0 } };
+            return { ...body, sourceLockHash: sha(body.sourceLock), planHash: sha(body) };
+        }
         if (adoptionState !== ADOPTION_STATES.CURRENTLY_ADOPTED) {
             const blockers = adoptionState === ADOPTION_STATES.HISTORICAL_ONLY ? ["HISTORICAL_MAPPING_ONLY"] : ["ADOPTION_REVIEW_REQUIRED"];
             const body = { artifactType: "SUPPLIER_ROUTE_PREPARATION_PLAN", schemaVersion: 1, request, adoptionState, outcome: OUTCOMES.REVIEW_REQUIRED, blockers, sourceLock: sourceLock(state, {}), proposedChanges: null, safety: { enabledWrites: 0, roleWrites: 0, pricingWrites: 0, publicationWrites: 0, storefrontWrites: 0, supplierCalls: 0 } };
@@ -238,10 +249,9 @@ function createSupplierRoutePreparationService({ repos = defaultRepos(), adapter
         const proposal = proposedMapping(state.mapping, state, request, initialRuntime);
         const runtime = runtimeFor(state, proposal);
         const assessment = assessPreCommercialFulfillmentReadiness({ ...state, mapping: proposal, customerMarkets: request.customerMarkets, ...runtime });
-        if (upper(state.offer?.reconciliationState) !== "EXACT_CANONICAL_MATCH") assessment.blockers.push("CANONICAL_EQUIVALENCE_REVIEW_REQUIRED");
         if (["PRIMARY", "BACKUP"].includes(upper(state.mapping.productionRole)) && upper(state.mapping.region) !== upper(proposal.region)) assessment.blockers.push("COMMERCIAL_ROUTE_REGION_CHANGE_REQUIRES_OWNER_REVIEW");
         assessment.blockers = [...new Set(assessment.blockers)].sort(); assessment.ready = assessment.blockers.length === 0;
-        const lock = sourceLock(state, runtime);
+        const lock = sourceLock(state, { ...runtime, equivalenceProof });
         const proposedChanges = assessment.ready ? {
             region: proposal.region, supplierCatalogOfferId: proposal.supplierCatalogOfferId,
             supplierProductCode: proposal.supplierProductCode, supplierPackageCode: proposal.supplierPackageCode,

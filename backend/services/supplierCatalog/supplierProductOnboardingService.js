@@ -11,10 +11,12 @@ const CatalogProduct = require("../../models/CatalogProduct");
 const CatalogPackage = require("../../models/CatalogPackage");
 const PackageSupplierSelection = require("../../models/PackageSupplierSelection");
 const AdminAuditLog = require("../../models/AdminAuditLog");
+const SupplierCatalogReconciliationDecision = require("../../models/SupplierCatalogReconciliationDecision");
 const { getSupplierAdapter } = require("../supplierAdapterRegistry");
 const { READINESS_MODES, assessMappingReadiness } = require("../supplierMappingReadinessService");
 const reconciliation = require("./supplierCatalogReconciliationService");
 const routePreparation = require("./supplierRoutePreparationService");
+const { assessCanonicalEquivalenceProof } = require("./canonicalEquivalenceProofService");
 
 const clean = value => String(value == null ? "" : value).trim();
 const upper = value => clean(value).toUpperCase();
@@ -42,7 +44,7 @@ function classifyOffer(offer, targetPackage) {
 }
 
 function createSupplierProductOnboardingService(dependencies = {}) {
-    const M = { Supplier: dependencies.Supplier || Supplier, Product: dependencies.Product || SupplierCatalogProduct, Offer: dependencies.Offer || SupplierCatalogOffer, Availability: dependencies.Availability || SupplierOfferAvailability, Mapping: dependencies.Mapping || SupplierProductMapping, CatalogProduct: dependencies.CatalogProduct || CatalogProduct, CatalogPackage: dependencies.CatalogPackage || CatalogPackage, Selection: dependencies.Selection || PackageSupplierSelection, Audit: dependencies.Audit || AdminAuditLog };
+    const M = { Supplier: dependencies.Supplier || Supplier, Product: dependencies.Product || SupplierCatalogProduct, Offer: dependencies.Offer || SupplierCatalogOffer, Availability: dependencies.Availability || SupplierOfferAvailability, Mapping: dependencies.Mapping || SupplierProductMapping, Decision: dependencies.Decision || SupplierCatalogReconciliationDecision, CatalogProduct: dependencies.CatalogProduct || CatalogProduct, CatalogPackage: dependencies.CatalogPackage || CatalogPackage, Selection: dependencies.Selection || PackageSupplierSelection, Audit: dependencies.Audit || AdminAuditLog };
     const reconcile = dependencies.reconciliation || reconciliation;
     const prepareRoute = dependencies.routePreparation || routePreparation;
     const adapterResolver = dependencies.adapterResolver || getSupplierAdapter;
@@ -79,12 +81,14 @@ function createSupplierProductOnboardingService(dependencies = {}) {
         if (!supplier) throw new SupplierProductOnboardingError("SUPPLIER_NOT_FOUND", "Supplier was not found.", 404);
         const offers = await lean(M.Offer.find({ supplierCatalogProductId: product._id }).sort({ supplierOfferCode: 1 }).select("_id supplierCatalogProductId supplierId catalogNamespace supplierProductCode supplierOfferCode supplierOfferName rawName normalizedSemantics catalogLifecycleState reconciliationState reconciliationEvidence rawSnapshotHash sourceRevision lastChangedAt"));
         const offerIds = offers.map(row => row._id);
-        const [availability, mappings] = await Promise.all([
+        const [availability, mappings, decisions] = await Promise.all([
             lean(M.Availability.find({ supplierCatalogOfferId: { $in: offerIds } }).select("supplierCatalogOfferId state coverageComplete evidenceCode observedAt staleAt")),
-            lean(M.Mapping.find({ supplierId: product.supplierId, $or: [{ supplierCatalogOfferId: { $in: offerIds } }, { supplierProductCode: product.supplierProductCode, region: product.supplierMarketCode }] }))
+            lean(M.Mapping.find({ supplierId: product.supplierId, $or: [{ supplierCatalogOfferId: { $in: offerIds } }, { supplierProductCode: product.supplierProductCode, region: product.supplierMarketCode }] })),
+            lean(M.Decision.find({ supplierCatalogOfferId: { $in: offerIds }, isCurrent: true }))
         ]);
         await prepareCanonicalProduct(product, context.actor, context.requestId || "");
         const availabilityByOffer = new Map(availability.map(row => [id(row.supplierCatalogOfferId), row]));
+        const decisionByOffer = new Map(decisions.map(row => [id(row.supplierCatalogOfferId), row]));
         const outcomes = [];
         for (const offer of offers) {
             let mapping = mappings.find(row => id(row.supplierCatalogOfferId) === id(offer) || (clean(row.supplierProductCode) === clean(offer.supplierProductCode) && clean(row.supplierPackageCode) === clean(offer.supplierOfferCode) && upper(row.region) === upper(product.supplierMarketCode)));
@@ -93,8 +97,19 @@ function createSupplierProductOnboardingService(dependencies = {}) {
             const evidence = canonicalEvidence(offer);
             const targetPackage = evidence ? await lean(M.CatalogPackage.findOne({ productCode: evidence.productCode, packageCode: evidence.packageCode, deletedAt: null }).select("_id productCode packageCode name enabled prices metadata")) : null;
             const assessed = classifyOffer(offer, targetPackage);
-            classification ||= assessed.classification;
-            let blockers = [...assessed.blockers];
+            let equivalenceConflict = false;
+            let blockers;
+            if (mapping) {
+                const canonicalProduct = await lean(M.CatalogProduct.findOne({ productCode: lower(mapping.productCode), deletedAt: null }).select("_id productCode"));
+                const canonicalPackages = await lean(M.CatalogPackage.find({ productCode: lower(mapping.productCode), packageCode: upper(mapping.packageCode), deletedAt: null }).select("_id productCode packageCode"));
+                const proof = assessCanonicalEquivalenceProof({ supplierProduct: product, offer, mapping, reconciliationDecision: decisionByOffer.get(id(offer)), canonicalProduct, canonicalPackages });
+                classification = proof.classification;
+                blockers = [...proof.blockers];
+                equivalenceConflict = !proof.proven;
+            } else {
+                classification ||= assessed.classification;
+                blockers = [...assessed.blockers];
+            }
             if (!mapping && ["PROVEN_SAME", "PROVEN_NEW"].includes(classification)) {
                 try {
                     const expectedSource = reconcile.sourceLock({ offer, product, availability: availabilityByOffer.get(id(offer)) });
@@ -109,7 +124,7 @@ function createSupplierProductOnboardingService(dependencies = {}) {
                     } else blockers.push(error.code || "RECONCILIATION_FAILED");
                 }
             }
-            if (mapping) {
+            if (mapping && !equivalenceConflict) {
                 const initialReadiness = assessMappingReadiness({ mode: READINESS_MODES.NEW_ORDER_SELECTABLE, mapping, supplier, offer, availability: availabilityByOffer.get(id(offer)), customerMarket: markets[0], adapter: adapterResolver(supplier) });
                 const existingContract = mapping.mappingMetadata?.fulfillmentContract;
                 const intentionallyDisabled = action === "REUSED_MAPPING" && mapping.enabled === false && !mapping.mappingMetadata?.reconciliationDecision && !mapping.mappingMetadata?.technicalPreparation;
@@ -134,7 +149,7 @@ function createSupplierProductOnboardingService(dependencies = {}) {
             blockers = [...new Set(blockers)].sort();
             const onlyEnablement = mapping && mapping.enabled !== true && blockers.every(code => code === "MAPPING_DISABLED");
             const technicallyPrepared = Boolean(mapping?.mappingMetadata?.technicalPreparation);
-            const state = mapping ? (!blockers.length ? "READY" : onlyEnablement && technicallyPrepared ? "NEEDS_ENABLEMENT" : "NEEDS_SETUP") : classification === "AMBIGUOUS" ? "NEEDS_REVIEW" : "BLOCKED";
+            const state = equivalenceConflict ? "NEEDS_REVIEW" : mapping ? (!blockers.length ? "READY" : onlyEnablement && technicallyPrepared ? "NEEDS_ENABLEMENT" : "NEEDS_SETUP") : classification === "AMBIGUOUS" ? "NEEDS_REVIEW" : "BLOCKED";
             outcomes.push({ supplierCatalogOfferId: id(offer), supplierOfferCode: offer.supplierOfferCode, supplierOfferName: offer.supplierOfferName || offer.rawName, classification, state, action: action || "NONE", mappingId: id(mapping), canonical: mapping ? { productCode: mapping.productCode, packageCode: mapping.packageCode } : evidence, blockers: [...new Set(blockers)].sort(), reviewUrl: state === "NEEDS_REVIEW" ? `/api/admin/supplier-catalog/offers/${id(offer)}/reconciliation` : "" });
         }
         const counts = key => outcomes.filter(row => row.action === key || row.state === key).length;

@@ -14,6 +14,7 @@ const { getSupplierAdapter } = require("./supplierAdapterRegistry");
 const { basicCandidateBlockers } = require("./supplierEligibilityRouteResolver");
 const { publicationPackageKey, publicationPackageMap, setPackageMarketPublication } = require("./packageMarketPublicationService");
 const { assessExistingPreparedRoute } = require("./supplierCatalog/supplierRoutePreparationService");
+const { assessCanonicalEquivalenceProof } = require("./supplierCatalog/canonicalEquivalenceProofService");
 const { contractFromSupplierCatalog } = require("./suppliers/fazercardsFulfillmentContractService");
 const { supplierCapabilityProductCode } = require("./fulfillmentCapabilityService");
 const { transactionalServiceCode } = require("./suppliers/wonddCatalogConfig");
@@ -175,14 +176,15 @@ function syntheticMappingFromOffer({ offer, supplier, supplierProduct } = {}) {
     };
 }
 
-function discoveryAssessment({ mapping, supplier, supplierProduct, offer, availability, product, pkg, customerMarkets, dependencies }) {
+function discoveryAssessment({ mapping, mappingIsDurable = true, supplier, supplierProduct, offer, availability, product, pkg, customerMarkets, dependencies }) {
     const blockers = [];
     if (!mapping) blockers.push("MISSING_MAPPING");
     if (!product || product.deletedAt) blockers.push("MISSING_CANONICAL_PRODUCT");
     if (!supplier || supplier.enabled !== true || upper(supplier.mode) !== "API") blockers.push("SUPPLIER_UNSUPPORTED");
     if (!supplierProduct || upper(supplierProduct.supportState) !== "SUPPORTED") blockers.push("SUPPLIER_PRODUCT_UNSUPPORTED");
     if (!offer || upper(offer.catalogLifecycleState) !== "ACTIVE") blockers.push("OFFER_NOT_ACTIVE");
-    if (offer && upper(offer.reconciliationState) !== "EXACT_CANONICAL_MATCH") blockers.push("CANONICAL_EQUIVALENCE_REVIEW_REQUIRED");
+    const equivalenceProof = assessCanonicalEquivalenceProof({ mapping: mappingIsDurable ? mapping : null, supplierProduct, offer, canonicalProduct: product, canonicalPackages: pkg ? [pkg] : [] });
+    if (!equivalenceProof.proven) blockers.push(...equivalenceProof.blockers);
     if (!availability || upper(availability.state) !== "AVAILABLE" || (availability.staleAt && new Date(availability.staleAt).getTime() <= Date.now())) blockers.push("AVAILABILITY_UNPROVEN");
     const supplierMarket = upper(supplierProduct?.supplierMarketCode);
     void supplierMarket;
@@ -309,8 +311,8 @@ function projectActivation(data, { search = "", productCode = "", supplierMarket
         const packagePublished = publicationRecords.some(item => item.published === true);
         const readiness = mappingReadiness({ mapping, supplier, pkg, offer, availability, customerMarket: market, now });
         const setup = mappingAvailability({ mapping, supplier, pkg, offer });
-        const discovery = discoveryAssessment({ mapping, supplier, supplierProduct, offer, availability, product, pkg, customerMarkets: requestedSellingRegions, dependencies });
-        const prepared = discovery.ready ? { ready: true, outcome: "FULFILLMENT_READY", blockers: [], fulfillmentContract: discovery.fulfillmentContract } : assessExistingPreparedRoute({ mapping, supplier, supplierProduct, offer, availability, canonicalProduct: product, canonicalPackages: pkg ? [pkg] : [] }, routeReadinessMarketsForMapping(mapping, requestedSellingRegions), dependencies);
+        const discovery = discoveryAssessment({ mapping, mappingIsDurable: !synthetic, supplier, supplierProduct, offer, availability, product, pkg, customerMarkets: requestedSellingRegions, dependencies });
+        const prepared = discovery.ready || synthetic ? { ready: discovery.ready, outcome: discovery.outcome, blockers: discovery.blockers, fulfillmentContract: discovery.fulfillmentContract } : assessExistingPreparedRoute({ mapping, supplier, supplierProduct, offer, availability, canonicalProduct: product, canonicalPackages: pkg ? [pkg] : [] }, routeReadinessMarketsForMapping(mapping, requestedSellingRegions), dependencies);
         const displayPackage = discoveryPackage(mapping, pkg, offer);
         const cost = mapping.supplierCostAuthority || {};
         const approvedCostPresent = cost.rawSupplierCost != null && Number.isFinite(Number(cost.rawSupplierCost));

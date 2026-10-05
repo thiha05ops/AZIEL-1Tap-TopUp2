@@ -7,15 +7,21 @@ const { canonicalEvidence, classifyOffer } = require("../services/supplierCatalo
 const { projectActivation } = require("../services/adminProductActivationService");
 const { resolveFulfillmentRoutingMode } = require("../config/fulfillmentRoutingMode");
 const { READINESS_MODES, assessMappingReadiness } = require("../services/supplierMappingReadinessService");
+const { assessCanonicalEquivalenceProof } = require("../services/supplierCatalog/canonicalEquivalenceProofService");
 
 const root = path.resolve(__dirname, "../..");
 const source = file => fs.readFileSync(path.join(root, file), "utf8");
 let checks = 0;
 const ok = (condition, message) => { assert.ok(condition, message); checks += 1; };
 
-const exact = { _id: "o1", supplierId: "s1", supplierCatalogProductId: "sp1", supplierOfferCode: "60", supplierOfferName: "60 Tokens", catalogLifecycleState: "ACTIVE", reconciliationState: "EXACT_CANONICAL_MATCH", reconciliationEvidence: { canonicalProductCode: "hok", canonicalPackageCode: "HOK_60" } };
+const exact = { _id: "o1", supplierId: "s1", supplierCatalogProductId: "sp1", supplierProductCode: "HOK", supplierOfferCode: "60", supplierOfferName: "60 Tokens", catalogLifecycleState: "ACTIVE", reconciliationState: "EXACT_CANONICAL_MATCH", reconciliationEvidence: { canonicalProductCode: "hok", canonicalPackageCode: "HOK_60" } };
 const ambiguous = { ...exact, _id: "o2", supplierOfferCode: "weekly", reconciliationState: "AMBIGUOUS", reconciliationEvidence: {} };
 const distinct = { ...exact, _id: "o3", supplierOfferCode: "new", reconciliationState: "NO_CANONICAL_PACKAGE", reconciliationEvidence: { canonicalProductCode: "hok", distinctEntitlement: true } };
+const supplierProduct = { _id: "sp1", supplierId: "s1", supplierProductCode: "HOK", supplierMarketCode: "TH" };
+const canonicalProduct = { _id: "cp1", productCode: "hok" };
+const canonicalPackage = { _id: "p1", productCode: "hok", packageCode: "HOK_60" };
+const exactMapping = { _id: "m1", supplierId: "s1", supplierCatalogOfferId: "o1", supplierProductCode: "HOK", supplierPackageCode: "60", region: "TH", productCode: "hok", packageCode: "HOK_60", archivedAt: null };
+const proof = overrides => assessCanonicalEquivalenceProof({ supplierProduct, offer: { ...exact, reconciliationState: "UNRECONCILED", reconciliationEvidence: {}, ...overrides?.offer }, mapping: { ...exactMapping, ...overrides?.mapping }, reconciliationDecision: overrides?.decision, canonicalProduct: overrides?.canonicalProduct === undefined ? canonicalProduct : overrides.canonicalProduct, canonicalPackages: overrides?.canonicalPackages === undefined ? [canonicalPackage] : overrides.canonicalPackages });
 
 ok(canonicalEvidence(exact).productCode === "hok", "canonical product evidence normalized");
 ok(canonicalEvidence(exact).packageCode === "HOK_60", "canonical package evidence normalized");
@@ -23,6 +29,29 @@ ok(classifyOffer(exact, { _id: "p1" }).classification === "PROVEN_SAME", "determ
 ok(classifyOffer(ambiguous, null).classification === "AMBIGUOUS", "ambiguous does not auto-link");
 ok(classifyOffer(distinct, null).classification === "PROVEN_NEW", "explicit distinct entitlement can create");
 ok(classifyOffer({ ...exact, catalogLifecycleState: "RETIRED" }, {}).classification === "BLOCKED", "retired offer blocked");
+ok(proof().proven && proof().source === "EXACT_MAPPING", "exact durable mapping proves equivalence despite incomplete mutable offer evidence");
+ok(!proof().blockers.includes("CANONICAL_EQUIVALENCE_REVIEW_REQUIRED"), "exact mapping does not retain duplicate equivalence blocker");
+const approvedLink = { _id: "d1", supplierCatalogOfferId: "o1", supplierIdentity: { supplierId: "s1", supplierProductCode: "HOK", supplierOfferCode: "60" }, decisionType: "LINK_TO_EXISTING_CANONICAL_PACKAGE", decisionStatus: "APPROVED", isCurrent: true, mappingId: "m1", canonicalProductId: "cp1", canonicalPackageId: "p1", canonicalProductCode: "hok", canonicalPackageCode: "HOK_60", sourceOfferHash: "" };
+ok(proof({ decision: approvedLink }).proven && proof({ decision: approvedLink }).source === "RECONCILIATION_DECISION", "approved LINK decision is durable authority");
+ok(proof({ decision: { ...approvedLink, decisionType: "CREATE_CANONICAL_PACKAGE_AND_LINK" } }).proven, "approved CREATE decision and exact created mapping remain proven");
+for (const [overrides, blocker, label] of [
+    [{ mapping: { supplierCatalogOfferId: "wrong" } }, "SUPPLIER_CATALOG_OFFER_IDENTITY_CONFLICT", "offer identity mismatch"],
+    [{ mapping: { supplierId: "wrong" } }, "SUPPLIER_IDENTITY_CONFLICT", "supplier identity mismatch"],
+    [{ mapping: { supplierProductCode: "WRONG" } }, "SUPPLIER_PRODUCT_IDENTITY_CONFLICT", "native product mismatch"],
+    [{ mapping: { supplierPackageCode: "WRONG" } }, "SUPPLIER_OFFER_IDENTITY_CONFLICT", "native offer mismatch"],
+    [{ mapping: { region: "MM" } }, "SUPPLIER_MARKET_IDENTITY_CONFLICT", "market contradiction"],
+    [{ canonicalProduct: null }, "CANONICAL_PRODUCT_MISSING", "canonical product missing"],
+    [{ canonicalPackages: [] }, "CANONICAL_PACKAGE_MISSING", "canonical package missing"],
+    [{ canonicalPackages: [{ ...canonicalPackage, packageCode: "WRONG" }] }, "CANONICAL_PACKAGE_IDENTITY_CONFLICT", "wrong canonical package"],
+    [{ mapping: { archivedAt: new Date() } }, "MAPPING_ARCHIVED", "archived mapping"]
+]) ok(!proof(overrides).proven && proof(overrides).blockers.includes(blocker), label + " fails closed");
+ok(!proof({ canonicalPackages: [canonicalPackage, { ...canonicalPackage, _id: "p2" }] }).proven, "contradictory active canonical authority requires review");
+ok(!proof({ decision: { ...approvedLink, sourceOfferHash: "stale" } }).proven && proof({ decision: { ...approvedLink, sourceOfferHash: "stale" } }).blockers.includes("RECONCILIATION_DECISION_SOURCE_STALE"), "stale decision requires review");
+ok(proof({ decision: approvedLink, offer: { reconciliationState: "AMBIGUOUS" } }).proven, "mutable reconciliation state does not invalidate exact durable decision");
+ok(!proof({ decision: approvedLink, offer: { supplierOfferCode: "changed" } }).proven, "native identity change invalidates decision");
+ok(assessCanonicalEquivalenceProof({ supplierProduct, offer: exact, canonicalProduct, canonicalPackages: [canonicalPackage] }).proven, "strict authoritative offer evidence remains available without mapping");
+ok(!assessCanonicalEquivalenceProof({ supplierProduct, offer: ambiguous, canonicalProduct, canonicalPackages: [] }).proven, "ambiguous unmapped offer requires review");
+ok(!assessCanonicalEquivalenceProof({ supplierProduct, offer: { ...ambiguous, supplierOfferName: "60 Tokens", supplierCost: 1, normalizedSemantics: { denomination: 60 } }, canonicalProduct, canonicalPackages: [canonicalPackage] }).proven, "name, price, and numeric denomination are not equivalence authority");
 
 const projection = projectActivation({
     products: [], packages: [], suppliers: [{ _id: "s1", supplierCode: "WONDD", name: "WonDD" }], mappings: [], publications: [], availability: [{ supplierCatalogOfferId: "o1", state: "AVAILABLE" }],
