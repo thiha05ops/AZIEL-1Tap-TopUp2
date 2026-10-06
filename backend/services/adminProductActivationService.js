@@ -276,9 +276,33 @@ function projectActivation(data, { search = "", productCode = "", supplierMarket
             };
         }).filter(product => !normalizedSearch || [product.name, product.productCode, product.productFamily, ...product.suppliers].some(value => lower(value).includes(normalizedSearch)))
           .sort((a, b) => a.name.localeCompare(b.name));
+        const logicalByKey = new Map(products.map(product => [`canonical:${product.productCode}`, {
+            logicalProductId: `canonical:${product.productCode}`, canonicalProductCode: product.productCode,
+            name: product.name, existingCanonical: true, packageCount: product.packageCount,
+            publishedPackageCount: product.publishedPackageCount, sources: []
+        }]));
+        for (const item of data.supplierProducts) {
+            const sourceMappings = data.mappings.filter(mapping => id(mapping.supplierId) === id(item.supplierId) && clean(mapping.supplierProductCode) === clean(item.supplierProductCode));
+            const authorityCode = lower(item.metadata?.onboardingCanonicalProduct?.productCode);
+            const mappedCodes = [...new Set(sourceMappings.map(mapping => lower(mapping.productCode)).filter(Boolean))];
+            const canonicalCode = mappedCodes.length === 1 ? mappedCodes[0] : authorityCode;
+            const logicalKey = canonicalCode ? `canonical:${canonicalCode}` : `supplier:${id(item)}`;
+            const offers = offersBySupplierProduct.get(id(item)) || [];
+            if (!logicalByKey.has(logicalKey)) logicalByKey.set(logicalKey, {
+                logicalProductId: logicalKey, canonicalProductCode: "", name: item.displayName || item.rawName || item.supplierProductCode,
+                existingCanonical: false, packageCount: offers.length, publishedPackageCount: 0, sources: []
+            });
+            const logical = logicalByKey.get(logicalKey);
+            logical.sources.push({ supplierCatalogProductId: id(item), supplierId: id(item.supplierId),
+                supplierProductCode: clean(item.supplierProductCode), supplierCode: upper(supplierById.get(id(item.supplierId))?.supplierCode),
+                supplierName: supplierById.get(id(item.supplierId))?.name || "", supplierMarket: upper(item.supplierMarketCode),
+                displayName: item.displayName || item.rawName || item.supplierProductCode, packageCount: offers.length,
+                mapped: sourceMappings.length > 0, sourceAuthority: canonicalCode ? (mappedCodes.length === 1 ? "EXACT_MAPPING" : "ONBOARDING_AUTHORITY") : "SUPPLIER_NATIVE" });
+        }
+        const logicalProducts = [...logicalByKey.values()].filter(item => !normalizedSearch || [item.name, item.canonicalProductCode, ...item.sources.flatMap(source => [source.displayName, source.supplierName, source.supplierCode])].some(value => lower(value).includes(normalizedSearch))).sort((a,b)=>a.name.localeCompare(b.name));
         return {
             authority: { catalog: "CatalogProduct/CatalogPackage", route: "SupplierProductMapping.productionRole", cost: "SupplierProductMapping.supplierCostAuthority", pricing: "Daily Pricing/Pricing Engine", input: "SupplierCatalogProduct + mapping readiness", fulfillment: "supplier eligibility route resolver", publication: "PackageMarketPublication" },
-            projectionMode: "NAVIGATION", customerMarket: market, commerceMarketSupported: COMMERCE_MARKETS.includes(market), products,
+            projectionMode: "NAVIGATION", customerMarket: market, commerceMarketSupported: COMMERCE_MARKETS.includes(market), products, logicalProducts,
             markets: [], packages: [], supplierInventory: data.supplierProducts.map(item => ({
                 supplierCatalogProductId: id(item), supplierId: id(item.supplierId), supplierProductCode: clean(item.supplierProductCode),
                 supplierCode: upper(supplierById.get(id(item.supplierId))?.supplierCode), supplierName: supplierById.get(id(item.supplierId))?.name || "",
@@ -393,7 +417,7 @@ function createAdminProductActivationService(models = {}) {
                 lean(M.CatalogProduct.find({ deletedAt: null }).select("productCode name enabled commerceState publicDiscoveryEnabled catalogCategory metadata"), session),
                 lean(M.Mapping.find({ archivedAt: null }).select("productCode packageCode supplierId supplierCode supplierProductCode supplierCatalogOfferId region"), session),
                 lean(M.Publication.find({ published: true }).select("productCode packageCode customerMarket published decisionVersion decisionNote"), session),
-                lean(M.SupplierProduct.find({}).select("_id supplierId supplierProductCode supplierMarketCode displayName rawName"), session),
+                lean(M.SupplierProduct.find({}).select("_id supplierId supplierProductCode supplierMarketCode displayName rawName metadata"), session),
                 lean(M.Offer.find({}).select("_id supplierId supplierCatalogProductId supplierOfferCode supplierOfferName rawName reconciliationState catalogLifecycleState"), session),
                 lean(M.Supplier.find({}).select("_id supplierCode name enabled mode"), session),
                 lean(M.Availability.find({}).select("supplierCatalogOfferId state coverageComplete evidenceCode staleAt"), session)
