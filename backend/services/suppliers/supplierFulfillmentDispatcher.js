@@ -17,9 +17,9 @@ function supportsMapping(mapping = {}) {
         const providerGameCode = providerGameCodeForProduct(productCode) || productCode;
         const identity = resolveWonddCatalogIdentity(mapping.supplierProductCode);
         const declarativeContract = verifiedMappingContract(mapping);
-        const hasExecutableInput = declarativeContract?.protocol === "WONDD_GAME_ID_TOPUP" || hasWonddGameIdFormatter(mapping.productCode);
-        return hasExecutableInput &&
-            identity?.family?.productCode === providerGameCode;
+        const hasDeclarativeContract = declarativeContract?.protocol === "WONDD_GAME_ID_TOPUP" && Boolean(declarativeContract.transactionalServiceCode);
+        const hasLegacyExecutableInput = hasWonddGameIdFormatter(mapping.productCode) && identity?.family?.productCode === providerGameCode;
+        return hasDeclarativeContract || hasLegacyExecutableInput;
     }
     if (code === "FAZERCARDS") {
         return require("./fazercardsFulfillmentProcessor").supportsFazerCardsMapping(mapping);

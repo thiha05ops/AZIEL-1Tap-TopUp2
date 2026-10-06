@@ -7,6 +7,7 @@ const {
 } = require("../services/suppliers/wonddAdapter");
 const { createWonddFulfillmentProcessor, validateWonddMapping } = require("../services/suppliers/wonddFulfillmentProcessor");
 const { buildWonddGameId } = require("../services/suppliers/wonddGameIdFormatters");
+const { contractFingerprint, buildFieldsFromContract } = require("../services/suppliers/fazercardsFulfillmentContractService");
 
 function response(payload) {
     return { ok: true, status: 200, async text() { return JSON.stringify(payload); } };
@@ -48,6 +49,20 @@ async function adapterContractTests() {
     assert.strictEqual(accepted.status, "PENDING");
     assert.strictEqual(accepted.supplierReference, "W-100");
 
+    const generic = createWonddAdapter({ env: { WONDD_USERNAME: "configured", WONDD_PASSWORD: "configured", WONDD_AUTO_FULFILLMENT_ENABLED_PRODUCTS: "future" } });
+    assert.deepStrictEqual(generic.buildTopupPayload({ productCode: "future", serviceCode: "future_service", packCode: "PACK-1", providerFields: { gameid2: "SERVER-ONLY" } }), { method: "topup", servicecode: "future_service", packcode: "PACK-1", gameid2: "SERVER-ONLY" });
+    assert.deepStrictEqual(generic.buildTopupPayload({ productCode: "future", serviceCode: "future_service", packCode: "PACK-1", providerFields: { gameid: "100", gameid2: "200" } }), { method: "topup", servicecode: "future_service", packcode: "PACK-1", gameid: "100", gameid2: "200" });
+    assert.deepStrictEqual(generic.buildTopupPayload({ productCode: "future", serviceCode: "future_service", packCode: "PACK-1", providerFields: { gameid: "100", gameid2: "200", gameid3: "ROLE" } }), { method: "topup", servicecode: "future_service", packcode: "PACK-1", gameid: "100", gameid2: "200", gameid3: "ROLE" });
+    assert.deepStrictEqual(generic.buildTopupPayload({ productCode: "future", serviceCode: "future_service", packCode: "PACK-1", providerFields: {}, noCustomerInput: true }), { method: "topup", servicecode: "future_service", packcode: "PACK-1" });
+    assert.throws(() => generic.buildTopupPayload({ productCode: "future", serviceCode: "future_service", packCode: "PACK-1", providerFields: {} }), error => error.code === "WONDD_CUSTOMER_INPUT_REQUIRED");
+    assert.throws(() => generic.buildTopupPayload({ productCode: "future", serviceCode: "future_service", packCode: "PACK-1", providerFields: { arbitrary: "unsafe" } }), error => error.code === "WONDD_CUSTOMER_INPUT_FIELD_UNSUPPORTED");
+    const declarative={protocol:"WONDD_GAME_ID_TOPUP",fields:[{customerField:"playerId",providerField:"gameid",required:true,type:"numeric-text",constraints:{pattern:"^\\d{3}$"},transformationId:"DIRECT"},{customerField:"serverId",providerField:"gameid2",required:true,type:"numeric-text",transformationId:"DIRECT"}]};
+    assert.deepStrictEqual(buildFieldsFromContract(declarative,{playerId:"100",serverId:"200"}),{gameid:"100",gameid2:"200"});
+    assert.throws(()=>buildFieldsFromContract(declarative,{playerId:"100"}),error=>error.code==="SUPPLIER_REQUIRED_INPUT_MISSING");
+    assert.throws(()=>buildFieldsFromContract(declarative,{playerId:"abc",serverId:"200"}),error=>error.code==="SUPPLIER_INPUT_CONSTRAINT_FAILED");
+    assert.throws(()=>buildFieldsFromContract({...declarative,fields:[{...declarative.fields[0],providerField:"unsupported"}]},{playerId:"100"}),error=>error.code==="SUPPLIER_INPUT_CONTRACT_NOT_VERIFIED");
+    assert.deepStrictEqual(buildFieldsFromContract({protocol:"WONDD_GAME_ID_TOPUP",noCustomerInput:true,fields:[]},{}),{});
+
     assert.strictEqual(normalizeWonddError({ errorcode: "E03" }).failureCode, "WONDD_INSUFFICIENT_BALANCE");
     assert.strictEqual(normalizeWonddError({ errorcode: "E03" }).rawMetadata.category, "OPERATIONAL");
     assert.strictEqual(normalizeWonddError({ errorcode: "E04" }).rawMetadata.category, "CONFIGURATION");
@@ -79,7 +94,7 @@ async function stateAuthorityTests() {
         async submitTopup(input) {
             submits += 1;
             assert.strictEqual(input.serviceCode, "mlbb");
-            assert.strictEqual(input.gameId, "123456789 1234");
+            assert.deepStrictEqual(input.providerFields, { gameid: "123456789 1234" });
             return { status: "PENDING", supplierReference: "W-100", supplierCode: "WONDD", providerStatus: "ACCEPTED", rawMetadata: { responseCode: "00" } };
         },
         async checkStatus() { return statusResult; },
@@ -112,6 +127,10 @@ async function stateAuthorityTests() {
     await processor.poll(failed._id, 0);
     assert.strictEqual(failed.status, "FAILED");
     assert.strictEqual(transitions.at(-1), "failed");
+
+    const genericContract={version:1,decisionVersion:1,supplierCode:"WONDD",protocol:"WONDD_GAME_ID_TOPUP",transactionalServiceCode:"future_service",supplierProductCode:"9999",sourceSupplierCatalogProductId:"product-future",sourceHash:"hash",sourceOfferHash:"offer-hash",authorityScope:"PRODUCT",noCustomerInput:false,fields:[{customerField:"playerId",providerField:"gameid",required:true,label:"Player ID",type:"numeric-text",options:[],constraints:{},evidenceReference:"supplier docs",transformationId:"DIRECT"},{customerField:"serverId",providerField:"gameid2",required:true,label:"Server ID",type:"numeric-text",options:[],constraints:{},evidenceReference:"supplier docs",transformationId:"DIRECT"}]};genericContract.fingerprint=contractFingerprint(genericContract);
+    const genericMapping={...mapping,productCode:"future",supplierProductCode:"9999",supplierPackageCode:"FUTURE01",mappingMetadata:{...mapping.mappingMetadata,fulfillmentContract:genericContract}};
+    validateWonddMapping(genericMapping);
 }
 
 (async () => {

@@ -3,6 +3,7 @@
 const assert = require("assert");
 const fixture = require("../fixtures/wonddCatalogIngestionPhase2D");
 const svc = require("../services/supplierCatalog/providers/wonddCatalogIngestionService");
+const fs = require("fs");
 
 let checks = 0; const ok = (value, message) => { assert(value, message); checks++; };
 const observedAt = new Date("2026-08-30T00:00:00.000Z");
@@ -24,6 +25,7 @@ function memoryRepositories() {
     ok(stage.offers.some(x=>x.supplierProductCode==="9622"&&x.supplierOfferCode==="ML00086"),"packcode offer identity");
     const mlbb=stage.products.find(x=>x.supplierProductCode==="9622"); ok(mlbb.metadata.transactionalServiceCode==="mlbb"&&mlbb.supplierProductCode!==mlbb.metadata.transactionalServiceCode,"serviceid distinct from serviceCode");
     ok(mlbb.metadata.serviceCodeAuthority==="WONDD_CATALOG_CONFIG_LEGACY","confirmed legacy serviceCode authority");
+    ok(!mlbb.normalizedInputContract.fields,"legacy config customer fields are not promoted to supplier authority");
     const bcm=stage.products.find(x=>x.supplierProductCode==="9604"); ok(bcm.metadata.transactionalServiceCode===""&&bcm.metadata.serviceCodeAuthority==="UNRESOLVED","unknown serviceCode not inferred");
     ok(stage.products.every(x=>x.supplierMarketCode==="UNSPECIFIED"),"markets default unspecified");
     ok(stage.offers.every(x=>x.supplierCost.currency==="THB")&&stage.products.every(x=>x.supplierMarketCode!=="TH"),"THB does not infer TH");
@@ -33,7 +35,9 @@ function memoryRepositories() {
     const duplicate=await svc.stageCatalog({reader:fixture.reader({rows:[fixture.rows[0],fixture.rows[0]]}),supplierId:"s",observedAt}); ok(duplicate.errors.some(x=>x.code==="DUPLICATE_PROVIDER_IDENTITY")&&duplicate.offers.length===1,"duplicate rejected");
     const future=await svc.stageCatalog({reader:fixture.reader({rows:[{serviceid:"9999",servicecode:"future_game",packcode:"FUTURE01",name:"Future 100 Credits",netpricedealer:10,inputSchema:{fields:[{customerField:"playerId",providerField:"gameid",label:"Player ID",type:"numeric-text",required:true,transformationId:"DIRECT"}]}}]}),supplierId:"s",observedAt});
     ok(future.products[0].supportState==="SUPPORTED"&&future.products[0].metadata.transactionalServiceCode==="future_game"&&future.products[0].metadata.serviceCodeAuthority==="WONDD_SUPPLIER_CATALOG","future native protocol product uses exact supplier execution identity without product-specific code");
-    ok(future.products[0].normalizedInputContract.authority==="WONDD_PACKAGE_CATALOG_INPUT_SCHEMA"&&future.products[0].normalizedInputContract.fields[0].providerField==="gameid","future authoritative WonDD input schema becomes AUTO-CONTRACT without product logic");
+    ok(future.products[0].normalizedInputContract.authority==="WONDD_PACKAGE_CATALOG_INPUT_SCHEMA"&&future.products[0].normalizedInputContract.transactionalServiceCode==="future_game"&&future.products[0].normalizedInputContract.fields[0].providerField==="gameid","future authoritative WonDD input schema becomes AUTO-CONTRACT without product logic");
+    const multiField=await svc.stageCatalog({reader:fixture.reader({rows:[{serviceid:"9998",servicecode:"future_multi",packcode:"MULTI01",name:"Future Multi",netpricedealer:12,inputSchema:{fields:[{customerField:"playerId",providerField:"gameid",required:true,type:"numeric-text"},{customerField:"serverId",providerField:"gameid2",required:true,type:"numeric-text"},{customerField:"roleId",providerField:"gameid3",required:true,type:"text"}]}}]}),supplierId:"s",observedAt});
+    ok(multiField.products[0].normalizedInputContract.fields.map(x=>x.providerField).join(",")==="gameid,gameid2,gameid3","supplier-provided WonDD gameid fields normalize generically");
     const malformed=await svc.stageCatalog({reader:fixture.reader({rows:[...fixture.rows,{serviceid:"",packcode:"X",name:"Bad",netpricedealer:1}]}),supplierId:"s",observedAt}); ok(malformed.errors.some(x=>x.code==="MALFORMED_OFFER")&&malformed.offers.length===fixture.rows.length,"malformed row isolated");
     const partialPlan=svc.planMutations(malformed,{offers:[{supplierProductCode:"9999",supplierOfferCode:"OLD",availability:{state:"AVAILABLE"}}]}); ok(partialPlan.missing.length===0&&partialPlan.coverageState==="PARTIAL","partial blocks missing transitions");
     ok(stage.offers.filter(x=>x.reconciliationState==="EXACT_CANONICAL_MATCH").length===3,"exact mapping by confirmed identity");
@@ -43,6 +47,8 @@ function memoryRepositories() {
     ok(stage.offers.find(x=>x.supplierOfferCode==="ML00086").supplierCost.amount===58,"supplier cost retained");
     const store=memoryRepositories(), applied=await svc.applyCatalogOnlyPlan(plan,store.repos,{runKey:`WONDD:${stage.contentRevision}`}); ok(store.state.products.size===4&&store.state.offers.size===5&&store.state.availability.size===5&&applied.status==="SUCCEEDED_PARTIAL","isolated apply persists catalog only");
     const replayStage=await svc.stageCatalog({reader:fixture.reader(),supplierId:"supplier-wondd",mappings:fixture.mappings,observedAt:later}); const replay=svc.planMutations(replayStage,{products:[...store.state.products.values()],offers:[...store.state.offers.values()]}); ok(replay.products.every(x=>x.operation==="UPDATE")&&replay.offers.every(x=>x.operation==="UPDATE"),"stable replay idempotent");
+    const reviewed={...store.state.products.get("9622"),normalizedInputContract:{review:{status:"OWNER_REVIEWED"},fields:[{customerField:"playerId",providerField:"gameid",required:true,type:"numeric-text",transformationId:"DIRECT"}]},requiredFields:[{customerField:"playerId"}]};
+    const reviewedReplay=svc.planMutations(replayStage,{products:[reviewed],offers:[...store.state.offers.values()]}); ok(reviewedReplay.products.find(x=>x.supplierProductCode==="9622").normalizedInputContract.review.status==="OWNER_REVIEWED","unchanged ingestion preserves reviewed product contract");
     const changedRows=fixture.rows.map(x=>x.packcode==="ML00086"?{...x,netpricedealer:59}:x), changedStage=await svc.stageCatalog({reader:fixture.reader({rows:changedRows}),supplierId:"supplier-wondd",mappings:fixture.mappings,observedAt:later}); const changed=svc.planMutations(changedStage,{products:[...store.state.products.values()],offers:[...store.state.offers.values()]}); ok(changed.offers.find(x=>x.supplierOfferCode==="ML00086").supplierCost.amount===59&&changed.offers.find(x=>x.supplierOfferCode==="ML00086").operation==="UPDATE","changed cost catalog-only update");
     ok(replay.products.every(x=>new Date(x.firstSeenAt).getTime()===observedAt.getTime())&&replay.offers.every(x=>new Date(x.firstSeenAt).getTime()===observedAt.getTime()),"firstSeenAt preserved");
     ok(replay.offers.every(x=>new Date(x.lastChangedAt).getTime()===observedAt.getTime()),"lastChangedAt stable");
@@ -54,6 +60,8 @@ function memoryRepositories() {
     ok(!JSON.stringify(stage).includes("PackageMarketPublication"),"no publication mutation");
     ok(stage.offers.every(x=>Object.keys(x.supplierCost).sort().join(",")==="amount,currency,observedAt"),"no pricing mutation");
     ok(protectedBefore.includes("PRIMARY")&&protectedBefore.includes("UNKNOWN"),"no role or eligibility mutation");
+    const finalizationSource=fs.readFileSync(require.resolve("../services/supplierCatalog/addProductFinalizationService"),"utf8");
+    ok(finalizationSource.includes("draft={supplierId:state.supplier._id")&&finalizationSource.includes("supplierProductCode:offer.supplierProductCode"),"Add Product preserves native serviceid in SupplierProductMapping while execution identity remains in the contract");
     let orders=0,validations=0,statuses=0; const reader=svc.createCatalogReader({getPackageCatalog:async()=>({rows:fixture.rows,completenessEvidence:svc.COMPLETENESS_EVIDENCE}),submitTopup:()=>orders++,validate:()=>validations++,checkStatus:()=>statuses++}); await svc.stageCatalog({reader,supplierId:"s",observedAt}); ok(orders===0,"no supplier order call"); ok(validations===0,"no validation call"); ok(statuses===0,"no status or fulfillment call");
     console.log(JSON.stringify({result:"PASS",checks,products:stage.products.length,offers:stage.offers.length,coverageState:stage.coverageState,contentRevision:stage.contentRevision,databaseConnections:0,protectedWrites:0,orderCalls:orders,validationCalls:validations,statusCalls:statuses},null,2));
 })().catch(error=>{console.error(error);process.exit(1);});
