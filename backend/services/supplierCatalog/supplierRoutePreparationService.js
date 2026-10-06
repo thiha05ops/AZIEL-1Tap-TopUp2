@@ -18,6 +18,7 @@ const { contractFromSupplierCatalog, contractFingerprint, verifiedMappingContrac
 const { assessPreCommercialFulfillmentReadiness, supplierCapabilityProductCode } = require("../fulfillmentCapabilityService");
 const { normalizeSupplierMarket } = require("../../constants/supplierMarkets");
 const { assessCanonicalEquivalenceProof } = require("./canonicalEquivalenceProofService");
+const { resolvedAuthorities } = require("./supplierBusinessAuthorityService");
 
 const ACTION = "SUPPLIER_ROUTE_TECHNICALLY_PREPARED";
 const ACTIVE_CANONICAL_QUERY = Object.freeze({ deletedAt: null });
@@ -62,6 +63,7 @@ function outcomeFor(blockers = []) {
     if (blockers.some(code => ["STALE_OR_WRONG_OFFER_LINKAGE", "SUPPLIER_IDENTITY_MISMATCH", "CANONICAL_EQUIVALENCE_REVIEW_REQUIRED"].includes(code))) return OUTCOMES.REVIEW_REQUIRED;
     if (blockers.includes("COMMERCIAL_ROUTE_REGION_CHANGE_REQUIRES_OWNER_REVIEW")) return OUTCOMES.REVIEW_REQUIRED;
     if (blockers.includes("MARKET_UNRESOLVED")) return OUTCOMES.MARKET_UNRESOLVED;
+    if (blockers.includes("CUSTOMER_MARKET_NOT_ELIGIBLE")) return OUTCOMES.REVIEW_REQUIRED;
     if (blockers.some(code => ["AVAILABILITY_UNPROVEN", "OFFER_NOT_ACTIVE"].includes(code))) return OUTCOMES.AVAILABILITY_UNPROVEN;
     if (blockers.some(code => ["INPUT_CONTRACT_UNRESOLVED", "INPUT_NOT_READY", "VALIDATION_NOT_READY"].includes(code))) return OUTCOMES.INPUT_CONTRACT_UNRESOLVED;
     if (blockers.some(code => ["PROTOCOL_UNSUPPORTED", "SUPPLIER_ADAPTER_NOT_READY", "SUPPLIER_AUTO_FULFILLMENT_DISABLED"].includes(code))) return OUTCOMES.PROTOCOL_UNSUPPORTED;
@@ -108,10 +110,14 @@ function sourceLock(state, runtime) {
 
 function deterministicSupplierMarket(state = {}) {
     const mappingMarket = normalizeSupplierMarket(state.mapping?.region) || upper(state.mapping?.region);
-    if (mappingMarket && !["UNKNOWN", "UNSPECIFIED"].includes(mappingMarket)) return mappingMarket;
     const market = normalizeSupplierMarket(state.supplierProduct?.supplierMarketCode) || upper(state.supplierProduct?.supplierMarketCode);
-    if (market && !["UNKNOWN", "UNSPECIFIED"].includes(market)) return market;
+    const reviewedMarket = normalizeSupplierMarket(resolvedAuthorities(state.supplierProduct, state.offer).market?.nativeMarketEvidence);
+    // A legacy mapping region proves canonical history, not supplier-market
+    // authority. Preserve an established route scope only when the catalog (or
+    // an explicit Owner review) supplies non-ambiguous market evidence.
+    if (reviewedMarket) return reviewedMarket;
     if (!market || ["UNKNOWN", "UNSPECIFIED"].includes(market)) return "";
+    if (mappingMarket && !["UNKNOWN", "UNSPECIFIED"].includes(mappingMarket)) return mappingMarket;
     return market;
 }
 
@@ -194,7 +200,9 @@ function defaultRepos() {
         canonicalPackages: (productCode, packageCode, session) => sessionize(CatalogPackage.find({ productCode, packageCode, ...ACTIVE_CANONICAL_QUERY }), session).lean(),
         auditByPlanHash: (planHash, session) => sessionize(AdminAuditLog.findOne({ action: ACTION, "metadata.planHash": planHash }), session).lean(),
         currentDecision: (offerId, session) => sessionize(SupplierCatalogReconciliationDecision.findOne({ supplierCatalogOfferId: offerId, isCurrent: true }), session).lean(),
+        mappingByExactMarket: (mapping, region, session) => sessionize(SupplierProductMapping.findOne({ supplierId: mapping.supplierId, productCode: mapping.productCode, packageCode: mapping.packageCode, supplierCatalogOfferId: mapping.supplierCatalogOfferId, supplierProductCode: mapping.supplierProductCode, supplierPackageCode: mapping.supplierPackageCode, region, archivedAt: null }), session).lean(),
         updateMapping: (mappingId, expectedUpdatedAt, update, session) => SupplierProductMapping.updateOne({ _id: mappingId, updatedAt: new Date(expectedUpdatedAt) }, { $set: update }, { session, runValidators: true }),
+        createMapping: (document, session) => SupplierProductMapping.create([document], { session }).then(rows => rows[0].toObject()),
         createAudit: (document, session) => AdminAuditLog.create([document], { session })
     };
 }
@@ -240,23 +248,29 @@ function createSupplierRoutePreparationService({ repos = defaultRepos(), adapter
             const body = { artifactType: "SUPPLIER_ROUTE_PREPARATION_PLAN", schemaVersion: 1, request, adoptionState, outcome: OUTCOMES.REVIEW_REQUIRED, blockers, sourceLock: sourceLock(state, {}), proposedChanges: null, safety: { enabledWrites: 0, roleWrites: 0, pricingWrites: 0, publicationWrites: 0, storefrontWrites: 0, supplierCalls: 0 } };
             return { ...body, sourceLockHash: sha(body.sourceLock), planHash: sha(body) };
         }
-        const proposedSupplierMarket = deterministicSupplierMarket(state) || upper(state.mapping.region);
-        const marketCompatible = true;
+        const proposedSupplierMarket = deterministicSupplierMarket(state);
+        const existingMarketMapping = proposedSupplierMarket && upper(state.mapping.region) !== proposedSupplierMarket && typeof repos.mappingByExactMarket === "function" ? await repos.mappingByExactMarket(state.mapping, proposedSupplierMarket, session) : null;
+        const routeMapping = existingMarketMapping || state.mapping;
+        const operation = existingMarketMapping || upper(state.mapping.region) === proposedSupplierMarket ? "UPDATE" : "CREATE";
         const initialRuntime = runtimeFor(state, state.mapping);
-        const proposal = proposedMapping(state.mapping, state, request, initialRuntime);
+        const proposalBase = operation === "CREATE"
+            ? { ...routeMapping, enabled: false, productionRole: "DISABLED", supplierMarketEvidence: undefined, fulfillmentEligibility: undefined, mappingMetadata: {} }
+            : routeMapping;
+        const proposal = proposedMapping(proposalBase, state, request, initialRuntime);
         const runtime = runtimeFor(state, proposal);
         const assessment = assessPreCommercialFulfillmentReadiness({ ...state, mapping: proposal, customerMarkets: request.customerMarkets, ...runtime });
-        if (["PRIMARY", "BACKUP"].includes(upper(state.mapping.productionRole)) && upper(state.mapping.region) !== upper(proposal.region)) assessment.blockers.push("COMMERCIAL_ROUTE_REGION_CHANGE_REQUIRES_OWNER_REVIEW");
+        if (!proposedSupplierMarket) assessment.blockers.push("MARKET_UNRESOLVED");
+        if (operation === "UPDATE" && ["PRIMARY", "BACKUP"].includes(upper(routeMapping.productionRole)) && upper(routeMapping.region) !== upper(proposal.region)) assessment.blockers.push("COMMERCIAL_ROUTE_REGION_CHANGE_REQUIRES_OWNER_REVIEW");
         assessment.blockers = [...new Set(assessment.blockers)].sort(); assessment.ready = assessment.blockers.length === 0;
-        const lock = sourceLock(state, { ...runtime, equivalenceProof });
+        const lock = sourceLock({ ...state, mapping: routeMapping }, { ...runtime, equivalenceProof });
         const proposedChanges = assessment.ready ? {
             region: proposal.region, supplierCatalogOfferId: proposal.supplierCatalogOfferId,
             supplierProductCode: proposal.supplierProductCode, supplierPackageCode: proposal.supplierPackageCode,
             executionMode: "API", supplierMarketEvidence: proposal.supplierMarketEvidence, fulfillmentEligibility: proposal.fulfillmentEligibility,
             fulfillmentContract: runtime.fulfillmentContract,
-            readiness: { supplierMapped: true, inputReady: true, validationReady: true, fulfillmentReady: true }
+            readiness: { supplierMapped: true, inputReady: true, validationReady: true, fulfillmentReady: true }, operation
         } : null;
-        const body = { artifactType: "SUPPLIER_ROUTE_PREPARATION_PLAN", schemaVersion: 1, request, adoptionState, outcome: outcomeFor(assessment.blockers), blockers: assessment.blockers, evidence: { supplierCode: upper(state.supplier?.supplierCode), supplierProductCode: clean(state.supplierProduct?.supplierProductCode), supplierOfferCode: clean(state.offer?.supplierOfferCode), supplierMarket: proposedSupplierMarket, customerMarkets: request.customerMarkets, canonicalProductCode: clean(state.mapping.productCode), canonicalPackageCode: upper(state.mapping.packageCode), protocol: clean(runtime.fulfillmentContract?.protocol) }, sourceLock: lock, proposedChanges, safety: { enabledWrites: 0, roleWrites: 0, supplierMarketWrites: proposedChanges && proposedChanges.region !== state.mapping.region ? 1 : 0, offerLinkageWrites: proposedChanges && id(proposedChanges.supplierCatalogOfferId) !== id(state.mapping.supplierCatalogOfferId) ? 1 : 0, pricingWrites: 0, publicationWrites: 0, storefrontWrites: 0, supplierCalls: 0 } };
+        const body = { artifactType: "SUPPLIER_ROUTE_PREPARATION_PLAN", schemaVersion: 1, request, adoptionState, outcome: outcomeFor(assessment.blockers), blockers: assessment.blockers, evidence: { supplierCode: upper(state.supplier?.supplierCode), supplierProductCode: clean(state.supplierProduct?.supplierProductCode), supplierOfferCode: clean(state.offer?.supplierOfferCode), supplierMarket: proposedSupplierMarket, customerMarkets: request.customerMarkets, canonicalProductCode: clean(state.mapping.productCode), canonicalPackageCode: upper(state.mapping.packageCode), protocol: clean(runtime.fulfillmentContract?.protocol) }, sourceLock: lock, proposedChanges, safety: { enabledWrites: 0, roleWrites: 0, mappingCreates: proposedChanges?.operation === "CREATE" ? 1 : 0, supplierMarketWrites: 0, offerLinkageWrites: proposedChanges && id(proposedChanges.supplierCatalogOfferId) !== id(state.mapping.supplierCatalogOfferId) ? 1 : 0, pricingWrites: 0, publicationWrites: 0, storefrontWrites: 0, supplierCalls: 0 } };
         return { ...body, sourceLockHash: sha(lock), planHash: sha(body) };
     }
 
@@ -268,13 +282,14 @@ function createSupplierRoutePreparationService({ repos = defaultRepos(), adapter
         if (!suppliedHash || sha(expectedBody) !== suppliedHash) throw new SupplierRoutePreparationError("PREPARATION_PLAN_HASH_MISMATCH", "The reviewed preparation plan hash is invalid.");
         if (plan.outcome !== OUTCOMES.FULFILLMENT_READY || !plan.proposedChanges) throw new SupplierRoutePreparationError("PREPARATION_NOT_READY", "This supplier route is not eligible for technical preparation.", 409, { blockers: plan.blockers || [] });
         const replay = await repos.auditByPlanHash(suppliedHash, null);
-        if (replay) return { applied: 0, idempotentReplay: true, planHash: suppliedHash, mappingId: plan.request.mappingId };
+        if (replay) return { applied: 0, idempotentReplay: true, planHash: suppliedHash, mappingId: id(replay.resourceId) || plan.request.mappingId };
         return repos.transaction(async session => {
             const insideReplay = await repos.auditByPlanHash(suppliedHash, session);
-            if (insideReplay) return { applied: 0, idempotentReplay: true, planHash: suppliedHash, mappingId: plan.request.mappingId };
+            if (insideReplay) return { applied: 0, idempotentReplay: true, planHash: suppliedHash, mappingId: id(insideReplay.resourceId) || plan.request.mappingId };
             const fresh = await generatePlan(plan.request, { session });
             if (fresh.planHash !== suppliedHash || fresh.sourceLockHash !== plan.sourceLockHash) throw new SupplierRoutePreparationError("PREPARATION_SOURCE_STALE", "Supplier, catalog, mapping, contract, adapter, or availability evidence changed after review.");
-            const now = clock(), currentMetadata = (await repos.mappingById(plan.request.mappingId, session)).mappingMetadata || {};
+            const now = clock(), anchor = await repos.mappingById(plan.request.mappingId, session), isCreate = plan.proposedChanges.operation === "CREATE", targetMappingId = isCreate ? "" : plan.sourceLock.mapping.id, targetMapping = isCreate ? null : await repos.mappingById(targetMappingId, session), currentMetadata = targetMapping?.mappingMetadata || {};
+            const technicalPreparation = { authority: ACTION, planHash: suppliedHash, sourceLockHash: plan.sourceLockHash, reviewedCustomerMarkets: plan.request.customerMarkets, protocol: plan.evidence.protocol, preparedAt: now, preparedBy: clean(actor.username) };
             const update = {
                 region: plan.proposedChanges.region,
                 supplierCatalogOfferId: plan.proposedChanges.supplierCatalogOfferId,
@@ -283,12 +298,20 @@ function createSupplierRoutePreparationService({ repos = defaultRepos(), adapter
                 executionMode: "API",
                 supplierMarketEvidence: plan.proposedChanges.supplierMarketEvidence,
                 fulfillmentEligibility: { ...plan.proposedChanges.fulfillmentEligibility, verifiedAt: now },
-                mappingMetadata: { ...currentMetadata, fulfillmentContract: plan.proposedChanges.fulfillmentContract, readiness: { ...(currentMetadata.readiness || {}), ...plan.proposedChanges.readiness }, technicalPreparation: { authority: ACTION, planHash: suppliedHash, sourceLockHash: plan.sourceLockHash, reviewedCustomerMarkets: plan.request.customerMarkets, protocol: plan.evidence.protocol, preparedAt: now, preparedBy: clean(actor.username) } }
+                mappingMetadata: isCreate
+                    ? { fulfillmentContract: plan.proposedChanges.fulfillmentContract, readiness: { ...plan.proposedChanges.readiness, pricingReady: false, storefrontReady: false }, technicalPreparation }
+                    : { ...currentMetadata, fulfillmentContract: plan.proposedChanges.fulfillmentContract, readiness: { ...(currentMetadata.readiness || {}), ...plan.proposedChanges.readiness }, technicalPreparation }
             };
-            const write = await repos.updateMapping(plan.request.mappingId, plan.sourceLock.mapping.updatedAt, update, session);
-            if (write.matchedCount !== 1) throw new SupplierRoutePreparationError("PREPARATION_SOURCE_STALE", "The supplier mapping changed during preparation.");
-            await repos.createAudit({ actorAdminId: actor.id || actor._id || null, actorUsernameSnapshot: clean(actor.username), actorRoleSnapshot: upper(actor.role), action: ACTION, resourceType: "SupplierProductMapping", resourceId: plan.request.mappingId, metadata: { planHash: suppliedHash, sourceLockHash: plan.sourceLockHash, customerMarkets: plan.request.customerMarkets, supplierCode: plan.evidence.supplierCode, supplierProductCode: plan.evidence.supplierProductCode, supplierOfferCode: plan.evidence.supplierOfferCode, canonicalProductCode: plan.evidence.canonicalProductCode, canonicalPackageCode: plan.evidence.canonicalPackageCode, before: { enabled: plan.sourceLock.mapping.enabled, productionRole: plan.sourceLock.mapping.productionRole, executionMode: plan.sourceLock.mapping.executionMode, region: plan.sourceLock.mapping.supplierMarket, supplierCatalogOfferId: plan.sourceLock.mapping.supplierCatalogOfferId }, mutations: ["region", "supplierCatalogOfferId", "supplierProductCode", "supplierPackageCode", "executionMode", "supplierMarketEvidence", "fulfillmentEligibility", "mappingMetadata.fulfillmentContract", "mappingMetadata.readiness"] } }, session);
-            return { applied: 1, idempotentReplay: false, planHash: suppliedHash, mappingId: plan.request.mappingId, outcome: OUTCOMES.FULFILLMENT_READY };
+            let preparedMappingId = targetMappingId;
+            if (isCreate) {
+                const created = await repos.createMapping({ supplierId: anchor.supplierId, supplierCode: anchor.supplierCode, productCode: anchor.productCode, packageCode: anchor.packageCode, supplierProductCode: update.supplierProductCode, supplierPackageCode: update.supplierPackageCode, supplierCatalogOfferId: update.supplierCatalogOfferId, supplierDisplayName: anchor.supplierDisplayName, region: update.region, enabled: false, productionRole: "DISABLED", archivedAt: null, executionMode: update.executionMode, supplierMarketEvidence: update.supplierMarketEvidence, fulfillmentEligibility: update.fulfillmentEligibility, mappingMetadata: update.mappingMetadata }, session);
+                preparedMappingId = id(created);
+            } else {
+                const write = await repos.updateMapping(targetMappingId, plan.sourceLock.mapping.updatedAt, update, session);
+                if (write.matchedCount !== 1) throw new SupplierRoutePreparationError("PREPARATION_SOURCE_STALE", "The supplier mapping changed during preparation.");
+            }
+            await repos.createAudit({ actorAdminId: actor.id || actor._id || null, actorUsernameSnapshot: clean(actor.username), actorRoleSnapshot: upper(actor.role), action: ACTION, resourceType: "SupplierProductMapping", resourceId: preparedMappingId, metadata: { planHash: suppliedHash, sourceLockHash: plan.sourceLockHash, customerMarkets: plan.request.customerMarkets, supplierCode: plan.evidence.supplierCode, supplierProductCode: plan.evidence.supplierProductCode, supplierOfferCode: plan.evidence.supplierOfferCode, canonicalProductCode: plan.evidence.canonicalProductCode, canonicalPackageCode: plan.evidence.canonicalPackageCode, operation: plan.proposedChanges.operation, sourceMappingId: plan.request.mappingId, before: { enabled: plan.sourceLock.mapping.enabled, productionRole: plan.sourceLock.mapping.productionRole, executionMode: plan.sourceLock.mapping.executionMode, region: plan.sourceLock.mapping.supplierMarket, supplierCatalogOfferId: plan.sourceLock.mapping.supplierCatalogOfferId }, mutations: ["supplierCatalogOfferId", "supplierProductCode", "supplierPackageCode", "executionMode", "supplierMarketEvidence", "fulfillmentEligibility", "mappingMetadata.fulfillmentContract", "mappingMetadata.readiness"] } }, session);
+            return { applied: 1, idempotentReplay: false, planHash: suppliedHash, mappingId: preparedMappingId, outcome: OUTCOMES.FULFILLMENT_READY };
         });
     }
     return { generatePlan, applyPlan };
