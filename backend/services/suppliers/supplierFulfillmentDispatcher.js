@@ -10,12 +10,15 @@ function supportsMapping(mapping = {}) {
     if (!processorFor(code)) return false;
     if (code === "WONDD") {
         const { hasWonddGameIdFormatter } = require("./wonddFulfillmentProcessor");
+        const { verifiedMappingContract } = require("./fazercardsFulfillmentContractService");
         const { resolveWonddCatalogIdentity } = require("./wonddCatalogConfig");
         const { providerGameCodeForProduct } = require("../commerce/canonicalGameInputContract");
         const productCode = String(mapping.productCode || "").trim().toLowerCase();
         const providerGameCode = providerGameCodeForProduct(productCode) || productCode;
         const identity = resolveWonddCatalogIdentity(mapping.supplierProductCode);
-        return hasWonddGameIdFormatter(mapping.productCode) &&
+        const declarativeContract = verifiedMappingContract(mapping);
+        const hasExecutableInput = declarativeContract?.protocol === "WONDD_GAME_ID_TOPUP" || hasWonddGameIdFormatter(mapping.productCode);
+        return hasExecutableInput &&
             identity?.family?.productCode === providerGameCode;
     }
     if (code === "FAZERCARDS") {

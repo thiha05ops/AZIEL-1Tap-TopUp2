@@ -193,6 +193,7 @@ function assessPreCommercialFulfillmentReadiness({
     if (!markets.length) blockers.push("CUSTOMER_MARKET_REQUIRED");
     const eligibility = validateFulfillmentEligibility(mapping?.fulfillmentEligibility);
     if (!eligibility.valid || eligibility.value.mode === "UNKNOWN") blockers.push("CUSTOMER_MARKET_ELIGIBILITY_UNPROVEN");
+    else if (markets.some(market => !isCustomerMarketEligible(eligibility.value, market))) blockers.push("CUSTOMER_MARKET_NOT_ELIGIBLE");
     if (!fulfillmentContract || (!fulfillmentContract.fields?.length && fulfillmentContract.noCustomerInput !== true)) blockers.push("INPUT_CONTRACT_UNRESOLVED");
     if (String(mapping?.executionMode || "").toUpperCase() !== "API" || processorSupported !== true) blockers.push("PROTOCOL_UNSUPPORTED");
     if (adapterConfigured !== true) blockers.push("SUPPLIER_ADAPTER_NOT_READY");
