@@ -3,14 +3,15 @@
 const { PROTOCOLS, inputAuthorityDiagnostic } = require("./supplierSellabilityContractCoverageService");
 const { normalizeSupplierMarket } = require("../../constants/supplierMarkets");
 const { validateFulfillmentEligibility, isCustomerMarketEligible } = require("../supplierFulfillmentEligibilityService");
+const { resolvedAuthorities } = require("./supplierBusinessAuthorityService");
 
 const clean = value => String(value == null ? "" : value).trim();
 const upper = value => clean(value).toUpperCase();
 const id = value => clean(value?._id || value);
 const SOURCE_BLOCKERS = new Set(["STALE_SOURCE"]);
 
-function verifiedEligibility(product = {}, mapping = null) {
-    return mapping?.fulfillmentEligibility || product.metadata?.fulfillmentEligibility || product.normalizedInputContract?.fulfillmentEligibility || null;
+function verifiedEligibility(product = {}, mapping = null, offer = null) {
+    return mapping?.fulfillmentEligibility || resolvedAuthorities(product, offer).market?.fulfillmentEligibility || product.metadata?.fulfillmentEligibility || product.normalizedInputContract?.fulfillmentEligibility || null;
 }
 
 function packageDisposition({ offer = {}, mapping = null, canonicalPackage = null, newCanonicalProduct = false } = {}) {
@@ -28,11 +29,18 @@ function evaluateAddProductOffer({ supplier = {}, product = {}, offer = {}, avai
     if (sourceStale) blockers.push("STALE_SOURCE");
     if (upper(offer.catalogLifecycleState) !== "ACTIVE" || upper(availability?.state) !== "AVAILABLE") blockers.push("SUPPLIER_UNAVAILABLE");
     if (!PROTOCOLS[supplierCode]) blockers.push("UNSUPPORTED_PROTOCOL");
-    const input = inputAuthorityDiagnostic(product, supplierCode);
-    if (input.reason === "EXECUTION_IDENTITY_MISSING") blockers.push("EXECUTION_IDENTITY_REQUIRED");
-    else if (!["SUPPLIER_METADATA_NORMALIZED", "OWNER_VERIFIED_FALLBACK"].includes(input.reason)) blockers.push("INPUT_CONTRACT_REQUIRED");
-    if (!normalizeSupplierMarket(mapping?.region || product.supplierMarketCode)) blockers.push("SUPPLIER_MARKET_AUTHORITY_REQUIRED");
-    const eligibility = verifiedEligibility(product, mapping);
+    const authorities = resolvedAuthorities(product, offer);
+    const inputProduct = offer?.metadata?.normalizedInputContract ? { ...product, normalizedInputContract: offer.metadata.normalizedInputContract } : product;
+    const input = inputAuthorityDiagnostic(inputProduct, supplierCode);
+    if (input.reason === "EXECUTION_IDENTITY_MISSING") {
+        if (!authorities.execution?.executionIdentity) blockers.push("EXECUTION_IDENTITY_REQUIRED");
+        const contractWithoutExecution = { ...inputProduct, normalizedInputContract: { ...(inputProduct.normalizedInputContract || {}), transactionalServiceCode: authorities.execution?.executionIdentity?.servicecode || authorities.execution?.executionIdentity?.serviceCode || authorities.execution?.executionIdentity?.transactionalServiceCode || "" } };
+        const contractDiagnostic = inputAuthorityDiagnostic(contractWithoutExecution, supplierCode);
+        if (!["SUPPLIER_METADATA_NORMALIZED", "OWNER_VERIFIED_FALLBACK"].includes(contractDiagnostic.reason)) blockers.push("INPUT_CONTRACT_REQUIRED");
+    } else if (!["SUPPLIER_METADATA_NORMALIZED", "OWNER_VERIFIED_FALLBACK"].includes(input.reason)) blockers.push("INPUT_CONTRACT_REQUIRED");
+    const supplierMarket = normalizeSupplierMarket(mapping?.region || product.supplierMarketCode || authorities.market?.nativeMarketEvidence);
+    if (!supplierMarket && !authorities.market?.nativeMarketEvidence) blockers.push("SUPPLIER_MARKET_AUTHORITY_REQUIRED");
+    const eligibility = verifiedEligibility(product, mapping, offer);
     if (!validateFulfillmentEligibility(eligibility).valid || customerMarkets.some(market => !isCustomerMarketEligible(eligibility, market))) blockers.push("CUSTOMER_MARKET_INELIGIBLE");
     if (!disposition.proven) blockers.push("PACKAGE_IDENTITY_REVIEW");
     const unique = [...new Set(blockers)];
