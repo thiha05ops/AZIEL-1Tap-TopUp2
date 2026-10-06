@@ -137,19 +137,24 @@ function createWonddAdapter(options = {}) {
     function buildTopupPayload(input = {}) {
         const serviceCode = clean(input.serviceCode).toLowerCase();
         const packCode = clean(input.packCode);
-        const gameId = clean(input.gameId);
         if (!/^[a-z0-9_-]{1,80}$/i.test(serviceCode)) throw new WonddAdapterError("WONDD_SERVICE_MAPPING_INVALID", "WonDD servicecode is invalid.", { category: "CONFIGURATION" });
         if (!packCode) throw new WonddAdapterError("WONDD_PACKAGE_MAPPING_MISSING", "A verified WonDD packcode mapping is required.", { category: "CONFIGURATION" });
+        const suppliedProviderFields = input.providerFields && typeof input.providerFields === "object" ? Object.entries(input.providerFields) : null;
+        if (suppliedProviderFields?.some(([key]) => !["gameid", "gameid2", "gameid3"].includes(key))) throw new WonddAdapterError("WONDD_CUSTOMER_INPUT_FIELD_UNSUPPORTED", "WonDD customer information contains an unsupported provider field.", { category: "CONFIGURATION" });
+        const providerFields = suppliedProviderFields
+            ? Object.fromEntries(suppliedProviderFields.filter(([, value]) => clean(value)).map(([key, value]) => [key, clean(value)]))
+            : { gameid: clean(input.gameId) };
+        if (!Object.keys(providerFields).length && input.noCustomerInput !== true) throw new WonddAdapterError("WONDD_CUSTOMER_INPUT_REQUIRED", "Verified WonDD customer information is required.", { category: "CONFIGURATION" });
         const productCode = clean(input.productCode || Object.keys(CONFIRMED_SERVICE_CODES).find(key => CONFIRMED_SERVICE_CODES[key].toLowerCase() === serviceCode)).toLowerCase();
-        validateBuiltGameId(productCode, gameId);
-        return { method: "topup", servicecode: serviceCode, packcode: packCode, gameid: gameId };
+        if (!input.providerFields) validateBuiltGameId(productCode, providerFields.gameid);
+        return { method: "topup", servicecode: serviceCode, packcode: packCode, ...providerFields };
     }
 
     function dryRunTopup(input = {}) {
         const payload = buildTopupPayload(input);
         if (!isConfigured()) throw new WonddAdapterError("WONDD_NOT_CONFIGURED", "WonDD credentials are not configured.", { category: "CONFIGURATION" });
         const productCode = clean(input.productCode || Object.keys(CONFIRMED_SERVICE_CODES).find(key => CONFIRMED_SERVICE_CODES[key].toLowerCase() === clean(input.serviceCode).toLowerCase())).toLowerCase();
-        return { status: "DRY_RUN_VALID", configured: true, liveEnabled: isAutoFulfillmentEnabled(productCode), payload: { method: payload.method, servicecode: payload.servicecode, packcode: payload.packcode, gameid: maskGameId(payload.gameid) } };
+        return { status: "DRY_RUN_VALID", configured: true, liveEnabled: isAutoFulfillmentEnabled(productCode), payload: Object.fromEntries(Object.entries(payload).map(([key, value]) => [key, key.startsWith("gameid") ? maskGameId(value) : value])) };
     }
 
     async function submitTopup(input = {}) {
