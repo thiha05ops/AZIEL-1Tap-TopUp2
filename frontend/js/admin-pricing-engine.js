@@ -10,7 +10,10 @@
         previewController: null, previewTimer: null, saveTimer: null, draftController: null, draftSeq: 0, publishing: false,
         loadController: null, loadSeq: 0, detailController: null, detailSeq: 0, pendingPreviewKeys: null,
         productBrowserOpen: true,
-        productBrowserSearch: ""
+        productBrowserSearch: "",
+        workspaceError: "", workspaceErrorRetryable: false,
+        detailError: "", detailErrorRetryable: false, detailErrorProductId: "", detailErrorRegion: "",
+        detailProductId: "", detailRegion: ""
     };
     const settings = { loaded: false, loading: false, policies: [], fxAuthorities: [], region: "TH", saving: false };
 
@@ -193,7 +196,8 @@
 
     function dailyBlockingReason() {
         if (!daily.navigationProducts.length) return "Add a valid supplier-to-canonical mapping before setting prices.";
-        if (daily.selectedProductId && !daily.detailRows.length) return "No valid supplier-to-canonical package mappings are available for this product.";
+        if (daily.productBrowserOpen) return "";
+        if (daily.selectedProductId && daily.detailLoaded && daily.detailProductId === daily.selectedProductId && daily.detailRegion === daily.region && !daily.detailRows.length) return "No valid supplier-to-canonical package mappings are available for this product.";
         if (!["TH", "MM"].every(region => daily.policies.some(policy => policy.region === region && (policy.active || policy.draft)))) return "Failed to load active Thailand and Myanmar pricing policies.";
         if (!daily.selectedProductId) return "Select a product.";
         const supplier = activeSupplier();
@@ -206,13 +210,39 @@
         return text(rows.find(row => row.savedDraftSupplierId)?.savedDraftSupplierId);
     }
 
-    function setDailyError(message, retryable = false) {
+    function renderDailyError() {
         const box = $("pricingDailyBlocking");
         if (!box) return;
+        const detailOwned = !daily.productBrowserOpen && daily.detailErrorProductId === daily.selectedProductId && daily.detailErrorRegion === daily.region;
+        const message = daily.productBrowserOpen ? daily.workspaceError : detailOwned ? daily.detailError : dailyBlockingReason();
+        const retryable = daily.productBrowserOpen ? daily.workspaceErrorRetryable : detailOwned ? daily.detailErrorRetryable : false;
         box.hidden = !message;
         box.textContent = message || "";
         const retry = $("pricingRetryRefresh");
         if (retry) retry.hidden = !retryable;
+    }
+
+    function setWorkspaceError(message, retryable = false) {
+        daily.workspaceError = message || "";
+        daily.workspaceErrorRetryable = Boolean(message && retryable);
+        renderDailyError();
+    }
+
+    function clearDetailError() {
+        daily.detailError = "";
+        daily.detailErrorRetryable = false;
+        daily.detailErrorProductId = "";
+        daily.detailErrorRegion = "";
+        renderDailyError();
+    }
+
+    function setDailyError(message, retryable = false) {
+        if (daily.productBrowserOpen) return setWorkspaceError(message, retryable);
+        daily.detailError = message || "";
+        daily.detailErrorRetryable = Boolean(message && retryable);
+        daily.detailErrorProductId = daily.selectedProductId;
+        daily.detailErrorRegion = daily.region;
+        renderDailyError();
     }
 
     function renderSupplierSelect() {
@@ -226,7 +256,7 @@
         select.value = upper(activeSupplier()?.supplierCode);
         const supplier = activeSupplier();
         $("pricingSupplierCurrency").textContent = supplier?.supplierCurrency || "-";
-        setDailyError(dailyBlockingReason());
+        renderDailyError();
     }
 
     function renderSupplierMarketSelect() {
@@ -631,7 +661,7 @@
         daily.loadController?.abort();
         daily.loadController = new AbortController();
         daily.loading = true;
-        setDailyError("");
+        setWorkspaceError("");
         $("pricingDailyState").textContent = "Loading products";
         try {
             const params = new URLSearchParams();
@@ -655,7 +685,7 @@
             return true;
         } catch (error) {
             if (error.name === "AbortError" || seq !== daily.loadSeq) return false;
-            setDailyError(error.message, true);
+            setWorkspaceError(error.message, true);
             $("pricingDailyState").textContent = "Products unavailable";
             return false;
         } finally { if (seq === daily.loadSeq) daily.loading = false; }
@@ -667,29 +697,34 @@
         cancelDetailWork();
         invalidateDraftSave();
         const productId = daily.selectedProductId;
+        const customerMarket = daily.region;
         const seq = ++daily.detailSeq;
         daily.detailController = new AbortController();
         daily.detailLoading = true;
         daily.previewCompleted = false;
         daily.previewError = "";
-        setDailyError("");
+        daily.detailLoaded = false;
+        clearDetailError();
         $("pricingDailyState").textContent = postPublish ? "Published · revalidating" : "Loading product";
         daily.detailRows = daily.detailCache.get(productId) || [];
         renderRows();
         try {
             const params = new URLSearchParams({ supplierId: daily.supplierId });
             const detail = await pricingFetch(`/api/admin/pricing-engine/products/${encodeURIComponent(productId)}?${params}`, { signal: daily.detailController.signal });
-            if (seq !== daily.detailSeq || productId !== daily.selectedProductId) return false;
+            if (seq !== daily.detailSeq || productId !== daily.selectedProductId || customerMarket !== daily.region || daily.productBrowserOpen) return false;
             daily.detailRows = Array.isArray(detail.rows) ? detail.rows : [];
             daily.detailCache.set(productId, daily.detailRows);
             daily.detailLoaded = true;
+            daily.detailProductId = productId;
+            daily.detailRegion = customerMarket;
             daily.detailRows.forEach(row => { if (row.savedDraftSupplierCost != null) daily.edits.set(rowKey(row), { value: row.savedDraftSupplierCost, restored: true }); });
             $("pricingDailyState").textContent = postPublish ? "Published · revalidated" : "Product ready";
             renderRows();
+            renderDailyError();
             schedulePreview();
             return true;
         } catch (error) {
-            if (error.name === "AbortError" || seq !== daily.detailSeq || productId !== daily.selectedProductId) return false;
+            if (error.name === "AbortError" || seq !== daily.detailSeq || productId !== daily.selectedProductId || customerMarket !== daily.region || daily.productBrowserOpen) return false;
             if (!preserveOnError) daily.detailRows = [];
             setDailyError(failureMessage || (postPublish ? `Publication succeeded, but authoritative workspace refresh failed: ${error.message}` : error.message), true);
             $("pricingDailyState").textContent = postPublish ? "Published · refresh required" : "Product unavailable";
@@ -857,12 +892,15 @@
         });
 
         $("pricingProductBrowserRegion")?.addEventListener("change", event => {
+            cancelDetailWork();
+            clearDetailError();
             daily.region = event.target.value;
             daily.productBrowserOpen = true;
             rememberDailyScope(daily);
             const pricingRegion = $("pricingRegionSelect");
             if (pricingRegion) pricingRegion.value = daily.region;
             renderProductBrowser();
+            renderDailyError();
         });
 
         $("pricingProductCards")?.addEventListener("click", event => {
@@ -871,6 +909,8 @@
             const productId = trigger.dataset.pricingProductOpen;
             if (!daily.navigationProducts.some(item => item.productId === productId)) return;
 
+            cancelDetailWork();
+            clearDetailError();
             daily.selectedProductId = productId;
             daily.productBrowserOpen = false;
             daily.search = "";
@@ -885,14 +925,15 @@
         $("pricingBackToProducts")?.addEventListener("click", () => {
             cancelDetailWork();
             daily.productBrowserOpen = true;
+            clearDetailError();
             daily.search = "";
             const packageSearch = $("pricingPackageSearch");
             if (packageSearch) packageSearch.value = "";
             renderProductBrowser();
         });
 
-        $("pricingRegionSelect")?.addEventListener("change", event => { daily.region = event.target.value;rememberDailyScope(daily);const browserRegion=$("pricingProductBrowserRegion");if(browserRegion)browserRegion.value=daily.region;renderSelectedProductIdentity();renderRows(); });
-        $("pricingProductSelect")?.addEventListener("change", event => { const value=event.target.value;daily.selectedProductId=daily.navigationProducts.some(item=>item.productId===value)?value:"";event.target.value=daily.selectedProductId;rememberDailyScope(daily);daily.search = ""; $("pricingPackageSearch").value = "";if(daily.selectedProductId)loadProductDetail(true); });
+        $("pricingRegionSelect")?.addEventListener("change", event => { cancelDetailWork();clearDetailError();daily.region = event.target.value;if(daily.detailLoaded&&daily.detailProductId===daily.selectedProductId)daily.detailRegion=daily.region;rememberDailyScope(daily);const browserRegion=$("pricingProductBrowserRegion");if(browserRegion)browserRegion.value=daily.region;renderSelectedProductIdentity();renderRows();renderDailyError(); });
+        $("pricingProductSelect")?.addEventListener("change", event => { cancelDetailWork();clearDetailError();const value=event.target.value;daily.selectedProductId=daily.navigationProducts.some(item=>item.productId===value)?value:"";event.target.value=daily.selectedProductId;rememberDailyScope(daily);daily.search = ""; $("pricingPackageSearch").value = "";if(daily.selectedProductId)loadProductDetail(true); });
         $("pricingSupplierSelect")?.addEventListener("change", event => { const supplier=daily.suppliers.find(item=>upper(item.supplierCode)===upper(event.target.value));cancelDetailWork();daily.supplierId=supplier?String(supplier.id||supplier.supplierId||supplier._id):"";daily.supplierMarket="";daily.selectedProductId="";daily.detailRows=[];daily.detailCache.clear();event.target.value=supplier?upper(supplier.supplierCode):"";daily.edits.clear(); daily.priceEdits.clear(); daily.selected.clear(); daily.previews.clear(); daily.loaded=false;if(daily.supplierId)loadInventory(true); });
         $("pricingSupplierMarketSelect")?.addEventListener("change", event => { const value=upper(event.target.value);daily.supplierMarket=daily.supplierMarkets.some(item=>item.value===value)?value:"";event.target.value=daily.supplierMarket;rememberDailyScope(daily); });
         $("pricingPackageSearch")?.addEventListener("input", event => { daily.search = event.target.value; renderRows(); });
