@@ -151,6 +151,32 @@ function canonicalEvidenceForOffer(offer = {}) {
     return productCode && packageCode ? { productCode, packageCode } : null;
 }
 
+function normalizedSuggestionIdentity(value = "") {
+    return lower(value)
+        .replace(/\([^)]*\)/g, " ")
+        .replace(/\b(global|thailand|thai|myanmar|burma|indonesia|special)\b/g, " ")
+        .replace(/[^a-z0-9]+/g, " ")
+        .trim()
+        .replace(/\s+/g, " ");
+}
+
+function canonicalProductSuggestion({ supplierProduct = {}, sourceMappings = [], offers = [], canonicalProducts = [] } = {}) {
+    const canonicalByCode = new Map(canonicalProducts.map(item => [lower(item.productCode), item]));
+    const authorityCode = lower(supplierProduct.metadata?.onboardingCanonicalProduct?.productCode);
+    const mappedCodes = [...new Set(sourceMappings.map(item => lower(item.productCode)).filter(code => canonicalByCode.has(code)))];
+    const evidenceCodes = [...new Set(offers.map(canonicalEvidenceForOffer).map(item => lower(item?.productCode)).filter(code => canonicalByCode.has(code)))];
+    const durableCode = mappedCodes.length === 1 ? mappedCodes[0] : authorityCode && canonicalByCode.has(authorityCode) ? authorityCode : evidenceCodes.length === 1 ? evidenceCodes[0] : "";
+    if (durableCode) {
+        const product = canonicalByCode.get(durableCode);
+        return { productCode: durableCode, name: product.name || durableCode, evidence: mappedCodes.length === 1 ? "EXACT_MAPPING" : authorityCode === durableCode ? "ONBOARDING_AUTHORITY" : "RECONCILIATION_EVIDENCE", confidence: "AUTHORITATIVE" };
+    }
+    const sourceIdentity = normalizedSuggestionIdentity(supplierProduct.displayName || supplierProduct.rawName || supplierProduct.supplierProductCode);
+    if (!sourceIdentity) return null;
+    const nameMatches = canonicalProducts.filter(item => normalizedSuggestionIdentity(item.name || item.productCode) === sourceIdentity);
+    if (nameMatches.length !== 1) return null;
+    return { productCode: lower(nameMatches[0].productCode), name: nameMatches[0].name || nameMatches[0].productCode, evidence: "DISPLAY_NAME_SUGGESTION_ONLY", confidence: "SUGGESTION" };
+}
+
 function syntheticMappingFromOffer({ offer, supplier, supplierProduct } = {}) {
     const canonical = canonicalEvidenceForOffer(offer);
     if (!canonical) return null;
@@ -293,11 +319,13 @@ function projectActivation(data, { search = "", productCode = "", supplierMarket
                 existingCanonical: false, packageCount: offers.length, publishedPackageCount: 0, sources: []
             });
             const logical = logicalByKey.get(logicalKey);
+            const suggestion = canonicalProductSuggestion({ supplierProduct: item, sourceMappings, offers, canonicalProducts: data.products });
             logical.sources.push({ supplierCatalogProductId: id(item), supplierId: id(item.supplierId),
                 supplierProductCode: clean(item.supplierProductCode), supplierCode: upper(supplierById.get(id(item.supplierId))?.supplierCode),
                 supplierName: supplierById.get(id(item.supplierId))?.name || "", supplierMarket: upper(item.supplierMarketCode),
                 displayName: item.displayName || item.rawName || item.supplierProductCode, packageCount: offers.length,
-                mapped: sourceMappings.length > 0, sourceAuthority: canonicalCode ? (mappedCodes.length === 1 ? "EXACT_MAPPING" : "ONBOARDING_AUTHORITY") : "SUPPLIER_NATIVE" });
+                mapped: sourceMappings.length > 0, sourceAuthority: canonicalCode ? (mappedCodes.length === 1 ? "EXACT_MAPPING" : "ONBOARDING_AUTHORITY") : "SUPPLIER_NATIVE",
+                suggestedCanonicalProduct: suggestion });
         }
         const logicalProducts = [...logicalByKey.values()].filter(item => !normalizedSearch || [item.name, item.canonicalProductCode, ...item.sources.flatMap(source => [source.displayName, source.supplierName, source.supplierCode])].some(value => lower(value).includes(normalizedSearch))).sort((a,b)=>a.name.localeCompare(b.name));
         return {
@@ -418,7 +446,7 @@ function createAdminProductActivationService(models = {}) {
                 lean(M.Mapping.find({ archivedAt: null }).select("productCode packageCode supplierId supplierCode supplierProductCode supplierCatalogOfferId region"), session),
                 lean(M.Publication.find({ published: true }).select("productCode packageCode customerMarket published decisionVersion decisionNote"), session),
                 lean(M.SupplierProduct.find({}).select("_id supplierId supplierProductCode supplierMarketCode displayName rawName metadata"), session),
-                lean(M.Offer.find({}).select("_id supplierId supplierCatalogProductId supplierOfferCode supplierOfferName rawName reconciliationState catalogLifecycleState"), session),
+                lean(M.Offer.find({}).select("_id supplierId supplierCatalogProductId supplierOfferCode supplierOfferName rawName reconciliationState reconciliationEvidence catalogLifecycleState"), session),
                 lean(M.Supplier.find({}).select("_id supplierCode name enabled mode"), session),
                 lean(M.Availability.find({}).select("supplierCatalogOfferId state coverageComplete evidenceCode staleAt"), session)
             ]);
@@ -500,4 +528,4 @@ async function publishSelectedPackages({ productCode, customerMarket, selections
 }
 
 const defaultService = createAdminProductActivationService();
-module.exports = Object.freeze({ COMMERCE_MARKETS, AdminProductActivationError, eligibilityAllows, mappingAvailability, mappingReadiness, blockerActions, canonicalEvidenceForOffer, syntheticMappingFromOffer, discoveryAssessment, discoveryMappingCandidate, discoveryPackage, routeReadinessMarketsForMapping, projectActivation, createAdminProductActivationService, getWorkspace: defaultService.getWorkspace, publishSelectedPackage, publishSelectedPackages });
+module.exports = Object.freeze({ COMMERCE_MARKETS, AdminProductActivationError, eligibilityAllows, mappingAvailability, mappingReadiness, blockerActions, canonicalEvidenceForOffer, normalizedSuggestionIdentity, canonicalProductSuggestion, syntheticMappingFromOffer, discoveryAssessment, discoveryMappingCandidate, discoveryPackage, routeReadinessMarketsForMapping, projectActivation, createAdminProductActivationService, getWorkspace: defaultService.getWorkspace, publishSelectedPackage, publishSelectedPackages });
