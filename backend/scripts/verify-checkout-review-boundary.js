@@ -11,7 +11,7 @@ const { createAndPersistPricingQuote } = require("../services/commerce/pricingQu
 const { checkoutFromQuote } = require("../services/commerce/checkoutApplicationService");
 const { ensurePaidOrderFulfillmentWork } = require("../services/paidFulfillmentRoutingService");
 const { isMarketDecoupledV2RouteSnapshot } = require("../services/fulfillmentService");
-const { buildFieldsFromContract } = require("../services/suppliers/fazercardsFulfillmentContractService");
+const { buildFieldsFromContract, contractFingerprint } = require("../services/suppliers/fazercardsFulfillmentContractService");
 
 const ROOT = path.resolve(__dirname, "../..");
 const checkoutSource = fs.readFileSync(path.join(ROOT, "frontend/js/product-checkout.js"), "utf8");
@@ -177,15 +177,21 @@ async function verifyBackend() {
     assert.strictEqual(result.review.pricing.quotedTotalAmount, 652);
     assert.strictEqual(result.review.pricing.currency, "THB");
 
+    const fulfillmentContract = {
+        version: 1, decisionVersion: 1, supplierCode: "FAZERCARDS", protocol: "FAZERCARDS_TOPUPS_ORDER_V2",
+        supplierProductCode: mapping.supplierProductCode, sourceHash: "fixture-source-hash", transactionalServiceCode: "", noCustomerInput: false,
+        fields: [
+            { customerField: "playerId", providerField: "player_id", required: true, label: "Player ID", type: "text", options: [], constraints: {}, evidenceReference: "fixture", transformationId: "DIRECT" },
+            { customerField: "serverId", providerField: "server_id", required: true, label: "Server ID", type: "text", options: [], constraints: {}, evidenceReference: "fixture", transformationId: "DIRECT" }
+        ]
+    };
+    fulfillmentContract.fingerprint = contractFingerprint(fulfillmentContract);
     const supplierRouteSnapshot = {
         routeType: "SUPPLIER_API", supplierMappingId: mapping._id, supplierId: mapping.supplierId, supplierCode: "FAZERCARDS",
         productCode: "mlbb", packageCode, supplierProductCode: mapping.supplierProductCode, supplierPackageCode: mapping.supplierPackageCode,
-        executionMode: "API", selectedRole: "PRIMARY", selectedAt: new Date().toISOString(), snapshotVersion: 2,
+        executionMode: "API", selectedRole: "PACKAGE_SUPPLIER_SELECTION", selectionDecisionVersion: 1, selectedAt: new Date().toISOString(), snapshotVersion: 2,
         supplierMarket: "GLOBAL", customerMarket: "TH", eligibility: mapping.fulfillmentEligibility,
-        fulfillmentContract: { version: 1, supplierCode: "FAZERCARDS", protocol: "FAZERCARDS_TOPUPS_ORDER_V2", supplierProductCode: mapping.supplierProductCode, fields: [
-            { customerField: "playerId", providerField: "player_id", required: true, label: "Player ID", type: "text", constraints: {} },
-            { customerField: "serverId", providerField: "server_id", required: true, label: "Server ID", type: "text", constraints: {} }
-        ] }
+        fulfillmentContract
     };
     let persistedOrder = null;
     let supplierCalls = 0;
@@ -296,6 +302,6 @@ async function main() {
 }
 
 main().catch(error => {
-    console.error(error.stack || error);
+    console.error(error.stack || error, error.details || error.metadata || "");
     process.exitCode = 1;
 });

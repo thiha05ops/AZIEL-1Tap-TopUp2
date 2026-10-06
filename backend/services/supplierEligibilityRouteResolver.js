@@ -45,7 +45,9 @@ function operationalPrimaryCustomerMarkets(mapping = {}) {
     if (readiness.supplierMapped !== true || readiness.pricingReady !== true || readiness.inputReady !== true || readiness.fulfillmentReady !== true) return [];
     const eligibility = validateFulfillmentEligibility(mapping.fulfillmentEligibility);
     if (!eligibility.valid || eligibility.value.mode === "UNKNOWN") return [];
-    return [...CUSTOMER_MARKETS];
+    return eligibility.value.mode === "GLOBAL"
+        ? [...CUSTOMER_MARKETS]
+        : eligibility.value.allowedCustomerMarkets.filter(market => CUSTOMER_MARKETS.includes(market));
 }
 
 function eligiblePrimaryRouteConflicts({ candidate = {}, existingMappings = [] } = {}) {
@@ -65,6 +67,7 @@ function basicCandidateBlockers({ mapping = {}, supplier = {}, pkg = {}, custome
     const eligibility = validateFulfillmentEligibility(mapping.fulfillmentEligibility);
     if (!eligibility.valid) blockers.push(...eligibility.errors);
     else if (eligibility.value.mode === "UNKNOWN") blockers.push("FULFILLMENT_ELIGIBILITY_UNKNOWN");
+    else if (eligibility.value.mode === "CUSTOMER_MARKET_ALLOWLIST" && !eligibility.value.allowedCustomerMarkets.includes(market)) blockers.push("CUSTOMER_MARKET_NOT_ELIGIBLE");
     if (mapping.archivedAt) blockers.push("MAPPING_ARCHIVED");
     if (mapping.productionRole !== "PRIMARY") blockers.push("MAPPING_NOT_PRIMARY");
     if (mapping.enabled !== true) blockers.push("MAPPING_DISABLED");

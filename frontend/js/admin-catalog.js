@@ -33,6 +33,9 @@ const catalogPackageOverviewPending = new Map();
 const catalogPackageOverviewVersions = new Map();
 let catalogPackageOperationalFilter = "AUTO";
 let catalogPackageOverviewRequestId = 0;
+const catalogBulkSelectedPackages = new Set();
+let catalogBulkSelectionScope = "";
+let catalogBulkAssignment = null;
 const PRODUCT_COMPATIBILITY_MARKETS = Object.freeze([
     ["GLOBAL", "Global"],
     ["TH", "Thailand"],
@@ -341,6 +344,7 @@ function marketLabel(market = "", fallback = "") {
 }
 
 async function selectCatalogProduct(productCode, rerenderList = true) {
+    ensureCatalogBulkSelectionScope(productCode, catalogCustomerMarket);
     selectedCatalogProductCode = productCode || "";
     const requestId = ++catalogProductRequestId;
     catalogProductRequestController?.abort();
@@ -494,13 +498,169 @@ function catalogPackageOverviewKey(productCode, market = catalogCustomerMarket) 
     return `${String(productCode || "").toLowerCase()}:${market === "MM" ? "MM" : "TH"}`;
 }
 
+function ensureCatalogBulkSelectionScope(productCode, market = catalogCustomerMarket) {
+    const scope = catalogPackageOverviewKey(productCode, market);
+    if (catalogBulkSelectionScope !== scope) {
+        catalogBulkSelectedPackages.clear();
+        catalogBulkSelectionScope = scope;
+        catalogBulkAssignment = null;
+    }
+}
+
+function clearCatalogBulkSelection({ render = true } = {}) {
+    catalogBulkSelectedPackages.clear();
+    catalogBulkAssignment = null;
+    if (render && selectedCatalogProduct && activeCatalogTab === "merchandising") renderCatalogDetail(selectedCatalogProduct);
+}
+
+function bulkCandidatePlan(overview, selectedCodes, supplierId) {
+    const selected = new Set(selectedCodes.map(code => String(code || "").toUpperCase()));
+    return (overview.packages || []).filter(item => selected.has(String(item.package?.packageCode || "").toUpperCase())).map(item => {
+        const matches = (item.candidates || []).filter(candidate => String(candidate.supplier?.supplierId || "") === String(supplierId || ""));
+        const eligible = matches.filter(candidate => candidate.readiness?.selectable === true);
+        const blockerCodes = eligible.length > 1
+            ? ["AMBIGUOUS_SUPPLIER_MAPPING_IDENTITY"]
+            : eligible.length === 1
+                ? []
+                : matches.length
+                    ? [...new Set(matches.flatMap(candidate => candidate.readiness?.blockerCodes || ["SUPPLIER_MAPPING_NOT_READY"]))]
+                    : ["NO_EXACT_SUPPLIER_MAPPING"];
+        return { item, candidate: eligible.length === 1 ? eligible[0] : null, blockerCodes };
+    });
+}
+
+function catalogBulkSupplierOptions(overview, selectedCodes) {
+    const selected = new Set(selectedCodes.map(code => String(code || "").toUpperCase()));
+    const suppliers = new Map();
+    (overview.packages || []).filter(item => selected.has(String(item.package?.packageCode || "").toUpperCase())).forEach(item => {
+        (item.candidates || []).forEach(candidate => {
+            const supplierId = String(candidate.supplier?.supplierId || "");
+            if (!supplierId) return;
+            if (!suppliers.has(supplierId)) suppliers.set(supplierId, { supplierId, name: candidate.supplier?.name || candidate.supplier?.supplierCode || "Supplier" });
+        });
+    });
+    return [...suppliers.values()].map(supplier => {
+        const plan = bulkCandidatePlan(overview, selectedCodes, supplier.supplierId);
+        return { ...supplier, eligible: plan.filter(item => item.candidate).length, blocked: plan.filter(item => !item.candidate).length };
+    }).sort((left, right) => right.eligible - left.eligible || left.name.localeCompare(right.name) || left.supplierId.localeCompare(right.supplierId));
+}
+
+function ensureCatalogBulkSupplierModal() {
+    if (document.getElementById("catalogBulkSupplierModal")) return;
+    const modal = document.createElement("div");
+    modal.id = "catalogBulkSupplierModal";
+    modal.className = "admin-action-modal catalog-bulk-supplier-modal";
+    modal.innerHTML = `<div class="admin-action-modal-box catalog-bulk-supplier-box" role="dialog" aria-modal="true" aria-labelledby="catalogBulkSupplierTitle"><header class="catalog-merch-modal-header"><div><span>Bulk fulfillment assignment</span><h3 id="catalogBulkSupplierTitle">Set fulfillment supplier</h3><p data-bulk-supplier-subtitle></p></div><button type="button" class="admin-icon-btn" data-close-bulk-supplier aria-label="Close"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button></header><div class="catalog-bulk-supplier-body" data-bulk-supplier-body></div></div>`;
+    modal.addEventListener("click", event => {
+        if (event.target === modal || event.target.closest("[data-close-bulk-supplier]")) closeCatalogBulkSupplierModal();
+        const option = event.target.closest("[data-bulk-supplier-option]");
+        if (option && catalogBulkAssignment) {
+            catalogBulkAssignment.supplierId = option.dataset.bulkSupplierOption;
+            renderCatalogBulkSupplierModal();
+        }
+        if (event.target.closest("[data-bulk-supplier-back]") && catalogBulkAssignment) {
+            catalogBulkAssignment.supplierId = "";
+            renderCatalogBulkSupplierModal();
+        }
+        if (event.target.closest("[data-confirm-bulk-supplier]")) submitCatalogBulkSupplierAssignment().catch(error => showAdminToast?.(error.message, "error"));
+    });
+    document.body.appendChild(modal);
+}
+
+function closeCatalogBulkSupplierModal() {
+    document.getElementById("catalogBulkSupplierModal")?.classList.remove("show");
+    catalogBulkAssignment = null;
+}
+
+function openCatalogBulkSupplierModal(product, overview) {
+    ensureCatalogBulkSupplierModal();
+    catalogBulkAssignment = {
+        product,
+        productCode: product.productCode,
+        customerMarket: catalogCustomerMarket,
+        overview,
+        selectedCodes: [...catalogBulkSelectedPackages],
+        supplierId: "",
+        saving: false,
+        result: null
+    };
+    renderCatalogBulkSupplierModal();
+    document.getElementById("catalogBulkSupplierModal")?.classList.add("show");
+}
+
+function renderCatalogBulkSupplierModal() {
+    const modal = document.getElementById("catalogBulkSupplierModal");
+    const assignment = catalogBulkAssignment;
+    if (!modal || !assignment) return;
+    const body = modal.querySelector("[data-bulk-supplier-body]");
+    const marketName = assignment.customerMarket === "MM" ? "Myanmar" : "Thailand";
+    modal.querySelector("[data-bulk-supplier-subtitle]").textContent = `${assignment.selectedCodes.length} canonical packages · Customer market: ${marketName}`;
+    if (assignment.result) {
+        const summary = assignment.result.summary || {};
+        body.innerHTML = `<section class="catalog-bulk-review-summary"><div><span>Assigned</span><strong>${Number(summary.assigned || 0)}</strong></div><div><span>Unchanged</span><strong>${Number(summary.unchanged || 0)}</strong></div><div><span>Conflicted</span><strong>${Number(summary.conflicted || 0)}</strong></div><div><span>Blocked</span><strong>${Number(summary.blocked || 0)}</strong></div></section><div class="catalog-bulk-result-list">${(assignment.result.results || []).map(item => `<div><strong>${escapeHtml(item.packageCode)}</strong><span class="catalog-supplier-status">${escapeHtml(item.status)}</span>${item.code ? `<small>${escapeHtml(catalogPackageBlockerLabel(item.code))}</small>` : ""}</div>`).join("")}</div><footer class="catalog-bulk-footer"><button type="button" class="admin-primary-btn" data-close-bulk-supplier>Done</button></footer>`;
+        return;
+    }
+    const options = catalogBulkSupplierOptions(assignment.overview, assignment.selectedCodes);
+    if (!assignment.supplierId) {
+        body.innerHTML = `<div class="catalog-bulk-supplier-options">${options.map(option => `<button type="button" data-bulk-supplier-option="${escapeHtml(option.supplierId)}"><span><strong>${escapeHtml(option.name)}</strong><small>${option.eligible} eligible · ${option.blocked} blocked</small></span><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></button>`).join("") || `<div class="catalog-empty-state"><strong>No exact supplier candidates</strong><span>The selected packages do not share an authoritative supplier candidate.</span></div>`}</div>`;
+        return;
+    }
+    const option = options.find(item => item.supplierId === assignment.supplierId);
+    const plan = bulkCandidatePlan(assignment.overview, assignment.selectedCodes, assignment.supplierId);
+    const eligible = plan.filter(item => item.candidate);
+    const blocked = plan.filter(item => !item.candidate);
+    body.innerHTML = `<section class="catalog-bulk-review-summary"><div><span>Customer market</span><strong>${marketName}</strong></div><div><span>Supplier</span><strong>${escapeHtml(option?.name || "Supplier")}</strong></div><div><span>Selected</span><strong>${plan.length}</strong></div><div><span>Ready to assign</span><strong>${eligible.length}</strong></div><div><span>Blocked</span><strong>${blocked.length}</strong></div></section>${blocked.length ? `<section class="catalog-bulk-blocked"><h4>Blocked packages</h4>${blocked.map(item => `<div><strong>${escapeHtml(item.item.package?.name || item.item.package?.packageCode)}</strong><small>${escapeHtml(item.blockerCodes.map(catalogPackageBlockerLabel).join(" · "))}</small></div>`).join("")}</section>` : ""}<label class="catalog-supplier-reason"><span>Reason <small>Optional</small></span><input type="text" maxlength="500" data-bulk-supplier-reason placeholder="Why is this supplier being assigned?"></label><footer class="catalog-bulk-footer"><button type="button" class="admin-secondary-btn" data-bulk-supplier-back>Back</button><button type="button" class="admin-primary-btn" data-confirm-bulk-supplier ${eligible.length && !assignment.saving ? "" : "disabled"}>${assignment.saving ? "Assigning…" : `Confirm ${eligible.length} package${eligible.length === 1 ? "" : "s"}`}</button></footer>`;
+}
+
+async function submitCatalogBulkSupplierAssignment() {
+    const assignment = catalogBulkAssignment;
+    if (!assignment || assignment.saving || !assignment.supplierId) return;
+    const scope = catalogPackageOverviewKey(assignment.productCode, assignment.customerMarket);
+    assignment.saving = true;
+    assignment.reason = document.querySelector("[data-bulk-supplier-reason]")?.value || "";
+    renderCatalogBulkSupplierModal();
+    try {
+        const packageByCode = new Map((assignment.overview.packages || []).map(item => [String(item.package?.packageCode || "").toUpperCase(), item]));
+        const result = await adminFetch(`/api/admin/catalog/products/${encodeURIComponent(assignment.productCode)}/packages/bulk-supplier-selection`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                customerMarket: assignment.customerMarket,
+                supplierId: assignment.supplierId,
+                reason: assignment.reason,
+                packages: assignment.selectedCodes.map(packageCode => ({ packageCode, expectedDecisionVersion: packageByCode.get(String(packageCode).toUpperCase())?.selection?.decisionVersion ?? null }))
+            })
+        });
+        if (!result?.success) throw new Error(result?.message || "Bulk supplier assignment failed.");
+        if (catalogPackageOverviewKey(selectedCatalogProductCode, catalogCustomerMarket) === scope) {
+            (result.results || []).filter(item => ["ASSIGNED", "UNCHANGED"].includes(item.status)).forEach(item => catalogBulkSelectedPackages.delete(String(item.packageCode).toUpperCase()));
+            await loadCatalogPackageOverview(assignment.product, { force: true });
+        }
+        assignment.result = result;
+        renderCatalogBulkSupplierModal();
+    } catch (error) {
+        assignment.saving = false;
+        renderCatalogBulkSupplierModal();
+        throw error;
+    }
+}
+
 function catalogPackageBlockerLabel(code = "") {
     return ({
         PACKAGE_DISABLED: "Canonical package is disabled",
         PACKAGE_DELETED: "Canonical package is deleted",
         NO_VALID_PRICE: `No published ${catalogCustomerMarket} price`,
         PACKAGE_SUPPLIER_SELECTION_REQUIRED: `No fulfillment supplier is selected for ${catalogCustomerMarket === "MM" ? "Myanmar" : "Thailand"}`,
-        FULFILLMENT_NOT_READY: "Selected supplier mapping is not ready for new orders"
+        FULFILLMENT_NOT_READY: "Selected supplier mapping is not ready for new orders",
+        NO_EXACT_SUPPLIER_MAPPING: "No exact supplier mapping",
+        AMBIGUOUS_SUPPLIER_MAPPING_IDENTITY: "Multiple exact mapping identities require individual review",
+        MAPPING_DISABLED: "Supplier mapping is disabled",
+        MAPPING_ARCHIVED: "Supplier mapping is archived",
+        CUSTOMER_MARKET_NOT_ELIGIBLE: "Supplier mapping is not eligible for this customer market",
+        FULFILLMENT_ELIGIBILITY_UNKNOWN: "Fulfillment eligibility is unresolved",
+        INPUT_CONTRACT_NOT_READY: "Customer input contract is not ready",
+        MAPPING_EXECUTION_NOT_API: "Supplier execution identity is unresolved",
+        SUPPLIER_ADAPTER_NOT_READY: "Supplier adapter is not ready"
     })[code] || String(code || "Setup is required").replaceAll("_", " ").toLowerCase();
 }
 
@@ -569,8 +729,11 @@ function reconcileCatalogPackageOverview(product, pkg, authoritativeState) {
 function renderOperationalPackageRows(product, packages, overview) {
     const region = catalogCustomerMarket === "MM" ? "MM" : "TH";
     const marketName = region === "MM" ? "Myanmar" : "Thailand";
+    ensureCatalogBulkSelectionScope(product.productCode, region);
     const byCode = new Map((overview.packages || []).map(item => [String(item.package?.packageCode || "").toUpperCase(), item]));
     const joined = packages.filter(pkg => !pkg.deleted && !pkg.deletedAt).map(pkg => ({ pkg, state: byCode.get(String(pkg.packageCode).toUpperCase()) || null }));
+    const availableCodes = new Set(joined.map(item => String(item.pkg.packageCode).toUpperCase()));
+    [...catalogBulkSelectedPackages].forEach(code => { if (!availableCodes.has(code)) catalogBulkSelectedPackages.delete(code); });
     const counts = joined.reduce((result, item) => {
         const state = storefrontOperationalState(item.state);
         result[state] = (result[state] || 0) + 1;
@@ -594,16 +757,18 @@ function renderOperationalPackageRows(product, packages, overview) {
         const statusLabel = operational === "LIVE" ? "Live" : operational === "UNPUBLISHED" ? "Unpublished" : "Setup required";
         return `<article class="catalog-merch-row operational-${operational.toLowerCase()}" data-merch-package="${escapeHtml(pkg.packageCode)}">
             <div class="catalog-merch-summary">
-                <div class="catalog-merch-package"><div class="catalog-merch-package-icon">${pkg.iconUrl ? `<img src="${escapeHtml(pkg.iconUrl)}" alt="">` : `<span>${escapeHtml((pkg.name || "?").slice(0,1).toUpperCase())}</span>`}</div><div><strong>${escapeHtml(pkg.name || pkg.packageCode)}</strong><small>${escapeHtml(marketName)}</small></div></div>
+                <div class="catalog-merch-package"><label class="catalog-bulk-package-check"><input type="checkbox" data-bulk-package-select="${escapeHtml(pkg.packageCode)}" aria-label="Select ${escapeHtml(pkg.name || pkg.packageCode)} for bulk supplier assignment" ${catalogBulkSelectedPackages.has(String(pkg.packageCode).toUpperCase()) ? "checked" : ""}></label><div class="catalog-merch-package-icon">${pkg.iconUrl ? `<img src="${escapeHtml(pkg.iconUrl)}" alt="">` : `<span>${escapeHtml((pkg.name || "?").slice(0,1).toUpperCase())}</span>`}</div><div><strong>${escapeHtml(pkg.name || pkg.packageCode)}</strong><small>${escapeHtml(marketName)}</small></div></div>
                 <div class="catalog-merch-price"><span>Customer price</span><strong>${price && Number(price.amount) > 0 ? escapeHtml(`${Number(price.amount).toLocaleString()} ${price.currency || (region === "MM" ? "MMK" : "THB")}`) : "—"}</strong></div>
                 <div class="catalog-merch-offer-preview" data-package-supplier-summary="${escapeHtml(pkg.packageCode)}"><span>Fulfillment supplier</span><strong>${escapeHtml(selected?.supplier?.name || "No supplier")}</strong><small>${selected ? escapeHtml(selected.readiness?.summary || "") : "Explicit selection required"}</small></div>
                 <div class="catalog-merch-state"><span class="catalog-operational-status is-${operational.toLowerCase()}"><i class="fa-solid ${operational === "LIVE" ? "fa-circle-check" : operational === "UNPUBLISHED" ? "fa-circle-minus" : "fa-triangle-exclamation"}" aria-hidden="true"></i>${statusLabel}</span>${blockers.length ? `<small title="${escapeHtml(blockers.map(catalogPackageBlockerLabel).join(" · "))}">${escapeHtml(catalogPackageBlockerLabel(blockers[0]))}</small>` : ""}</div>
                 <div class="catalog-merch-actions"><button type="button" class="admin-secondary-btn catalog-merch-manage-btn" data-manage-merchandising="${escapeHtml(pkg.packageCode)}">Manage</button></div>
             </div></article>`;
     }).join("");
+    const bulkBar = catalogBulkSelectedPackages.size ? `<div class="catalog-bulk-action-bar" role="region" aria-label="Bulk package actions"><strong>${catalogBulkSelectedPackages.size} selected</strong><div><button type="button" class="admin-primary-btn" data-open-bulk-supplier>Set fulfillment supplier</button><button type="button" class="admin-secondary-btn" data-clear-bulk-packages>Clear selection</button></div></div>` : "";
     return `<section class="catalog-merchandising-panel">
         <div class="catalog-merchandising-head"><div><span>Storefront Merchandising</span><h3>Package Offers</h3><p>One canonical package per row. Pricing and fulfillment authorities remain separate.</p></div><label class="catalog-merch-market"><span>Customer market</span><select data-merch-market><option value="TH" ${region === "TH" ? "selected" : ""}>Thailand · THB</option><option value="MM" ${region === "MM" ? "selected" : ""}>Myanmar · MMK</option></select></label></div>
         <div class="catalog-package-operations"><div class="catalog-package-state-filters" role="group" aria-label="Package state">${filter("LIVE", "Live", counts.LIVE)}${filter("SETUP_REQUIRED", "Setup required", counts.SETUP_REQUIRED)}${filter("UNPUBLISHED", "Unpublished", counts.UNPUBLISHED)}${filter("ALL", "All", joined.length)}</div><label><span class="sr-only">Search packages</span><input type="search" data-merch-package-search value="${escapeHtml(catalogPackageSearch)}" placeholder="Search packages"></label></div>
+        ${bulkBar}
         <p class="catalog-package-result-count">${visible.length} package${visible.length === 1 ? "" : "s"} shown · ordered by canonical package order</p>
         <div class="catalog-merch-list">${rows || `<div class="catalog-empty-state"><strong>No ${effectiveFilter === "ALL" ? "matching" : effectiveFilter.toLowerCase().replace("_", " ")} packages</strong><span>Choose another operational state or adjust the package search.</span></div>`}</div>
     </section>`;
@@ -2391,6 +2556,7 @@ function bindActiveCatalogTab(detail, product, packages) {
         detail.querySelector("[data-merch-market]")?.addEventListener("change", event => {
             catalogCustomerMarket = event.target.value === "MM" ? "MM" : "TH";
             catalogPackageOperationalFilter = "AUTO";
+            ensureCatalogBulkSelectionScope(product.productCode, catalogCustomerMarket);
             sessionStorage.setItem(
                 "aziel.catalog.customerMarket",
                 catalogCustomerMarket
@@ -2407,6 +2573,18 @@ function bindActiveCatalogTab(detail, product, packages) {
             catalogPackageSearch = event.target.value || "";
             renderCatalogDetail(product);
             detail.querySelector("[data-merch-package-search]")?.focus();
+        });
+        detail.querySelectorAll("[data-bulk-package-select]").forEach(input => {
+            input.addEventListener("change", () => {
+                const packageCode = String(input.dataset.bulkPackageSelect || "").toUpperCase();
+                input.checked ? catalogBulkSelectedPackages.add(packageCode) : catalogBulkSelectedPackages.delete(packageCode);
+                renderCatalogDetail(product);
+            });
+        });
+        detail.querySelector("[data-clear-bulk-packages]")?.addEventListener("click", () => clearCatalogBulkSelection());
+        detail.querySelector("[data-open-bulk-supplier]")?.addEventListener("click", () => {
+            const overview = catalogPackageOverviewCache.get(catalogPackageOverviewKey(product.productCode));
+            if (overview) openCatalogBulkSupplierModal(product, overview);
         });
 
         detail.querySelectorAll("[data-manage-merchandising]").forEach(button => {

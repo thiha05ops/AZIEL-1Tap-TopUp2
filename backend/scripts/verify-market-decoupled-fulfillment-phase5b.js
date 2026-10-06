@@ -85,7 +85,8 @@ function verifySnapshotsAndStaticSafety() {
     const wallet = read("backend/scripts/verify-wallet-paid-auto-fulfillment.js");
     assert(wallet.includes("walletDebitCount") && wallet.includes("repeatedProviderSubmissions"));
     const paid = read("backend/services/paidFulfillmentRoutingService.js");
-    assert(!paid.includes("resolveCheckoutRouteSnapshot"));
+    assert(paid.includes("SUPPLIER_ROUTE_SNAPSHOT_BOUND"));
+    assert(paid.indexOf("if (routeSnapshot)") < paid.indexOf("options.resolveCurrentRoute || resolveCheckoutRouteSnapshot"), "Frozen orders must never reach current-route resolution; only historical no-snapshot orders may use it.");
     const config = read("backend/config/supplierAutoFulfillmentGate.js");
     assert(!config.includes("submitTopup") && !config.includes("updateOne"));
 }

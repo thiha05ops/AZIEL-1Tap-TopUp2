@@ -84,7 +84,8 @@ assert(checkout.includes("packageCode: catalog.packageCode"));
 assert(checkout.includes("region: catalog.region"));
 assert(checkout.includes("enabled: true"));
 assert(checkout.includes("FULFILLMENT_UNAVAILABLE"));
-assert(catalogRuntime.includes("item.fulfillmentRegions[region] !== true"));
+assert(catalogRuntime.includes("product.publicReadiness?.regions?.[normalizedRegion]"), "Frontend availability must consume the authoritative backend regional-readiness projection.");
+assert(!catalogRuntime.includes("item.fulfillmentRegions[region]"), "Frontend must not independently reconstruct fulfillment readiness from legacy package flags.");
 assert(!fs.readFileSync(path.join(root, "backend/catalog/publicProductReadiness.js"), "utf8").includes('productCode === "pubg"'));
 
 console.log("Fulfillment-aware public readiness verification passed.");

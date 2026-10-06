@@ -81,9 +81,13 @@ const {
     PackageSupplierSelectionError,
     setPackageSupplierSelection
 } = require("../services/packageSupplierSelectionService");
+const {
+    BulkPackageSupplierSelectionError,
+    setBulkPackageSupplierSelection
+} = require("../services/bulkPackageSupplierSelectionService");
 
 function sendAdminCatalogError(res, error) {
-    if (error instanceof CatalogAdminError || error instanceof PackageMarketPublicationError || error instanceof PackageSupplierCandidateError || error instanceof PackageSupplierSelectionError || error instanceof MediaError || error instanceof StorageError || error instanceof GameBannerError || error instanceof StorefrontSectionError || error instanceof AdminPricingControlCenterError) {
+    if (error instanceof CatalogAdminError || error instanceof PackageMarketPublicationError || error instanceof PackageSupplierCandidateError || error instanceof PackageSupplierSelectionError || error instanceof BulkPackageSupplierSelectionError || error instanceof MediaError || error instanceof StorageError || error instanceof GameBannerError || error instanceof StorefrontSectionError || error instanceof AdminPricingControlCenterError) {
         return res.status(error.statusCode || 400).json({
             success: false,
             code: error.code,
@@ -569,6 +573,21 @@ router.put("/admin/catalog/products/:productCode/packages/:packageCode/supplier-
             customerMarket: req.body?.customerMarket,
             supplierMappingId: req.body?.supplierMappingId,
             expectedDecisionVersion: req.body?.expectedDecisionVersion,
+            reason: req.body?.reason
+        }, { actor: req.admin, req });
+        return res.json({ success: true, ...result });
+    } catch (error) {
+        return sendAdminCatalogError(res, error);
+    }
+});
+
+router.put("/admin/catalog/products/:productCode/packages/bulk-supplier-selection", adminMiddleware, requireAdminPermission(PERMISSIONS.OWNER_ROUTING_MANAGE), async (req, res) => {
+    try {
+        const result = await setBulkPackageSupplierSelection({
+            productCode: req.params.productCode,
+            customerMarket: req.body?.customerMarket,
+            supplierId: req.body?.supplierId,
+            packages: req.body?.packages,
             reason: req.body?.reason
         }, { actor: req.admin, req });
         return res.json({ success: true, ...result });
