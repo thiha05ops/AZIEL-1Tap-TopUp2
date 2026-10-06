@@ -64,8 +64,8 @@ for (const [change, blocker] of [
     [{ canonicalPackages: [canonicalPackage, { ...canonicalPackage, _id: "ck2" }] }, "AMBIGUOUS_CANONICAL_IDENTITY"]
 ]) assert(assessPreCommercialFulfillmentReadiness({ ...readyInput, ...change }).blockers.includes(blocker), blocker);
 
-function fixtures({ failAudit = false } = {}) {
-    const state = { mapping: { ...mapping, region: "TH", executionMode: "MANUAL", fulfillmentEligibility: { mode: "UNKNOWN", allowedCustomerMarkets: [], evidenceCode: "", evidenceSource: "", verifiedAt: null, version: 1 }, mappingMetadata: { readiness: { supplierMapped: true, pricingReady: false, inputReady: false, validationReady: false, fulfillmentReady: false, storefrontReady: false } } }, exactMarketMapping: null, supplier: { ...supplier }, supplierProduct: { ...supplierProduct, supplierMarketCode: "GLOBAL" }, offer: { ...offer, reconciliationState: "AMBIGUOUS", reconciliationEvidence: {} }, availability: { ...availability }, canonicalProduct: { ...canonicalProduct }, canonicalPackages: [{ ...canonicalPackage }], audits: [], createdMappings: [], updates: [] };
+function fixtures({ failAudit = false, adapterConfigured = true } = {}) {
+    const state = { mapping: { ...mapping, region: "TH", executionMode: "MANUAL", fulfillmentEligibility: { mode: "UNKNOWN", allowedCustomerMarkets: [], evidenceCode: "", evidenceSource: "", verifiedAt: null, version: 1 }, mappingMetadata: { readiness: { supplierMapped: true, pricingReady: false, inputReady: false, validationReady: false, fulfillmentReady: false, storefrontReady: false } } }, exactMarketMapping: null, supplier: { ...supplier }, supplierProduct: { ...supplierProduct, supplierMarketCode: "GLOBAL" }, offer: { ...offer, reconciliationState: "AMBIGUOUS", reconciliationEvidence: {} }, availability: { ...availability }, canonicalProduct: { ...canonicalProduct }, canonicalProductEvidence: { ...canonicalProduct }, canonicalPackages: [{ ...canonicalPackage }], canonicalPackagesEvidence: [{ ...canonicalPackage }], audits: [], createdMappings: [], updates: [] };
     const repos = {
         transaction: async fn => {
             const snapshot = structuredClone(state);
@@ -79,6 +79,8 @@ function fixtures({ failAudit = false } = {}) {
         availabilityByOffer: async () => state.availability,
         canonicalProduct: async () => state.canonicalProduct,
         canonicalPackages: async () => state.canonicalPackages,
+        canonicalProductAny: async () => state.canonicalProductEvidence,
+        canonicalPackagesAny: async () => state.canonicalPackagesEvidence,
         auditByPlanHash: async planHash => state.audits.find(item => item.metadata.planHash === planHash) || null,
         mappingByExactMarket: async (anchor, region) => state.exactMarketMapping && state.exactMarketMapping.region === region ? state.exactMarketMapping : null,
         updateMapping: async (id, expectedUpdatedAt, update) => {
@@ -90,7 +92,7 @@ function fixtures({ failAudit = false } = {}) {
         createMapping: async document => { const created = { ...document, _id: `created-${state.createdMappings.length + 1}`, updatedAt: now }; state.createdMappings.push(created); return created; },
         createAudit: async document => { if (failAudit) throw new Error("AUDIT_WRITE_FAILED"); state.audits.push(document); return [document]; }
     };
-    const service = createSupplierRoutePreparationService({ repos, adapterResolver: () => ({ isConfigured: () => true, isAutoFulfillmentEnabled: () => true }), processorSupportResolver: value => value.mappingMetadata?.fulfillmentContract?.protocol === "FAZERCARDS_TOPUPS_ORDER_V2", clock: () => now });
+    const service = createSupplierRoutePreparationService({ repos, adapterResolver: () => ({ isConfigured: () => adapterConfigured, isAutoFulfillmentEnabled: () => true }), processorSupportResolver: value => value.mappingMetadata?.fulfillmentContract?.protocol === "FAZERCARDS_TOPUPS_ORDER_V2", clock: () => now });
     return { state, service };
 }
 
@@ -159,6 +161,50 @@ function fixtures({ failAudit = false } = {}) {
     const reviewedMarketPlan = await unresolvedMarket.service.generatePlan({ mappingId: "m1", customerMarkets: ["TH"] });
     assert.strictEqual(reviewedMarketPlan.outcome, OUTCOMES.FULFILLMENT_READY, "Explicit reviewed supplier-market authority must make the existing exact route preparable.");
     assert.strictEqual(reviewedMarketPlan.proposedChanges.region, "TH");
+
+    const inactiveCanonical = fixtures();
+    inactiveCanonical.state.canonicalProduct = null;
+    inactiveCanonical.state.canonicalProductEvidence = { ...canonicalProduct, deletedAt: now, updatedAt: now };
+    const inactiveCanonicalPlan = await inactiveCanonical.service.generatePlan({ mappingId: "m1", customerMarkets: ["TH"] });
+    assert.strictEqual(inactiveCanonicalPlan.sourceLock.canonicalEquivalence.proven, true, "Exact mapping/reconciliation evidence must remain canonical proof even when its canonical product is inactive.");
+    assert(inactiveCanonicalPlan.blockers.includes("MISSING_CANONICAL_LINK"));
+    assert.strictEqual(inactiveCanonicalPlan.requirements.canonicalPackage.proven, true);
+    assert.strictEqual(inactiveCanonicalPlan.requirements.canonicalPackage.ready, false);
+    assert.strictEqual(inactiveCanonicalPlan.requirements.canonicalPackage.action, "RESTORE_CANONICAL_PRODUCT");
+
+    const wonddFlow = fixtures();
+    wonddFlow.state.supplier = { ...wonddFlow.state.supplier, supplierCode: "WONDD" };
+    wonddFlow.state.mapping = { ...wonddFlow.state.mapping, supplierCode: "WONDD", productCode: "heartopia", packageCode: "HTP_20", supplierProductCode: "9624", supplierPackageCode: "HTP00020", supplierCatalogOfferId: "wo1" };
+    wonddFlow.state.supplierProduct = { ...wonddFlow.state.supplierProduct, _id: "wsp1", supplierProductCode: "9624", supplierMarketCode: "UNSPECIFIED", normalizedInputContract: {}, requiredFields: [], metadata: { transactionalServiceCode: "HTP", serviceCodeAuthority: "WONDD_CATALOG_CONFIG_LEGACY" } };
+    wonddFlow.state.offer = { ...wonddFlow.state.offer, _id: "wo1", supplierId: "s1", supplierCatalogProductId: "wsp1", supplierProductCode: "9624", supplierOfferCode: "HTP00020", reconciliationState: "EXACT_CANONICAL_MATCH" };
+    wonddFlow.state.availability = { ...wonddFlow.state.availability, supplierCatalogOfferId: "wo1" };
+    wonddFlow.state.canonicalProduct = { ...wonddFlow.state.canonicalProduct, productCode: "heartopia" };
+    wonddFlow.state.canonicalProductEvidence = { ...wonddFlow.state.canonicalProduct };
+    wonddFlow.state.canonicalPackages = [{ ...canonicalPackage, productCode: "heartopia", packageCode: "HTP_20" }];
+    wonddFlow.state.canonicalPackagesEvidence = structuredClone(wonddFlow.state.canonicalPackages);
+    const wonddInitial = await wonddFlow.service.generatePlan({ mappingId: "m1", customerMarkets: ["TH"] });
+    assert(wonddInitial.blockers.includes("MARKET_UNRESOLVED"));
+    assert(wonddInitial.blockers.includes("EXECUTION_IDENTITY_UNRESOLVED"));
+    assert(wonddInitial.blockers.includes("INPUT_CONTRACT_UNRESOLVED"));
+    assert.strictEqual(wonddInitial.requirements.canonicalPackage.proven, true);
+    wonddFlow.state.supplierProduct.metadata.businessAuthority = { marketAuthority: { nativeMarketEvidence: "TH", fulfillmentEligibility: { mode: "CUSTOMER_MARKET_ALLOWLIST", allowedCustomerMarkets: ["TH"] } } };
+    const wonddMarket = await wonddFlow.service.generatePlan({ mappingId: "m1", customerMarkets: ["TH"] });
+    assert.strictEqual(wonddMarket.requirements.supplierMarket.ready, true);
+    assert.strictEqual(wonddMarket.requirements.customerEligibility.ready, true);
+    assert.strictEqual(wonddMarket.requirements.executionIdentity.ready, false);
+    assert.strictEqual(wonddMarket.requirements.customerInformation.ready, false);
+    wonddFlow.state.supplierProduct.metadata.businessAuthority.executionAuthority = { executionIdentity: { servicecode: "HTP" } };
+    const wonddExecution = await wonddFlow.service.generatePlan({ mappingId: "m1", customerMarkets: ["TH"] });
+    assert.strictEqual(wonddExecution.requirements.executionIdentity.ready, true);
+    assert.strictEqual(wonddExecution.requirements.customerInformation.ready, false);
+    wonddFlow.state.supplierProduct.normalizedInputContract = { version: 1, decisionVersion: 1, transactionalServiceCode: "HTP", fields: [{ customerField: "playerId", providerField: "gameid", required: true, label: "Player ID", type: "numeric-text", transformationId: "DIRECT", evidenceReference: "provider docs" }], authority: "OWNER_REVIEWED_PROVIDER_EVIDENCE", review: { status: "OWNER_REVIEWED", sourceHash: wonddFlow.state.supplierProduct.rawSnapshotHash } };
+    const wonddReady = await wonddFlow.service.generatePlan({ mappingId: "m1", customerMarkets: ["TH"] });
+    assert.strictEqual(wonddReady.outcome, OUTCOMES.FULFILLMENT_READY);
+    assert(Object.values(wonddReady.requirements).every(item => item.ready === true));
+    const wonddUnavailable = fixtures(); wonddUnavailable.state.availability.state = "UNKNOWN";
+    assert((await wonddUnavailable.service.generatePlan({ mappingId: "m1", customerMarkets: ["TH"] })).requirements.availability.ready === false);
+    const adapterMissing = fixtures({ adapterConfigured: false });
+    assert.strictEqual((await adapterMissing.service.generatePlan({ mappingId: "m1", customerMarkets: ["TH"] })).requirements.adapterProtocol.adapterConfigured, false);
     const crossMarket = fixtures();
     crossMarket.state.mapping.mappingMetadata = { foreignOnly: "TH_ROUTE_ONLY", readiness: { supplierMapped: true, inputReady: false, validationReady: false, fulfillmentReady: false, pricingReady: true, storefrontReady: true }, technicalPreparation: { authority: "FOREIGN_TH_PREPARATION", reviewedCustomerMarkets: ["TH"] } };
     crossMarket.state.mapping.supplierMarketEvidence = { normalizedMarket: "TH", supplierMarketCode: "TH", marketClassification: "FOREIGN_ROUTE", evidenceCode: "TH_ONLY" };
@@ -216,5 +262,9 @@ function fixtures({ failAudit = false } = {}) {
     assert(wizardSource.includes('MARKET_ROUTE_DECISION:"Set up route"'));
     assert(wizardSource.includes('data-apply-route-setup'));
     assert(wizardSource.includes('/api/admin/supplier-catalog/route-preparation/plan'));
+    for (const label of ["Canonical package", "Supplier market", "Customer eligibility", "Execution identity", "Customer information", "Availability", "Adapter / protocol"]) assert(wizardSource.includes(label), `Missing route requirement: ${label}`);
+    assert(wizardSource.includes("RESTORE_CANONICAL_PRODUCT"));
+    assert(wizardSource.includes("Run controlled refresh"));
+    assert(wizardSource.includes("/api/admin/supplier-catalog/automation/"));
     console.log(JSON.stringify({ result: "PASS", preCommercialReadyWhilePrivate: true, negativeCases: 8, sourceLockRejectsStale: true, idempotentApply: true, automaticPrimaryAssignments: 0, enabledWrites: 0, pricingWrites: 0, publicationWrites: 0, storefrontWrites: 0, supplierCalls: 0 }, null, 2));
 })().catch(error => { console.error("VERIFY_SUPPLIER_ROUTE_PREPARATION_FAILED:", error); process.exitCode = 1; });

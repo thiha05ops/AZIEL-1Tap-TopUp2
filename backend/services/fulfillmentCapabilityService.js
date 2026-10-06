@@ -67,6 +67,7 @@ function normalizeProductCompatibilityMarkets(markets = []) {
 }
 
 function productCompatibilityMarketsFromAuthority(product = {}) {
+    product = product || {};
     const metadataMarkets = normalizeProductCompatibilityMarkets(
         product.metadata?.productAccountCompatibilityMarkets ||
         product.metadata?.accountCompatibilityMarkets ||
