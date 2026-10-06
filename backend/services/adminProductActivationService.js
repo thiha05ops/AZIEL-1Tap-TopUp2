@@ -163,18 +163,40 @@ function normalizedSuggestionIdentity(value = "") {
 function canonicalProductSuggestion({ supplierProduct = {}, sourceMappings = [], offers = [], canonicalProducts = [] } = {}) {
     const canonicalByCode = new Map(canonicalProducts.map(item => [lower(item.productCode), item]));
     const authorityCode = lower(supplierProduct.metadata?.onboardingCanonicalProduct?.productCode);
-    const mappedCodes = [...new Set(sourceMappings.map(item => lower(item.productCode)).filter(code => canonicalByCode.has(code)))];
-    const evidenceCodes = [...new Set(offers.map(canonicalEvidenceForOffer).map(item => lower(item?.productCode)).filter(code => canonicalByCode.has(code)))];
-    const durableCode = mappedCodes.length === 1 ? mappedCodes[0] : authorityCode && canonicalByCode.has(authorityCode) ? authorityCode : evidenceCodes.length === 1 ? evidenceCodes[0] : "";
-    if (durableCode) {
-        const product = canonicalByCode.get(durableCode);
-        return { productCode: durableCode, name: product.name || durableCode, evidence: mappedCodes.length === 1 ? "EXACT_MAPPING" : authorityCode === durableCode ? "ONBOARDING_AUTHORITY" : "RECONCILIATION_EVIDENCE", confidence: "AUTHORITATIVE" };
+    const offerById = new Map(offers.map(offer => [id(offer), offer]));
+    const offerByNativeCode = new Map(offers.map(offer => [clean(offer.supplierOfferCode), offer]));
+    const evidenceByProduct = new Map();
+    const addEvidence = (productCode, offerId, evidence) => {
+        const code = lower(productCode);
+        if (!code || !offerId || !canonicalByCode.has(code)) return;
+        if (!evidenceByProduct.has(code)) evidenceByProduct.set(code, { offerIds: new Set(), evidence: new Set() });
+        evidenceByProduct.get(code).offerIds.add(offerId);
+        evidenceByProduct.get(code).evidence.add(evidence);
+    };
+    for (const mapping of sourceMappings) {
+        const offer = offerById.get(id(mapping.supplierCatalogOfferId)) || offerByNativeCode.get(clean(mapping.supplierPackageCode));
+        if (offer) addEvidence(mapping.productCode, id(offer), "EXACT_MAPPING");
+    }
+    for (const offer of offers) {
+        const canonical = canonicalEvidenceForOffer(offer);
+        if (canonical) addEvidence(canonical.productCode, id(offer), "RECONCILIATION_EVIDENCE");
+    }
+    const candidates = [...evidenceByProduct.entries()].map(([productCode, value]) => {
+        const product = canonicalByCode.get(productCode);
+        return { productCode, name: product.name || productCode, distinctOfferCount: value.offerIds.size, evidence: value.evidence.has("EXACT_MAPPING") ? "EXACT_MAPPING" : "RECONCILIATION_EVIDENCE" };
+    }).sort((a, b) => b.distinctOfferCount - a.distinctOfferCount || a.productCode.localeCompare(b.productCode));
+    const authoritative = authorityCode && canonicalByCode.has(authorityCode) ? authorityCode : "";
+    const uniqueLeader = candidates[0] && candidates[0].distinctOfferCount > (candidates[1]?.distinctOfferCount || 0) ? candidates[0] : null;
+    const durable = authoritative ? candidates.find(item => item.productCode === authoritative) || { productCode: authoritative, name: canonicalByCode.get(authoritative).name || authoritative, distinctOfferCount: 0, evidence: "ONBOARDING_AUTHORITY" } : uniqueLeader;
+    if (durable) {
+        const evidence = authoritative === durable.productCode ? "ONBOARDING_AUTHORITY" : durable.evidence;
+        return { ...durable, evidence, confidence: "AUTHORITATIVE", totalSourceOfferCount: new Set(offers.map(id).filter(Boolean)).size, alternatives: candidates.filter(item => item.productCode !== durable.productCode) };
     }
     const sourceIdentity = normalizedSuggestionIdentity(supplierProduct.displayName || supplierProduct.rawName || supplierProduct.supplierProductCode);
     if (!sourceIdentity) return null;
     const nameMatches = canonicalProducts.filter(item => normalizedSuggestionIdentity(item.name || item.productCode) === sourceIdentity);
     if (nameMatches.length !== 1) return null;
-    return { productCode: lower(nameMatches[0].productCode), name: nameMatches[0].name || nameMatches[0].productCode, evidence: "DISPLAY_NAME_SUGGESTION_ONLY", confidence: "SUGGESTION" };
+    return { productCode: lower(nameMatches[0].productCode), name: nameMatches[0].name || nameMatches[0].productCode, evidence: "DISPLAY_NAME_SUGGESTION_ONLY", confidence: "SUGGESTION", distinctOfferCount: 0, totalSourceOfferCount: new Set(offers.map(id).filter(Boolean)).size, alternatives: [] };
 }
 
 function syntheticMappingFromOffer({ offer, supplier, supplierProduct } = {}) {
