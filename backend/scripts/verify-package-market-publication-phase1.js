@@ -25,7 +25,7 @@ function verify() {
     const ready = operationalPackage();
     assert.strictEqual(projectPackagePublication(ready, null).published, false, "Missing record must fail closed.");
     assert.strictEqual(projectPackagePublication(ready, { published: false }).state, "PRIVATE", "published=false must remain private.");
-    const publishedReady = projectPackagePublication(ready, { published: true, decisionVersion: 1 });
+    const publishedReady = projectPackagePublication(ready, { customerMarket: "TH", published: true, decisionVersion: 1 });
     assert.strictEqual(publishedReady.state, "PUBLISHED");
     assert.strictEqual(publishedReady.currentlyPurchasable, true);
     for (const changed of [
@@ -34,12 +34,12 @@ function verify() {
         operationalPackage({ enabled: false }),
         operationalPackage({ deletedAt: new Date() })
     ]) {
-        const state = projectPackagePublication(changed, { published: true, decisionVersion: 1 });
+        const state = projectPackagePublication(changed, { customerMarket: "TH", published: true, decisionVersion: 1 });
         assert.strictEqual(state.state, "SUPPRESSED");
         assert.strictEqual(state.currentlyPurchasable, false);
         assert.strictEqual(state.published, true, "Operational failure must preserve publication intent.");
     }
-    assert.strictEqual(projectPackagePublication(ready, { published: true, decisionVersion: 1 }).state, "PUBLISHED", "Operational recovery must not require republish.");
+    assert.strictEqual(projectPackagePublication(ready, { customerMarket: "TH", published: true, decisionVersion: 1 }).state, "PUBLISHED", "Operational recovery must not require republish.");
     const projection = { productCode: "mlbb", packages: [ready, operationalPackage({ packageCode: "MLBB_PRIVATE" })] };
     applyPublicationMetadata(projection, [{ productCode: "mlbb", packageCode: "MLBB_TEST", customerMarket: "TH", published: true }], "TH");
     assert.deepStrictEqual(explicitPublishedPackages(projection).map(pkg => pkg.packageCode), ["MLBB_TEST"]);
@@ -57,7 +57,7 @@ function verify() {
     const routeSource = fs.readFileSync(path.join(root, "backend/routes/catalog.js"), "utf8");
     assert(routeSource.includes("/publication"), "Admin API must expose explicit package publication.");
     const uiSource = fs.readFileSync(path.join(root, "frontend/js/admin-catalog.js"), "utf8");
-    assert(uiSource.includes("Public Storefront") && uiSource.includes("Published but Suppressed"), "Admin UI must distinguish publication states.");
+    assert(uiSource.includes("Make public") && uiSource.includes("Make private") && uiSource.includes("data-manage-package-public-detail"), "Admin drawer must expose explicit publication intent and readiness detail.");
     console.log(JSON.stringify({ result: "PASS", checks: 15, supplierRequests: 0, databaseWrites: 0 }, null, 2));
 }
 

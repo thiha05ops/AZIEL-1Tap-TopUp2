@@ -74,7 +74,8 @@ const {
 } = require("../services/packageMarketPublicationService");
 const {
     PackageSupplierCandidateError,
-    getPackageSupplierCandidates
+    getPackageSupplierCandidates,
+    getProductPackageSupplierOverview
 } = require("../services/packageSupplierCandidateService");
 const {
     PackageSupplierSelectionError,
@@ -532,6 +533,18 @@ router.get("/admin/catalog/products/:productCode/packages", adminMiddleware, req
             success: false,
             message: "Catalog data unavailable"
         });
+    }
+});
+
+router.get("/admin/catalog/products/:productCode/storefront-package-overview", adminMiddleware, requireAdminPermission(PERMISSIONS.CATALOG_READ), async (req, res) => {
+    try {
+        const result = await getProductPackageSupplierOverview({
+            productCode: req.params.productCode,
+            customerMarket: req.query?.customerMarket
+        });
+        return res.json({ success: true, ...result });
+    } catch (error) {
+        return sendAdminCatalogError(res, error);
     }
 });
 
