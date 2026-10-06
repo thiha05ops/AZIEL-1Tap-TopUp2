@@ -42,8 +42,10 @@ assert(service.includes("STALE_SOURCE"));
 assert(service.includes('scope: state.offer ? "OFFER" : "PRODUCT"'));
 
 const finalization = fs.readFileSync(path.join(__dirname, "../services/supplierCatalog/addProductFinalizationService.js"), "utf8");
-assert(finalization.includes("MARKET_SCOPED_CANONICAL_CONFLICT"));
+assert(finalization.includes("OWNER_PACKAGE_DECISION_REQUIRED"));
+assert(finalization.includes("EXISTING_MAPPING_TARGET_CONFLICT"));
+assert(!finalization.includes('row.blockers=[...new Set(["MARKET_SCOPED_CANONICAL_CONFLICT"'), "supplier-market scope must not globally block safe catalog reconciliation");
 assert(finalization.includes("sellableMarketScope"));
 assert(finalization.includes('enabled:false,productionRole:"DISABLED"'));
 
-console.log(JSON.stringify({ result: "PASS", autoContract: exact.state, marketResolution: approvedMarket.state, inputContractBlocker: missingInput.primaryBlocker, executionResolution: approvedExecution.state, authorityTransaction: "STATIC_SESSION_AND_AUDIT_CONTRACT_VERIFIED", marketScopedCanonicalSafety: "VERIFIED" }, null, 2));
+console.log(JSON.stringify({ result: "PASS", autoContract: exact.state, marketResolution: approvedMarket.state, inputContractBlocker: missingInput.primaryBlocker, executionResolution: approvedExecution.state, authorityTransaction: "STATIC_SESSION_AND_AUDIT_CONTRACT_VERIFIED", packageDecisionSafety: "PER_OFFER_OWNER_DECISION_VERIFIED", supplierAndCustomerMarkets: "DECOUPLED_FOR_CATALOG_INGESTION" }, null, 2));
