@@ -85,9 +85,14 @@ const {
     BulkPackageSupplierSelectionError,
     setBulkPackageSupplierSelection
 } = require("../services/bulkPackageSupplierSelectionService");
+const {
+    ProductReadyPublicationError,
+    applyProductReadyPublicationPlan,
+    getProductReadyPublicationPlan
+} = require("../services/productReadyPublicationService");
 
 function sendAdminCatalogError(res, error) {
-    if (error instanceof CatalogAdminError || error instanceof PackageMarketPublicationError || error instanceof PackageSupplierCandidateError || error instanceof PackageSupplierSelectionError || error instanceof BulkPackageSupplierSelectionError || error instanceof MediaError || error instanceof StorageError || error instanceof GameBannerError || error instanceof StorefrontSectionError || error instanceof AdminPricingControlCenterError) {
+    if (error instanceof CatalogAdminError || error instanceof PackageMarketPublicationError || error instanceof ProductReadyPublicationError || error instanceof PackageSupplierCandidateError || error instanceof PackageSupplierSelectionError || error instanceof BulkPackageSupplierSelectionError || error instanceof MediaError || error instanceof StorageError || error instanceof GameBannerError || error instanceof StorefrontSectionError || error instanceof AdminPricingControlCenterError) {
         return res.status(error.statusCode || 400).json({
             success: false,
             code: error.code,
@@ -804,6 +809,29 @@ router.patch("/admin/catalog/products/:productCode/packages/:packageCode/publica
             product,
             package: product?.packages?.find(item => item.packageCode === result.publication.packageCode) || null
         });
+    } catch (error) {
+        return sendAdminCatalogError(res, error);
+    }
+});
+
+router.get("/admin/catalog/products/:productCode/publication-ready-plan", adminMiddleware, requireAdminPermission(PERMISSIONS.CATALOG_READ), async (req, res) => {
+    try {
+        res.set("Cache-Control", "no-store");
+        return res.json({ success: true, ...(await getProductReadyPublicationPlan({ productCode: req.params.productCode, markets: ["TH", "MM"] })) });
+    } catch (error) {
+        return sendAdminCatalogError(res, error);
+    }
+});
+
+router.post("/admin/catalog/products/:productCode/publication-ready-apply", adminMiddleware, requireAdminPermission(PERMISSIONS.CATALOG_MANAGE), async (req, res) => {
+    try {
+        const result = await applyProductReadyPublicationPlan({
+            productCode: req.params.productCode,
+            markets: req.body?.markets,
+            marketPlanTokens: req.body?.marketPlanTokens,
+            decisionNote: req.body?.decisionNote || "Publish all ready packages"
+        }, { actor: req.admin, req });
+        return res.json({ success: true, ...result });
     } catch (error) {
         return sendAdminCatalogError(res, error);
     }

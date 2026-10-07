@@ -31,6 +31,9 @@ const catalogSupplierCandidateCache = new Map();
 const catalogPackageOverviewCache = new Map();
 const catalogPackageOverviewPending = new Map();
 const catalogPackageOverviewVersions = new Map();
+const catalogPublicationReadyPlanCache = new Map();
+const catalogPublicationReadyPlanPending = new Map();
+const catalogPublicationReadyResults = new Map();
 let catalogPackageOperationalFilter = "AUTO";
 let catalogPackageOverviewRequestId = 0;
 const catalogBulkSelectedPackages = new Set();
@@ -498,6 +501,96 @@ function catalogPackageOverviewKey(productCode, market = catalogCustomerMarket) 
     return `${String(productCode || "").toLowerCase()}:${market === "MM" ? "MM" : "TH"}`;
 }
 
+function invalidateCatalogPublicationReadiness(productCode) {
+    catalogPublicationReadyPlanCache.delete(String(productCode || "").toLowerCase());
+}
+
+async function loadCatalogPublicationReadyPlan(product, { force = false } = {}) {
+    const productCode = String(product?.productCode || "").toLowerCase();
+    if (!productCode) return null;
+    if (!force && catalogPublicationReadyPlanCache.has(productCode)) return catalogPublicationReadyPlanCache.get(productCode);
+    if (!force && catalogPublicationReadyPlanPending.has(productCode)) return catalogPublicationReadyPlanPending.get(productCode);
+    const request = adminFetch(`/api/admin/catalog/products/${encodeURIComponent(productCode)}/publication-ready-plan`)
+        .then(data => {
+            if (!data?.success) throw new Error(data?.message || "Market publication readiness is unavailable.");
+            catalogPublicationReadyPlanCache.set(productCode, data);
+            if (selectedCatalogProductCode === productCode && activeCatalogTab === "merchandising") renderCatalogDetail(selectedCatalogProduct || product);
+            return data;
+        })
+        .finally(() => {
+            if (catalogPublicationReadyPlanPending.get(productCode) === request) catalogPublicationReadyPlanPending.delete(productCode);
+        });
+    catalogPublicationReadyPlanPending.set(productCode, request);
+    return request;
+}
+
+function renderPublicationReadyResult(result = {}) {
+    const rows = ["TH", "MM"].filter(market => result.markets?.[market]).map(market => {
+        const item = result.markets[market];
+        return `<div><strong>${market === "MM" ? "Myanmar" : "Thailand"}</strong><span>Published ${Number(item.published || 0)} · Already public ${Number(item.alreadyPublic || 0)} · Blocked ${Number(item.blocked || 0)} · Conflicted ${Number(item.conflicted || 0)}</span></div>`;
+    }).join("");
+    return rows ? `<div class="catalog-market-availability-result">${rows}</div>` : "";
+}
+
+function renderCatalogMarketAvailability(product) {
+    const productCode = String(product?.productCode || "").toLowerCase();
+    const plan = catalogPublicationReadyPlanCache.get(productCode);
+    const result = catalogPublicationReadyResults.get(productCode);
+    if (!plan) return `<section class="catalog-market-availability" aria-busy="true"><div><span>Market Availability</span><strong>Loading publication readiness…</strong></div></section>`;
+    const row = market => {
+        const item = plan.markets?.[market] || {};
+        const name = market === "MM" ? "Myanmar" : "Thailand";
+        return `<div class="catalog-market-availability-row"><div><strong>${name}</strong><span>Public ${Number(item.public || 0)} · Ready ${Number(item.ready || 0)} · Blocked ${Number(item.blocked || 0)}</span></div><button type="button" class="admin-secondary-btn" data-publish-ready-market="${market}" ${Number(item.ready || 0) ? "" : "disabled"}>Publish Ready</button></div>`;
+    };
+    const blockedDetails = ["TH", "MM"].map(market => {
+        const packages = plan.markets?.[market]?.blockedPackages || [];
+        if (!packages.length) return "";
+        return `<details class="catalog-market-blocked"><summary>${market === "MM" ? "Myanmar" : "Thailand"} blocked packages (${packages.length})</summary><div>${packages.map(pkg => `<p><strong>${escapeHtml(pkg.packageName || pkg.packageCode)}</strong><span>${escapeHtml((pkg.blockers || []).map(item => item.label || item.code).join(" · "))}</span></p>`).join("")}</div></details>`;
+    }).join("");
+    const totalReady = Number(plan.markets?.TH?.ready || 0) + Number(plan.markets?.MM?.ready || 0);
+    return `<section class="catalog-market-availability"><header><div><span>Storefront publication</span><h4>Market Availability</h4><p>Published means publication intent is recorded. Blocked packages are skipped.</p></div><button type="button" class="admin-primary-btn" data-publish-ready-all ${totalReady ? "" : "disabled"}>Publish All Ready Markets</button></header>${row("TH")}${row("MM")}${blockedDetails ? `<div class="catalog-market-blocked-list">${blockedDetails}</div>` : ""}${renderPublicationReadyResult(result)}</section>`;
+}
+
+function publicationBlockerSummary(plan, markets) {
+    const grouped = new Map();
+    markets.forEach(market => (plan.markets?.[market]?.blockedPackages || []).forEach(pkg => (pkg.blockers || []).forEach(item => grouped.set(item.label || item.code, (grouped.get(item.label || item.code) || 0) + 1))));
+    return [...grouped.entries()].map(([label, count]) => `${count} × ${label}`).join("\n") || "No blocked packages";
+}
+
+async function applyCatalogPublicationReady(product, markets) {
+    const productCode = String(product?.productCode || "").toLowerCase();
+    const plan = await loadCatalogPublicationReadyPlan(product);
+    const requested = [...new Set(markets)].filter(market => ["TH", "MM"].includes(market));
+    const ready = requested.reduce((sum, market) => sum + Number(plan.markets?.[market]?.ready || 0), 0);
+    const alreadyPublic = requested.reduce((sum, market) => sum + Number(plan.markets?.[market]?.public || 0), 0);
+    const blocked = requested.reduce((sum, market) => sum + Number(plan.markets?.[market]?.blocked || 0), 0);
+    const confirmed = await confirmCatalogAction({
+        title: requested.length === 2 ? "Publish all ready markets?" : `Publish ready packages in ${requested[0] === "MM" ? "Myanmar" : "Thailand"}?`,
+        message: `${ready} ready package${ready === 1 ? "" : "s"} will receive publication intent.\n${alreadyPublic} already public · ${blocked} blocked\n\nBlocked reasons:\n${publicationBlockerSummary(plan, requested)}\n\nNo supplier, price, mapping, Store Catalog membership, or routing will be created automatically.`,
+        confirmText: `Publish ${ready} Ready`
+    });
+    if (!confirmed) return;
+    const response = await adminFetch(`/api/admin/catalog/products/${encodeURIComponent(productCode)}/publication-ready-apply`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            markets: requested,
+            marketPlanTokens: Object.fromEntries(requested.map(market => [market, plan.markets[market].marketPlanToken])),
+            decisionNote: "Product-level Publish Ready"
+        })
+    });
+    if (!response?.success) throw new Error(response?.message || "Ready packages could not be published.");
+    catalogPublicationReadyResults.set(productCode, response);
+    catalogPublicationReadyPlanCache.delete(productCode);
+    catalogPackageOverviewCache.delete(catalogPackageOverviewKey(productCode, "TH"));
+    catalogPackageOverviewCache.delete(catalogPackageOverviewKey(productCode, "MM"));
+    [...catalogSupplierCandidateCache.keys()].filter(key => key.startsWith(`${productCode}:`)).forEach(key => catalogSupplierCandidateCache.delete(key));
+    await Promise.all([loadCatalogPublicationReadyPlan(product, { force: true }), loadCatalogPackageOverview(product, { force: true })]);
+    const published = requested.reduce((sum, market) => sum + Number(response.markets?.[market]?.published || 0), 0);
+    const conflicts = requested.reduce((sum, market) => sum + Number(response.markets?.[market]?.conflicted || 0), 0);
+    showAdminToast?.(conflicts ? `${published} packages published; ${conflicts} require a refreshed review.` : `${published} ready packages published.`, conflicts ? "info" : "success");
+}
+
 function ensureCatalogBulkSelectionScope(productCode, market = catalogCustomerMarket) {
     const scope = catalogPackageOverviewKey(productCode, market);
     if (catalogBulkSelectionScope !== scope) {
@@ -634,6 +727,7 @@ async function submitCatalogBulkSupplierAssignment() {
         if (!result?.success) throw new Error(result?.message || "Bulk supplier assignment failed.");
         if (catalogPackageOverviewKey(selectedCatalogProductCode, catalogCustomerMarket) === scope) {
             (result.results || []).filter(item => ["ASSIGNED", "UNCHANGED"].includes(item.status)).forEach(item => catalogBulkSelectedPackages.delete(String(item.packageCode).toUpperCase()));
+            invalidateCatalogPublicationReadiness(assignment.productCode);
             await loadCatalogPackageOverview(assignment.product, { force: true });
         }
         assignment.result = result;
@@ -767,6 +861,7 @@ function renderOperationalPackageRows(product, packages, overview) {
     const bulkBar = catalogBulkSelectedPackages.size ? `<div class="catalog-bulk-action-bar" role="region" aria-label="Bulk package actions"><strong>${catalogBulkSelectedPackages.size} selected</strong><div><button type="button" class="admin-primary-btn" data-open-bulk-supplier>Set fulfillment supplier</button><button type="button" class="admin-secondary-btn" data-clear-bulk-packages>Clear selection</button></div></div>` : "";
     return `<section class="catalog-merchandising-panel">
         <div class="catalog-merchandising-head"><div><span>Storefront Merchandising</span><h3>Package Offers</h3><p>One canonical package per row. Pricing and fulfillment authorities remain separate.</p></div><label class="catalog-merch-market"><span>Customer market</span><select data-merch-market><option value="TH" ${region === "TH" ? "selected" : ""}>Thailand · THB</option><option value="MM" ${region === "MM" ? "selected" : ""}>Myanmar · MMK</option></select></label></div>
+        ${renderCatalogMarketAvailability(product)}
         <div class="catalog-package-operations"><div class="catalog-package-state-filters" role="group" aria-label="Package state">${filter("LIVE", "Live", counts.LIVE)}${filter("SETUP_REQUIRED", "Setup required", counts.SETUP_REQUIRED)}${filter("UNPUBLISHED", "Unpublished", counts.UNPUBLISHED)}${filter("ALL", "All", joined.length)}</div><label><span class="sr-only">Search packages</span><input type="search" data-merch-package-search value="${escapeHtml(catalogPackageSearch)}" placeholder="Search packages"></label></div>
         ${bulkBar}
         <p class="catalog-package-result-count">${visible.length} package${visible.length === 1 ? "" : "s"} shown · ordered by canonical package order</p>
@@ -783,7 +878,7 @@ function renderCatalogMerchandisingPanel(product, packages) {
     const activePackages = packages.filter(pkg => !pkg.deleted && !pkg.deletedAt);
     const overview = catalogPackageOverviewCache.get(catalogPackageOverviewKey(product.productCode));
     if (overview) return renderOperationalPackageRows(product, activePackages, overview);
-    return `<section class="catalog-merchandising-panel"><div class="catalog-merchandising-head"><div><span>Storefront Merchandising</span><h3>Package Offers</h3><p>Loading authoritative package availability…</p></div></div><div class="catalog-merch-list" aria-busy="true"><div class="admin-dashboard-skeleton"></div><div class="admin-dashboard-skeleton"></div></div><div class="admin-empty-state" data-package-overview-error hidden><strong>Package storefront state is unavailable</strong><span>Use Refresh to retry without changing catalog data.</span></div></section>`;
+    return `<section class="catalog-merchandising-panel"><div class="catalog-merchandising-head"><div><span>Storefront Merchandising</span><h3>Package Offers</h3><p>Loading authoritative package availability…</p></div></div>${renderCatalogMarketAvailability(product)}<div class="catalog-merch-list" aria-busy="true"><div class="admin-dashboard-skeleton"></div><div class="admin-dashboard-skeleton"></div></div><div class="admin-empty-state" data-package-overview-error hidden><strong>Package storefront state is unavailable</strong><span>Use Refresh to retry without changing catalog data.</span></div></section>`;
 
     const rows = activePackages.map(pkg => {
         const price = pkg.prices?.[region] || null;
@@ -1830,12 +1925,12 @@ function formatCandidateCost(cost = {}) {
 
 function candidateCostState(cost = {}) {
     if (cost.amount === null || cost.amount === undefined || cost.amount === "" || cost.state === "UNAVAILABLE") return "Cost unavailable";
-    return cost.stale === true || cost.state === "STALE" ? "Stale" : "Current";
+    return cost.stale === true || cost.state === "STALE" ? "Cost stale" : "Cost current";
 }
 
 function candidateOperatorStatus(candidate = {}) {
     const blockers = candidate.readiness?.blockerCodes || [];
-    if (candidate.readiness?.selectable === true) return "Ready";
+    if (candidate.readiness?.selectable === true) return "Route ready";
     if (blockers.includes("MAPPING_DISABLED") || blockers.includes("MAPPING_ARCHIVED")) return "Mapping disabled";
     if (blockers.includes("MAPPING_EXECUTION_NOT_API") || blockers.includes("SUPPLIER_ADAPTER_NOT_READY") || blockers.includes("PROVIDER_FEATURE_GATE_OFF")) return "Not configured for API fulfillment";
     if (blockers.includes("FULFILLMENT_ELIGIBILITY_UNKNOWN") || blockers.includes("CUSTOMER_MARKET_NOT_ELIGIBLE")) return "Customer-market eligibility unverified";
@@ -1864,7 +1959,7 @@ function renderSupplierMappingRow(candidate, repeatedSupplier = false) {
     return `<label class="catalog-supplier-candidate ${candidate.readiness.selectable ? "" : "is-disabled"}">
         <input type="radio" name="manage-package-supplier" value="${escapeHtml(candidate.supplierMappingId)}" ${candidate.readiness.selectable ? "" : "disabled"} ${candidate.selected ? "checked" : ""}>
         <span class="catalog-supplier-candidate-body">
-            <span class="catalog-supplier-candidate-head"><strong>${escapeHtml(candidate.supplier.name)}</strong><span class="catalog-supplier-badges">${candidate.selected ? '<span class="catalog-supplier-status is-selected">Selected</span>' : ""}<span class="catalog-supplier-status">${escapeHtml(status)}</span></span></span>
+            <span class="catalog-supplier-candidate-head"><strong>${escapeHtml(candidate.supplier.name)}</strong><span class="catalog-supplier-badges">${candidate.selected ? `<span class="catalog-supplier-status is-selected">Selected for ${catalogCustomerMarket === "MM" ? "MM" : "TH"}</span>` : ""}<span class="catalog-supplier-status">${escapeHtml(status)}</span></span></span>
             <small>${escapeHtml(account)}${repeatedSupplier && providerIdentity ? ` · ${escapeHtml(providerIdentity)}` : ""}</small>
             ${!repeatedSupplier && providerIdentity ? `<small class="catalog-supplier-provider">${escapeHtml(providerIdentity)}</small>` : ""}
             <small class="catalog-supplier-cost"><span>${escapeHtml(costLabel)}</span><span>${escapeHtml(candidateCostState(candidate.cost))}</span></small>
@@ -2058,6 +2153,8 @@ async function saveManagePackageSupplier(product, pkg, modal) {
     const latest = await loadPackageSupplierCandidateData(product, pkg, { refresh: true });
     renderManagePackageCandidates(modal, latest);
     reconcileCatalogPackageOverview(product, pkg, latest);
+    invalidateCatalogPublicationReadiness(product.productCode);
+    loadCatalogPublicationReadyPlan(product, { force: true }).catch(() => {});
     showAdminToast?.(result.changed ? "Fulfillment supplier selection saved" : "Supplier selection is already current", result.changed ? "success" : "info");
 }
 
@@ -2084,10 +2181,11 @@ async function updateManagePackagePublication(product, pkg, modal) {
         if (!result?.success) throw new Error(result?.message || "Package visibility could not be changed.");
         if (result.product) selectedCatalogProduct = result.product;
         catalogSupplierCandidateCache.delete(`${product.productCode}:${pkg.packageCode}:${market}`);
+        invalidateCatalogPublicationReadiness(product.productCode);
         const latest = await loadPackageSupplierCandidateData(result.product || product, pkg, { refresh: true });
         renderManagePackageCandidates(modal, latest);
         reconcileCatalogPackageOverview(result.product || product, pkg, latest);
-        showAdminToast?.(published ? `${pkg.name || pkg.packageCode} is public in ${marketName}` : `${pkg.name || pkg.packageCode} is private in ${marketName}`, "success");
+        showAdminToast?.(published ? `Publication enabled for ${pkg.name || pkg.packageCode} in ${marketName}` : `${pkg.name || pkg.packageCode} is private in ${marketName}`, "success");
     } catch (error) {
         renderManagePackageCandidates(modal, current);
         throw error;
@@ -2423,7 +2521,7 @@ async function updateMerchandisingPublication(product, pkg, input) {
 
         showAdminToast?.(
             published
-                ? `${pkg.name || pkg.packageCode} is public in ${marketName}`
+                ? `Publication enabled for ${pkg.name || pkg.packageCode} in ${marketName}`
                 : `${pkg.name || pkg.packageCode} is hidden in ${marketName}`,
             "success"
         );
@@ -2553,6 +2651,15 @@ function bindActiveCatalogTab(detail, product, packages) {
         if (!catalogPackageOverviewCache.has(catalogPackageOverviewKey(product.productCode))) {
             loadCatalogPackageOverview(product).catch(error => showAdminToast?.(error?.message || "Package storefront state is unavailable.", "error"));
         }
+        if (!catalogPublicationReadyPlanCache.has(String(product.productCode || "").toLowerCase())) {
+            loadCatalogPublicationReadyPlan(product).catch(error => showAdminToast?.(error?.message || "Market publication readiness is unavailable.", "error"));
+        }
+        detail.querySelectorAll("[data-publish-ready-market]").forEach(button => button.addEventListener("click", () => {
+            applyCatalogPublicationReady(product, [button.dataset.publishReadyMarket]).catch(error => showAdminToast?.(error?.message || "Ready packages could not be published.", "error"));
+        }));
+        detail.querySelector("[data-publish-ready-all]")?.addEventListener("click", () => {
+            applyCatalogPublicationReady(product, ["TH", "MM"]).catch(error => showAdminToast?.(error?.message || "Ready packages could not be published.", "error"));
+        });
         detail.querySelector("[data-merch-market]")?.addEventListener("change", event => {
             catalogCustomerMarket = event.target.value === "MM" ? "MM" : "TH";
             catalogPackageOperationalFilter = "AUTO";
@@ -4998,6 +5105,7 @@ async function mutateCatalog(url, body, options) {
         const index = catalogProducts.findIndex(item => item.productCode === data.product.productCode);
         if (index >= 0) catalogProducts[index] = { ...catalogProducts[index], ...data.product };
         selectedCatalogProduct = data.product;
+        invalidateCatalogPublicationReadiness(productCodeToKeep);
         catalogPackageOverviewCache.delete(catalogPackageOverviewKey(productCodeToKeep, "TH"));
         catalogPackageOverviewCache.delete(catalogPackageOverviewKey(productCodeToKeep, "MM"));
         renderCatalogProducts();

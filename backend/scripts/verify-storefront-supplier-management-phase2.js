@@ -18,8 +18,9 @@ assert(ui.includes("const usable = candidates.filter") && ui.includes("const una
 assert(ui.includes("Unavailable mappings (${unavailable.length})") && ui.includes("catalog-supplier-unavailable"), "unavailable mappings must remain visible in a collapsed disclosure");
 assert(ui.includes("candidate.providerIdentity?.productCode") && ui.includes("candidate.supplierMarket"), "same-supplier routes must expose mapping distinctions");
 assert(ui.includes('value="${escapeHtml(candidate.supplierMappingId)}"'), "radio value must remain the exact mapping identity");
-assert(ui.includes("candidate.selected ? '<span class=\"catalog-supplier-status is-selected\">Selected</span>'"), "selected mapping must have a visible selected state distinct from readiness");
-assert(ui.includes("candidateCostState") && ui.includes('? "Stale" : "Current"') && ui.includes("catalog-supplier-cost"), "route readiness and commercial cost freshness must remain separate concepts");
+assert(ui.includes('Selected for ${catalogCustomerMarket === "MM" ? "MM" : "TH"}') && ui.includes("candidate.selected"), "selected mapping must have a market-specific visible selected state distinct from readiness");
+assert(ui.includes("candidateCostState") && ui.includes('? "Cost stale" : "Cost current"') && ui.includes("catalog-supplier-cost"), "route readiness and commercial cost freshness must remain separate concepts");
+assert(ui.includes('return "Route ready"'), "route readiness label must remain distinct from selection and cost freshness");
 assert(ui.includes("No fulfillment supplier is currently available for this package in"), "no-usable-supplier state must be explicit and market-specific");
 assert(ui.includes("Supplier selection required"), "no-selection state must remain explicit");
 assert(ui.includes("candidate.eligibility?.mode") && ui.includes("candidate.readiness?.blockerCodes"), "safe technical mapping details must remain diagnostically accessible");
