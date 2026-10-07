@@ -48,14 +48,8 @@ function publicationPackageMap(records = []) {
 }
 
 function suppressionReasons(pkg = {}, customerMarket = "TH") {
-    const market = normalizeCustomerMarket(customerMarket);
-    const reasons = [];
-    if (pkg.deletedAt) reasons.push("PACKAGE_DELETED");
-    if (pkg.enabled === false) reasons.push("PACKAGE_DISABLED");
-    const price = pkg.prices?.[market];
-    if (!price || price.enabled === false || !Number.isFinite(Number(price.amount)) || Number(price.amount) <= 0) reasons.push("NO_VALID_PRICE");
-    if (pkg.fulfillmentRegions?.[market] !== true) reasons.push("FULFILLMENT_NOT_READY");
-    return reasons;
+    normalizeCustomerMarket(customerMarket);
+    return [];
 }
 
 function projectPackagePublication(pkg, recordOrRecords, customerMarket = "TH") {
@@ -105,9 +99,9 @@ function stripPublicationMetadata(projection) {
 }
 
 function explicitPublishedPackages(projection) {
-    // Publication controls storefront inclusion. Operational safety is projected
-    // separately so an unsafe package remains published-but-suppressed rather
-    // than silently losing the Admin's publication decision.
+    // This record owns only the Admin's package Selling ON/OFF decision.
+    // Price, product intent and route readiness are evaluated by the shared
+    // effective-sales projection and never mutate this intent.
     return (projection?.packages || []).filter(pkg => pkg.publication?.published === true);
 }
 

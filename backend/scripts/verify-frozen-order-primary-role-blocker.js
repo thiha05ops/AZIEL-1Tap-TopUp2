@@ -25,13 +25,15 @@ const route = {
 };
 
 assert.strictEqual(normalizeSupplierRouteSnapshot(route, quote).selectedRole, "PRIMARY", "PRIMARY frozen route must normalize today.");
+assert.strictEqual(normalizeSupplierRouteSnapshot({ ...route, selectedRole: "PACKAGE_SUPPLIER_SELECTION" }, quote).selectedRole, "PACKAGE_SUPPLIER_SELECTION", "Explicit Storefront supplier selection must freeze successfully.");
+assert.strictEqual(normalizeSupplierRouteSnapshot({ ...route, selectedRole: "UNIQUE_EXECUTABLE_ROUTE" }, quote).selectedRole, "UNIQUE_EXECUTABLE_ROUTE", "Automatically resolved unique route must freeze successfully.");
 const mappingAfterRoleChange = { _id: route.supplierMappingId, enabled: true, archivedAt: null, productionRole: "BACKUP" };
 assert.strictEqual(String(mappingAfterRoleChange._id), route.supplierMappingId, "Frozen mapping identity remains exact after the role change.");
-assert.strictEqual(mappingAfterRoleChange.productionRole !== "PRIMARY", true, "Current fulfillment will reject this otherwise unchanged frozen route solely on role.");
+assert.strictEqual(mappingAfterRoleChange.productionRole !== "PRIMARY", true, "The current mapping role may change without rewriting the frozen route.");
 assert.throws(
     () => normalizeSupplierRouteSnapshot({ ...route, selectedRole: "BACKUP" }, quote),
-    error => error.code === ORDER_SNAPSHOT_ERROR_CODES.INVALID_FULFILMENT_INPUT && /PRIMARY/.test(error.message),
-    "Current snapshot normalization must expose the pre-Phase-3 BACKUP role blocker."
+    error => error.code === ORDER_SNAPSHOT_ERROR_CODES.INVALID_FULFILMENT_INPUT,
+    "A newly supplied BACKUP role is not a valid checkout snapshot authority."
 );
 assert.throws(
     () => normalizeSupplierRouteSnapshot({ ...route, selectedRole: "DISABLED" }, quote),
@@ -39,5 +41,5 @@ assert.throws(
     "DISABLED must remain unsafe."
 );
 const fulfillment = fs.readFileSync(path.resolve(__dirname, "../services/fulfillmentService.js"), "utf8");
-assert(fulfillment.includes('if (mapping.productionRole !== "PRIMARY") throw new FulfillmentError("SUPPLIER_MAPPING_NOT_PRIMARY"'), "Current fulfillment role-only rejection must remain visible until Phase 3.");
-console.log("PASS documented pre-Phase-3 blocker: frozen BACKUP routes are rejected; DISABLED remains unsafe");
+assert(fulfillment.includes('if (!routeSnapshot && mapping.productionRole !== "PRIMARY")'), "Only non-frozen route resolution may require the current PRIMARY role.");
+console.log("PASS frozen PRIMARY snapshot remains executable after current mapping becomes BACKUP; new BACKUP/DISABLED snapshots remain unsafe");

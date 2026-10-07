@@ -89,18 +89,11 @@ function resolvePublicProductReadiness(product = {}, packages = [], commerceRead
     if (!String(product.artworkPath || product.imageUrl || product.presentation?.imageAssetId || "").trim()) warnings.push("artwork");
     if (packages.some(item => item.enabled !== false && !String(item.customerNote || "").trim())) warnings.push("packageNotes");
 
-    // In the explicit Store Catalog projection, selection + storefront
-    // visibility + package publication have already been applied by the
-    // caller. Purchasable is therefore derived from those authorities and
-    // current fulfillment readiness, not a second mutable product-level
-    // commerce switch. Legacy projections retain their historical intent.
-    const explicitCommercialAuthority = options.explicitCommercialAuthority === true;
-    const requested = explicitCommercialAuthority
-        ? "PURCHASABLE"
-        : String(product.commerceState || product.requestedCommerceState || "HIDDEN").toUpperCase();
-    const discoverable = explicitCommercialAuthority
-        ? product.enabled !== false && !product.deletedAt
-        : product.publicDiscoveryEnabled === true && product.enabled !== false && !product.deletedAt;
+    // Product Purchasable is the product-level sales decision in every
+    // projection. Store Catalog membership and package Selling/readiness are
+    // applied by the caller; none of them may bypass this control.
+    const requested = String(product.commerceState || product.requestedCommerceState || "HIDDEN").toUpperCase();
+    const discoverable = product.publicDiscoveryEnabled === true && product.enabled !== false && !product.deletedAt;
     let state = "HIDDEN";
     if (canonical && discoverable && requested !== "HIDDEN") {
         const intentionallyComingSoon = String(product.lifecycleStatus || "").toUpperCase() === "COMING_SOON" || requested === "COMING_SOON";

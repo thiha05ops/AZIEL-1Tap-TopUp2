@@ -55,7 +55,7 @@ function isMarketDecoupledV2RouteSnapshot({ routeSnapshot = null, mapping = null
         String(routeSnapshot.supplierProductCode || "").trim() === String(mapping.supplierProductCode || "").trim() &&
         String(routeSnapshot.supplierPackageCode || "").trim() === String(mapping.supplierPackageCode || "").trim() &&
         String(routeSnapshot.executionMode || "").trim().toUpperCase() === "API" &&
-        ["PRIMARY", "PACKAGE_SUPPLIER_SELECTION"].includes(String(routeSnapshot.selectedRole || "").trim().toUpperCase()) &&
+        ["PRIMARY", "PACKAGE_SUPPLIER_SELECTION", "UNIQUE_EXECUTABLE_ROUTE"].includes(String(routeSnapshot.selectedRole || "").trim().toUpperCase()) &&
         (!persistedSupplierMarket || persistedSupplierMarket === String(mapping.region || "").trim().toUpperCase());
 }
 

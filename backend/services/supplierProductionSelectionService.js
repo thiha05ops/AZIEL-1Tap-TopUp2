@@ -142,7 +142,7 @@ async function resolveLegacyCheckoutRouteSnapshot({ productCode, packageCode, re
     return { ready: false, blockers: [...primary.blockers, !manualAllowed ? "MANUAL_ADMIN_NOT_ALLOWED" : "MANUAL_PRICE_NOT_PUBLISHED"], routeSnapshot: null };
 }
 
-function selectedRouteSnapshot(mapping, selection, customerMarket) {
+function selectedRouteSnapshot(mapping, selection, customerMarket, selectedRole = "PACKAGE_SUPPLIER_SELECTION") {
     return Object.freeze({
         routeType: "SUPPLIER_API", snapshotVersion: 2,
         supplierMappingId: String(mapping._id), supplierId: String(mapping.supplierId), supplierCode: mapping.supplierCode,
@@ -150,7 +150,7 @@ function selectedRouteSnapshot(mapping, selection, customerMarket) {
         region: upper(customerMarket), customerMarket: upper(customerMarket), supplierMarket: upper(mapping.region),
         supplierProductCode: mapping.supplierProductCode, supplierPackageCode: mapping.supplierPackageCode,
         fulfillmentContract: mapping.mappingMetadata?.fulfillmentContract || null, executionMode: mapping.executionMode,
-        selectedRole: "PACKAGE_SUPPLIER_SELECTION", selectionDecisionVersion: Number(selection.decisionVersion),
+        selectedRole, selectionDecisionVersion: selection ? Number(selection.decisionVersion) : null,
         eligibility: mapping.fulfillmentEligibility || null, selectedAt: new Date().toISOString()
     });
 }
@@ -162,7 +162,36 @@ async function resolveSelectedCheckoutRouteSnapshot({ productCode, packageCode, 
     const normalizedPackage = upper(packageCode);
     const customerMarket = upper(region);
     const selection = await PackageSupplierSelection.findOne({ productCode: normalizedProduct, packageCode: normalizedPackage, customerMarket }).lean();
-    if (!selection) return { ready: false, blockers: ["PACKAGE_SUPPLIER_SELECTION_REQUIRED"], routeSnapshot: null };
+    if (!selection) {
+        const mappings = await Mapping.find({ productCode: normalizedProduct, packageCode: normalizedPackage, archivedAt: null }).lean();
+        if (!mappings.length) return { ready: false, blockers: ["NO_EXECUTABLE_SUPPLIER_ROUTE"], routeSnapshot: null, resolution: "NONE" };
+        const supplierIds = [...new Set(mappings.map(item => String(item.supplierId)))];
+        const offerIds = [...new Set(mappings.map(item => item.supplierCatalogOfferId).filter(Boolean).map(String))];
+        const [suppliers, offers, availabilityRows] = await Promise.all([
+            Supplier.find({ _id: { $in: supplierIds } }).lean(),
+            SupplierCatalogOffer.find({ _id: { $in: offerIds } }).lean(),
+            SupplierOfferAvailability.find({ supplierCatalogOfferId: { $in: offerIds } }).lean()
+        ]);
+        const supplierById = new Map(suppliers.map(item => [String(item._id), item]));
+        const offerById = new Map(offers.map(item => [String(item._id), item]));
+        const availabilityByOffer = new Map(availabilityRows.map(item => [String(item.supplierCatalogOfferId), item]));
+        const assessed = mappings.map(mapping => {
+            const supplier = supplierById.get(String(mapping.supplierId)) || null;
+            return { mapping, assessment: assessMappingReadiness({
+                mode: READINESS_MODES.NEW_ORDER_SELECTABLE,
+                mapping,
+                supplier,
+                offer: offerById.get(String(mapping.supplierCatalogOfferId)) || null,
+                availability: availabilityByOffer.get(String(mapping.supplierCatalogOfferId)) || null,
+                customerMarket,
+                adapter: supplier ? getSupplierAdapter(supplier) : null
+            }) };
+        });
+        const ready = assessed.filter(item => item.assessment.ready);
+        if (ready.length === 1) return { ready: true, blockers: [], routeSnapshot: selectedRouteSnapshot(ready[0].mapping, null, customerMarket, "UNIQUE_EXECUTABLE_ROUTE"), resolution: "UNIQUE_EXECUTABLE_ROUTE" };
+        if (ready.length > 1) return { ready: false, blockers: ["AMBIGUOUS_EXECUTABLE_SUPPLIER_ROUTES"], routeSnapshot: null, resolution: "AMBIGUOUS" };
+        return { ready: false, blockers: [...new Set(assessed.flatMap(item => item.assessment.blockers))], routeSnapshot: null, resolution: "BLOCKED" };
+    }
     const mapping = await Mapping.findById(selection.supplierMappingId).lean();
     if (!mapping || mapping.productCode !== normalizedProduct || mapping.packageCode !== normalizedPackage) return { ready: false, blockers: ["SELECTED_MAPPING_INVALID"], routeSnapshot: null };
     const supplier = await Supplier.findById(mapping.supplierId).lean();
@@ -170,8 +199,8 @@ async function resolveSelectedCheckoutRouteSnapshot({ productCode, packageCode, 
     const availability = mapping.supplierCatalogOfferId ? await SupplierOfferAvailability.findOne({ supplierCatalogOfferId: mapping.supplierCatalogOfferId }).lean() : null;
     const adapter = supplier ? getSupplierAdapter(supplier) : null;
     const assessment = assessMappingReadiness({ mode: READINESS_MODES.NEW_ORDER_SELECTABLE, mapping, supplier, offer, availability, customerMarket, adapter });
-    if (!assessment.ready) return { ready: false, blockers: assessment.blockers, routeSnapshot: null };
-    return { ready: true, blockers: [], routeSnapshot: selectedRouteSnapshot(mapping, selection, customerMarket) };
+    if (!assessment.ready) return { ready: false, blockers: assessment.blockers, routeSnapshot: null, resolution: "OWNER_SELECTION" };
+    return { ready: true, blockers: [], routeSnapshot: selectedRouteSnapshot(mapping, selection, customerMarket), resolution: "OWNER_SELECTION" };
 }
 
 function compareRoutingDecisions({ legacy, shadow }) {
@@ -211,10 +240,14 @@ function isGenuineManualOnlyResolution(shadow) {
         shadow.blockerCodes[0] === "NO_PRIMARY_MAPPING";
 }
 
-function createRoutingAuthority({ legacyResolver = resolveLegacyCheckoutRouteSnapshot, eligibilityResolver = resolveEligibilityPrimaryRoute, selectedResolver = resolveSelectedCheckoutRouteSnapshot, modeResolver = resolveFulfillmentRoutingMode, diagnosticsObserver = null } = {}) {
+function createRoutingAuthority(options = {}) {
+    const { legacyResolver = resolveLegacyCheckoutRouteSnapshot, eligibilityResolver = resolveEligibilityPrimaryRoute, selectedResolver = resolveSelectedCheckoutRouteSnapshot, modeResolver = resolveFulfillmentRoutingMode, diagnosticsObserver = null } = options;
+    const enforceStorefrontAuthority = Object.keys(options).length === 0 || Object.prototype.hasOwnProperty.call(options, "selectedResolver");
     return async function route({ productCode, packageCode, region, includeDiagnostics = false }) {
         const routingMode = modeResolver();
-        if (routingMode === FULFILLMENT_ROUTING_MODES.SELECTED) return selectedResolver({ productCode, packageCode, region });
+        const storefrontRoute = enforceStorefrontAuthority ? await selectedResolver({ productCode, packageCode, region }) : null;
+        if (storefrontRoute && (storefrontRoute.ready === true || (storefrontRoute.resolution && storefrontRoute.resolution !== "NONE"))) return storefrontRoute;
+        if (routingMode === FULFILLMENT_ROUTING_MODES.SELECTED) return storefrontRoute || selectedResolver({ productCode, packageCode, region });
         const legacy = await legacyResolver({ productCode, packageCode, region });
         if (routingMode === FULFILLMENT_ROUTING_MODES.SHADOW) {
             let selected;

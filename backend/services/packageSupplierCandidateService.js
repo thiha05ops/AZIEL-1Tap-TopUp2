@@ -1,6 +1,7 @@
 "use strict";
 
 const CatalogPackage = require("../models/CatalogPackage");
+const CatalogProduct = require("../models/CatalogProduct");
 const MediaAsset = require("../models/MediaAsset");
 const PackageMarketPublication = require("../models/PackageMarketPublication");
 const PackageSupplierSelection = require("../models/PackageSupplierSelection");
@@ -8,11 +9,9 @@ const Supplier = require("../models/Supplier");
 const SupplierCatalogOffer = require("../models/SupplierCatalogOffer");
 const SupplierOfferAvailability = require("../models/SupplierOfferAvailability");
 const SupplierProductMapping = require("../models/SupplierProductMapping");
+const StoreCatalogSelection = require("../models/StoreCatalogSelection");
 const { getSupplierAdapter } = require("./supplierAdapterRegistry");
-const { supplierCapabilityProductCode } = require("./fulfillmentCapabilityService");
-const { validateFulfillmentEligibility } = require("./supplierFulfillmentEligibilityService");
 const { READINESS_MODES, assessMappingReadiness } = require("./supplierMappingReadinessService");
-const { resolveFulfillmentRoutingMode, FULFILLMENT_ROUTING_MODES } = require("../config/fulfillmentRoutingMode");
 
 class PackageSupplierCandidateError extends Error {
     constructor(code, message, statusCode = 400) {
@@ -70,7 +69,35 @@ function readinessSummary(blockers = []) {
     return "Fulfillment not ready";
 }
 
-function evaluatePackageSupplierCandidates({ productCode, packageCode, customerMarket, pkg, publication = null, selection = null, mappings = [], suppliers = [], offers = [], availabilityRows = [], iconAsset = null, adapterFor = getSupplierAdapter } = {}) {
+function resolveEffectiveSupplierCandidate(candidates = [], selection = null) {
+    const selectable = candidates.filter(candidate => candidate.readiness?.selectable === true);
+    if (selection) {
+        const selected = candidates.find(candidate => candidate.supplierMappingId === objectId(selection.supplierMappingId)) || null;
+        return selected?.readiness?.selectable === true
+            ? { candidate: selected, source: "OWNER_SELECTION", blockers: [] }
+            : { candidate: selected, source: "OWNER_SELECTION", blockers: selected?.readiness?.blockerCodes?.length ? selected.readiness.blockerCodes : ["SELECTED_MAPPING_INVALID"] };
+    }
+    if (selectable.length === 1) return { candidate: selectable[0], source: "UNIQUE_EXECUTABLE_ROUTE", blockers: [] };
+    if (selectable.length > 1) return { candidate: null, source: "AMBIGUOUS", blockers: ["AMBIGUOUS_EXECUTABLE_SUPPLIER_ROUTES"] };
+    const exactBlockers = [...new Set(candidates.flatMap(candidate => candidate.readiness?.blockerCodes || []))];
+    return { candidate: null, source: "NONE", blockers: exactBlockers.length ? exactBlockers : ["NO_EXECUTABLE_SUPPLIER_ROUTE"] };
+}
+
+function effectivePackageSalesState({ product = null, storeCatalogMember = false, pkg = null, publication = null, customerMarket = "TH", candidates = [], selection = null } = {}) {
+    const market = normalizeCustomerMarket(customerMarket);
+    if (publication?.published !== true) return { state: "DISABLED", blockers: [], route: resolveEffectiveSupplierCandidate(candidates, selection) };
+    const blockers = [];
+    if (!storeCatalogMember) blockers.push("NOT_IN_STORE_CATALOG");
+    if (!product || product.deletedAt || product.enabled === false || product.publicDiscoveryEnabled !== true || upper(product.commerceState) !== "PURCHASABLE") blockers.push("PRODUCT_NOT_PURCHASABLE");
+    if (!pkg || pkg.deletedAt || pkg.enabled === false) blockers.push("PACKAGE_DISABLED");
+    const price = pkg?.prices?.[market];
+    if (!price || price.enabled === false || !(Number(price.amount) > 0)) blockers.push("NO_VALID_PRICE");
+    const route = resolveEffectiveSupplierCandidate(candidates, selection);
+    blockers.push(...route.blockers);
+    return { state: blockers.length ? "BLOCKED" : "LIVE", blockers: [...new Set(blockers)], route };
+}
+
+function evaluatePackageSupplierCandidates({ productCode, packageCode, customerMarket, product = null, storeCatalogMember = false, pkg, publication = null, selection = null, mappings = [], suppliers = [], offers = [], availabilityRows = [], iconAsset = null, adapterFor = getSupplierAdapter } = {}) {
     const normalizedProduct = lower(productCode);
     const normalizedPackage = upper(packageCode);
     const market = normalizeCustomerMarket(customerMarket);
@@ -115,9 +142,8 @@ function evaluatePackageSupplierCandidates({ productCode, packageCode, customerM
     if (pkg.deletedAt) publicationBlockers.push("PACKAGE_DELETED");
     if (pkg.enabled === false) publicationBlockers.push("PACKAGE_DISABLED");
     if (!price || price.enabled === false || !Number.isFinite(Number(price.amount)) || Number(price.amount) <= 0) publicationBlockers.push("NO_VALID_PRICE");
-    const selectedAuthority = resolveFulfillmentRoutingMode() === FULFILLMENT_ROUTING_MODES.SELECTED;
-    if (selectedAuthority && !selection) publicationBlockers.push("PACKAGE_SUPPLIER_SELECTION_REQUIRED");
-    if (selectedAuthority ? !candidates.some(item => item.selected && item.readiness.selectable) : !candidates.some(item => item.readiness.selectable)) publicationBlockers.push("FULFILLMENT_NOT_READY");
+    const effectiveState = effectivePackageSalesState({ product, storeCatalogMember, pkg, publication, customerMarket: market, candidates, selection });
+    publicationBlockers.push(...effectiveState.blockers);
     const published = publication?.published === true;
     return {
         package: { productCode: normalizedProduct, packageCode: normalizedPackage, name: pkg.name, iconUrl: iconAsset?.secureUrl || iconAsset?.url || "", iconAltText: iconAsset?.altText || "", updatedAt: pkg.updatedAt || null },
@@ -125,6 +151,7 @@ function evaluatePackageSupplierCandidates({ productCode, packageCode, customerM
         publication: { published, state: !published ? "PRIVATE" : publicationBlockers.length ? "SUPPRESSED" : "PUBLISHED", blockers: published ? publicationBlockers : [] },
         customerPrice: price ? { amount: Number(price.amount), currency: price.currency || (market === "MM" ? "MMK" : "THB"), enabled: price.enabled !== false, publishedPriceMode: price.publishedPriceMode || "", supplierId: objectId(price.supplierId), supplierCode: upper(price.supplierCode), supplierName: clean(price.supplierName), supplierCost: price.supplierCost == null ? null : Number(price.supplierCost), supplierCurrency: upper(price.supplierCurrency), supplierCostTimestamp: price.supplierCostTimestamp || null } : null,
         selection: selection ? { supplierMappingId: selectedId, decisionVersion: Number(selection.decisionVersion), selectedAt: selection.selectedAt, selectedBy: selection.selectedByUsernameSnapshot } : null,
+        effectiveState: { state: effectiveState.state, blockers: effectiveState.blockers, supplierMappingId: effectiveState.route.candidate?.supplierMappingId || "", supplierResolution: effectiveState.route.source },
         candidates
     };
 }
@@ -138,7 +165,9 @@ function createPackageSupplierCandidateService(models = {}, dependencies = {}) {
         Supplier: models.Supplier || Supplier,
         Offer: models.Offer || SupplierCatalogOffer,
         Availability: models.Availability || SupplierOfferAvailability,
-        Mapping: models.Mapping || SupplierProductMapping
+        Mapping: models.Mapping || SupplierProductMapping,
+        Product: models.Product || CatalogProduct,
+        StoreSelection: models.StoreSelection || StoreCatalogSelection
     };
     const adapterFor = dependencies.getSupplierAdapter || getSupplierAdapter;
 
@@ -149,11 +178,13 @@ function createPackageSupplierCandidateService(models = {}, dependencies = {}) {
         if (!normalizedProduct || !normalizedPackage) {
             throw new PackageSupplierCandidateError("PACKAGE_IDENTITY_REQUIRED", "Product and package are required.");
         }
-        const [pkg, publication, selection, mappings] = await Promise.all([
+        const [product, pkg, publication, selection, mappings, storeCatalogMember] = await Promise.all([
+            M.Product.findOne({ productCode: normalizedProduct }).lean(),
             M.Package.findOne({ productCode: normalizedProduct, packageCode: normalizedPackage, deletedAt: null }).lean(),
             M.Publication.findOne({ productCode: normalizedProduct, packageCode: normalizedPackage, customerMarket: market }).lean(),
             M.Selection.findOne({ productCode: normalizedProduct, packageCode: normalizedPackage, customerMarket: market }).lean(),
-            M.Mapping.find({ productCode: normalizedProduct, packageCode: normalizedPackage }).sort({ supplierCode: 1, region: 1, _id: 1 }).lean()
+            M.Mapping.find({ productCode: normalizedProduct, packageCode: normalizedPackage }).sort({ supplierCode: 1, region: 1, _id: 1 }).lean(),
+            M.StoreSelection.exists({ productCode: normalizedProduct, status: "ACTIVE", sellingRegions: market, "packages.packageCode": normalizedPackage })
         ]);
         if (!pkg) throw new PackageSupplierCandidateError("CATALOG_PACKAGE_NOT_FOUND", "Package not found.", 404);
 
@@ -165,7 +196,7 @@ function createPackageSupplierCandidateService(models = {}, dependencies = {}) {
             offerIds.length ? M.Availability.find({ supplierCatalogOfferId: { $in: offerIds } }).lean() : [],
             pkg.iconAssetId ? M.Media.findOne({ assetId: pkg.iconAssetId, status: "active" }).lean() : null
         ]);
-        return evaluatePackageSupplierCandidates({ productCode: normalizedProduct, packageCode: normalizedPackage, customerMarket: market, pkg, publication, selection, mappings, suppliers, offers, availabilityRows, iconAsset, adapterFor });
+        return evaluatePackageSupplierCandidates({ productCode: normalizedProduct, packageCode: normalizedPackage, customerMarket: market, product, storeCatalogMember: Boolean(storeCatalogMember), pkg, publication, selection, mappings, suppliers, offers, availabilityRows, iconAsset, adapterFor });
     };
 }
 
@@ -177,7 +208,9 @@ module.exports = {
     costProjection,
     createPackageSupplierCandidateService,
     evaluatePackageSupplierCandidates,
+    effectivePackageSalesState,
     getPackageSupplierCandidates,
     normalizeCustomerMarket,
+    resolveEffectiveSupplierCandidate,
     readinessSummary
 };

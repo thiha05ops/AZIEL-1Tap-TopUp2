@@ -45,7 +45,6 @@ function assessMappingReadiness({ mode, mapping = {}, supplier = null, offer = n
     else if (mode !== READINESS_MODES.FROZEN_ORDER_EXECUTABLE && eligibility.value.mode === "CUSTOMER_MARKET_ALLOWLIST" && !eligibility.value.allowedCustomerMarkets.includes(upper(customerMarket))) blockers.push("CUSTOMER_MARKET_NOT_ELIGIBLE");
 
     if (mode !== READINESS_MODES.FROZEN_ORDER_EXECUTABLE) {
-        if (mode === READINESS_MODES.PUBLIC_PURCHASABLE && readiness.pricingReady !== true) blockers.push("PRICING_NOT_READY");
         const offerMatches = offer && objectId(offer) === objectId(mapping.supplierCatalogOfferId) && objectId(offer.supplierId) === objectId(mapping.supplierId) && clean(offer.supplierProductCode) === clean(mapping.supplierProductCode) && clean(offer.supplierOfferCode) === clean(mapping.supplierPackageCode) && upper(offer.catalogLifecycleState) === "ACTIVE";
         if (!offerMatches) blockers.push("SUPPLIER_OFFER_NOT_ACTIVE");
         const availabilityCurrent = availability && objectId(availability.supplierCatalogOfferId) === objectId(mapping.supplierCatalogOfferId) && upper(availability.state) === "AVAILABLE" && (!availability.staleAt || new Date(availability.staleAt).getTime() > Date.now());
@@ -54,9 +53,7 @@ function assessMappingReadiness({ mode, mapping = {}, supplier = null, offer = n
     if (mode === READINESS_MODES.PUBLIC_PURCHASABLE) {
         const price = pkg?.prices?.[upper(customerMarket)];
         if (!pkg || pkg.deletedAt || pkg.enabled !== true) blockers.push("PACKAGE_NOT_PUBLIC_READY");
-        if (publication?.published !== true) blockers.push("PACKAGE_NOT_PUBLISHED");
         if (!price || price.enabled !== true || !(Number(price.amount) > 0)) blockers.push("NO_VALID_PRICE");
-        if (!selection || objectId(selection.supplierMappingId) !== objectId(mapping)) blockers.push("SELECTED_MAPPING_MISMATCH");
     }
     return { ready: blockers.length === 0, blockers: [...new Set(blockers)].sort(), mode };
 }

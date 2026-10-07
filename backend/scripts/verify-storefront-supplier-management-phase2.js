@@ -21,14 +21,14 @@ assert(ui.includes('value="${escapeHtml(candidate.supplierMappingId)}"'), "radio
 assert(ui.includes("candidate.selected ? '<span class=\"catalog-supplier-status is-selected\">Selected</span>'"), "selected mapping must have a visible selected state distinct from readiness");
 assert(ui.includes("candidateCostState") && ui.includes('? "Stale" : "Current"') && ui.includes("catalog-supplier-cost"), "route readiness and commercial cost freshness must remain separate concepts");
 assert(ui.includes("No fulfillment supplier is currently available for this package in"), "no-usable-supplier state must be explicit and market-specific");
-assert(ui.includes("Supplier selection required"), "no-selection state must remain explicit");
+assert(ui.includes("data.effectiveState?.supplierMappingId"), "unique executable routes must be projected without an unnecessary selection task");
 assert(ui.includes("candidate.eligibility?.mode") && ui.includes("candidate.readiness?.blockerCodes"), "safe technical mapping details must remain diagnostically accessible");
 assert(ui.includes('data-save-package-supplier') && ui.includes("Save supplier"));
 assert(ui.includes('data-save-merch-modal>Save offer presentation') || (ui.includes('data-save-merch-modal') && ui.includes("Save offer presentation")), "merchandising persistence must remain a secondary Advanced action");
 assert(ui.includes("catalog-manage-advanced") && ui.includes("Offer presentation"));
 assert(ui.includes("Unsaved supplier change") && ui.includes("No unsaved supplier changes") && ui.includes("data-save-package-supplier") && ui.includes("save.disabled = true"));
-assert(ui.includes("Change fulfillment supplier?") && ui.includes("Customer price will not change.") && ui.includes("Publication state will not change."));
-assert(ui.includes("This supplier selection remains Storefront intent until routing cutover is separately enabled."));
+assert(ui.includes("Change fulfillment supplier?") && ui.includes("Customer price will not change.") && ui.includes("Selling state will not change."));
+assert(!ui.includes("This supplier selection remains Storefront intent until routing cutover is separately enabled."), "Storefront selection must not be described as a non-runtime future intent");
 assert(ui.includes("Supplier selection changed elsewhere. Refreshing the latest selection."));
 assert(ui.includes("renderPackageSupplierSummary") && ui.includes("data-package-public-state"));
 assert(ui.includes('method: asset ? "PATCH" : "DELETE"') && ui.includes("expectedUpdatedAt: pkg.updatedAt"));
@@ -42,8 +42,8 @@ assert(selectionService.includes("customerPriceChanged: false") && selectionServ
 assert(checkout.includes("const resolveCheckoutRouteSnapshot = createRoutingAuthority();"));
 assert(fulfillment.includes("async function startFulfillmentForOrder"));
 assert(checkout.includes("PackageSupplierSelection.findOne"), "future selected authority must read one explicit package/customer-market selection");
-assert(checkout.includes("FULFILLMENT_ROUTING_MODES.SELECTED") && checkout.includes("FULFILLMENT_ROUTING_MODES.SHADOW"), "selected routing must remain explicitly mode-gated");
+assert(checkout.includes("storefrontRoute.resolution") && checkout.includes("OWNER_SELECTION"), "explicit Storefront selection must override routing mode without fallback");
 assert(read("backend/config/fulfillmentRoutingMode.js").includes("if (!configured) return FULFILLMENT_ROUTING_MODES.LEGACY_REGION"), "default routing must remain legacy");
-assert(checkout.includes("return includeDiagnostics ? { ...legacy, diagnostics } : legacy"), "shadow must return the legacy customer route");
+assert(checkout.includes("return includeDiagnostics ? { ...legacy, diagnostics } : legacy"), "legacy diagnostics behavior remains available when no Storefront route authority exists");
 assert(!fulfillment.includes("PackageSupplierSelection"));
 console.log("PASS Phase 2 API/drawer/stale/image and checkout/fulfillment boundary verification");
