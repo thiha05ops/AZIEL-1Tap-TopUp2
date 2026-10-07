@@ -3618,6 +3618,27 @@
     border-radius:14px;
     background:var(--v2-surface);
 }
+.admin-v2 .catalog-supplier-setup{
+    display:grid;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:0 18px;
+    padding:14px 16px;
+    border:1px solid color-mix(in srgb,var(--admin-accent) 28%,var(--v2-border));
+    border-radius:14px;
+    background:var(--v2-surface);
+}
+.admin-v2 .catalog-supplier-setup>header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:16px;padding-bottom:11px;border-bottom:1px solid var(--v2-border)}
+.admin-v2 .catalog-supplier-setup>header span,.admin-v2 .catalog-supplier-setup>header p,.admin-v2 .catalog-supplier-setup-row span{display:block;color:var(--v2-text-muted);font-size:11px}
+.admin-v2 .catalog-supplier-setup>header h4{margin:2px 0 1px;font-size:15px}
+.admin-v2 .catalog-supplier-setup>header p{margin:0}
+.admin-v2 .catalog-supplier-setup-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-top:12px}
+.admin-v2 .catalog-supplier-setup-row strong{display:block;margin-bottom:3px;font-size:13px}
+.admin-v2 .catalog-supplier-setup-exceptions{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:8px 16px;padding-top:10px}
+.admin-v2 .catalog-supplier-setup-details{min-width:220px;color:var(--v2-text-muted);font-size:11px}
+.admin-v2 .catalog-supplier-setup-details summary{cursor:pointer;font-weight:600}
+.admin-v2 .catalog-supplier-setup-details div{max-height:180px;overflow:auto;margin-top:8px;padding:8px 10px;border:1px solid var(--v2-border);border-radius:10px;background:var(--v2-subtle)}
+.admin-v2 .catalog-supplier-setup-details p{margin:0 0 8px}.admin-v2 .catalog-supplier-setup-details p:last-child{margin-bottom:0}.admin-v2 .catalog-supplier-setup-details strong,.admin-v2 .catalog-supplier-setup-details span{display:block}
+.admin-v2 .catalog-supplier-setup-result{grid-column:1/-1;margin:10px 0 0;color:var(--admin-success,#6fd19a);font-size:12px;font-weight:700}
 .admin-v2 .catalog-market-availability>header{
     grid-column:1/-1;
     display:flex;
@@ -3905,13 +3926,15 @@
         width:100%;
     }
     .admin-v2 .catalog-market-availability,
-    .admin-v2 .catalog-market-availability-result{
+    .admin-v2 .catalog-market-availability-result,
+    .admin-v2 .catalog-supplier-setup{
         grid-template-columns:1fr;
     }
     .admin-v2 .catalog-market-availability>header{
         align-items:stretch;
         flex-direction:column;
     }
+    .admin-v2 .catalog-supplier-setup>header{align-items:stretch;flex-direction:column}
     .admin-v2 .catalog-merch-summary{
         grid-template-columns:1fr auto;
         gap:12px;

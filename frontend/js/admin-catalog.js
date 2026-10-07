@@ -34,6 +34,9 @@ const catalogPackageOverviewVersions = new Map();
 const catalogPublicationReadyPlanCache = new Map();
 const catalogPublicationReadyPlanPending = new Map();
 const catalogPublicationReadyResults = new Map();
+const catalogSupplierBootstrapPlanCache = new Map();
+const catalogSupplierBootstrapPlanPending = new Map();
+const catalogSupplierBootstrapResults = new Map();
 let catalogPackageOperationalFilter = "AUTO";
 let catalogPackageOverviewRequestId = 0;
 const catalogBulkSelectedPackages = new Set();
@@ -532,6 +535,69 @@ function renderPublicationReadyResult(result = {}) {
     return rows ? `<div class="catalog-market-availability-result">${rows}</div>` : "";
 }
 
+async function loadCatalogSupplierBootstrapPlan(product, { force = false } = {}) {
+    const productCode = String(product?.productCode || "").toLowerCase();
+    if (!productCode) return null;
+    if (!force && catalogSupplierBootstrapPlanCache.has(productCode)) return catalogSupplierBootstrapPlanCache.get(productCode);
+    if (!force && catalogSupplierBootstrapPlanPending.has(productCode)) return catalogSupplierBootstrapPlanPending.get(productCode);
+    const request = adminFetch(`/api/admin/catalog/products/${encodeURIComponent(productCode)}/supplier-selection-bootstrap-plan`)
+        .then(data => {
+            if (!data?.success) throw new Error(data?.message || "Supplier setup is unavailable.");
+            catalogSupplierBootstrapPlanCache.set(productCode, data);
+            if (selectedCatalogProductCode === productCode && activeCatalogTab === "merchandising") renderCatalogDetail(selectedCatalogProduct || product);
+            return data;
+        })
+        .finally(() => {
+            if (catalogSupplierBootstrapPlanPending.get(productCode) === request) catalogSupplierBootstrapPlanPending.delete(productCode);
+        });
+    catalogSupplierBootstrapPlanPending.set(productCode, request);
+    return request;
+}
+
+function renderCatalogSupplierSetup(product) {
+    const productCode = String(product?.productCode || "").toLowerCase();
+    const plan = catalogSupplierBootstrapPlanCache.get(productCode);
+    const result = catalogSupplierBootstrapResults.get(productCode);
+    if (!plan) return `<section class="catalog-supplier-setup" aria-busy="true"><div><span>Supplier Setup</span><strong>Loading exact supplier-selection authority…</strong></div></section>`;
+    const marketRow = market => {
+        const counts = plan.markets?.[market]?.counts || {};
+        const selected = Number(counts.ALREADY_SELECTED || 0) + Number(counts.PROTECTED_EXISTING_SELECTION || 0);
+        const safe = Number(counts.SAFE_TO_CREATE || 0);
+        const blocked = Number(counts.BLOCKED || 0) + Number(counts.INELIGIBLE || 0);
+        const ambiguous = Number(counts.AMBIGUOUS || 0);
+        const protectedCount = Number(counts.PROTECTED_EXISTING_SELECTION || 0);
+        return `<div class="catalog-supplier-setup-row"><div><strong>${market === "MM" ? "Myanmar" : "Thailand"}</strong><span>Selected ${selected} · Safe to apply ${safe} · Blocked ${blocked}${ambiguous ? ` · Ambiguous ${ambiguous}` : ""}${protectedCount ? ` · Protected ${protectedCount}` : ""}</span></div></div>`;
+    };
+    const exceptions = ["TH", "MM"].map(market => {
+        const rows = (plan.markets?.[market]?.packages || []).filter(row => !["SAFE_TO_CREATE", "ALREADY_SELECTED"].includes(row.state));
+        if (!rows.length) return "";
+        return `<details class="catalog-supplier-setup-details"><summary>${market === "MM" ? "Myanmar" : "Thailand"} details (${rows.length})</summary><div>${rows.map(row => `<p><strong>${escapeHtml(row.packageName || row.packageCode)}</strong><span>${escapeHtml(row.state.replaceAll("_", " "))}${row.blockers?.length ? ` · ${escapeHtml(row.blockers.join(" · "))}` : ""}</span></p>`).join("")}</div></details>`;
+    }).join("");
+    const safeTotal = ["TH", "MM"].reduce((sum, market) => sum + Number(plan.markets?.[market]?.counts?.SAFE_TO_CREATE || 0), 0);
+    const applied = ["TH", "MM"].map(market => result?.markets?.[market]?.status === "APPLIED" ? `${market}: ${Number(result.markets[market].created || 0)} created` : "").filter(Boolean).join(" · ");
+    return `<section class="catalog-supplier-setup"><header><div><span>Supplier Setup</span><h4>Exact fulfillment selections</h4><p>Missing selections can be created only from durable Store Catalog mapping authority. Existing selections are preserved.</p></div><button type="button" class="admin-primary-btn" data-apply-safe-supplier-selections ${safeTotal ? "" : "disabled"}>Review / Apply Missing Safe Selections</button></header>${marketRow("TH")}${marketRow("MM")}${exceptions ? `<div class="catalog-supplier-setup-exceptions">${exceptions}</div>` : ""}${applied ? `<p class="catalog-supplier-setup-result">${escapeHtml(applied)} · Prices and publication unchanged.</p>` : ""}</section>`;
+}
+
+async function applyCatalogSupplierBootstrap(product) {
+    const productCode = String(product?.productCode || "").toLowerCase();
+    const plan = await loadCatalogSupplierBootstrapPlan(product, { force: true });
+    const markets = ["TH", "MM"].filter(market => Number(plan.markets?.[market]?.counts?.SAFE_TO_CREATE || 0) > 0);
+    const createCount = markets.reduce((sum, market) => sum + Number(plan.markets[market].counts.SAFE_TO_CREATE || 0), 0);
+    if (!createCount) return;
+    const confirmed = await confirmCatalogAction({ title: "Apply missing safe supplier selections?", message: `${createCount} missing selection${createCount === 1 ? "" : "s"} will be created from exact Store Catalog mapping provenance.\n\nExisting explicit selections are preserved. Prices, publication, mappings, and supplier data will not change.`, confirmText: `Apply ${createCount} Safe` });
+    if (!confirmed) return;
+    const response = await adminFetch(`/api/admin/catalog/products/${encodeURIComponent(productCode)}/supplier-selection-bootstrap-apply`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ markets, marketPlanTokens: Object.fromEntries(markets.map(market => [market, plan.markets[market].marketPlanToken])), decisionNote: "Product-level safe supplier selection bootstrap" }) });
+    if (!response?.success) throw new Error(response?.message || "Safe supplier selections could not be applied.");
+    catalogSupplierBootstrapResults.set(productCode, response);
+    catalogSupplierBootstrapPlanCache.delete(productCode);
+    catalogPublicationReadyPlanCache.delete(productCode);
+    catalogPackageOverviewCache.delete(catalogPackageOverviewKey(productCode, "TH"));
+    catalogPackageOverviewCache.delete(catalogPackageOverviewKey(productCode, "MM"));
+    await Promise.all([loadCatalogSupplierBootstrapPlan(product, { force: true }), loadCatalogPublicationReadyPlan(product, { force: true }), loadCatalogPackageOverview(product, { force: true })]);
+    const createdCount = markets.reduce((sum, market) => sum + Number(response.markets?.[market]?.created || 0), 0);
+    showAdminToast?.(`${createdCount} safe supplier selection${createdCount === 1 ? "" : "s"} applied. Prices and publication are unchanged.`, "success");
+}
+
 function renderCatalogMarketAvailability(product) {
     const productCode = String(product?.productCode || "").toLowerCase();
     const plan = catalogPublicationReadyPlanCache.get(productCode);
@@ -901,6 +967,7 @@ function renderOperationalPackageRows(product, packages, overview) {
     }).join("");
     return `<section class="catalog-merchandising-panel">
         <div class="catalog-merchandising-head"><div><span>Storefront Merchandising</span><h3>Package Offers</h3><p>One canonical package per row. Pricing and fulfillment authorities remain separate.</p></div><label class="catalog-merch-market"><span>Customer market</span><select data-merch-market><option value="TH" ${region === "TH" ? "selected" : ""}>Thailand · THB</option><option value="MM" ${region === "MM" ? "selected" : ""}>Myanmar · MMK</option></select></label></div>
+        ${renderCatalogSupplierSetup(product)}
         ${renderCatalogMarketAvailability(product)}
         <div class="catalog-package-operations"><div class="catalog-package-state-filters" role="group" aria-label="Package state">${filter("LIVE", "Live", counts.LIVE)}${filter("SETUP_REQUIRED", "Setup required", counts.SETUP_REQUIRED)}${filter("UNPUBLISHED", "Unpublished", counts.UNPUBLISHED)}${filter("ALL", "All", joined.length)}</div><label><span class="sr-only">Search packages</span><input type="search" data-merch-package-search value="${escapeHtml(catalogPackageSearch)}" placeholder="Search packages"></label></div>
         <div data-catalog-bulk-action-host>${renderCatalogBulkActionBar()}</div>
@@ -918,7 +985,7 @@ function renderCatalogMerchandisingPanel(product, packages) {
     const activePackages = packages.filter(pkg => !pkg.deleted && !pkg.deletedAt);
     const overview = catalogPackageOverviewCache.get(catalogPackageOverviewKey(product.productCode));
     if (overview) return renderOperationalPackageRows(product, activePackages, overview);
-    return `<section class="catalog-merchandising-panel"><div class="catalog-merchandising-head"><div><span>Storefront Merchandising</span><h3>Package Offers</h3><p>Loading authoritative package availability…</p></div></div>${renderCatalogMarketAvailability(product)}<div class="catalog-merch-list" aria-busy="true"><div class="admin-dashboard-skeleton"></div><div class="admin-dashboard-skeleton"></div></div><div class="admin-empty-state" data-package-overview-error hidden><strong>Package storefront state is unavailable</strong><span>Use Refresh to retry without changing catalog data.</span></div></section>`;
+    return `<section class="catalog-merchandising-panel"><div class="catalog-merchandising-head"><div><span>Storefront Merchandising</span><h3>Package Offers</h3><p>Loading authoritative package availability…</p></div></div>${renderCatalogSupplierSetup(product)}${renderCatalogMarketAvailability(product)}<div class="catalog-merch-list" aria-busy="true"><div class="admin-dashboard-skeleton"></div><div class="admin-dashboard-skeleton"></div></div><div class="admin-empty-state" data-package-overview-error hidden><strong>Package storefront state is unavailable</strong><span>Use Refresh to retry without changing catalog data.</span></div></section>`;
 
     const rows = activePackages.map(pkg => {
         const price = pkg.prices?.[region] || null;
@@ -2694,6 +2761,12 @@ function bindActiveCatalogTab(detail, product, packages) {
         if (!catalogPublicationReadyPlanCache.has(String(product.productCode || "").toLowerCase())) {
             loadCatalogPublicationReadyPlan(product).catch(error => showAdminToast?.(error?.message || "Market publication readiness is unavailable.", "error"));
         }
+        if (!catalogSupplierBootstrapPlanCache.has(String(product.productCode || "").toLowerCase())) {
+            loadCatalogSupplierBootstrapPlan(product).catch(error => showAdminToast?.(error?.message || "Supplier setup is unavailable.", "error"));
+        }
+        detail.querySelector("[data-apply-safe-supplier-selections]")?.addEventListener("click", () => {
+            applyCatalogSupplierBootstrap(product).catch(error => showAdminToast?.(error?.message || "Safe supplier selections could not be applied.", "error"));
+        });
         detail.querySelectorAll("[data-publish-ready-market]").forEach(button => button.addEventListener("click", () => {
             applyCatalogPublicationReady(product, [button.dataset.publishReadyMarket]).catch(error => showAdminToast?.(error?.message || "Ready packages could not be published.", "error"));
         }));
