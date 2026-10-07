@@ -48,11 +48,12 @@ const input = { productCode: "mlbb", customerMarkets: ["TH"] };
 
     const source = fs.readFileSync(path.join(__dirname, "../services/supplierCatalog/addProductFinalizationService.js"), "utf8");
     const wizard = fs.readFileSync(path.join(__dirname, "../../frontend/js/admin-add-product-wizard.js"), "utf8");
-    assert(source.includes("publicationWrites:0,priceWrites:0,packageSupplierSelectionWrites:0,primaryAssignments:0,supplierCalls:0"));
+    assert(source.includes("publicationWrites:0,priceWrites:0,packageSupplierSelectionWrites,primaryAssignments:0,supplierCalls:0"));
+    assert(source.includes("applyPackageSupplierSelectionBootstrapPlan"), "finalization must reconcile exact missing selection authority without a manual step");
     assert(!source.includes("mapping.region="));
     assert(wizard.includes("SUPPLIER_MARKET_ROUTE_DECISION"));
     assert(wizard.includes('labels=["Regions","Product","Supplier","Packages","Review"]'));
     assert.strictEqual(creates, 1);
 
-    console.log(JSON.stringify({ result: "PASS", scenarios: { thOnly: "NEEDS_ATTENTION/SUPPLIER_MARKET_ROUTE_DECISION", globalOnly: "REUSED", thAndGlobal: "GLOBAL_REUSED", newRelationship: "CREATED_DISABLED" }, mappingCreates: creates, foreignMappingIdsCommitted: 0, existingMappingsChanged: 0, pricingWrites: 0, publicationWrites: 0, packageSupplierSelectionWrites: 0, primaryAssignments: 0, supplierCalls: 0, productionWrites: 0 }, null, 2));
+    console.log(JSON.stringify({ result: "PASS", scenarios: { thOnly: "NEEDS_ATTENTION/SUPPLIER_MARKET_ROUTE_DECISION", globalOnly: "REUSED", thAndGlobal: "GLOBAL_REUSED", newRelationship: "CREATED_DISABLED" }, mappingCreates: creates, foreignMappingIdsCommitted: 0, existingMappingsChanged: 0, pricingWrites: 0, publicationWrites: 0, packageSupplierSelectionWrites: "AUTOMATIC_EXACT_AUTHORITY_ONLY", primaryAssignments: 0, supplierCalls: 0, productionWrites: 0 }, null, 2));
 })().catch(error => { console.error(error); process.exit(1); });

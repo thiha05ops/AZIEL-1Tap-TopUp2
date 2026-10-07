@@ -512,6 +512,15 @@ async function main() {
     const adminService = fs.readFileSync(path.join(ROOT, "backend/services/catalogAdminService.js"), "utf8");
     assert(!adminService.includes("This product does not support the selected region."), "Admin pricing must not use product compatibility metadata as a TH/MM commerce gate.");
     assert(adminService.includes("normalizeManualAllowedRegions"), "Manual fulfillment regions must have a separate TH/MM commerce normalizer.");
+    for (const relativePath of [
+        "backend/services/packageSupplierCandidateService.js",
+        "backend/services/packageSupplierSelectionBootstrapService.js",
+        "backend/services/productReadyPublicationService.js",
+        "backend/services/commerce/paymentCatalogEligibilityService.js"
+    ]) {
+        const source = fs.readFileSync(path.join(ROOT, relativePath), "utf8");
+        assert(!source.includes("productSupportsRegion"), `${relativePath} must not use product/account compatibility metadata as customer-market commerce authority.`);
+    }
 
     const explicitStorefrontVisibility = await verifyExplicitStorefrontVisibilitySeparatesPublishedPackages();
     const routeCommerceMarketSeparation = verifySupplierRouteCommerceMarketSeparation();

@@ -14,7 +14,6 @@ const { supplierCapabilityProductCode } = require("./fulfillmentCapabilityServic
 const { validateFulfillmentEligibility } = require("./supplierFulfillmentEligibilityService");
 const { READINESS_MODES, assessMappingReadiness } = require("./supplierMappingReadinessService");
 const { resolveFulfillmentRoutingMode, FULFILLMENT_ROUTING_MODES } = require("../config/fulfillmentRoutingMode");
-const { productSupportsRegion } = require("../catalog/productRegionAuthority");
 
 class PackageSupplierCandidateError extends Error {
     constructor(code, message, statusCode = 400) {
@@ -114,7 +113,7 @@ function evaluatePackageSupplierCandidates({ productCode, packageCode, customerM
     });
     const price = pkg.prices?.[market];
     const publicationBlockers = [];
-    if (product && (product.enabled !== true || product.deletedAt || !productSupportsRegion(product, market))) publicationBlockers.push("PRODUCT_MARKET_UNAVAILABLE");
+    if (product && (product.enabled !== true || product.deletedAt)) publicationBlockers.push("PRODUCT_UNAVAILABLE");
     if (pkg.deletedAt) publicationBlockers.push("PACKAGE_DELETED");
     if (pkg.enabled === false) publicationBlockers.push("PACKAGE_DISABLED");
     if (!price || price.enabled === false || !Number.isFinite(Number(price.amount)) || Number(price.amount) <= 0) publicationBlockers.push("NO_VALID_PRICE");

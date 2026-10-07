@@ -16,7 +16,7 @@ const future = "2099-01-01T00:00:00.000Z";
 const adapter = calls => ({ isConfigured: () => true, isAutoFulfillmentEnabled: () => true, createOrder: async () => { calls.count += 1; } });
 
 function fixture() {
-    const product = { _id: "product-1", productCode: "game", name: "Game", enabled: true, deletedAt: null, publicDiscoveryEnabled: true, commerceState: "PURCHASABLE", lifecycleStatus: "ACTIVE", supportedRegions: ["TH", "MM"], updatedAt: "2026-01-01T00:00:00.000Z" };
+    const product = { _id: "product-1", productCode: "game", name: "Game", enabled: true, deletedAt: null, publicDiscoveryEnabled: true, commerceState: "PURCHASABLE", lifecycleStatus: "ACTIVE", supportedRegions: ["GLOBAL"], updatedAt: "2026-01-01T00:00:00.000Z" };
     const packages = ["READY", "DISABLED", "MISSING"].map((packageCode, index) => ({ _id: `package-${index}`, productCode: "game", packageCode, name: packageCode, enabled: packageCode !== "DISABLED", deletedAt: null, prices: { TH: { amount: 10, currency: "THB", enabled: true }, MM: { amount: 100, currency: "MMK", enabled: true } }, updatedAt: "2026-01-01T00:00:00.000Z" }));
     const mappings = ["READY", "DISABLED"].map((packageCode, index) => ({ _id: `mapping-${index}`, supplierId: "supplier-1", supplierCode: "FIXTURE", productCode: "game", packageCode, supplierProductCode: "native-product", supplierPackageCode: `native-${packageCode}`, supplierCatalogOfferId: `offer-${index}`, region: "GLOBAL", enabled: packageCode !== "DISABLED", archivedAt: null, executionMode: "API", productionRole: "DISABLED", fulfillmentEligibility: { mode: "GLOBAL", allowedCustomerMarkets: [], evidenceCode: "PROVIDER_CONFIRMED", version: 1 }, mappingMetadata: { readiness: { supplierMapped: true, inputReady: true, fulfillmentReady: true } }, updatedAt: "2026-01-01T00:00:00.000Z" }));
     return {
@@ -40,6 +40,7 @@ async function verify() {
     const projected = projectBootstrapPlan(base, { markets: ["TH", "MM"], adapterFor: () => adapter(calls) });
     ok(projected.markets.TH.packages.find(row => row.packageCode === "READY").state === "SAFE_TO_CREATE", "exact ready provenance is safe in TH");
     ok(projected.markets.MM.packages.find(row => row.packageCode === "READY").state === "SAFE_TO_CREATE", "GLOBAL mapping is independently safe in MM");
+    ok(!projected.markets.TH.packages.find(row => row.packageCode === "READY").blockers.includes("PRODUCT_MARKET_UNAVAILABLE"), "product compatibility metadata is not a TH commerce gate");
     ok(projected.markets.TH.packages.find(row => row.packageCode === "DISABLED").state === "BLOCKED", "disabled mapping remains blocked");
     ok(projected.markets.TH.packages.find(row => row.packageCode === "MISSING").blockers.includes("STORE_CATALOG_MAPPING_AUTHORITY_MISSING"), "missing exact offer provenance is blocked");
 

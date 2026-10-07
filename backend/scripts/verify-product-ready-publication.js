@@ -50,7 +50,7 @@ function fixture() {
     const mappingRows = packages.filter(item => !["NO_MAPPING", "NO_SELECTION"].includes(item.packageCode)).map(item => mapping(item.packageCode, { enabled: item.packageCode !== "NOT_READY" }));
     const selectedCodes = ["READY", "PUBLIC_TH", "DISABLED", "NO_MM_PRICE", "NOT_READY", "NO_STORE"];
     return {
-        product: { productCode, enabled: true, deletedAt: null, publicDiscoveryEnabled: true, commerceState: "PURCHASABLE", lifecycleStatus: "ACTIVE", supportedRegions: ["TH", "MM"] },
+        product: { productCode, enabled: true, deletedAt: null, publicDiscoveryEnabled: true, commerceState: "PURCHASABLE", lifecycleStatus: "ACTIVE", supportedRegions: ["GLOBAL"] },
         packages,
         mappings: mappingRows,
         suppliers: [{ _id: "supplier-1", supplierCode: "FIXTURE", enabled: true, mode: "API" }],

@@ -16,7 +16,7 @@ const { storeCatalogSelectionMode } = require("./catalogService");
 const { getSupplierAdapter } = require("./supplierAdapterRegistry");
 const { supplierCapabilityProductCode } = require("./fulfillmentCapabilityService");
 const { READINESS_MODES, assessMappingReadiness } = require("./supplierMappingReadinessService");
-const { isProductPubliclyEligible, productSupportsRegion } = require("../catalog/productRegionAuthority");
+const { isProductPubliclyEligible } = require("../catalog/productRegionAuthority");
 const { publishPackageMarketBatch } = require("./packageMarketPublicationService");
 
 const MARKETS = Object.freeze(["TH", "MM"]);
@@ -27,7 +27,6 @@ const objectId = value => clean(value?._id || value);
 
 const BLOCKER_LABELS = Object.freeze({
     PRODUCT_NOT_SELLABLE: "Product is not publicly sellable",
-    PRODUCT_MARKET_UNAVAILABLE: "Product is not available in this customer market",
     PACKAGE_DELETED: "Canonical package is deleted",
     PACKAGE_DISABLED: "Canonical package is disabled",
     NO_VALID_PRICE: "No valid enabled customer price",
@@ -117,7 +116,6 @@ function projectProductReadyPublication(data = {}, { markets = MARKETS, adapterF
             let adapterReadiness = null;
             const blockers = [];
             if (!isProductPubliclyEligible(product)) blockers.push("PRODUCT_NOT_SELLABLE");
-            if (!productSupportsRegion(product, market)) blockers.push("PRODUCT_MARKET_UNAVAILABLE");
             if (pkg.deletedAt) blockers.push("PACKAGE_DELETED");
             if (pkg.enabled !== true) blockers.push("PACKAGE_DISABLED");
             const price = pkg.prices?.[market];

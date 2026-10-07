@@ -14,7 +14,6 @@ const { ADMIN_AUDIT_ACTIONS, writeAdminAudit } = require("./adminAuditService");
 const { getSupplierAdapter } = require("./supplierAdapterRegistry");
 const { supplierCapabilityProductCode } = require("./fulfillmentCapabilityService");
 const { READINESS_MODES, assessMappingReadiness } = require("./supplierMappingReadinessService");
-const { productSupportsRegion } = require("../catalog/productRegionAuthority");
 
 const MARKETS = Object.freeze(["TH", "MM"]);
 const STATES = Object.freeze(["SAFE_TO_CREATE", "ALREADY_SELECTED", "BLOCKED", "AMBIGUOUS", "INELIGIBLE", "PROTECTED_EXISTING_SELECTION"]);
@@ -97,9 +96,8 @@ function projectBootstrapPlan(data = {}, { markets = MARKETS, adapterFor = getSu
             if (selection) {
                 state = intendedMapping && id(selection.supplierMappingId) === id(intendedMapping) ? "ALREADY_SELECTED" : "PROTECTED_EXISTING_SELECTION";
                 if (state === "PROTECTED_EXISTING_SELECTION") blockers.push("EXISTING_SELECTION_PRESERVED");
-            } else if (product.enabled !== true || product.deletedAt || !productSupportsRegion(product, market)) {
-                state = "INELIGIBLE";
-                blockers.push("PRODUCT_MARKET_UNAVAILABLE");
+            } else if (product.enabled !== true || product.deletedAt) {
+                blockers.push("PRODUCT_UNAVAILABLE");
             } else if (pkg.enabled !== true || pkg.deletedAt) {
                 blockers.push(pkg.deletedAt ? "PACKAGE_DELETED" : "PACKAGE_DISABLED");
             } else if (authorityMappingIds.length > 1) {

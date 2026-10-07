@@ -2,8 +2,7 @@
 
 const CatalogProduct = require("../../models/CatalogProduct");
 const CatalogPackage = require("../../models/CatalogPackage");
-const PackageMarketPublication = require("../../models/PackageMarketPublication");
-const { isProductPubliclyEligible, productSupportsRegion } = require("../../catalog/productRegionAuthority");
+const { isProductPubliclyEligible } = require("../../catalog/productRegionAuthority");
 const { canonicalSerialize } = require("./pricingQuoteRuntime");
 
 const text = value => String(value == null ? "" : value).trim();
@@ -64,25 +63,17 @@ async function validatePaymentCatalogEligibility({ quote = {}, transactionContex
         if (session) request.session(session);
         return request.lean();
     });
-    const loadPublication = dependencies.loadPublication || (async query => {
-        const request = PackageMarketPublication.findOne(query);
-        if (session) request.session(session);
-        return request.lean();
-    });
-    const [product, pkg, publication] = await Promise.all([
+    const [product, pkg] = await Promise.all([
         loadProduct({ productCode }),
-        loadPackage({ _id: packageId, productCode, packageCode }),
-        loadPublication({ productCode, packageCode, customerMarket: region, published: true })
+        loadPackage({ _id: packageId, productCode, packageCode })
     ]);
     if (!product || !isProductPubliclyEligible(product)) return denied("PRODUCT_NOT_SELLABLE");
-    if (!productSupportsRegion(product, region)) return denied("PRODUCT_REGION_UNAVAILABLE");
     if (!pkg) return denied("PACKAGE_IDENTITY_MISMATCH");
     if (pkg.enabled !== true) return denied("PACKAGE_DISABLED");
     if (pkg.deletedAt) return denied("PACKAGE_DELETED");
     const price = pkg.prices?.[region];
     if (!price || price.enabled !== true || !(Number(price.amount) > 0)) return denied("PACKAGE_PRICE_UNAVAILABLE");
     if (upper(price.currency) !== currency) return denied("PACKAGE_CURRENCY_MISMATCH");
-    if (!publication) return denied("PACKAGE_NOT_PUBLISHED");
     return { allowed: true, supplierRouteSnapshot: null };
 }
 

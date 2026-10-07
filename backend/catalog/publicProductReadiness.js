@@ -77,7 +77,6 @@ function resolvePublicProductReadiness(product = {}, packages = [], commerceRead
     const warnings = [];
     if (!canonical) blockers.push("canonicalIdentity");
     if (!route) blockers.push("route");
-    if (!Array.isArray(product.supportedRegions) || !product.supportedRegions.length) blockers.push("regions");
     if (!Object.values(regions).some(item => item.pricingReady)) blockers.push("packagesAndPricing");
     if (!Object.values(regions).some(item => item.fulfillmentReady)) blockers.push("fulfillment");
     if (!Object.values(regions).some(item => item.availabilityReady)) blockers.push("availability");
@@ -89,9 +88,9 @@ function resolvePublicProductReadiness(product = {}, packages = [], commerceRead
     if (!String(product.artworkPath || product.imageUrl || product.presentation?.imageAssetId || "").trim()) warnings.push("artwork");
     if (packages.some(item => item.enabled !== false && !String(item.customerNote || "").trim())) warnings.push("packageNotes");
 
-    // In the explicit Store Catalog projection, selection + storefront
-    // visibility + package publication have already been applied by the
-    // caller. Purchasable is therefore derived from those authorities and
+    // In the explicit Store Catalog projection, selection, storefront
+    // visibility, pricing, and fulfillment readiness have already been applied
+    // by the caller. Purchasable is therefore derived from those authorities and
     // current fulfillment readiness, not a second mutable product-level
     // commerce switch. Legacy projections retain their historical intent.
     const explicitCommercialAuthority = options.explicitCommercialAuthority === true;

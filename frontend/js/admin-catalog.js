@@ -851,7 +851,7 @@ function catalogPackageBlockerLabel(code = "") {
         PACKAGE_DISABLED: "Canonical package is disabled",
         PACKAGE_DELETED: "Canonical package is deleted",
         NO_VALID_PRICE: `Price missing for ${catalogCustomerMarket}`,
-        PRODUCT_MARKET_UNAVAILABLE: "Product is unavailable in this customer market",
+        PRODUCT_UNAVAILABLE: "Product is disabled or unavailable",
         PACKAGE_SUPPLIER_SELECTION_REQUIRED: `No fulfillment supplier is selected for ${catalogCustomerMarket === "MM" ? "Myanmar" : "Thailand"}`,
         FULFILLMENT_NOT_READY: "Selected supplier mapping is not ready for new orders",
         NO_EXACT_SUPPLIER_MAPPING: "No exact supplier mapping",
