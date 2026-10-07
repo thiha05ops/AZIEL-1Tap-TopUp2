@@ -38,6 +38,13 @@ assert(!ui.slice(ui.indexOf("async function updateManagePackageImage"), ui.index
 const advancedSave = ui.slice(ui.indexOf('modal.querySelector("[data-save-merch-modal]")'), ui.indexOf("async function updateMerchandisingPublication"));
 assert(!advancedSave.includes("closeCatalogMerchandisingModal()"), "saving Advanced merchandising must preserve the supplier draft in the open drawer");
 assert(ui.includes('data-manage-package-advanced-dirty') && ui.includes('advancedDirty.textContent = "Unsaved changes"'), "Advanced must expose a local dirty indicator without competing write authority");
+assert(ui.includes("function syncCatalogBulkSelectionUi") && ui.includes("data-catalog-bulk-action-host"), "bulk package selection must update its local action UI without replacing Product Presentation");
+const bulkSelectionHandler = ui.slice(ui.indexOf('detail.querySelectorAll("[data-bulk-package-select]")'), ui.indexOf('bindCatalogBulkActionBar(detail, product);', ui.indexOf('detail.querySelectorAll("[data-bulk-package-select]")')));
+assert(bulkSelectionHandler.includes("catalogBulkSelectedPackages.add(packageCode)") && bulkSelectionHandler.includes("catalogBulkSelectedPackages.delete(packageCode)"), "selecting and deselecting must preserve exact package selection state");
+assert(bulkSelectionHandler.includes("syncCatalogBulkSelectionUi(detail, product, input)") && !bulkSelectionHandler.includes("renderCatalogDetail(product)"), "package checkbox changes must not rerender the detail panel or Market Availability");
+const localBulkSync = ui.slice(ui.indexOf("function catalogScrollOwner"), ui.indexOf("function bulkCandidatePlan"));
+assert(localBulkSync.includes("getBoundingClientRect") && localBulkSync.includes("scrollOwner.scrollTop += delta") && localBulkSync.includes("window.scrollBy(0, delta)"), "bulk action layout changes must preserve the active checkbox viewport position in nested and document scrolling modes");
+assert(!bulkSelectionHandler.includes("focus(") && !bulkSelectionHandler.includes("scrollIntoView"), "package checkbox changes must preserve native checkbox focus without forced navigation");
 assert(selectionService.includes("candidateBlockers({"), "write validation must reuse Phase 1 readiness authority");
 assert(selectionService.includes("customerPriceChanged: false") && selectionService.includes("publicationChanged: false"));
 assert(checkout.includes("const resolveCheckoutRouteSnapshot = createRoutingAuthority();"));

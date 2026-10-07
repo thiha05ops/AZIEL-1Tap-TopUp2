@@ -606,6 +606,47 @@ function clearCatalogBulkSelection({ render = true } = {}) {
     if (render && selectedCatalogProduct && activeCatalogTab === "merchandising") renderCatalogDetail(selectedCatalogProduct);
 }
 
+function renderCatalogBulkActionBar() {
+    return catalogBulkSelectedPackages.size ? `<div class="catalog-bulk-action-bar" role="region" aria-label="Bulk package actions"><strong>${catalogBulkSelectedPackages.size} selected</strong><div><button type="button" class="admin-primary-btn" data-open-bulk-supplier>Set fulfillment supplier</button><button type="button" class="admin-secondary-btn" data-clear-bulk-packages>Clear selection</button></div></div>` : "";
+}
+
+function catalogScrollOwner(element) {
+    for (let current = element?.parentElement; current; current = current.parentElement) {
+        const overflowY = getComputedStyle(current).overflowY;
+        if (/(auto|scroll|overlay)/.test(overflowY) && current.scrollHeight > current.clientHeight) return current;
+    }
+    return document.scrollingElement || document.documentElement;
+}
+
+function preserveCatalogAnchorPosition(anchor, update) {
+    const scrollOwner = catalogScrollOwner(anchor);
+    const before = anchor?.getBoundingClientRect?.().top;
+    update();
+    if (!Number.isFinite(before) || !anchor?.isConnected) return;
+    const delta = anchor.getBoundingClientRect().top - before;
+    if (!delta) return;
+    if (scrollOwner === document.scrollingElement || scrollOwner === document.documentElement || scrollOwner === document.body) {
+        window.scrollBy(0, delta);
+    } else {
+        scrollOwner.scrollTop += delta;
+    }
+}
+
+function bindCatalogBulkActionBar(detail, product) {
+    detail.querySelector("[data-clear-bulk-packages]")?.addEventListener("click", () => clearCatalogBulkSelection());
+    detail.querySelector("[data-open-bulk-supplier]")?.addEventListener("click", () => {
+        const overview = catalogPackageOverviewCache.get(catalogPackageOverviewKey(product.productCode));
+        if (overview) openCatalogBulkSupplierModal(product, overview);
+    });
+}
+
+function syncCatalogBulkSelectionUi(detail, product, anchor) {
+    const host = detail.querySelector("[data-catalog-bulk-action-host]");
+    if (!host) return;
+    preserveCatalogAnchorPosition(anchor, () => { host.innerHTML = renderCatalogBulkActionBar(); });
+    bindCatalogBulkActionBar(detail, product);
+}
+
 function bulkCandidatePlan(overview, selectedCodes, supplierId) {
     const selected = new Set(selectedCodes.map(code => String(code || "").toUpperCase()));
     return (overview.packages || []).filter(item => selected.has(String(item.package?.packageCode || "").toUpperCase())).map(item => {
@@ -858,12 +899,11 @@ function renderOperationalPackageRows(product, packages, overview) {
                 <div class="catalog-merch-actions"><button type="button" class="admin-secondary-btn catalog-merch-manage-btn" data-manage-merchandising="${escapeHtml(pkg.packageCode)}">Manage</button></div>
             </div></article>`;
     }).join("");
-    const bulkBar = catalogBulkSelectedPackages.size ? `<div class="catalog-bulk-action-bar" role="region" aria-label="Bulk package actions"><strong>${catalogBulkSelectedPackages.size} selected</strong><div><button type="button" class="admin-primary-btn" data-open-bulk-supplier>Set fulfillment supplier</button><button type="button" class="admin-secondary-btn" data-clear-bulk-packages>Clear selection</button></div></div>` : "";
     return `<section class="catalog-merchandising-panel">
         <div class="catalog-merchandising-head"><div><span>Storefront Merchandising</span><h3>Package Offers</h3><p>One canonical package per row. Pricing and fulfillment authorities remain separate.</p></div><label class="catalog-merch-market"><span>Customer market</span><select data-merch-market><option value="TH" ${region === "TH" ? "selected" : ""}>Thailand · THB</option><option value="MM" ${region === "MM" ? "selected" : ""}>Myanmar · MMK</option></select></label></div>
         ${renderCatalogMarketAvailability(product)}
         <div class="catalog-package-operations"><div class="catalog-package-state-filters" role="group" aria-label="Package state">${filter("LIVE", "Live", counts.LIVE)}${filter("SETUP_REQUIRED", "Setup required", counts.SETUP_REQUIRED)}${filter("UNPUBLISHED", "Unpublished", counts.UNPUBLISHED)}${filter("ALL", "All", joined.length)}</div><label><span class="sr-only">Search packages</span><input type="search" data-merch-package-search value="${escapeHtml(catalogPackageSearch)}" placeholder="Search packages"></label></div>
-        ${bulkBar}
+        <div data-catalog-bulk-action-host>${renderCatalogBulkActionBar()}</div>
         <p class="catalog-package-result-count">${visible.length} package${visible.length === 1 ? "" : "s"} shown · ordered by canonical package order</p>
         <div class="catalog-merch-list">${rows || `<div class="catalog-empty-state"><strong>No ${effectiveFilter === "ALL" ? "matching" : effectiveFilter.toLowerCase().replace("_", " ")} packages</strong><span>Choose another operational state or adjust the package search.</span></div>`}</div>
     </section>`;
@@ -2685,14 +2725,10 @@ function bindActiveCatalogTab(detail, product, packages) {
             input.addEventListener("change", () => {
                 const packageCode = String(input.dataset.bulkPackageSelect || "").toUpperCase();
                 input.checked ? catalogBulkSelectedPackages.add(packageCode) : catalogBulkSelectedPackages.delete(packageCode);
-                renderCatalogDetail(product);
+                syncCatalogBulkSelectionUi(detail, product, input);
             });
         });
-        detail.querySelector("[data-clear-bulk-packages]")?.addEventListener("click", () => clearCatalogBulkSelection());
-        detail.querySelector("[data-open-bulk-supplier]")?.addEventListener("click", () => {
-            const overview = catalogPackageOverviewCache.get(catalogPackageOverviewKey(product.productCode));
-            if (overview) openCatalogBulkSupplierModal(product, overview);
-        });
+        bindCatalogBulkActionBar(detail, product);
 
         detail.querySelectorAll("[data-manage-merchandising]").forEach(button => {
             button.addEventListener("click", () => {
