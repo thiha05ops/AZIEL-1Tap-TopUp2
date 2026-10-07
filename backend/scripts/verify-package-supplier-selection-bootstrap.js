@@ -123,8 +123,9 @@ async function verify() {
     const ui = read("frontend/js/admin-catalog.js");
     const addProduct = read("backend/services/supplierCatalog/addProductFinalizationService.js");
     ok(routes.includes("supplier-selection-bootstrap-plan") && routes.includes("supplier-selection-bootstrap-apply"), "admin plan/apply API exists");
-    ok(ui.includes("renderCatalogSupplierSetup") && ui.includes("Review / Apply Missing Safe Selections") && ui.indexOf("renderCatalogSupplierSetup(product)") < ui.indexOf("renderCatalogMarketAvailability(product)"), "Supplier Setup renders above Market Availability");
-    ok(ui.includes("Existing explicit selections are preserved") && ui.includes("Prices, publication, mappings, and supplier data will not change"), "UI states authority safety boundaries");
+    const normalMerchandising = ui.slice(ui.indexOf("function renderOperationalPackageRows"), ui.indexOf("function renderCatalogMerchandisingPanel"));
+    ok(!normalMerchandising.includes("renderCatalogSupplierSetup") && !normalMerchandising.includes("renderCatalogMarketAvailability") && !normalMerchandising.includes("Publish Ready"), "normal merchandising renders status without setup/publication ceremony");
+    ok(normalMerchandising.includes("Live ${counts.LIVE} · Blocked ${counts.BLOCKED} · Total ${joined.length}"), "operator counts use one non-overlapping sellability denominator");
     const checkboxHandler = ui.slice(ui.indexOf('detail.querySelectorAll("[data-bulk-package-select]")'), ui.indexOf('bindCatalogBulkActionBar(detail, product);', ui.indexOf('detail.querySelectorAll("[data-bulk-package-select]")')));
     ok(checkboxHandler.includes("syncCatalogBulkSelectionUi") && !checkboxHandler.includes("renderCatalogDetail(product)"), "package checkbox scroll-preservation remains intact");
     ok(addProduct.includes("getPackageSupplierSelectionBootstrapPlan") && addProduct.includes("applyPackageSupplierSelectionBootstrapPlan") && addProduct.includes("packageSupplierSelectionWrites"), "Add Product reuses bootstrap authority without duplicate validation");

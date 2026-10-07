@@ -1161,6 +1161,15 @@ async function toPublicCatalog(options = {}) {
 const PUBLIC_PRODUCT_DETAIL_CACHE_TTL_MS = 15_000;
 const publicProductDetailCache = new Map();
 
+function clearPublicCatalogCaches(productCode = "") {
+    const normalized = normalizeProductCode(productCode);
+    publicCatalogCache.clear();
+    if (!normalized) publicProductDetailCache.clear();
+    else for (const key of publicProductDetailCache.keys()) {
+        if (key.startsWith(`${normalized}:`)) publicProductDetailCache.delete(key);
+    }
+}
+
 function publicProductDetailCacheKey(productCode, options = {}) {
     return [
         normalizeProductCode(productCode),
@@ -1875,6 +1884,7 @@ module.exports = {
     applyAdminSupplierSupport,
     applyPublicPackageEligibility,
     CatalogError,
+    clearPublicCatalogCaches,
     storeCatalogSelectionMode,
     getCatalogProductDetail,
     resolveAdminCatalogProduct,

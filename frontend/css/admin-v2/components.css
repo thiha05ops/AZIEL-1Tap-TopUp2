@@ -4080,6 +4080,7 @@
 .admin-v2 .catalog-operational-status{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700}
 .admin-v2 .catalog-operational-status.is-live{color:var(--admin-success,#6fd19a)}
 .admin-v2 .catalog-operational-status.is-setup_required{color:var(--admin-warning,#f5b942)}
+.admin-v2 .catalog-operational-status.is-blocked{color:var(--admin-warning,#f5b942)}
 .admin-v2 .catalog-operational-status.is-unpublished{color:var(--v2-text-muted)}
 .admin-v2 .catalog-merch-row.operational-setup_required{border-color:color-mix(in srgb,var(--admin-warning,#f5b942) 22%,var(--v2-border))}
 .admin-v2 .catalog-merch-row.operational-unpublished{background:color-mix(in srgb,var(--v2-surface) 92%,var(--v2-subtle))}

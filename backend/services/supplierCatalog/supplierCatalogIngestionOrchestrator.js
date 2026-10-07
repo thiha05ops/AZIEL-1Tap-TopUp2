@@ -22,6 +22,11 @@ function createSupplierCatalogIngestionOrchestrator(options = {}) {
     const models = options.models || { Supplier, Mapping, Product, Offer, Run };
     const providerFactory = options.providerFactory || defaultProvider;
     const repositories = options.repositories || (() => createSupplierCatalogMongoRepositories());
+    const logger = options.logger || console;
+    const reconcileSellability = options.reconcileSellability || (async productCode => {
+        const { reconcileAutomaticPackageSupplierSelections } = require("../packageSupplierSelectionBootstrapService");
+        return reconcileAutomaticPackageSupplierSelections({ productCode, markets: ["TH", "MM"], decisionNote: "Automatic reconciliation after supplier availability refresh" }, { actor: { username: "supplier-catalog-system", role: "SYSTEM" } });
+    });
     const sleep = options.sleep || wait, clock = options.clock || (() => new Date());
     function leaseGuardedRepositories(base, assertLease) {
         const wrap = group => Object.fromEntries(Object.entries(group || {}).map(([name,fn]) => [name, async (...args) => { await assertLease(); return fn(...args); }]));
@@ -39,7 +44,7 @@ function createSupplierCatalogIngestionOrchestrator(options = {}) {
         let heartbeat, attempts = 0, leaseFailure = null;
         try {
             heartbeat = setInterval(() => locks.renew(lock, supplierPolicy.lockTtlMs).catch(error => { leaseFailure = error; }), Math.max(1000, Math.floor(supplierPolicy.lockTtlMs / 3))); heartbeat.unref?.();
-            const { service, reader } = providerFactory(supplierCode), mappings = await models.Mapping.find({ supplierCode }).select("supplierCode supplierProductCode supplierPackageCode").lean();
+            const { service, reader } = providerFactory(supplierCode), mappings = await models.Mapping.find({ supplierCode }).select("supplierCode supplierProductCode supplierPackageCode productCode").lean();
             const scope = { supplierId: supplier._id, catalogNamespace: service.NAMESPACE };
             const [products, offers] = await Promise.all([models.Product.find(scope).lean(), models.Offer.find(scope).lean()]);
             let stage;
@@ -53,6 +58,11 @@ function createSupplierCatalogIngestionOrchestrator(options = {}) {
             const assertLease = async () => { if (leaseFailure) throw leaseFailure; await locks.renew(lock, supplierPolicy.lockTtlMs); };
             const result = await service.applyCatalogOnlyPlan(plan, leaseGuardedRepositories(repositories(), assertLease), { runKey });
             await models.Run.updateOne({ _id: result._id }, { $set: { trigger, requestedAt, attemptCount: attempts, lockOwnerId: owner, requestedBy: input.actor || {}, reason: String(input.reason || "") } });
+            const affectedProducts = [...new Set(mappings.map(mapping => String(mapping.productCode || "").trim().toLowerCase()).filter(Boolean))];
+            for (const productCode of affectedProducts) {
+                try { await reconcileSellability(productCode); }
+                catch (error) { logger.warn?.("Automatic sellability reconciliation deferred", { productCode, code: error?.code || error?.name || "RECONCILIATION_FAILED" }); }
+            }
             return { runKey, supplierCode, status: result.status, coverageState: result.coverageState, attempts, runId: String(result._id) };
         } catch (error) {
             const provider = (() => { try { return providerFactory(supplierCode).service; } catch { return null; } })();

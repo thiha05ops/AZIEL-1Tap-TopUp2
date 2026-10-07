@@ -15,6 +15,7 @@ const StoreCatalogSelection = require("../models/StoreCatalogSelection");
 const {
     CatalogError,
     applyPackageFulfillmentReadiness,
+    clearPublicCatalogCaches,
     projectCatalogProduct,
     resolveDatabasePackagePriceFromRows
 } = require("../services/catalogService");
@@ -313,33 +314,36 @@ async function verifyExplicitStorefrontVisibilitySeparatesPublishedPackages() {
             published: true,
             decisionVersion: 1
         }))
-    }, () => toPublicCatalog({
+    }, () => {
+        clearPublicCatalogCaches(productCode);
+        return toPublicCatalog({
         source: "database",
         includeDisabled: false,
         includeAssetProjection: false,
         includeAdminPricing: false,
         customerMarket: "MM",
         publicationProjectionMode: "EXPLICIT"
-    }));
+        });
+    });
 
     let catalog = await readPublicMm({ published: [] });
     let projected = catalog.find(item => item.productCode === productCode);
-    assert(projected, "CASE A: Store Catalog visible product must appear even when zero MM packages are published.");
-    assert.strictEqual(projected.packageCount, 0, "CASE A: zero published packages must expose zero purchasable package options.");
-    assert.deepStrictEqual(projected.packages, [], "CASE A: unpublished packages must not leak into the public package list.");
-    assert.strictEqual(projected.purchasable, false, "CASE A: visible product with no published packages must not be purchasable.");
-    assert.strictEqual(projected.publicState, "COMING_SOON", "CASE A: visible product with no purchasable packages must use unavailable/coming-soon semantics.");
+    assert(projected, "CASE A: Store Catalog visible product must appear without publication ceremony.");
+    assert.strictEqual(projected.packageCount, 2, "CASE A: both currently sellable packages must be exposed.");
+    assert.deepStrictEqual(projected.packages.map(item => item.packageCode), ["PUBLISHED_PACKAGE", "UNPUBLISHED_PACKAGE"], "CASE A: historical publication absence must not suppress sellable packages.");
+    assert.strictEqual(projected.purchasable, true, "CASE A: exact fulfillment plus valid pricing is purchasable.");
+    assert.strictEqual(projected.publicState, "AVAILABLE", "CASE A: sellability recovers automatically without publication intent.");
 
     catalog = await readPublicMm({ published: ["PUBLISHED_PACKAGE"] });
     projected = catalog.find(item => item.productCode === productCode);
     assert(projected, "CASE B: product with one published package must appear.");
-    assert.deepStrictEqual(projected.packages.map(item => item.packageCode), ["PUBLISHED_PACKAGE"], "CASE B/E: only published package options may be exposed.");
+    assert.deepStrictEqual(projected.packages.map(item => item.packageCode), ["PUBLISHED_PACKAGE", "UNPUBLISHED_PACKAGE"], "CASE B/E: publication history does not alter current sellability.");
     assert.strictEqual(projected.packages[0].prices.MM.amount, 1000, "CASE B: published package pricing must remain available.");
 
     catalog = await readPublicMm({ published: [{ packageCode: "PUBLISHED_PACKAGE", customerMarket: "TH" }] });
     projected = catalog.find(item => item.productCode === productCode);
     assert(projected, "CASE B2: product with package-level publication must appear in MM even when the publication record was created from TH.");
-    assert.deepStrictEqual(projected.packages.map(item => item.packageCode), ["PUBLISHED_PACKAGE"], "CASE B2: package-level publication must expose the same package option in MM.");
+    assert.deepStrictEqual(projected.packages.map(item => item.packageCode), ["PUBLISHED_PACKAGE", "UNPUBLISHED_PACKAGE"], "CASE B2: package-level publication remains historical in MM.");
     assert.strictEqual(projected.packages[0].prices.MM.amount, 1000, "CASE B2: MM still uses MMK pricing.");
 
     catalog = await readPublicMm({ visibleRegions: ["TH"], published: ["PUBLISHED_PACKAGE"] });
@@ -347,7 +351,7 @@ async function verifyExplicitStorefrontVisibilitySeparatesPublishedPackages() {
 
     const source = fs.readFileSync(path.join(ROOT, "backend/services/catalogService.js"), "utf8");
     assert(!source.includes("if (!projection.packages.length) return null;"), "Public Store Catalog product inclusion must not be gated by published package count.");
-    return { zeroPublishedVisible: true, unpublishedPackagesHidden: true, publishedPackageVisible: true, hiddenRegionHidden: true };
+    return { zeroPublicationSellable: true, publicationHistoryNeutral: true, hiddenRegionHidden: true };
 }
 
 function isolatedMongoUri() {

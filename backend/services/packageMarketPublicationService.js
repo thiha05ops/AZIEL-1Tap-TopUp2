@@ -105,10 +105,17 @@ function stripPublicationMetadata(projection) {
 }
 
 function explicitPublishedPackages(projection) {
-    // Publication controls storefront inclusion. Operational safety is projected
-    // separately so an unsafe package remains published-but-suppressed rather
-    // than silently losing the Admin's publication decision.
-    return (projection?.packages || []).filter(pkg => pkg.publication?.published === true);
+    // Publication records remain historical/audit evidence. Normal storefront
+    // inclusion is derived from current price plus the exact selected route
+    // already projected into fulfillmentRegions by the catalog service.
+    return (projection?.packages || []).filter(pkg => {
+        const market = normalizeCustomerMarket(pkg.publication?.customerMarket || "TH");
+        const price = pkg.prices?.[market];
+        return pkg.enabled !== false && !pkg.deletedAt &&
+            pkg.fulfillmentRegions?.[market] === true &&
+            price?.enabled !== false && Number.isFinite(Number(price?.amount)) &&
+            Number(price.amount) > 0;
+    });
 }
 
 function comparePublicationSets(legacyProducts = [], proposedProducts = [], customerMarket = "TH") {

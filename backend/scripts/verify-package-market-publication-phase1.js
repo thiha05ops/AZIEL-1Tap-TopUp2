@@ -42,7 +42,7 @@ function verify() {
     assert.strictEqual(projectPackagePublication(ready, { customerMarket: "TH", published: true, decisionVersion: 1 }).state, "PUBLISHED", "Operational recovery must not require republish.");
     const projection = { productCode: "mlbb", packages: [ready, operationalPackage({ packageCode: "MLBB_PRIVATE" })] };
     applyPublicationMetadata(projection, [{ productCode: "mlbb", packageCode: "MLBB_TEST", customerMarket: "TH", published: true }], "TH");
-    assert.deepStrictEqual(explicitPublishedPackages(projection).map(pkg => pkg.packageCode), ["MLBB_TEST"]);
+    assert.deepStrictEqual(explicitPublishedPackages(projection).map(pkg => pkg.packageCode), ["MLBB_TEST", "MLBB_PRIVATE"], "current sellability, not historical publication intent, controls inclusion");
 
     const root = path.resolve(__dirname, "../..");
     const untouched = [
@@ -55,9 +55,10 @@ function verify() {
     const publicationSource = fs.readFileSync(path.join(root, "backend/services/packageMarketPublicationService.js"), "utf8");
     assert(publicationSource.includes('PACKAGE_MARKET_PUBLICATION_MODE'), "Catalog must have a controlled publication mode.");
     const routeSource = fs.readFileSync(path.join(root, "backend/routes/catalog.js"), "utf8");
-    assert(routeSource.includes("/publication"), "Admin API must expose explicit package publication.");
+    assert(routeSource.includes("/publication"), "Historical publication API remains available for compatibility/audit.");
     const uiSource = fs.readFileSync(path.join(root, "frontend/js/admin-catalog.js"), "utf8");
-    assert(uiSource.includes("Make public") && uiSource.includes("Make private") && uiSource.includes("data-manage-package-public-detail"), "Admin drawer must expose explicit publication intent and readiness detail.");
+    const normalMerchandising = uiSource.slice(uiSource.indexOf("function renderOperationalPackageRows"), uiSource.indexOf("function renderCatalogMerchandisingPanel"));
+    assert(!normalMerchandising.includes("Publish Ready") && !normalMerchandising.includes("renderCatalogMarketAvailability"), "Normal merchandising must not expose publication ceremony.");
     console.log(JSON.stringify({ result: "PASS", checks: 15, supplierRequests: 0, databaseWrites: 0 }, null, 2));
 }
 

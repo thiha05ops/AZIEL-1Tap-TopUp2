@@ -53,7 +53,9 @@ service({ productCode: "game", packageCode: "PACK", customerMarket: "TH" }).then
     assert.strictEqual(disabled.readiness.selectable, false);
     assert(disabled.readiness.blockerCodes.includes("MAPPING_DISABLED"));
     assert(disabled.readiness.blockerCodes.includes("SUPPLIER_AVAILABILITY_NOT_CONFIRMED"));
-    assert.strictEqual(result.publication.state, "PUBLISHED");
+    assert.strictEqual(result.publication.state, "RECORDED", "legacy publication is retained as historical evidence only");
+    assert.strictEqual(result.operational.state, "BLOCKED");
+    assert(result.operational.blockerCodes.includes("PACKAGE_SUPPLIER_SELECTION_REQUIRED"));
     assert.strictEqual(costProjection({ supplierCostAuthority: { rawSupplierCost: null } }, { supplierCost: { amount: 7, currency: "USD", observedAt: new Date() } }).amount, 7);
     for (const missing of [null, undefined, "", "not-a-number", Infinity]) {
         assert.strictEqual(costProjection({ supplierCostAuthority: { rawSupplierCost: missing } }, { supplierCost: { amount: null } }).amount, null);

@@ -196,4 +196,19 @@ function createPackageSupplierSelectionBootstrapService(models = {}, dependencie
 }
 
 const service = createPackageSupplierSelectionBootstrapService();
-module.exports = { MARKETS, STATES, PackageSupplierSelectionBootstrapError, adapterFingerprint, authorityFingerprint, normalizeMarkets, projectBootstrapPlan, createPackageSupplierSelectionBootstrapService, getPackageSupplierSelectionBootstrapPlan: service.plan, applyPackageSupplierSelectionBootstrapPlan: service.apply };
+async function reconcileAutomaticPackageSupplierSelections(input = {}, context = {}, session = null) {
+    const markets = normalizeMarkets(input.markets || MARKETS);
+    const plan = await service.plan({ productCode: input.productCode, markets }, session);
+    const actionable = markets.filter(market => Number(plan.markets?.[market]?.counts?.SAFE_TO_CREATE || 0) > 0);
+    if (!actionable.length) {
+        return { productCode: plan.productCode, markets: Object.fromEntries(markets.map(market => [market, { status: "UNCHANGED", created: 0 }])) };
+    }
+    return service.apply({
+        productCode: plan.productCode,
+        markets: actionable,
+        marketPlanTokens: Object.fromEntries(actionable.map(market => [market, plan.markets[market].marketPlanToken])),
+        decisionNote: clean(input.decisionNote || "Automatic sellability lifecycle reconciliation")
+    }, context, session);
+}
+
+module.exports = { MARKETS, STATES, PackageSupplierSelectionBootstrapError, adapterFingerprint, authorityFingerprint, normalizeMarkets, projectBootstrapPlan, createPackageSupplierSelectionBootstrapService, getPackageSupplierSelectionBootstrapPlan: service.plan, applyPackageSupplierSelectionBootstrapPlan: service.apply, reconcileAutomaticPackageSupplierSelections };

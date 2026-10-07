@@ -1,6 +1,7 @@
 "use strict";
 
 const CatalogPackage = require("../models/CatalogPackage");
+const CatalogProduct = require("../models/CatalogProduct");
 const MediaAsset = require("../models/MediaAsset");
 const PackageMarketPublication = require("../models/PackageMarketPublication");
 const PackageSupplierSelection = require("../models/PackageSupplierSelection");
@@ -13,6 +14,7 @@ const { supplierCapabilityProductCode } = require("./fulfillmentCapabilityServic
 const { validateFulfillmentEligibility } = require("./supplierFulfillmentEligibilityService");
 const { READINESS_MODES, assessMappingReadiness } = require("./supplierMappingReadinessService");
 const { resolveFulfillmentRoutingMode, FULFILLMENT_ROUTING_MODES } = require("../config/fulfillmentRoutingMode");
+const { productSupportsRegion } = require("../catalog/productRegionAuthority");
 
 class PackageSupplierCandidateError extends Error {
     constructor(code, message, statusCode = 400) {
@@ -70,7 +72,7 @@ function readinessSummary(blockers = []) {
     return "Fulfillment not ready";
 }
 
-function evaluatePackageSupplierCandidates({ productCode, packageCode, customerMarket, pkg, publication = null, selection = null, mappings = [], suppliers = [], offers = [], availabilityRows = [], iconAsset = null, adapterFor = getSupplierAdapter } = {}) {
+function evaluatePackageSupplierCandidates({ productCode, packageCode, customerMarket, product = null, pkg, publication = null, selection = null, mappings = [], suppliers = [], offers = [], availabilityRows = [], iconAsset = null, adapterFor = getSupplierAdapter } = {}) {
     const normalizedProduct = lower(productCode);
     const normalizedPackage = upper(packageCode);
     const market = normalizeCustomerMarket(customerMarket);
@@ -112,6 +114,7 @@ function evaluatePackageSupplierCandidates({ productCode, packageCode, customerM
     });
     const price = pkg.prices?.[market];
     const publicationBlockers = [];
+    if (product && (product.enabled !== true || product.deletedAt || !productSupportsRegion(product, market))) publicationBlockers.push("PRODUCT_MARKET_UNAVAILABLE");
     if (pkg.deletedAt) publicationBlockers.push("PACKAGE_DELETED");
     if (pkg.enabled === false) publicationBlockers.push("PACKAGE_DISABLED");
     if (!price || price.enabled === false || !Number.isFinite(Number(price.amount)) || Number(price.amount) <= 0) publicationBlockers.push("NO_VALID_PRICE");
@@ -133,11 +136,11 @@ function evaluatePackageSupplierCandidates({ productCode, packageCode, customerM
         ...(publicationBlockers.includes("FULFILLMENT_NOT_READY") ? fulfillmentBlockers : [])
     ])];
     const published = publication?.published === true;
-    const operationalState = !published ? "UNPUBLISHED" : operationalBlockers.length ? "SETUP_REQUIRED" : "LIVE";
+    const operationalState = operationalBlockers.length ? "BLOCKED" : "LIVE";
     return {
         package: { productCode: normalizedProduct, packageCode: normalizedPackage, name: pkg.name, iconUrl: iconAsset?.secureUrl || iconAsset?.url || "", iconAltText: iconAsset?.altText || "", updatedAt: pkg.updatedAt || null },
         customerMarket: market,
-        publication: { published, state: !published ? "PRIVATE" : publicationBlockers.length ? "SUPPRESSED" : "PUBLISHED", blockers: published ? publicationBlockers : [] },
+        publication: { published, historical: true, state: published ? "RECORDED" : "NOT_RECORDED", blockers: [] },
         operational: {
             state: operationalState,
             blockerCodes: operationalBlockers,
@@ -159,7 +162,8 @@ async function getProductPackageSupplierOverview({ productCode, customerMarket }
     const normalizedProduct = lower(productCode);
     const market = normalizeCustomerMarket(customerMarket);
     if (!normalizedProduct) throw new PackageSupplierCandidateError("PACKAGE_IDENTITY_REQUIRED", "Product is required.");
-    const [packages, publications, selections, mappings] = await Promise.all([
+    const [product, packages, publications, selections, mappings] = await Promise.all([
+        CatalogProduct.findOne({ productCode: normalizedProduct }).lean(),
         CatalogPackage.find({ productCode: normalizedProduct, deletedAt: null }).sort({ sortOrder: 1, packageCode: 1 }).lean(),
         PackageMarketPublication.find({ productCode: normalizedProduct, customerMarket: market }).lean(),
         PackageSupplierSelection.find({ productCode: normalizedProduct, customerMarket: market }).lean(),
@@ -191,6 +195,7 @@ async function getProductPackageSupplierOverview({ productCode, customerMarket }
             productCode: normalizedProduct,
             packageCode: pkg.packageCode,
             customerMarket: market,
+            product,
             pkg,
             publication: publicationByPackage.get(upper(pkg.packageCode)) || null,
             selection: selectionByPackage.get(upper(pkg.packageCode)) || null,
@@ -206,6 +211,7 @@ async function getProductPackageSupplierOverview({ productCode, customerMarket }
 function createPackageSupplierCandidateService(models = {}, dependencies = {}) {
     const M = {
         Package: models.Package || CatalogPackage,
+        Product: Object.keys(models).length ? (models.Product || null) : CatalogProduct,
         Media: models.Media || MediaAsset,
         Publication: models.Publication || PackageMarketPublication,
         Selection: models.Selection || PackageSupplierSelection,
@@ -223,7 +229,8 @@ function createPackageSupplierCandidateService(models = {}, dependencies = {}) {
         if (!normalizedProduct || !normalizedPackage) {
             throw new PackageSupplierCandidateError("PACKAGE_IDENTITY_REQUIRED", "Product and package are required.");
         }
-        const [pkg, publication, selection, mappings] = await Promise.all([
+        const [product, pkg, publication, selection, mappings] = await Promise.all([
+            M.Product ? M.Product.findOne({ productCode: normalizedProduct }).lean() : Promise.resolve(null),
             M.Package.findOne({ productCode: normalizedProduct, packageCode: normalizedPackage, deletedAt: null }).lean(),
             M.Publication.findOne({ productCode: normalizedProduct, packageCode: normalizedPackage, customerMarket: market }).lean(),
             M.Selection.findOne({ productCode: normalizedProduct, packageCode: normalizedPackage, customerMarket: market }).lean(),
@@ -239,7 +246,7 @@ function createPackageSupplierCandidateService(models = {}, dependencies = {}) {
             offerIds.length ? M.Availability.find({ supplierCatalogOfferId: { $in: offerIds } }).lean() : [],
             pkg.iconAssetId ? M.Media.findOne({ assetId: pkg.iconAssetId, status: "active" }).lean() : null
         ]);
-        return evaluatePackageSupplierCandidates({ productCode: normalizedProduct, packageCode: normalizedPackage, customerMarket: market, pkg, publication, selection, mappings, suppliers, offers, availabilityRows, iconAsset, adapterFor });
+        return evaluatePackageSupplierCandidates({ productCode: normalizedProduct, packageCode: normalizedPackage, customerMarket: market, product, pkg, publication, selection, mappings, suppliers, offers, availabilityRows, iconAsset, adapterFor });
     };
 }
 

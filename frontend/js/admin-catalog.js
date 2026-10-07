@@ -287,7 +287,7 @@ function renderCatalogProductRow(product) {
         const state = storefrontOperationalState(item);
         counts[state] = (counts[state] || 0) + 1;
         return counts;
-    }, { LIVE: 0, SETUP_REQUIRED: 0, UNPUBLISHED: 0 });
+    }, { LIVE: 0, BLOCKED: 0 });
 
     return `
         <button class="catalog-product-row ${active} ${deleted ? "is-deleted" : ""}" type="button"
@@ -300,7 +300,7 @@ function renderCatalogProductRow(product) {
             </span>
             <span class="catalog-row-meta">
                 <b>${overview ? `${operationalCounts.LIVE} Live` : adminT(statusKey, statusText)}</b>
-                <small>${overview ? `${operationalCounts.SETUP_REQUIRED} Setup · ${operationalCounts.UNPUBLISHED} Unpublished` : `${Number(product.packageCount || 0)} ${adminT("packages", "Packages")}`}</small>
+                <small>${overview ? `${operationalCounts.BLOCKED} Blocked · ${operationalCounts.LIVE + operationalCounts.BLOCKED} Total` : `${Number(product.packageCount || 0)} ${adminT("packages", "Packages")}`}</small>
             </span>
             <span class="catalog-row-edit">${adminT("edit", "Edit")}</span>
         </button>
@@ -450,9 +450,9 @@ function renderCatalogDetail(product) {
                     <div class="catalog-action-menu-popover">
                         ${productDeleted
             ? `<button type="button" data-product-restore><i class="fa-solid fa-rotate-left" aria-hidden="true"></i>${adminT("restore_product", "Restore Product")}</button>`
-            : `<button class="${product.enabled ? "danger" : ""}" type="button" data-product-toggle="${product.enabled ? "disable" : "enable"}">
-                                <i class="fa-solid ${product.enabled ? "fa-eye-slash" : "fa-eye"}" aria-hidden="true"></i>
-                                ${adminT(product.enabled ? "disable_product" : "enable_product", product.enabled ? "Disable Product" : "Enable Product")}
+            : `<button class="${product.publicDiscoveryEnabled ? "danger" : ""}" type="button" data-product-toggle="${product.publicDiscoveryEnabled ? "hide" : "show"}">
+                                <i class="fa-solid ${product.publicDiscoveryEnabled ? "fa-eye-slash" : "fa-eye"}" aria-hidden="true"></i>
+                                ${product.publicDiscoveryEnabled ? "Hide Product" : "Show Product"}
                             </button>`}
                     </div>
                 </details>
@@ -850,7 +850,8 @@ function catalogPackageBlockerLabel(code = "") {
     return ({
         PACKAGE_DISABLED: "Canonical package is disabled",
         PACKAGE_DELETED: "Canonical package is deleted",
-        NO_VALID_PRICE: `No published ${catalogCustomerMarket} price`,
+        NO_VALID_PRICE: `Price missing for ${catalogCustomerMarket}`,
+        PRODUCT_MARKET_UNAVAILABLE: "Product is unavailable in this customer market",
         PACKAGE_SUPPLIER_SELECTION_REQUIRED: `No fulfillment supplier is selected for ${catalogCustomerMarket === "MM" ? "Myanmar" : "Thailand"}`,
         FULFILLMENT_NOT_READY: "Selected supplier mapping is not ready for new orders",
         NO_EXACT_SUPPLIER_MAPPING: "No exact supplier mapping",
@@ -866,7 +867,7 @@ function catalogPackageBlockerLabel(code = "") {
 }
 
 function storefrontOperationalState(item = {}) {
-    return item.operational?.state || (item.publication?.published !== true ? "UNPUBLISHED" : "SETUP_REQUIRED");
+    return item.operational?.state === "LIVE" ? "LIVE" : "BLOCKED";
 }
 
 function sortStorefrontPackages(packages = []) {
@@ -939,9 +940,9 @@ function renderOperationalPackageRows(product, packages, overview) {
         const state = storefrontOperationalState(item.state);
         result[state] = (result[state] || 0) + 1;
         return result;
-    }, { LIVE: 0, SETUP_REQUIRED: 0, UNPUBLISHED: 0 });
+    }, { LIVE: 0, BLOCKED: 0 });
     const effectiveFilter = catalogPackageOperationalFilter === "AUTO"
-        ? (counts.LIVE ? "LIVE" : counts.SETUP_REQUIRED ? "SETUP_REQUIRED" : counts.UNPUBLISHED ? "UNPUBLISHED" : "ALL")
+        ? (counts.LIVE ? "LIVE" : counts.BLOCKED ? "BLOCKED" : "ALL")
         : catalogPackageOperationalFilter;
     const query = catalogPackageSearch.trim().toLowerCase();
     const visible = sortStorefrontPackages(joined.filter(item => {
@@ -954,22 +955,21 @@ function renderOperationalPackageRows(product, packages, overview) {
         const operational = storefrontOperationalState(state);
         const price = state?.customerPrice;
         const selected = (state?.candidates || []).find(candidate => candidate.selected);
-        const blockers = operational === "SETUP_REQUIRED" ? (state?.operational?.blockerCodes || []) : [];
-        const statusLabel = operational === "LIVE" ? "Live" : operational === "UNPUBLISHED" ? "Unpublished" : "Setup required";
+        const blockers = operational === "BLOCKED" ? (state?.operational?.blockerCodes || []) : [];
+        const statusLabel = operational === "LIVE" ? "Live" : "Blocked";
         return `<article class="catalog-merch-row operational-${operational.toLowerCase()}" data-merch-package="${escapeHtml(pkg.packageCode)}">
             <div class="catalog-merch-summary">
                 <div class="catalog-merch-package"><label class="catalog-bulk-package-check"><input type="checkbox" data-bulk-package-select="${escapeHtml(pkg.packageCode)}" aria-label="Select ${escapeHtml(pkg.name || pkg.packageCode)} for bulk supplier assignment" ${catalogBulkSelectedPackages.has(String(pkg.packageCode).toUpperCase()) ? "checked" : ""}></label><div class="catalog-merch-package-icon">${pkg.iconUrl ? `<img src="${escapeHtml(pkg.iconUrl)}" alt="">` : `<span>${escapeHtml((pkg.name || "?").slice(0,1).toUpperCase())}</span>`}</div><div><strong>${escapeHtml(pkg.name || pkg.packageCode)}</strong><small>${escapeHtml(marketName)}</small></div></div>
                 <div class="catalog-merch-price"><span>Customer price</span><strong>${price && Number(price.amount) > 0 ? escapeHtml(`${Number(price.amount).toLocaleString()} ${price.currency || (region === "MM" ? "MMK" : "THB")}`) : "—"}</strong></div>
-                <div class="catalog-merch-offer-preview" data-package-supplier-summary="${escapeHtml(pkg.packageCode)}"><span>Fulfillment supplier</span><strong>${escapeHtml(selected?.supplier?.name || "No supplier")}</strong><small>${selected ? escapeHtml(selected.readiness?.summary || "") : "Explicit selection required"}</small></div>
-                <div class="catalog-merch-state"><span class="catalog-operational-status is-${operational.toLowerCase()}"><i class="fa-solid ${operational === "LIVE" ? "fa-circle-check" : operational === "UNPUBLISHED" ? "fa-circle-minus" : "fa-triangle-exclamation"}" aria-hidden="true"></i>${statusLabel}</span>${blockers.length ? `<small title="${escapeHtml(blockers.map(catalogPackageBlockerLabel).join(" · "))}">${escapeHtml(catalogPackageBlockerLabel(blockers[0]))}</small>` : ""}</div>
+                <div class="catalog-merch-offer-preview" data-package-supplier-summary="${escapeHtml(pkg.packageCode)}"><span>Fulfillment supplier</span><strong>${escapeHtml(selected?.supplier?.name || "No supplier")}</strong><small>${selected ? escapeHtml(selected.readiness?.summary || "") : "Supplier decision required"}</small></div>
+                <div class="catalog-merch-state"><span class="catalog-operational-status is-${operational.toLowerCase()}"><i class="fa-solid ${operational === "LIVE" ? "fa-circle-check" : "fa-triangle-exclamation"}" aria-hidden="true"></i>${statusLabel}</span>${blockers.length ? `<small title="${escapeHtml(blockers.map(catalogPackageBlockerLabel).join(" · "))}">${escapeHtml(catalogPackageBlockerLabel(blockers[0]))}</small>` : ""}</div>
                 <div class="catalog-merch-actions"><button type="button" class="admin-secondary-btn catalog-merch-manage-btn" data-manage-merchandising="${escapeHtml(pkg.packageCode)}">Manage</button></div>
             </div></article>`;
     }).join("");
     return `<section class="catalog-merchandising-panel">
         <div class="catalog-merchandising-head"><div><span>Storefront Merchandising</span><h3>Package Offers</h3><p>One canonical package per row. Pricing and fulfillment authorities remain separate.</p></div><label class="catalog-merch-market"><span>Customer market</span><select data-merch-market><option value="TH" ${region === "TH" ? "selected" : ""}>Thailand · THB</option><option value="MM" ${region === "MM" ? "selected" : ""}>Myanmar · MMK</option></select></label></div>
-        ${renderCatalogSupplierSetup(product)}
-        ${renderCatalogMarketAvailability(product)}
-        <div class="catalog-package-operations"><div class="catalog-package-state-filters" role="group" aria-label="Package state">${filter("LIVE", "Live", counts.LIVE)}${filter("SETUP_REQUIRED", "Setup required", counts.SETUP_REQUIRED)}${filter("UNPUBLISHED", "Unpublished", counts.UNPUBLISHED)}${filter("ALL", "All", joined.length)}</div><label><span class="sr-only">Search packages</span><input type="search" data-merch-package-search value="${escapeHtml(catalogPackageSearch)}" placeholder="Search packages"></label></div>
+        <section class="catalog-market-availability"><header><div><span>Store Status</span><h4>${escapeHtml(marketName)}</h4><p>Live ${counts.LIVE} · Blocked ${counts.BLOCKED} · Total ${joined.length}</p></div></header></section>
+        <div class="catalog-package-operations"><div class="catalog-package-state-filters" role="group" aria-label="Package state">${filter("LIVE", "Live", counts.LIVE)}${filter("BLOCKED", "Blocked", counts.BLOCKED)}${filter("ALL", "All", joined.length)}</div><label><span class="sr-only">Search packages</span><input type="search" data-merch-package-search value="${escapeHtml(catalogPackageSearch)}" placeholder="Search packages"></label></div>
         <div data-catalog-bulk-action-host>${renderCatalogBulkActionBar()}</div>
         <p class="catalog-package-result-count">${visible.length} package${visible.length === 1 ? "" : "s"} shown · ordered by canonical package order</p>
         <div class="catalog-merch-list">${rows || `<div class="catalog-empty-state"><strong>No ${effectiveFilter === "ALL" ? "matching" : effectiveFilter.toLowerCase().replace("_", " ")} packages</strong><span>Choose another operational state or adjust the package search.</span></div>`}</div>
@@ -985,7 +985,7 @@ function renderCatalogMerchandisingPanel(product, packages) {
     const activePackages = packages.filter(pkg => !pkg.deleted && !pkg.deletedAt);
     const overview = catalogPackageOverviewCache.get(catalogPackageOverviewKey(product.productCode));
     if (overview) return renderOperationalPackageRows(product, activePackages, overview);
-    return `<section class="catalog-merchandising-panel"><div class="catalog-merchandising-head"><div><span>Storefront Merchandising</span><h3>Package Offers</h3><p>Loading authoritative package availability…</p></div></div>${renderCatalogSupplierSetup(product)}${renderCatalogMarketAvailability(product)}<div class="catalog-merch-list" aria-busy="true"><div class="admin-dashboard-skeleton"></div><div class="admin-dashboard-skeleton"></div></div><div class="admin-empty-state" data-package-overview-error hidden><strong>Package storefront state is unavailable</strong><span>Use Refresh to retry without changing catalog data.</span></div></section>`;
+    return `<section class="catalog-merchandising-panel"><div class="catalog-merchandising-head"><div><span>Storefront Merchandising</span><h3>Package Offers</h3><p>Loading automatic sellability status…</p></div></div><div class="catalog-merch-list" aria-busy="true"><div class="admin-dashboard-skeleton"></div><div class="admin-dashboard-skeleton"></div></div><div class="admin-empty-state" data-package-overview-error hidden><strong>Package storefront state is unavailable</strong><span>Use Refresh to retry without changing catalog data.</span></div></section>`;
 
     const rows = activePackages.map(pkg => {
         const price = pkg.prices?.[region] || null;
@@ -1805,11 +1805,10 @@ function ensureCatalogMerchandisingModal() {
 
                 <section class="catalog-merch-modal-section" data-manage-package-section="public">
                     <div class="catalog-merch-modal-section-head">
-                        <span>Public state</span>
+                        <span>Store status</span>
                         <h4 data-manage-package-public-state>Loading…</h4>
-                        <p data-manage-package-public-detail>Checking publication and storefront readiness.</p>
+                        <p data-manage-package-public-detail>Checking current price and fulfillment readiness.</p>
                     </div>
-                    <button class="admin-secondary-btn" type="button" data-manage-package-publication disabled>Loading…</button>
                 </section>
 
                 <section class="catalog-merch-modal-section" data-manage-package-section="supplier">
@@ -2175,12 +2174,7 @@ function renderManagePackageCandidates(modal, data = {}) {
     const operationalBlockers = data.operational?.blockerCodes || data.publication?.blockers || [];
     modal.querySelector("[data-manage-package-public-detail]").textContent = operationalBlockers.length
         ? operationalBlockers.map(catalogPackageBlockerLabel).join(" · ")
-        : data.publication?.published ? "Publication is enabled for this customer market." : "This package is not published for this customer market.";
-    const publicationButton = modal.querySelector("[data-manage-package-publication]");
-    if (publicationButton) {
-        publicationButton.disabled = false;
-        publicationButton.textContent = data.publication?.published ? "Make private" : "Make public";
-    }
+        : "Price and exact auto-fulfillment routing are ready for this customer market.";
     const price = data.customerPrice;
     modal.querySelector("[data-manage-package-customer-price]").textContent = price && Number.isFinite(Number(price.amount))
         ? `${Number(price.amount).toLocaleString()} ${price.currency}` : "Price unavailable";
@@ -2260,8 +2254,6 @@ async function saveManagePackageSupplier(product, pkg, modal) {
     const latest = await loadPackageSupplierCandidateData(product, pkg, { refresh: true });
     renderManagePackageCandidates(modal, latest);
     reconcileCatalogPackageOverview(product, pkg, latest);
-    invalidateCatalogPublicationReadiness(product.productCode);
-    loadCatalogPublicationReadyPlan(product, { force: true }).catch(() => {});
     showAdminToast?.(result.changed ? "Fulfillment supplier selection saved" : "Supplier selection is already current", result.changed ? "success" : "info");
 }
 
@@ -2352,7 +2344,6 @@ function openCatalogMerchandisingModal(product, pkg) {
         .then(data => {
             renderManagePackageCandidates(modal, data);
             modal.querySelector("[data-save-package-supplier]").onclick = () => saveManagePackageSupplier(product, pkg, modal).catch(error => showAdminToast?.(error.message, "error"));
-            modal.querySelector("[data-manage-package-publication]").onclick = () => updateManagePackagePublication(product, pkg, modal).catch(error => showAdminToast?.(error.message, "error"));
         })
         .catch(error => {
             modal.querySelector("[data-manage-package-selection-state]").textContent = "Supplier data unavailable";
@@ -2758,21 +2749,6 @@ function bindActiveCatalogTab(detail, product, packages) {
         if (!catalogPackageOverviewCache.has(catalogPackageOverviewKey(product.productCode))) {
             loadCatalogPackageOverview(product).catch(error => showAdminToast?.(error?.message || "Package storefront state is unavailable.", "error"));
         }
-        if (!catalogPublicationReadyPlanCache.has(String(product.productCode || "").toLowerCase())) {
-            loadCatalogPublicationReadyPlan(product).catch(error => showAdminToast?.(error?.message || "Market publication readiness is unavailable.", "error"));
-        }
-        if (!catalogSupplierBootstrapPlanCache.has(String(product.productCode || "").toLowerCase())) {
-            loadCatalogSupplierBootstrapPlan(product).catch(error => showAdminToast?.(error?.message || "Supplier setup is unavailable.", "error"));
-        }
-        detail.querySelector("[data-apply-safe-supplier-selections]")?.addEventListener("click", () => {
-            applyCatalogSupplierBootstrap(product).catch(error => showAdminToast?.(error?.message || "Safe supplier selections could not be applied.", "error"));
-        });
-        detail.querySelectorAll("[data-publish-ready-market]").forEach(button => button.addEventListener("click", () => {
-            applyCatalogPublicationReady(product, [button.dataset.publishReadyMarket]).catch(error => showAdminToast?.(error?.message || "Ready packages could not be published.", "error"));
-        }));
-        detail.querySelector("[data-publish-ready-all]")?.addEventListener("click", () => {
-            applyCatalogPublicationReady(product, ["TH", "MM"]).catch(error => showAdminToast?.(error?.message || "Ready packages could not be published.", "error"));
-        });
         detail.querySelector("[data-merch-market]")?.addEventListener("change", event => {
             catalogCustomerMarket = event.target.value === "MM" ? "MM" : "TH";
             catalogPackageOperationalFilter = "AUTO";
@@ -4180,20 +4156,21 @@ function fromDatetimeInputValue(value) {
 }
 
 async function toggleProductAvailability(product) {
-    const nextEnabled = !product.enabled;
+    const show = product.publicDiscoveryEnabled !== true;
     const confirmed = await confirmCatalogAction({
-        title: adminT(nextEnabled ? "enable_product" : "disable_product", nextEnabled ? "Enable Product" : "Disable Product"),
-        message: nextEnabled
-            ? `${adminT("enable_product_message", "New purchases for this product will be allowed.")}`
-            : `${adminT("disable_product_message", "New purchases for this product will be blocked. Existing orders will not be changed.")}`,
-        confirmText: adminT(nextEnabled ? "enable_product" : "disable_product", nextEnabled ? "Enable Product" : "Disable Product"),
-        danger: !nextEnabled
+        title: show ? "Show Product" : "Hide Product",
+        message: show
+            ? "The product will be visible again. Packages whose price and fulfillment route are currently valid become immediately sellable."
+            : "The product will be hidden from customers. Prices, supplier routes, package readiness, and existing orders will be preserved.",
+        confirmText: show ? "Show Product" : "Hide Product",
+        danger: !show
     });
 
     if (!confirmed) return;
 
     await mutateCatalog(`/api/admin/catalog/products/${encodeURIComponent(product.productCode)}`, {
-        enabled: nextEnabled,
+        publicDiscoveryEnabled: show,
+        commerceState: show ? "PURCHASABLE" : "HIDDEN",
         expectedUpdatedAt: product.updatedAt
     });
 }

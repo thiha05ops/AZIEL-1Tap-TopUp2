@@ -861,11 +861,10 @@ function classifyProductEnabledTransition(previousEnabled, nextEnabled) {
 }
 
 function shouldValidateProductReadiness({ transition, previousCommerceState, nextCommerceState, changedFields = [] } = {}) {
-    if (["WITHDRAWAL", "INACTIVE_EDIT"].includes(transition)) return false;
-    if (nextCommerceState !== "PURCHASABLE") return false;
-    if (transition === "ACTIVATION") return true;
-    if (previousCommerceState !== "PURCHASABLE") return true;
-    return changedFields.includes("supportedRegions");
+    // Visibility is merchandising intent, not a second fulfillment approval.
+    // Public projections still require at least one currently sellable package,
+    // so showing an unready product cannot make an unsafe package purchasable.
+    return false;
 }
 
 async function updateProduct({ productCode, patch = {}, actor = "admin" }) {
@@ -958,6 +957,7 @@ async function updateProduct({ productCode, patch = {}, actor = "admin" }) {
         }
     }
     await product.save();
+    require("./catalogService").clearPublicCatalogCaches(normalizedProductCode);
     console.log("Catalog product updated:", {
         action: "catalog.product.update",
         productCode: normalizedProductCode,
@@ -1092,6 +1092,22 @@ async function updatePackage({ productCode, packageCode, patch = {}, actor = "ad
             .slice(-100);
     }
     await item.save();
+    require("./catalogService").clearPublicCatalogCaches(normalizedProductCode);
+    if (CatalogPackage.db.readyState === 1) {
+        try {
+            const { reconcileAutomaticPackageSupplierSelections } = require("./packageSupplierSelectionBootstrapService");
+            const changedMarkets = Object.keys(patch.prices || {}).map(normalizeRegion).filter(region => ["TH", "MM"].includes(region));
+            await reconcileAutomaticPackageSupplierSelections({
+                productCode: normalizedProductCode,
+                markets: changedMarkets.length ? changedMarkets : ["TH", "MM"],
+                decisionNote: "Automatic reconciliation after package or price change"
+            }, { actor: { username: actor || "system", role: "SYSTEM" } });
+        } catch (error) {
+            // The price/package mutation remains authoritative. The next bounded
+            // lifecycle event retries without provider calls or render-time writes.
+            console.warn("Automatic package sellability reconciliation deferred:", error?.code || error?.name || "RECONCILIATION_FAILED");
+        }
+    }
     console.log("Catalog package updated:", {
         action: "catalog.package.update",
         productCode: normalizedProductCode,

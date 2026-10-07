@@ -99,7 +99,7 @@ function resolvePublicProductReadiness(product = {}, packages = [], commerceRead
         ? "PURCHASABLE"
         : String(product.commerceState || product.requestedCommerceState || "HIDDEN").toUpperCase();
     const discoverable = explicitCommercialAuthority
-        ? product.enabled !== false && !product.deletedAt
+        ? product.publicDiscoveryEnabled === true && product.enabled !== false && !product.deletedAt
         : product.publicDiscoveryEnabled === true && product.enabled !== false && !product.deletedAt;
     let state = "HIDDEN";
     if (canonical && discoverable && requested !== "HIDDEN") {
