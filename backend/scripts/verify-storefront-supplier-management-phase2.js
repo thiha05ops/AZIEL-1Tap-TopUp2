@@ -22,14 +22,14 @@ assert(ui.includes('Selected for ${catalogCustomerMarket === "MM" ? "MM" : "TH"}
 assert(ui.includes("candidateCostState") && ui.includes('? "Cost stale" : "Cost current"') && ui.includes("catalog-supplier-cost"), "route readiness and commercial cost freshness must remain separate concepts");
 assert(ui.includes('return "Route ready"'), "route readiness label must remain distinct from selection and cost freshness");
 assert(ui.includes("No fulfillment supplier is currently available for this package in"), "no-usable-supplier state must be explicit and market-specific");
-assert(ui.includes("Supplier selection required"), "no-selection state must remain explicit");
+assert(ui.includes("data.effectiveState?.supplierMappingId"), "unique executable routes must be projected without an unnecessary selection task");
 assert(ui.includes("candidate.eligibility?.mode") && ui.includes("candidate.readiness?.blockerCodes"), "safe technical mapping details must remain diagnostically accessible");
 assert(ui.includes('data-save-package-supplier') && ui.includes("Save supplier"));
 assert(ui.includes('data-save-merch-modal>Save offer presentation') || (ui.includes('data-save-merch-modal') && ui.includes("Save offer presentation")), "merchandising persistence must remain a secondary Advanced action");
 assert(ui.includes("catalog-manage-advanced") && ui.includes("Offer presentation"));
 assert(ui.includes("Unsaved supplier change") && ui.includes("No unsaved supplier changes") && ui.includes("data-save-package-supplier") && ui.includes("save.disabled = true"));
-assert(ui.includes("Change fulfillment supplier?") && ui.includes("Customer price will not change.") && ui.includes("Publication state will not change."));
-assert(ui.includes("This supplier selection remains Storefront intent until routing cutover is separately enabled."));
+assert(ui.includes("Change fulfillment supplier?") && ui.includes("Customer price will not change.") && ui.includes("Selling state will not change."));
+assert(!ui.includes("This supplier selection remains Storefront intent until routing cutover is separately enabled."), "Storefront selection must not be described as a non-runtime future intent");
 assert(ui.includes("Supplier selection changed elsewhere. Refreshing the latest selection."));
 assert(ui.includes("renderPackageSupplierSummary") && ui.includes("data-package-public-state"));
 assert(ui.includes('method: asset ? "PATCH" : "DELETE"') && ui.includes("expectedUpdatedAt: pkg.updatedAt"));

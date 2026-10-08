@@ -2,7 +2,7 @@
 
 const assert = require("assert");
 const mongoose = require("mongoose");
-const { costProjection, createPackageSupplierCandidateService } = require("../services/packageSupplierCandidateService");
+const { costProjection, createPackageSupplierCandidateService, evaluatePackageSupplierCandidates } = require("../services/packageSupplierCandidateService");
 
 const id = () => new mongoose.Types.ObjectId();
 const supplierA = id(), supplierB = id(), supplierC = id();
@@ -26,6 +26,8 @@ const offers = mappings.map(mapping => ({ _id: mapping.supplierCatalogOfferId, s
 const availability = mappings.map(mapping => ({ supplierCatalogOfferId: mapping.supplierCatalogOfferId, state: mapping._id === mappingC ? "UNAVAILABLE" : "AVAILABLE", observedAt: new Date(), staleAt: future }));
 
 const service = createPackageSupplierCandidateService({
+    Product: { findOne: () => query({ productCode: "game", enabled: true, publicDiscoveryEnabled: true, commerceState: "PURCHASABLE" }) },
+    StoreSelection: { exists: async () => ({ _id: id() }) },
     Package: { findOne: () => query({ productCode: "game", packageCode: "PACK", name: "Pack", enabled: true, prices: { TH: { amount: 100, currency: "THB", enabled: true } }, updatedAt: new Date() }) },
     Publication: { findOne: () => query({ published: true, customerMarket: "TH" }) },
     Selection: { findOne: () => query(null) },
@@ -53,9 +55,18 @@ service({ productCode: "game", packageCode: "PACK", customerMarket: "TH" }).then
     assert.strictEqual(disabled.readiness.selectable, false);
     assert(disabled.readiness.blockerCodes.includes("MAPPING_DISABLED"));
     assert(disabled.readiness.blockerCodes.includes("SUPPLIER_AVAILABILITY_NOT_CONFIRMED"));
-    assert.strictEqual(result.publication.state, "RECORDED", "legacy publication is retained as historical evidence only");
-    assert.strictEqual(result.operational.state, "BLOCKED");
-    assert(result.operational.blockerCodes.includes("PACKAGE_SUPPLIER_SELECTION_REQUIRED"));
+    assert.strictEqual(result.publication.state, "RECORDED", "publication record remains the package Selling authority");
+    assert.strictEqual(result.effectiveState.state, "BLOCKED", "multiple executable routes require an explicit Owner choice");
+    assert(result.effectiveState.blockers.includes("AMBIGUOUS_EXECUTABLE_SUPPLIER_ROUTES"));
+    const common = { productCode: "game", packageCode: "PACK", customerMarket: "TH", product: { enabled: true, publicDiscoveryEnabled: true, commerceState: "PURCHASABLE" }, storeCatalogMember: true, pkg: { productCode: "game", packageCode: "PACK", name: "Pack", enabled: true, prices: { TH: { amount: 100, enabled: true } } }, suppliers, offers, availabilityRows: availability, adapterFor: () => ({ isConfigured: () => true, isAutoFulfillmentEnabled: () => true }) };
+    const unique = evaluatePackageSupplierCandidates({ ...common, publication: { published: true }, mappings: [mappings[0]] });
+    assert.strictEqual(unique.effectiveState.state, "LIVE");
+    assert.strictEqual(unique.effectiveState.supplierResolution, "UNIQUE_EXECUTABLE_ROUTE");
+    const disabledByOwner = evaluatePackageSupplierCandidates({ ...common, publication: { published: false }, mappings: [mappings[0]] });
+    assert.strictEqual(disabledByOwner.effectiveState.state, "DISABLED");
+    const unavailableSelection = evaluatePackageSupplierCandidates({ ...common, publication: { published: true }, selection: { supplierMappingId: mappingC, decisionVersion: 1 }, mappings });
+    assert.strictEqual(unavailableSelection.effectiveState.state, "BLOCKED");
+    assert.strictEqual(unavailableSelection.effectiveState.supplierMappingId, String(mappingC), "explicit invalid route must remain authoritative without failover");
     assert.strictEqual(costProjection({ supplierCostAuthority: { rawSupplierCost: null } }, { supplierCost: { amount: 7, currency: "USD", observedAt: new Date() } }).amount, 7);
     for (const missing of [null, undefined, "", "not-a-number", Infinity]) {
         assert.strictEqual(costProjection({ supplierCostAuthority: { rawSupplierCost: missing } }, { supplierCost: { amount: null } }).amount, null);

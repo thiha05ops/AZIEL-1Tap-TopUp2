@@ -115,6 +115,8 @@ function assessProductionReadyFulfillmentMapping(mapping = {}, supplier = {}, co
     const routeProductMarketCompatibility = productCompatibilityMarkets.length
         ? supplierRouteProductMarketCompatibility(String(context.supplierRouteMarket || mapping.region || "").trim().toUpperCase(), productCompatibilityMarkets)
         : { compatible: true, deterministic: false, code: "PRODUCT_ACCOUNT_MARKET_NOT_ENFORCED_FOR_SELLING" };
+    if (!eligibility.valid) blockers.push(...eligibility.errors);
+    else if (eligibility.value.mode === "UNKNOWN") blockers.push("FULFILLMENT_ELIGIBILITY_UNKNOWN");
     ["supplierMapped", "inputReady", "validationReady", "pricingReady", "fulfillmentReady", "storefrontReady"].forEach(flag => {
         if (readiness[flag] !== true) blockers.push(`${flag.replace(/[A-Z]/g, letter => `_${letter}`).toUpperCase()}_FALSE`);
     });

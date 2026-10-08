@@ -3736,6 +3736,15 @@
     display:grid;
     gap:10px;
 }
+.admin-v2 .catalog-merch-package-groups{
+    display:grid;
+    gap:18px;
+}
+.admin-v2 .catalog-merch-package-groups h4{
+    margin:0 0 9px;
+    color:var(--v2-text);
+    font-size:13px;
+}
 .admin-v2 .catalog-merch-row{
     border:1px solid var(--v2-border);
     border-radius:14px;

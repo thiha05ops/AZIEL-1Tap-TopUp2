@@ -448,8 +448,9 @@ function normalizeSupplierRouteSnapshot(route, quote) {
     if (normalized.routeType === "MANUAL_ADMIN" && (normalized.supplierMappingId || normalized.supplierId || normalized.supplierCode !== "AZIEL_ADMIN")) {
         throw new OrderSnapshotRuntimeError(ORDER_SNAPSHOT_ERROR_CODES.INVALID_FULFILMENT_INPUT, "Manual Admin route must not contain supplier mapping identity.", { stage: "fulfilment-route" });
     }
-    if (normalized.routeType !== "MANUAL_ADMIN" && (!normalized.supplierMappingId || !normalized.supplierId || !["PRIMARY", "PACKAGE_SUPPLIER_SELECTION"].includes(normalized.selectedRole))) {
-        throw new OrderSnapshotRuntimeError(ORDER_SNAPSHOT_ERROR_CODES.INVALID_FULFILMENT_INPUT, "Supplier API route requires an explicit routing-authority snapshot.", { stage: "fulfilment-route" });
+    const executableSupplierRoles = ["PRIMARY", "PACKAGE_SUPPLIER_SELECTION", "UNIQUE_EXECUTABLE_ROUTE"];
+    if (normalized.routeType !== "MANUAL_ADMIN" && (!normalized.supplierMappingId || !normalized.supplierId || !executableSupplierRoles.includes(normalized.selectedRole))) {
+        throw new OrderSnapshotRuntimeError(ORDER_SNAPSHOT_ERROR_CODES.INVALID_FULFILMENT_INPUT, "Supplier API route requires an exact executable mapping snapshot.", { stage: "fulfilment-route" });
     }
     if (snapshotVersion === 2 && normalized.routeType !== "MANUAL_ADMIN") {
         const eligibility = validateFulfillmentEligibility(route.eligibility);

@@ -48,7 +48,6 @@ function assessMappingReadiness({ mode, mapping = {}, supplier = null, offer = n
         const price = pkg?.prices?.[upper(customerMarket)];
         if (!pkg || pkg.deletedAt || pkg.enabled !== true) blockers.push("PACKAGE_NOT_PUBLIC_READY");
         if (!price || price.enabled !== true || !(Number(price.amount) > 0)) blockers.push("NO_VALID_PRICE");
-        if (!selection || objectId(selection.supplierMappingId) !== objectId(mapping)) blockers.push("SELECTED_MAPPING_MISMATCH");
     }
     return { ready: blockers.length === 0, blockers: [...new Set(blockers)].sort(), mode };
 }

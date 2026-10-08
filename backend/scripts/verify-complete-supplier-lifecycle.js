@@ -35,7 +35,7 @@ async function main() {
     const selected = { ready: true, routeSnapshot: { supplierMappingId: "b" }, blockers: [] };
     const route = createRoutingAuthority({ legacyResolver: async () => ({ ready: true, routeSnapshot: { supplierMappingId: "a", routeType: "SUPPLIER_API" } }), selectedResolver: async () => selected, modeResolver: () => FULFILLMENT_ROUTING_MODES.SELECTED });
     check("new order SELECTED uses B", (await route({ productCode: "game", packageCode: "PACK", region: "TH" })).routeSnapshot.supplierMappingId === "b");
-    check("selected resolver fails closed without selection", source("backend/services/supplierProductionSelectionService.js").includes("PACKAGE_SUPPLIER_SELECTION_REQUIRED"));
+    check("unique executable route resolves without selection", source("backend/services/supplierProductionSelectionService.js").includes("UNIQUE_EXECUTABLE_ROUTE"));
     check("invalid selected mapping fails closed", source("backend/services/supplierProductionSelectionService.js").includes("SELECTED_MAPPING_INVALID"));
     check("selected failure has no fallback", !source("backend/services/supplierProductionSelectionService.js").match(/resolveSelectedCheckoutRouteSnapshot[\s\S]{0,1800}BACKUP/));
     const adapter = { isConfigured: () => true, isAutoFulfillmentEnabled: () => true };
@@ -60,9 +60,9 @@ async function main() {
     check("selection audit shares transaction session", source("backend/services/packageSupplierSelectionService.js").includes("session,") && source("backend/services/packageSupplierSelectionService.js").includes("await audit({"));
     check("consolidation never rewrites historical models", source("backend/services/catalogPackageConsolidationService.js").includes("HISTORICAL_IMMUTABLE") && source("backend/services/catalogPackageConsolidationService.js").includes("applyAvailable: false"));
     check("existing snapshots are not updated", !source("backend/services/fulfillmentService.js").includes("$set: { \"fulfilment.routeSnapshot\""));
-    check("default routing remains legacy", resolveFulfillmentRoutingMode({}) === FULFILLMENT_ROUTING_MODES.LEGACY_REGION);
+    check("default routing uses Storefront supplier authority", resolveFulfillmentRoutingMode({}) === FULFILLMENT_ROUTING_MODES.SELECTED);
     const shadowRoute = createRoutingAuthority({ legacyResolver: async () => ({ ready: true, routeSnapshot: { supplierMappingId: "a", routeType: "SUPPLIER_API" } }), selectedResolver: async () => ({ ready: true, routeSnapshot: { supplierMappingId: "b", supplierCode: "WONDD" }, blockers: [] }), modeResolver: () => FULFILLMENT_ROUTING_MODES.SHADOW });
-    check("shadow never changes a valid legacy route", (await shadowRoute({})).routeSnapshot.supplierMappingId === "a");
+    check("explicit Storefront selection overrides legacy mode", (await shadowRoute({})).routeSnapshot.supplierMappingId === "b");
     for (const failure of [
         Object.assign(new Error("selection read failed"), { code: "SELECTION_DB_FAILED" }),
         Object.assign(new Error("readiness failed"), { code: "READINESS_FAILED" }),
@@ -73,11 +73,12 @@ async function main() {
             selectedResolver: async () => { throw failure; },
             modeResolver: () => FULFILLMENT_ROUTING_MODES.SHADOW
         });
-        check(`shadow contains ${failure.code || "unexpected"} selected failure`, (await safeShadow({})).routeSnapshot.supplierMappingId === "a");
+        await assert.rejects(() => safeShadow({}), error => error === failure, "explicit selection read failure must fail closed without legacy fallback");
+        checks.push(`explicit authority contains ${failure.code || "unexpected"} failure`);
     }
     const projected = { packages: [{ packageCode: "PACK", fulfillmentRegions: { TH: true } }] };
-    const blockedPublic = applySelectedPublicPurchasability(projected, [{ packageCode: "PACK" }], [], [], [], [], [], [], "TH");
-    check("selected public catalog fails closed without selection", blockedPublic.packages[0].fulfillmentRegions.TH === false);
+    const blockedPublic = applySelectedPublicPurchasability(projected, { enabled: true, publicDiscoveryEnabled: true, commerceState: "PURCHASABLE" }, [{ packageCode: "PACK", enabled: true, prices: { TH: { enabled: true, amount: 10 } } }], [], [], [], [{ packageCode: "PACK", customerMarket: "TH", published: true }], [], [], "TH", true);
+    check("public catalog fails closed without executable route", blockedPublic.packages[0].fulfillmentRegions.TH === false);
     check("selected uses exact mapping", (await route({})).routeSnapshot === selected.routeSnapshot);
     check("no BACKUP iteration in selected resolver", !source("backend/services/supplierProductionSelectionService.js").includes("productionRole: ROLES.BACKUP"));
     check("no pricing provenance routing", !source("backend/services/supplierProductionSelectionService.js").includes("supplierCostSource"));

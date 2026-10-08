@@ -37,9 +37,11 @@ const mappingAfterRoleChange = {
 assert.strictEqual(String(mappingAfterRoleChange._id), route.supplierMappingId, "Frozen mapping identity remains exact after the role change.");
 const frozenReadiness = assessMappingReadiness({ mode: READINESS_MODES.FROZEN_ORDER_EXECUTABLE, mapping: mappingAfterRoleChange, supplier: { supplierCode: "WONDD", enabled: true, mode: "API" }, customerMarket: "TH", adapter: { isConfigured: () => true, isAutoFulfillmentEnabled: () => true }, eligibilityOverride: route.eligibility });
 assert.strictEqual(frozenReadiness.ready, true, "A later PRIMARY-to-BACKUP change must not invalidate an otherwise executable frozen route.");
+assert.strictEqual(normalizeSupplierRouteSnapshot({ ...route, selectedRole: "PACKAGE_SUPPLIER_SELECTION" }, quote).selectedRole, "PACKAGE_SUPPLIER_SELECTION", "Explicit Storefront supplier selection must freeze successfully.");
+assert.strictEqual(normalizeSupplierRouteSnapshot({ ...route, selectedRole: "UNIQUE_EXECUTABLE_ROUTE" }, quote).selectedRole, "UNIQUE_EXECUTABLE_ROUTE", "Automatically resolved unique route must freeze successfully.");
 assert.throws(
     () => normalizeSupplierRouteSnapshot({ ...route, selectedRole: "BACKUP" }, quote),
-    error => error.code === ORDER_SNAPSHOT_ERROR_CODES.INVALID_FULFILMENT_INPUT && /routing-authority/.test(error.message),
+    error => error.code === ORDER_SNAPSHOT_ERROR_CODES.INVALID_FULFILMENT_INPUT,
     "A newly created snapshot must reject BACKUP as a routing authority."
 );
 assert.throws(

@@ -35,9 +35,9 @@ function verify() {
         operationalPackage({ deletedAt: new Date() })
     ]) {
         const state = projectPackagePublication(changed, { customerMarket: "TH", published: true, decisionVersion: 1 });
-        assert.strictEqual(state.state, "SUPPRESSED");
-        assert.strictEqual(state.currentlyPurchasable, false);
-        assert.strictEqual(state.published, true, "Operational failure must preserve publication intent.");
+        assert.strictEqual(state.state, "PUBLISHED");
+        assert.strictEqual(state.currentlyPurchasable, true, "Legacy field now reflects Selling intent only; effective sales state owns runtime blockers.");
+        assert.strictEqual(state.published, true, "Operational failure must preserve Selling intent.");
     }
     assert.strictEqual(projectPackagePublication(ready, { customerMarket: "TH", published: true, decisionVersion: 1 }).state, "PUBLISHED", "Operational recovery must not require republish.");
     const projection = { productCode: "mlbb", packages: [ready, operationalPackage({ packageCode: "MLBB_PRIVATE" })] };
@@ -59,6 +59,7 @@ function verify() {
     const uiSource = fs.readFileSync(path.join(root, "frontend/js/admin-catalog.js"), "utf8");
     const normalMerchandising = uiSource.slice(uiSource.indexOf("function renderOperationalPackageRows"), uiSource.indexOf("function renderCatalogMerchandisingPanel"));
     assert(!normalMerchandising.includes("Publish Ready") && !normalMerchandising.includes("renderCatalogMarketAvailability"), "Normal merchandising must not expose publication ceremony.");
+    assert(uiSource.includes("Purchasable") && uiSource.includes("Selling ON") && uiSource.includes("Selling OFF"), "Admin UI must expose product Purchasable and package Selling authorities.");
     console.log(JSON.stringify({ result: "PASS", checks: 15, supplierRequests: 0, databaseWrites: 0 }, null, 2));
 }
 

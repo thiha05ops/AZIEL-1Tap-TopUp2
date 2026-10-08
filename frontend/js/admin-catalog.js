@@ -1073,7 +1073,7 @@ function renderCatalogMerchandisingPanel(product, packages) {
                             <span class="catalog-merch-public-toggle__track" aria-hidden="true">
                                 <span></span>
                             </span>
-                            <strong>${published ? "Public" : "Private"}</strong>
+                            <strong>${published ? "Selling ON" : "Selling OFF"}</strong>
                         </label>
                     </div>
 
@@ -1113,6 +1113,12 @@ function renderCatalogMerchandisingPanel(product, packages) {
                     </p>
                 </div>
 
+                <label class="catalog-merch-public-toggle" title="Allow technically ready packages in this product to be purchased">
+                    <input type="checkbox" data-product-purchasable ${product.publicDiscoveryEnabled === true && product.commerceState === "PURCHASABLE" ? "checked" : ""}>
+                    <span class="catalog-merch-public-toggle__track" aria-hidden="true"><span></span></span>
+                    <strong>Purchasable ${product.publicDiscoveryEnabled === true && product.commerceState === "PURCHASABLE" ? "ON" : "OFF"}</strong>
+                </label>
+
                 <label class="catalog-merch-market">
                     <span>Market</span>
                     <select data-merch-market>
@@ -1131,13 +1137,16 @@ function renderCatalogMerchandisingPanel(product, packages) {
                 </span>
             </div>
 
-            <div class="catalog-merch-list">
+            <div class="catalog-merch-package-groups">
+                <section><h4>Live Packages (<span data-live-package-count>0</span>)</h4><div class="catalog-merch-list" data-live-package-list></div></section>
+                <section><h4>Disabled / Blocked Packages (<span data-inactive-package-count>${activePackages.length}</span>)</h4><div class="catalog-merch-list" data-inactive-package-list>
                 ${rows || `
                     <div class="catalog-empty-state">
                         <strong>No packages available</strong>
                         <span>This product has no packages to merchandise.</span>
                     </div>
                 `}
+                </div></section>
             </div>
         </section>
     `;
@@ -2080,24 +2089,16 @@ function candidateRouteLabel(candidate = {}) {
 }
 
 function storefrontPackageState(data = {}) {
-    const market = data.customerMarket === "MM" ? "MM" : "TH";
-    if (data.publication?.published !== true) return "Unpublished";
-    if (!data.customerPrice || data.customerPrice.enabled === false || !(Number(data.customerPrice.amount) > 0)) return `No ${market} price`;
-    if (!data.selection) return "Supplier selection required";
-    const selected = (data.candidates || []).find(item => item.selected);
-    if (!selected || selected.availability?.state !== "AVAILABLE") return "Supplier unavailable";
-    if (selected.readiness?.selectable !== true) return "Fulfillment not ready";
-    return "Public";
+    return data.effectiveState?.state || "BLOCKED";
 }
 
 function renderPackageSupplierSummary(container, data = {}) {
     if (!container) return;
-    const selected = (data.candidates || []).find(item => item.selected);
-    const operationalState = storefrontOperationalState(data);
-    const state = operationalState === "LIVE" ? "Live" : operationalState === "UNPUBLISHED" ? "Unpublished" : "Setup required";
+    const selected = (data.candidates || []).find(item => item.supplierMappingId === data.effectiveState?.supplierMappingId);
+    const state = storefrontPackageState(data);
     container.innerHTML = `
         <span>Fulfillment supplier</span>
-        <strong>${escapeHtml(selected?.supplier?.name || "Selection required")}</strong>
+        <strong>${escapeHtml(selected?.supplier?.name || "No executable supplier")}</strong>
         <small>${escapeHtml(selected ? formatCandidateCost(selected.cost) : state)}</small>
     `;
 }
@@ -2110,7 +2111,15 @@ async function hydratePackageSupplierSummaries(product, packages, root = documen
             const data = await loadPackageSupplierCandidateData(product, pkg);
             renderPackageSupplierSummary(container, data);
             const state = root.querySelector(`[data-package-public-state="${CSS.escape(pkg.packageCode)}"]`);
-            if (state) state.textContent = storefrontPackageState(data);
+            if (state) state.textContent = [storefrontPackageState(data), ...(data.effectiveState?.blockers || []).map(code => code.replaceAll("_", " ").toLowerCase())].join(" · ");
+            const row = root.querySelector(`[data-merch-package="${CSS.escape(pkg.packageCode)}"]`);
+            const liveList = root.querySelector("[data-live-package-list]");
+            const inactiveList = root.querySelector("[data-inactive-package-list]");
+            if (row && liveList && inactiveList) (data.effectiveState?.state === "LIVE" ? liveList : inactiveList).append(row);
+            const liveCount = root.querySelector("[data-live-package-count]");
+            const inactiveCount = root.querySelector("[data-inactive-package-count]");
+            if (liveCount) liveCount.textContent = String(liveList?.querySelectorAll("[data-merch-package]").length || 0);
+            if (inactiveCount) inactiveCount.textContent = String(inactiveList?.querySelectorAll("[data-merch-package]").length || 0);
         } catch (_) {
             container.innerHTML = `<span>Fulfillment supplier</span><strong>Unavailable</strong><small>Could not load supplier state</small>`;
             const state = root.querySelector(`[data-package-public-state="${CSS.escape(pkg.packageCode)}"]`);
@@ -2156,10 +2165,10 @@ async function updateManagePackageImage(product, pkg, asset = null) {
 function renderManagePackageCandidates(modal, data = {}) {
     const marketName = data.customerMarket === "MM" ? "Myanmar" : "Thailand";
     const candidates = data.candidates || [];
-    const selected = candidates.find(item => item.selected);
+    const selected = candidates.find(item => item.supplierMappingId === data.effectiveState?.supplierMappingId);
     modal.querySelector("[data-manage-package-selection-state]").textContent = selected
         ? selected.supplier.name
-        : "Supplier selection required";
+        : "No executable supplier";
     const supplierCounts = candidates.reduce((counts, candidate) => counts.set(candidate.supplier.supplierId, (counts.get(candidate.supplier.supplierId) || 0) + 1), new Map());
     const usable = candidates.filter(candidate => candidate.readiness?.selectable === true);
     const unavailable = candidates.filter(candidate => candidate.readiness?.selectable !== true);
@@ -2174,7 +2183,7 @@ function renderManagePackageCandidates(modal, data = {}) {
     const operationalBlockers = data.operational?.blockerCodes || data.publication?.blockers || [];
     modal.querySelector("[data-manage-package-public-detail]").textContent = operationalBlockers.length
         ? operationalBlockers.map(catalogPackageBlockerLabel).join(" · ")
-        : "Price and exact auto-fulfillment routing are ready for this customer market.";
+        : data.publication?.published ? "Selling is enabled and the effective route is ready for this customer market." : "Selling is disabled for this customer market.";
     const price = data.customerPrice;
     modal.querySelector("[data-manage-package-customer-price]").textContent = price && Number.isFinite(Number(price.amount))
         ? `${Number(price.amount).toLocaleString()} ${price.currency}` : "Price unavailable";
@@ -2213,7 +2222,7 @@ async function saveManagePackageSupplier(product, pkg, modal) {
     const marketName = data.customerMarket === "MM" ? "Myanmar" : "Thailand";
     const confirmed = await confirmCatalogAction({
         title: "Change fulfillment supplier?",
-        message: `Package\n${pkg.name || pkg.packageCode}\n\nCustomer market\n${marketName}\n\nPrevious supplier route\n${previous ? `${candidateRouteLabel(previous)}\n${formatCandidateCost(previous.cost)}` : "No explicit supplier selected"}\n\nNew supplier route\n${candidateRouteLabel(next)}\n${formatCandidateCost(next.cost)}\n\nCustomer price\n${price ? `${Number(price.amount).toLocaleString()} ${price.currency}` : "Price unavailable"}\n\nCustomer price will not change.\nPublication state will not change.\nThis supplier selection remains Storefront intent until routing cutover is separately enabled.`,
+        message: `Package\n${pkg.name || pkg.packageCode}\n\nCustomer market\n${marketName}\n\nPrevious supplier route\n${previous ? `${candidateRouteLabel(previous)}\n${formatCandidateCost(previous.cost)}` : "No explicit supplier selected"}\n\nNew supplier route\n${candidateRouteLabel(next)}\n${formatCandidateCost(next.cost)}\n\nCustomer price\n${price ? `${Number(price.amount).toLocaleString()} ${price.currency}` : "Price unavailable"}\n\nCustomer price will not change.\nSelling state will not change.\nNew checkouts will use this exact supplier; existing frozen orders will not change.`,
         confirmText: "Change Supplier"
     });
     if (!confirmed) return;
@@ -2574,8 +2583,8 @@ async function updateMerchandisingPublication(product, pkg, input) {
 
     const confirmed = await confirmCatalogAction({
         title: published
-            ? `Make this package public in ${marketName}?`
-            : `Hide this package from ${marketName}?`,
+            ? `Turn Selling ON in ${marketName}?`
+            : `Turn Selling OFF in ${marketName}?`,
         message:
             `${pkg.name || pkg.packageCode}\n\n` +
             (
@@ -2584,7 +2593,7 @@ async function updateMerchandisingPublication(product, pkg, input) {
                     : `Customers in ${marketName} will no longer see or start a new purchase for this package.`
             ) +
             `\n\nSupplier mapping, fulfillment configuration, pricing history and past orders will not change.`,
-        confirmText: published ? "Make Public" : "Hide from Storefront"
+        confirmText: published ? "Enable Selling" : "Disable Selling"
     });
 
     if (!confirmed) {
@@ -2600,7 +2609,7 @@ async function updateMerchandisingPublication(product, pkg, input) {
             {
                 customerMarket: market,
                 published,
-                decisionNote: "Storefront Merchandising public visibility"
+                decisionNote: "Storefront package Selling decision"
             }
         );
 
@@ -2619,8 +2628,8 @@ async function updateMerchandisingPublication(product, pkg, input) {
 
         showAdminToast?.(
             published
-                ? `Publication enabled for ${pkg.name || pkg.packageCode} in ${marketName}`
-                : `${pkg.name || pkg.packageCode} is hidden in ${marketName}`,
+                ? `${pkg.name || pkg.packageCode} Selling is ON in ${marketName}`
+                : `${pkg.name || pkg.packageCode} Selling is OFF in ${marketName}`,
             "success"
         );
     } catch (error) {
@@ -2629,6 +2638,28 @@ async function updateMerchandisingPublication(product, pkg, input) {
             error?.message || "Package visibility could not be changed.",
             "error"
         );
+    } finally {
+        input.disabled = false;
+    }
+}
+
+async function updateProductPurchasable(product, input) {
+    const previous = product.publicDiscoveryEnabled === true && product.commerceState === "PURCHASABLE";
+    const enabled = input.checked === true;
+    input.disabled = true;
+    try {
+        const result = await mutateCatalog(`/api/admin/catalog/products/${encodeURIComponent(product.productCode)}`, {
+            publicDiscoveryEnabled: enabled,
+            commerceState: enabled ? "PURCHASABLE" : "HIDDEN",
+            expectedUpdatedAt: product.updatedAt
+        });
+        if (!result?.success) throw new Error(result?.message || "Product Purchasable state could not be changed.");
+        selectedCatalogProduct = result.product || selectedCatalogProduct;
+        renderCatalogDetail(result.product || selectedCatalogProduct || product);
+        showAdminToast?.(`Product Purchasable is ${enabled ? "ON" : "OFF"}`, "success");
+    } catch (error) {
+        input.checked = previous;
+        showAdminToast?.(error?.message || "Product Purchasable state could not be changed.", "error");
     } finally {
         input.disabled = false;
     }
@@ -2749,6 +2780,10 @@ function bindActiveCatalogTab(detail, product, packages) {
         if (!catalogPackageOverviewCache.has(catalogPackageOverviewKey(product.productCode))) {
             loadCatalogPackageOverview(product).catch(error => showAdminToast?.(error?.message || "Package storefront state is unavailable.", "error"));
         }
+        hydratePackageSupplierSummaries(product, packages, detail);
+        detail.querySelector("[data-product-purchasable]")?.addEventListener("change", event => {
+            updateProductPurchasable(product, event.target).catch(error => showAdminToast?.(error?.message || "Product Purchasable state could not be changed.", "error"));
+        });
         detail.querySelector("[data-merch-market]")?.addEventListener("change", event => {
             catalogCustomerMarket = event.target.value === "MM" ? "MM" : "TH";
             catalogPackageOperationalFilter = "AUTO";
