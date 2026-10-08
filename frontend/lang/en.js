@@ -81,7 +81,6 @@ window.AZIEL_LANG.en = {
     nav_features: "Features",
     nav_platform: "Platform",
     overview: "Overview",
-    security: "Security",
     transactions: "Transactions",
     theme: "Theme",
     "Safe & Trusted": "Account safeguards",
@@ -206,7 +205,6 @@ window.AZIEL_LANG.en = {
     scanPay: "Scan & Pay",
     orderId: "Order ID",
     amount: "Amount",
-    waitingPayment: "Waiting for Payment",
     paymentExpiresIn: "Payment expires in",
 
     pleaseWait: "Please wait a few seconds...",
@@ -278,13 +276,11 @@ window.AZIEL_LANG.en = {
     refundAbuseTitle: "Abuse Prevention",
     refundAbuseText: "Fake refund requests, repeated abuse, or fraudulent claims may result in account restriction or suspension.",
 
-    needHelp: "Need Help?",
     refundHelpText: "If you believe your order qualifies for a refund, please contact AZIEL Support or submit a refund request from your order tracking page.",
     refundHelpItem1: "Order ID",
     refundHelpItem2: "Payment Method",
     refundHelpItem3: "Payment Receipt or slip if available",
     refundHelpItem4: "Description of the issue",
-    contactSupport: "Contact Support",
     paymentPolicyTitle: "Payment Policy",
 
     paymentMethodsTitle: "Accepted Payment Methods",
@@ -618,7 +614,6 @@ window.AZIEL_LANG.en = {
     "Account - AZIEL": "Account - AZIEL",
     "Region: MM": "Region: MM",
     "Track order": "Track order",
-    "Loading...": "Loading...",
     "Password security status.": "Password security status.",
     "Change Password": "Change Password",
     "Extra account protection for your AZIEL account.": "Extra account protection for your AZIEL account.",

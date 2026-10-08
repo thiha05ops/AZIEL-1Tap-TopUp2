@@ -8,7 +8,7 @@ const {
 } = require("../catalog/catalogProjection");
 const { assertAssetCategory } = require("./mediaService");
 const { CATALOG_CATEGORIES, HOMEPAGE_FLAGS, HOMEPAGE_SECTIONS, CATALOG_LIFECYCLE, COMMERCE_STATES } = require("../catalog/catalogTaxonomy");
-const { getCanonicalProduct, resolveCanonicalProductRoute } = require("../catalog/canonicalOperationalCatalog");
+const { resolveProductRoute } = require("../catalog/productRoute");
 const { normalizeProductKnowledge, normalizeCustomerNote, normalizeCustomerNoteLocales, ProductKnowledgeError } = require("../catalog/productKnowledge");
 const { SUPPORTED_REGIONS: PRODUCT_COMPATIBILITY_MARKETS } = require("../catalog/productRegionAuthority");
 const { SUPPLIER_CURRENCY } = require("../constants/commerce");
@@ -16,7 +16,7 @@ const { finalizePublishedCustomerAmount } = require("./commerce/customerPayableA
 
 function normalizeAdminProductCode(value) {
     const requested = String(value || "").trim().toLowerCase();
-    const normalized = getCanonicalProduct(requested)?.productCode || requested;
+    const normalized = requested;
     if (!/^[a-z0-9][a-z0-9-]{0,79}$/.test(normalized)) {
         throw new CatalogAdminError("CATALOG_PRODUCT_UNSUPPORTED", "Product is not supported by the canonical catalog.", 409);
     }
@@ -870,36 +870,11 @@ function shouldValidateProductReadiness({ transition, previousCommerceState, nex
 async function updateProduct({ productCode, patch = {}, actor = "admin" }) {
     const normalizedProductCode = normalizeAdminProductCode(productCode);
     let product = await CatalogProduct.findOne({ productCode: normalizedProductCode });
-    let initializedFromCanonical = false;
-
     if (!product) {
-        const canonical = getCanonicalProduct(normalizedProductCode);
-        if (!canonical) {
-            throw new CatalogAdminError("CATALOG_PRODUCT_NOT_FOUND", "Product not found.", 404);
-        }
-        product = await CatalogProduct.findOneAndUpdate(
-            { productCode: normalizedProductCode },
-            {
-                $setOnInsert: {
-                    productCode: canonical.productCode,
-                    name: canonical.name,
-                    enabled: true,
-                    catalogCategory: canonical.catalogCategory,
-                    supportedRegions: canonical.supportedRegions,
-                    sortOrder: canonical.sortOrder,
-                    productRoute: canonical.productRoute,
-                    commerceState: "HIDDEN",
-                    publicDiscoveryEnabled: false,
-                    source: "admin",
-                    metadata: { initializedFromCanonical: true }
-                }
-            },
-            { returnDocument: "after", upsert: true, runValidators: true, setDefaultsOnInsert: true }
-        );
-        initializedFromCanonical = true;
+        throw new CatalogAdminError("CATALOG_PRODUCT_NOT_FOUND", "Product not found.", 404);
     }
 
-    if (!initializedFromCanonical) assertFresh(product, patch.expectedUpdatedAt);
+    assertFresh(product, patch.expectedUpdatedAt);
     const updates = buildProductPatch(patch);
     const previousEnabled = product.enabled !== false;
     const previousCommerceState = product.commerceState || "HIDDEN";
@@ -949,7 +924,7 @@ async function updateProduct({ productCode, patch = {}, actor = "admin" }) {
         const identityMissing = [
             !product.name && "name",
             !product.catalogCategory && "category",
-            !resolveCanonicalProductRoute(product.productCode) && "route",
+            !resolveProductRoute(product.productCode) && "route",
             !(product.artworkPath || product.presentation?.imageAssetId) && "artwork"
         ].filter(Boolean);
         if (identityMissing.length) {

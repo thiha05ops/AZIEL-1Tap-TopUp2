@@ -441,6 +441,6 @@
     document.addEventListener("pricesRendered", renderLowerProductContent);
     document.addEventListener("aziel:catalog-updated", renderLowerProductContent);
     window.addEventListener("aziel:shopRegionChanged", renderLowerProductContent);
-    window.addEventListener("aziel:locale-changed", renderLowerProductContent);
+    window.addEventListener("aziel:languageChanged", renderLowerProductContent);
     document.addEventListener("DOMContentLoaded", renderLowerProductContent);
 })();

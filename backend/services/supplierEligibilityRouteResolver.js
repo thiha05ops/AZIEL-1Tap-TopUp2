@@ -7,7 +7,7 @@ const FulfillmentAttempt = require("../models/FulfillmentAttempt");
 const SupplierCatalogOffer = require("../models/SupplierCatalogOffer");
 const SupplierOfferAvailability = require("../models/SupplierOfferAvailability");
 const { getSupplierAdapter } = require("./supplierAdapterRegistry");
-const { transactionalServiceCode } = require("./suppliers/wonddCatalogConfig");
+const { transactionalServiceCode } = require("./suppliers/supplierExecutionIdentity");
 const {
     validateFulfillmentEligibility
 } = require("./supplierFulfillmentEligibilityService");
@@ -35,7 +35,7 @@ function gateEnabled(mapping, adapter) {
 }
 
 function supplierCapabilityProductCode(mapping = {}) {
-    if (upper(mapping.supplierCode) === "WONDD") return transactionalServiceCode(mapping.supplierProductCode, mapping.productCode);
+    if (upper(mapping.supplierCode) === "WONDD") return transactionalServiceCode({ mapping });
     return clean(mapping.productCode);
 }
 
@@ -43,11 +43,7 @@ function operationalPrimaryCustomerMarkets(mapping = {}) {
     const readiness = mapping.mappingMetadata?.readiness || {};
     if (mapping.archivedAt || mapping.enabled !== true || upper(mapping.productionRole) !== "PRIMARY" || upper(mapping.executionMode) !== "API") return [];
     if (readiness.supplierMapped !== true || readiness.pricingReady !== true || readiness.inputReady !== true || readiness.fulfillmentReady !== true) return [];
-    const eligibility = validateFulfillmentEligibility(mapping.fulfillmentEligibility);
-    if (!eligibility.valid || eligibility.value.mode === "UNKNOWN") return [];
-    return eligibility.value.mode === "GLOBAL"
-        ? [...CUSTOMER_MARKETS]
-        : eligibility.value.allowedCustomerMarkets.filter(market => CUSTOMER_MARKETS.includes(market));
+    return [...CUSTOMER_MARKETS];
 }
 
 function eligiblePrimaryRouteConflicts({ candidate = {}, existingMappings = [] } = {}) {
@@ -64,10 +60,6 @@ function eligiblePrimaryRouteConflicts({ candidate = {}, existingMappings = [] }
 function basicCandidateBlockers({ mapping = {}, supplier = {}, pkg = {}, customerMarket = "", adapter = null, controlledTestEvidence = false, offer = null, availability = null, requireCatalogEvidence = false } = {}) {
     const blockers = [];
     const market = upper(customerMarket);
-    const eligibility = validateFulfillmentEligibility(mapping.fulfillmentEligibility);
-    if (!eligibility.valid) blockers.push(...eligibility.errors);
-    else if (eligibility.value.mode === "UNKNOWN") blockers.push("FULFILLMENT_ELIGIBILITY_UNKNOWN");
-    else if (eligibility.value.mode === "CUSTOMER_MARKET_ALLOWLIST" && !eligibility.value.allowedCustomerMarkets.includes(market)) blockers.push("CUSTOMER_MARKET_NOT_ELIGIBLE");
     if (mapping.archivedAt) blockers.push("MAPPING_ARCHIVED");
     if (mapping.productionRole !== "PRIMARY") blockers.push("MAPPING_NOT_PRIMARY");
     if (mapping.enabled !== true) blockers.push("MAPPING_DISABLED");
@@ -121,7 +113,7 @@ function summarizeEligibilityResolution({ mappings = [], assessments = new Map()
     return {
         outcome: OUTCOMES.ELIGIBLE,
         blockerCodes: [],
-        eligibility: validateFulfillmentEligibility(mapping.fulfillmentEligibility).value,
+        eligibility: mapping.fulfillmentEligibility || null,
         routeSnapshot: Object.freeze({
             routeType: "SUPPLIER_API",
             supplierMappingId: String(mapping._id),

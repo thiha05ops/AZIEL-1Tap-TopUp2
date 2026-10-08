@@ -46,12 +46,12 @@ function projectionRegressions() {
 
 function main() {
     projectionRegressions();
-    const orchestrator = read("backend/services/commerce/paymentOrchestrator.js");
+    const payableSubjectAdapter = read("backend/services/commerce/commerceOrderPayableSubjectAdapter.js");
     const routes = read("backend/routes/order.js");
     const recovery = read("backend/services/commerce/commercePaymentRecoveryService.js");
     const tracking = read("frontend/js/tracking.js");
 
-    assert(orchestrator.includes('toStatus: "paid"') && orchestrator.includes('fromStatuses: ["pending_payment"]'), "Payment approval must transition CommerceOrder pending_payment to paid.");
+    assert(payableSubjectAdapter.includes('targetStatus === "paid"') && payableSubjectAdapter.includes('fromStatuses: ["pending_payment"]') && payableSubjectAdapter.includes('toStatus: "paid"'), "Payment approval must transition CommerceOrder pending_payment to paid through the payable-subject adapter.");
     assert(routes.includes("async function projectOwnedCommerceOrders"), "Recent and exact lookup must share hydrated Commerce projection.");
     assert(routes.includes("paymentAttempt: paymentByOrder.get(order.orderId)"), "Customer projection must hydrate latest PaymentAttempt.");
     assert(routes.includes("fulfillmentAttempts: fulfillmentByOrder.get(String(order._id))"), "Customer projection must hydrate fulfillment state.");
@@ -60,7 +60,7 @@ function main() {
     assert(routes.includes('recoverable: normalizedOrderStatus === "pending_payment"'), "Customer DTO must expose canonical recoverability.");
     assert(recovery.includes('RECOVERABLE_ORDER_STATUSES') && recovery.includes('new Set(["pending_payment"])'), "Recovery must include only pending-payment orders.");
     assert(recovery.includes('RECOVERABLE_ORDER_PAYMENT_STATUSES') && recovery.includes('new Set(["pending", "unpaid"])'), "Paid/completed orders must be excluded from recovery.");
-    assert(tracking.includes('trackingApiUrl("/api/order/user/me")') && tracking.includes("getTrackingAuthHeaders().Authorization"), "Recent Orders must be token-owned rather than blocked by profile or cached username bootstrap.");
+    assert(tracking.includes('window.AZIEL.authFetch("/api/order/user/me")') && tracking.includes('trackingApiUrl("/api/order/user/me")'), "Recent Orders must use the authenticated session client with the credentialed fetch compatibility path.");
     assert(tracking.includes('orderStatus === "pending"') && tracking.includes('order.receiptSubmitted === true'), "Stale receipt evidence must not override a completed customer order.");
     assert(routes.includes('"owner.userId": String(req.user?._id'), "Commerce visibility must remain owner-isolated.");
 

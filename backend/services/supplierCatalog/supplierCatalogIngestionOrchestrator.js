@@ -30,7 +30,7 @@ function createSupplierCatalogIngestionOrchestrator(options = {}) {
     const sleep = options.sleep || wait, clock = options.clock || (() => new Date());
     function leaseGuardedRepositories(base, assertLease) {
         const wrap = group => Object.fromEntries(Object.entries(group || {}).map(([name,fn]) => [name, async (...args) => { await assertLease(); return fn(...args); }]));
-        return { products: wrap(base.products), offers: wrap(base.offers), availability: wrap(base.availability), observations: wrap(base.observations), runs: wrap(base.runs) };
+        return { products: wrap(base.products), offers: wrap(base.offers), availability: wrap(base.availability), observations: wrap(base.observations), bulk: wrap(base.bulk), runs: wrap(base.runs) };
     }
     async function run(input = {}) {
         const supplierCode = String(input.supplierCode || "").trim().toUpperCase(), trigger = input.trigger || "SYSTEM", policy = policyReader(), supplierPolicy = policy.suppliers[supplierCode];
@@ -51,12 +51,24 @@ function createSupplierCatalogIngestionOrchestrator(options = {}) {
             while (attempts < supplierPolicy.maxAttempts) {
                 attempts++;
                 const controller = new AbortController(), timeout = setTimeout(() => controller.abort(), supplierPolicy.timeoutMs); timeout.unref?.();
-                try { stage = await service.stageCatalog({ reader, supplierId: supplier._id, mappings, observedAt: clock(), signal: controller.signal }); clearTimeout(timeout); if (stage.errors?.length && !stage.products?.length && attempts < supplierPolicy.maxAttempts && retryable(stage.errors[0])) throw Object.assign(new Error("Retryable supplier catalog read failure."), { code: stage.errors[0].code, retryable: true }); break; }
+                try { stage = await service.stageCatalog({ reader, supplierId: supplier._id, mappings, observedAt: clock(), signal: controller.signal, onProgress: progress => logger.info?.("Supplier catalog ingestion progress", { supplierCode, attempt: attempts, ...progress }) }); clearTimeout(timeout); if (stage.errors?.length && !stage.products?.length && attempts < supplierPolicy.maxAttempts && retryable(stage.errors[0])) throw Object.assign(new Error("Retryable supplier catalog read failure."), { code: stage.errors[0].code, retryable: true }); break; }
                 catch (error) { clearTimeout(timeout); if (attempts >= supplierPolicy.maxAttempts || !retryable(error)) throw error; const delay = Math.min(supplierPolicy.retryMaxMs, supplierPolicy.retryBaseMs * (2 ** (attempts - 1))); await sleep(delay); }
             }
+            if (!stage?.products?.length) {
+                const failure = stage?.errors?.[0] || {};
+                throw new SupplierCatalogIngestionError(
+                    failure.code || "SUPPLIER_CATALOG_EMPTY",
+                    failure.message || "Supplier catalog returned no products; no persistence was attempted.",
+                    502,
+                    { coverageState: stage?.coverageState || "UNKNOWN" }
+                );
+            }
+            const planStartedAt = Date.now();
             const plan = service.planMutations(stage, { products, offers });
+            logger.info?.("Supplier catalog ingestion progress", { supplierCode, attempt: attempts, phase: "PLAN_READY", durationMs: Date.now() - planStartedAt, products: plan.products.length, offers: plan.offers.length, missing: plan.missing.length });
             const assertLease = async () => { if (leaseFailure) throw leaseFailure; await locks.renew(lock, supplierPolicy.lockTtlMs); };
-            const result = await service.applyCatalogOnlyPlan(plan, leaseGuardedRepositories(repositories(), assertLease), { runKey });
+            logger.info?.("Supplier catalog ingestion progress", { supplierCode, attempt: attempts, phase: "APPLY_START", products: plan.products.length, offers: plan.offers.length });
+            const result = await service.applyCatalogOnlyPlan(plan, leaseGuardedRepositories(repositories(), assertLease), { runKey, onProgress: progress => logger.info?.("Supplier catalog ingestion progress", { supplierCode, attempt: attempts, ...progress }) });
             await models.Run.updateOne({ _id: result._id }, { $set: { trigger, requestedAt, attemptCount: attempts, lockOwnerId: owner, requestedBy: input.actor || {}, reason: String(input.reason || "") } });
             const affectedProducts = [...new Set(mappings.map(mapping => String(mapping.productCode || "").trim().toLowerCase()).filter(Boolean))];
             for (const productCode of affectedProducts) {

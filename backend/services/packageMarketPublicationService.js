@@ -21,8 +21,8 @@ function normalizeCustomerMarket(value = "TH") {
 }
 
 function publicationMode(env = process.env) {
-    const mode = String(env.PACKAGE_MARKET_PUBLICATION_MODE || "LEGACY").trim().toUpperCase();
-    return PUBLICATION_MODES.includes(mode) ? mode : "LEGACY";
+    const mode = String(env.PACKAGE_MARKET_PUBLICATION_MODE || "EXPLICIT").trim().toUpperCase();
+    return PUBLICATION_MODES.includes(mode) ? mode : "EXPLICIT";
 }
 
 function publicationKey(productCode, packageCode, customerMarket = "TH") {
@@ -105,13 +105,10 @@ function stripPublicationMetadata(projection) {
 }
 
 function explicitPublishedPackages(projection) {
-    // Publication records remain historical/audit evidence. Normal storefront
-    // inclusion is derived from current price plus the exact selected route
-    // already projected into fulfillmentRegions by the catalog service.
     return (projection?.packages || []).filter(pkg => {
         const market = normalizeCustomerMarket(pkg.publication?.customerMarket || "TH");
         const price = pkg.prices?.[market];
-        return pkg.enabled !== false && !pkg.deletedAt &&
+        return pkg.publication?.published === true && pkg.enabled !== false && !pkg.deletedAt &&
             pkg.fulfillmentRegions?.[market] === true &&
             price?.enabled !== false && Number.isFinite(Number(price?.amount)) &&
             Number(price.amount) > 0;

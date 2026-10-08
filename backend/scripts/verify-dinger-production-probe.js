@@ -48,9 +48,52 @@ const baseEnv = Object.freeze({
     const unknown = classifyPayResponse({ code: "000", message: "PRIVATE MESSAGE", response: { transactionNum: "PRIVATE-TRANSACTION", qrCode: "PRIVATE-QR", sign: "PRIVATE-SIGNATURE", paymentToken: "PRIVATE-TOKEN", customerName: "PRIVATE-NAME", amount: 500 } }, { httpStatus: 200, bodyNonempty: true, jsonParsed: true });
     assert.strictEqual(unknown.classification, "UNKNOWN_HTTP_SUCCESS");
     assert.deepStrictEqual(unknown.topLevel.fields.map(field => field.name), ["code", "response"]);
-    assert.deepStrictEqual(unknown.nested[0].fields.map(field => field.name), ["amount", "transactionNum"]);
+    assert.deepStrictEqual(unknown.nested[0].fields.map(field => field.name), ["amount", "qrCode", "transactionNum"]);
     const unknownOutput = JSON.stringify(unknown);
-    ["PRIVATE MESSAGE", "PRIVATE-TRANSACTION", "PRIVATE-QR", "PRIVATE-SIGNATURE", "PRIVATE-TOKEN", "PRIVATE-NAME", "qrCode", "sign", "paymentToken", "customerName", "message"].forEach(secret => assert.strictEqual(unknownOutput.includes(secret), false));
+    ["PRIVATE MESSAGE", "PRIVATE-TRANSACTION", "PRIVATE-QR", "PRIVATE-SIGNATURE", "PRIVATE-TOKEN", "PRIVATE-NAME", "sign", "paymentToken", "customerName", "message"].forEach(secret => assert.strictEqual(unknownOutput.includes(secret), false));
+
+    // QR_FORMAT_DIAGNOSTIC_TESTS
+    const qrCases = [
+        ["DATA_IMAGE", "data:image/png;base64,AAAA"],
+        ["HTTPS_URL", "https://example.com/qr.png"],
+        ["SVG", "<svg xmlns='http://www.w3.org/2000/svg'></svg>"],
+        ["POSSIBLE_BASE64", "A".repeat(100)],
+        ["OPAQUE_TEXT", "000201010212"]
+    ];
+
+    for (const [expectedFormat, qrCode] of qrCases) {
+        const result = classifyPayResponse({
+            code: "000",
+            response: { qrCode }
+        }, {
+            httpStatus: 200,
+            bodyNonempty: true,
+            jsonParsed: true
+        });
+
+        assert.deepStrictEqual(result.qrDiagnostic, {
+            present: true,
+            type: "string",
+            nonempty: true,
+            format: expectedFormat
+        });
+
+        assert.strictEqual(
+            JSON.stringify(result).includes(qrCode),
+            false,
+            "QR payload must never appear in diagnostic output"
+        );
+    }
+
+    const missingQr = classifyPayResponse({
+        code: "000",
+        response: {}
+    });
+
+    assert.deepStrictEqual(
+        missingQr.qrDiagnostic,
+        { present: false }
+    );
 
     const calls = [];
     const logs = [];
@@ -172,6 +215,7 @@ const baseEnv = Object.freeze({
     assert.strictEqual(inspectDingerEnvironment(legacyOnly).configured, false, "unscoped legacy credentials must not cross environment boundaries");
     const separated = {
         DINGER_ENVIRONMENT: "LIVE", DINGER_ENABLED: "false", DINGER_LIVE_BASE_URL: "https://live.example.test",
+        DINGER_LIVE_TOKEN_URL: "https://live.example.test/api/token", DINGER_LIVE_PAY_URL: "https://live.example.test/api/pay",
         DINGER_LIVE_PROJECT_NAME: "live-project", DINGER_LIVE_API_KEY: "live-key", DINGER_LIVE_MERCHANT_NAME: "live-merchant",
         DINGER_LIVE_PUBLIC_KEY: publicKey, DINGER_LIVE_CALLBACK_KEY: "0123456789abcdef", DINGER_LIVE_CALLBACK_URL: "https://merchant.example.test/callback"
     };

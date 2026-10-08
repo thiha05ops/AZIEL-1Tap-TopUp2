@@ -1,5 +1,6 @@
 const express = require("express");
 const router = express.Router();
+const CatalogProduct = require("../models/CatalogProduct");
 
 const adminMiddleware = require("../middleware/adminMiddleware");
 const upload = require("../middleware/imageMemoryUpload");
@@ -48,7 +49,7 @@ const {
     listPublicExclusiveOffers,
     toPublicCatalog
 } = require("../services/catalogService");
-const { CANONICAL_OPERATIONAL_PRODUCTS, getCanonicalProduct, resolveCanonicalProductRoute } = require("../catalog/canonicalOperationalCatalog");
+const { resolveProductRoute } = require("../catalog/productRoute");
 const { availabilityReason } = require("../catalog/publicProductReadiness");
 const {
     getHomePresentation,
@@ -128,14 +129,13 @@ function projectAdminSource() {
 }
 
 function projectAdminCatalogMetadata(product = {}) {
-    const canonical = getCanonicalProduct(product.productCode) || {};
     return {
-        operationalCategory: canonical.category || "",
-        platform: canonical.platform || "",
-        market: canonical.market || "",
-        adminCategory: canonical.adminCategory || "",
-        family: canonical.family || "",
-        canonicalRoute: resolveCanonicalProductRoute(product.productCode)
+        operationalCategory: product.catalogCategory || product.category || "",
+        platform: product.presentation?.platform || "",
+        market: product.presentation?.marketScope || "",
+        adminCategory: product.catalogCategory || "",
+        family: product.family || "",
+        canonicalRoute: resolveProductRoute(product.productCode)
     };
 }
 
@@ -392,8 +392,9 @@ router.get("/catalog/:productCode", async (req, res) => {
 
 router.get("/admin/catalog/products", adminMiddleware, requireAdminPermission(PERMISSIONS.CATALOG_READ), async (req, res) => {
     try {
-        const adminProducts = (await Promise.all(CANONICAL_OPERATIONAL_PRODUCTS.map(canonical => (
-            resolveAdminCatalogProduct(canonical.productCode, {
+        const catalogProducts = await CatalogProduct.find({ deletedAt: null }).select("productCode").sort({ sortOrder: 1, productCode: 1 }).lean();
+        const adminProducts = (await Promise.all(catalogProducts.map(product => (
+            resolveAdminCatalogProduct(product.productCode, {
                 includeAssetProjection: true,
                 includeAdminPricing: false
             })

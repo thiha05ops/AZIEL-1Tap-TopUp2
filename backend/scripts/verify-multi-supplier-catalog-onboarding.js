@@ -63,9 +63,10 @@ assert.strictEqual(linked.currentLink.productCode, "mlbb");
 assert.strictEqual(linked.state, "READY", "an exact persisted link is catalog-ready even when fulfillment setup remains incomplete.");
 assert(linked.setupBlockers.length > 0, "live-readiness gaps remain visible and are not weakened.");
 for (const unresolved of plan.offers.filter(row => !row.mappingId)) {
-    assert.strictEqual(unresolved.state, "NEEDS_ATTENTION");
-    assert.strictEqual(unresolved.primaryBlocker, "OWNER_PACKAGE_DECISION_REQUIRED");
-    assert.strictEqual(unresolved.selectable, false, "name, price, and arithmetic never silently link an unmapped offer.");
+    assert.strictEqual(unresolved.state, "PREPARABLE");
+    assert.strictEqual(unresolved.primaryBlocker, "");
+    assert.strictEqual(unresolved.selectable, true, "A new exact supplier-native offer imports as its own package without silently linking by name, price, or arithmetic.");
+    assert.strictEqual(unresolved.packageDisposition.create, true);
     assert.strictEqual(unresolved.candidatePackages.length, 2, "existing AZIEL targets are suggestions only.");
 }
 
@@ -79,7 +80,7 @@ const modal = read("frontend/js/admin-supplier-catalog.js");
 assert(reconciliation.includes("LINK_TO_EXISTING_CANONICAL_PACKAGE") && reconciliation.includes("CREATE_CANONICAL_PACKAGE_AND_LINK"));
 assert(reconciliation.includes('enabled:false,productionRole:"DISABLED"') && reconciliation.includes('fulfillmentEligibility:{mode:"UNKNOWN"'));
 assert(finalizer.includes("packageSelection=new Map") && finalizer.includes("if(!packageSelection.has"), "adding a supplier source must not replace an existing canonical package link.");
-assert(finalizer.includes("publicationWrites:0") && finalizer.includes("priceWrites:0") && finalizer.includes("packageSupplierSelectionWrites:0") && finalizer.includes("primaryAssignments:0") && finalizer.includes("supplierCalls:0"));
+assert(finalizer.includes("publicationWrites:0") && finalizer.includes("priceWrites:0") && finalizer.includes("packageSupplierSelectionWrites") && finalizer.includes("primaryAssignments:0") && finalizer.includes("supplierCalls:0"));
 assert(!/Promise\.all\s*\(/.test(finalizer), "Add Product transaction operations must remain sequential on one Mongo session.");
 assert(finalizer.includes('AddProductFinalizationError("ADD_PRODUCT_PACKAGE_NOT_PREPARABLE","One or more packages are no longer preparable.",409)'), "finalization rejection must retain the numeric HTTP status contract.");
 assert(modal.includes("Names, prices, and arithmetic are suggestions only"));

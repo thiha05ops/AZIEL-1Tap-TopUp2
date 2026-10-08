@@ -15,7 +15,7 @@ const explicitTrue = value => String(value == null ? "" : value).trim().toLowerC
 
 function resolveSupplierGateMode(env = process.env) {
     const configured = String(env.AZIEL_SUPPLIER_GATE_MODE || "").trim().toUpperCase();
-    if (!configured) return SUPPLIER_GATE_MODES.LEGACY_PRODUCT_ONLY;
+    if (!configured) return SUPPLIER_GATE_MODES.SUPPLIER_ONLY;
     if (!Object.values(SUPPLIER_GATE_MODES).includes(configured)) throw Object.assign(new Error(`Unsupported supplier gate mode: ${configured}`), { code: "SUPPLIER_GATE_MODE_INVALID" });
     return configured;
 }

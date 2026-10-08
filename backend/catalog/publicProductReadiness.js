@@ -1,4 +1,4 @@
-const { resolveCanonicalProductRoute } = require("./canonicalOperationalCatalog");
+const { resolveProductRoute } = require("./productRoute");
 
 const REGIONS = Object.freeze(["MM", "TH"]);
 
@@ -71,7 +71,7 @@ function resolvePublicProductReadiness(product = {}, packages = [], commerceRead
     // operational list only selects dedicated legacy pages; it is not the
     // authority for Master Catalog membership.
     const canonical = /^[a-z0-9][a-z0-9-]{0,79}$/.test(String(product.productCode || "").trim().toLowerCase()) && !product.deletedAt;
-    const route = resolveCanonicalProductRoute(product.productCode);
+    const route = resolveProductRoute(product.productCode);
     const regions = Object.fromEntries(REGIONS.map(region => [region, regionReadiness(product, packages, region, commerceReadiness)]));
     const blockers = [];
     const warnings = [];

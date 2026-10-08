@@ -89,13 +89,13 @@ assert(!/TreeWalker|createTreeWalker/.test(runtime), "DOM text scraping is forbi
 assert(!/MutationObserver/.test(runtime), "MutationObserver translation is forbidden");
 assert(!/google\s*translate|TranslateElement/i.test(runtime), "browser translation is forbidden");
 assert(runtime.includes('const LANG_KEY = "azielLanguage"'), "a second locale authority is forbidden");
-assert(runtime.includes('"aziel:locale-changed"'), "live locale event must remain authoritative");
+assert(runtime.includes('"aziel:languageChanged"') && !runtime.includes('"aziel:locale-changed"'), "aziel:languageChanged must be the only live locale event");
 assert(runtime.includes("document.documentElement.lang"), "html lang synchronization required");
 assert(runtime.includes("textContent"), "translations must use safe text rendering");
 assert(!runtime.includes("innerHTML = translated"), "translated strings must not become trusted HTML");
 
 const stage = read("frontend/js/product-detail-stage.js");
-assert(stage.includes('window.addEventListener("aziel:locale-changed", renderLowerProductContent)'), "Product Knowledge must update live");
+assert(stage.includes('window.addEventListener("aziel:languageChanged", renderLowerProductContent)'), "Product Knowledge must update live");
 assert(!stage.includes("selectedPackage = null"), "locale changes must preserve package state");
 const preferences = read("frontend/js/locale-switcher.js");
 const regionBranch = preferences.match(/if \(group === "region"\) \{([\s\S]*?)\n        \}/)?.[1] || "";

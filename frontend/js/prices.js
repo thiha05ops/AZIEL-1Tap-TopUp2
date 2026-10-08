@@ -25,7 +25,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 
-  window.addEventListener("aziel:locale-changed", () => {
+  window.addEventListener("aziel:languageChanged", () => {
     const selectedCode = selectedPackage?.code || document.querySelector(".pack.active")?.dataset.code || "";
     renderGamePrices({ reselectCode: selectedCode, reason: "locale_changed" });
   });

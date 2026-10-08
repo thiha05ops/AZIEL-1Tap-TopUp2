@@ -769,15 +769,10 @@ async function startFulfillmentForOrder(orderId, payload = {}, context = {}) {
         if (!frozen.ready) throw new FulfillmentError("FROZEN_ROUTE_NOT_EXECUTABLE", `Frozen route is no longer executable: ${frozen.blockers.join(",")}`, 409);
     }
     if (supplier.supplierCode === "WONDD") {
-        const { resolveWonddCatalogIdentity } = require("./suppliers/wonddCatalogConfig");
-        const { hasWonddGameIdFormatter } = require("./suppliers/wonddGameIdFormatters");
-        const catalogIdentity = resolveWonddCatalogIdentity(mapping.supplierProductCode);
-        const capabilityProductCode = supplierCapabilityProductCode(mapping, supplier);
-        if (mapping.executionMode !== SUPPLIER_EXECUTION_MODES.API || !catalogIdentity || catalogIdentity.family.serviceCode !== capabilityProductCode || !String(mapping.supplierPackageCode || "").trim()) {
+        const { verifiedMappingContract } = require("./suppliers/fazercardsFulfillmentContractService");
+        const contract = routeSnapshot?.fulfillmentContract || verifiedMappingContract(mapping);
+        if (mapping.executionMode !== SUPPLIER_EXECUTION_MODES.API || contract?.protocol !== "WONDD_GAME_ID_TOPUP" || !String(contract?.transactionalServiceCode || "").trim() || !String(mapping.supplierProductCode || "").trim() || !String(mapping.supplierPackageCode || "").trim()) {
             throw new FulfillmentError("WONDD_PACKAGE_MAPPING_MISSING", "A verified WonDD serviceid and packcode mapping is required.", 409);
-        }
-        if (!hasWonddGameIdFormatter(mapping.productCode)) {
-            throw new FulfillmentError("WONDD_INPUT_CONTRACT_NOT_CONFIGURED", "WonDD player input contract is not configured.", 409);
         }
         const readiness = mapping.mappingMetadata?.readiness || {};
         const catalogPackage = await CatalogPackage.findOne({

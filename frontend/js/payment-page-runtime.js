@@ -446,7 +446,7 @@
     document.addEventListener("visibilitychange", () => {
         if (document.visibilityState !== "hidden") wakeMyanMyanPayStatusPolling();
     });
-    window.addEventListener("aziel:locale-changed", () => {
+    window.addEventListener("aziel:languageChanged", () => {
         if (!completionState) return;
         const { paid, paymentReceived, orderStatus, myanMyanPay } = completionState;
         const section = document.querySelector(".payment-completion");

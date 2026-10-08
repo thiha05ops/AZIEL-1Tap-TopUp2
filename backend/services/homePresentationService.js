@@ -7,16 +7,18 @@ const MediaAsset = require("../models/MediaAsset");
 const PackageMarketPublication = require("../models/PackageMarketPublication");
 const StoreCatalogSelection = require("../models/StoreCatalogSelection");
 const { publicCategoryFor } = require("../catalog/catalogTaxonomy");
-const { resolveCanonicalProductRoute } = require("../catalog/canonicalOperationalCatalog");
+const { resolveProductRoute } = require("../catalog/productRoute");
 
 const PRESENTATION_SECTIONS = Object.freeze([
     "POPULAR_MOBILE_GAMES",
     "ALL_MOBILE_GAMES",
+    "POPULAR_PC_GAMES",
     "SOCIAL_TOPUP"
 ]);
 const SECTION_ALIASES = Object.freeze({
     POPULAR_MOBILE_GAMES: ["POPULAR_MOBILE_GAMES", "POPULAR_GAME_TOPUP"],
     ALL_MOBILE_GAMES: ["ALL_MOBILE_GAMES", "POPULAR_GAME_TOPUP", "NEW_GAME_TOPUP"],
+    POPULAR_PC_GAMES: ["POPULAR_PC_GAMES"],
     SOCIAL_TOPUP: ["SOCIAL_TOPUP", "DIGITAL_SERVICES"]
 });
 
@@ -81,7 +83,7 @@ function buildPresentationPayload({ region, products = [], selections = [], publ
                 productCode,
                 displayName: String(product.name || productCode).trim(),
                 subtitle: String(product.productKnowledge?.shortDescription || product.description || "").trim(),
-                route: resolveCanonicalProductRoute(productCode),
+                route: resolveProductRoute(productCode),
                 category: publicCategoryFor(product.homepageCategory || product.catalogCategory),
                 artwork: projectArtwork(imageAsset, product.artworkPath),
                 placement: {

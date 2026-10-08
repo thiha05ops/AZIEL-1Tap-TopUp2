@@ -3,10 +3,10 @@ const Supplier = require("../models/Supplier");
 const SupplierProductMapping = require("../models/SupplierProductMapping");
 const SupplierCatalogOffer = require("../models/SupplierCatalogOffer");
 const SupplierOfferAvailability = require("../models/SupplierOfferAvailability");
-const { transactionalServiceCode } = require("./suppliers/wonddCatalogConfig");
+const { transactionalServiceCode } = require("./suppliers/supplierExecutionIdentity");
 const { getSupplierAdapter } = require("./supplierAdapterRegistry");
 const { supportsMapping } = require("./suppliers/supplierFulfillmentDispatcher");
-const { validateFulfillmentEligibility, isCustomerMarketEligible, supplierRouteProductMarketCompatibility } = require("./supplierFulfillmentEligibilityService");
+const { validateFulfillmentEligibility, supplierRouteProductMarketCompatibility } = require("./supplierFulfillmentEligibilityService");
 
 const REGIONS = Object.freeze(["MM", "TH"]);
 const PRODUCT_COMPATIBILITY_MARKETS = Object.freeze(["GLOBAL", "MM", "TH", "ID", "MY", "SG", "PH", "SEA", "ASIA"]);
@@ -44,7 +44,7 @@ function supplierProductCodeForReadiness(mapping = {}, supplier = {}, supplierPr
 function supplierCapabilityProductCode(mapping = {}, supplier = {}, supplierProduct = {}) {
     const supplierCode = String(supplier?.supplierCode || mapping?.supplierCode || "").trim().toUpperCase();
     if (supplierCode === "WONDD") {
-        return transactionalServiceCode(supplierProduct?.supplierProductCode || mapping?.supplierProductCode, mapping?.productCode);
+        return transactionalServiceCode({ mapping, supplierProduct });
     }
     return String(mapping?.productCode || "").trim();
 }
@@ -115,8 +115,6 @@ function assessProductionReadyFulfillmentMapping(mapping = {}, supplier = {}, co
     const routeProductMarketCompatibility = productCompatibilityMarkets.length
         ? supplierRouteProductMarketCompatibility(String(context.supplierRouteMarket || mapping.region || "").trim().toUpperCase(), productCompatibilityMarkets)
         : { compatible: true, deterministic: false, code: "PRODUCT_ACCOUNT_MARKET_NOT_ENFORCED_FOR_SELLING" };
-    if (!eligibility.valid) blockers.push(...eligibility.errors);
-    else if (eligibility.value.mode === "UNKNOWN") blockers.push("FULFILLMENT_ELIGIBILITY_UNKNOWN");
     ["supplierMapped", "inputReady", "validationReady", "pricingReady", "fulfillmentReady", "storefrontReady"].forEach(flag => {
         if (readiness[flag] !== true) blockers.push(`${flag.replace(/[A-Z]/g, letter => `_${letter}`).toUpperCase()}_FALSE`);
     });
@@ -192,9 +190,6 @@ function assessPreCommercialFulfillmentReadiness({
         void routeProductMarketCompatibility;
     }
     if (!markets.length) blockers.push("CUSTOMER_MARKET_REQUIRED");
-    const eligibility = validateFulfillmentEligibility(mapping?.fulfillmentEligibility);
-    if (!eligibility.valid || eligibility.value.mode === "UNKNOWN") blockers.push("CUSTOMER_MARKET_ELIGIBILITY_UNPROVEN");
-    else if (markets.some(market => !isCustomerMarketEligible(eligibility.value, market))) blockers.push("CUSTOMER_MARKET_NOT_ELIGIBLE");
     if (!fulfillmentContract || (!fulfillmentContract.fields?.length && fulfillmentContract.noCustomerInput !== true)) blockers.push("INPUT_CONTRACT_UNRESOLVED");
     if (String(mapping?.executionMode || "").toUpperCase() !== "API" || processorSupported !== true) blockers.push("PROTOCOL_UNSUPPORTED");
     if (adapterConfigured !== true) blockers.push("SUPPLIER_ADAPTER_NOT_READY");

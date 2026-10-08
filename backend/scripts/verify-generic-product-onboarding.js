@@ -4,7 +4,7 @@
 const assert = require("assert");
 const fs = require("fs");
 const path = require("path");
-const { resolveCanonicalProductRoute } = require("../catalog/canonicalOperationalCatalog");
+const { resolveProductRoute } = require("../catalog/productRoute");
 const { resolvePublicProductReadiness } = require("../catalog/publicProductReadiness");
 const {
     resolveAdminCatalogProduct,
@@ -52,7 +52,7 @@ const selection = {
 };
 
 async function main() {
-    assert.strictEqual(resolveCanonicalProductRoute(productCode), `/products/${productCode}`);
+assert.strictEqual(resolveProductRoute(productCode), `/products/${productCode}`);
     assert.strictEqual(fs.existsSync(path.join(ROOT, `frontend/${productCode}.html`)), false);
 
     assert.deepStrictEqual(canonicalPricingRegions(product, pkg, "TH"), ["TH"], "Pricing preparation remains independent from storefront activation.");

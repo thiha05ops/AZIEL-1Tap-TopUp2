@@ -21,7 +21,7 @@ function operationalPackage(overrides = {}) {
 }
 
 function verify() {
-    assert.strictEqual(publicationMode({}), "LEGACY", "Safe read switch must default to LEGACY.");
+    assert.strictEqual(publicationMode({}), "EXPLICIT", "Package Selling must default to explicit Storefront authority.");
     const ready = operationalPackage();
     assert.strictEqual(projectPackagePublication(ready, null).published, false, "Missing record must fail closed.");
     assert.strictEqual(projectPackagePublication(ready, { published: false }).state, "PRIVATE", "published=false must remain private.");
@@ -42,7 +42,7 @@ function verify() {
     assert.strictEqual(projectPackagePublication(ready, { customerMarket: "TH", published: true, decisionVersion: 1 }).state, "PUBLISHED", "Operational recovery must not require republish.");
     const projection = { productCode: "mlbb", packages: [ready, operationalPackage({ packageCode: "MLBB_PRIVATE" })] };
     applyPublicationMetadata(projection, [{ productCode: "mlbb", packageCode: "MLBB_TEST", customerMarket: "TH", published: true }], "TH");
-    assert.deepStrictEqual(explicitPublishedPackages(projection).map(pkg => pkg.packageCode), ["MLBB_TEST", "MLBB_PRIVATE"], "current sellability, not historical publication intent, controls inclusion");
+    assert.deepStrictEqual(explicitPublishedPackages(projection).map(pkg => pkg.packageCode), ["MLBB_TEST"], "Package Selling plus current readiness controls inclusion");
 
     const root = path.resolve(__dirname, "../..");
     const untouched = [

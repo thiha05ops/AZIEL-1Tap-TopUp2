@@ -2,9 +2,9 @@ const Campaign = require("../models/Campaign");
 const CampaignClaimState = require("../models/CampaignClaimState");
 const CampaignImpression = require("../models/CampaignImpression");
 const MediaAsset = require("../models/MediaAsset");
+const CatalogProduct = require("../models/CatalogProduct");
 const { assertAssetCategory, projectMediaAsset } = require("./mediaService");
 const { parseCtaTarget, parseSchedule, parseSortOrder } = require("./gameBannerService");
-const { CANONICAL_OPERATIONAL_PRODUCTS, getCanonicalProduct, isCanonicalProductCode } = require("../catalog/canonicalOperationalCatalog");
 const { CAMPAIGN_PLACEMENT_DEFINITIONS, CAMPAIGN_PLACEMENTS, getCampaignPlacementDefinition } = require("../catalog/campaignPlacements");
 const { normalizeCampaignLocales } = require("../catalog/localizedContent");
 
@@ -164,7 +164,7 @@ function buildCampaignPayload(patch = {}, existing = null) {
         ? parseEnum(patch.placement, CAMPAIGN_PLACEMENTS, "CAMPAIGN_PLACEMENT_INVALID", "Campaign placement")
         : source.placement || "ENTRY_POPUP";
     const requestedProductCode = cleanText(Object.prototype.hasOwnProperty.call(patch, "targetProductCode") ? patch.targetProductCode : source.targetProductCode, 80).toLowerCase();
-    if (getCampaignPlacementDefinition(placement).requiresProductTarget && !isCanonicalProductCode(requestedProductCode)) {
+    if (getCampaignPlacementDefinition(placement).requiresProductTarget && !/^[a-z0-9][a-z0-9-]{0,79}$/.test(requestedProductCode)) {
         throw new CampaignError("CAMPAIGN_PRODUCT_TARGET_INVALID", "Product Notice requires a canonical AZIEL product target.");
     }
 
@@ -229,7 +229,7 @@ function getProjectedState(campaign = {}, now = new Date()) {
     return "ACTIVE";
 }
 
-function projectAdminCampaign(campaign = {}, mediaMap = new Map()) {
+function projectAdminCampaign(campaign = {}, mediaMap = new Map(), productMap = new Map()) {
     const asset = mediaMap.get(campaign.mediaAssetId);
 
     return {
@@ -240,7 +240,7 @@ function projectAdminCampaign(campaign = {}, mediaMap = new Map()) {
         placement: campaign.placement,
         placementDefinition: CAMPAIGN_PLACEMENT_DEFINITIONS[campaign.placement],
         targetProductCode: campaign.targetProductCode || "",
-        targetProductName: getCanonicalProduct(campaign.targetProductCode)?.name || "",
+        targetProductName: productMap.get(campaign.targetProductCode)?.name || "",
         title: campaign.title,
         body: campaign.body,
         mediaAssetId: campaign.mediaAssetId || "",
@@ -287,17 +287,19 @@ async function listAdminCampaigns() {
     const campaigns = await Campaign.find({ archivedAt: null })
         .sort({ priority: -1, startsAt: 1, createdAt: 1, campaignCode: 1 })
         .lean();
-    const mediaMap = await loadMediaMap(campaigns);
+    const [mediaMap, products] = await Promise.all([loadMediaMap(campaigns), CatalogProduct.find({ deletedAt: null }).select("productCode name catalogCategory").lean()]);
+    const productMap = new Map(products.map(product => [product.productCode, product]));
 
     return {
-        campaigns: campaigns.map(item => projectAdminCampaign(item, mediaMap)),
+        campaigns: campaigns.map(item => projectAdminCampaign(item, mediaMap, productMap)),
         placements: Object.values(CAMPAIGN_PLACEMENT_DEFINITIONS),
-        canonicalProducts: CANONICAL_OPERATIONAL_PRODUCTS.map(product => ({ productCode: product.productCode, name: product.name, family: product.family, category: product.adminCategory }))
+        canonicalProducts: products.map(product => ({ productCode: product.productCode, name: product.name, family: product.family || "", category: product.catalogCategory || "" }))
     };
 }
 
 async function createCampaign({ patch = {}, actor = "admin" } = {}) {
     const payload = buildCampaignPayload(patch);
+    if (getCampaignPlacementDefinition(payload.placement).requiresProductTarget && !await CatalogProduct.exists({ productCode: payload.targetProductCode, deletedAt: null })) throw new CampaignError("CAMPAIGN_PRODUCT_TARGET_INVALID", "Product Notice requires an existing AZIEL product target.");
     payload.mediaAssetId = await assertCampaignMedia(payload.mediaAssetId);
 
     const existing = await Campaign.findOne({ campaignCode: payload.campaignCode }).lean();
@@ -333,6 +335,7 @@ async function updateCampaign({ campaignId, patch = {}, actor = "admin" } = {}) 
 
     const existing = campaign.toObject();
     const payload = buildCampaignPayload(patch, existing);
+    if (getCampaignPlacementDefinition(payload.placement).requiresProductTarget && !await CatalogProduct.exists({ productCode: payload.targetProductCode, deletedAt: null })) throw new CampaignError("CAMPAIGN_PRODUCT_TARGET_INVALID", "Product Notice requires an existing AZIEL product target.");
     payload.mediaAssetId = await assertCampaignMedia(payload.mediaAssetId);
     const deliveryFields = ["type", "placement", "targetProductCode", "title", "body", "locales", "mediaAssetId", "ctaLabel", "ctaTarget", "regions", "audience", "startsAt", "endsAt", "frequencyPolicy"];
     const deliveryChanged = deliveryFields.some(key => JSON.stringify(existing[key] ?? null) !== JSON.stringify(payload[key] ?? null));
@@ -406,7 +409,7 @@ async function resolveCampaignCandidates({ placement = "ENTRY_POPUP", productCod
     const definition = getCampaignPlacementDefinition(placement);
     if (!definition) throw new CampaignError("CAMPAIGN_PLACEMENT_INVALID", "Campaign placement is invalid.");
     const normalizedProductCode = cleanText(productCode, 80).toLowerCase();
-    if (definition.requiresProductTarget && !isCanonicalProductCode(normalizedProductCode)) {
+    if (definition.requiresProductTarget && !/^[a-z0-9][a-z0-9-]{0,79}$/.test(normalizedProductCode)) {
         throw new CampaignError("CAMPAIGN_PRODUCT_TARGET_INVALID", "A canonical product is required for this placement.");
     }
     const campaigns = await Campaign.find({

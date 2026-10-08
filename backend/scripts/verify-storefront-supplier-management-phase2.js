@@ -50,8 +50,9 @@ assert(selectionService.includes("customerPriceChanged: false") && selectionServ
 assert(checkout.includes("const resolveCheckoutRouteSnapshot = createRoutingAuthority();"));
 assert(fulfillment.includes("async function startFulfillmentForOrder"));
 assert(checkout.includes("PackageSupplierSelection.findOne"), "future selected authority must read one explicit package/customer-market selection");
-assert(checkout.includes("FULFILLMENT_ROUTING_MODES.SELECTED") && checkout.includes("FULFILLMENT_ROUTING_MODES.SHADOW"), "selected routing must remain explicitly mode-gated");
-assert(read("backend/config/fulfillmentRoutingMode.js").includes("if (!configured) return FULFILLMENT_ROUTING_MODES.LEGACY_REGION"), "default routing must remain legacy");
-assert(checkout.includes("return includeDiagnostics ? { ...legacy, diagnostics } : legacy"), "shadow must return the legacy customer route");
+assert(checkout.includes("return selectedResolver({ productCode, packageCode, region })"), "new orders must use only explicit package selection authority");
+assert(read("backend/config/fulfillmentRoutingMode.js").includes("if (!configured) return FULFILLMENT_ROUTING_MODES.SELECTED"), "new-order routing must default to explicit package selection");
+const newOrderAuthority = checkout.slice(checkout.indexOf("function createRoutingAuthority"), checkout.indexOf("const resolveCheckoutRouteSnapshot"));
+assert(!newOrderAuthority.includes("MANUAL_ADMIN") && !newOrderAuthority.includes("PRIMARY") && !newOrderAuthority.includes("routingMode"), "new-order routing must contain no legacy/manual/PRIMARY branch");
 assert(!fulfillment.includes("PackageSupplierSelection"));
 console.log("PASS Phase 2 API/drawer/stale/image and checkout/fulfillment boundary verification");

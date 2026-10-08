@@ -12,7 +12,7 @@ const multer = require("multer");
 const { Server } = require("socket.io");
 const rateLimit = require("express-rate-limit");
 const mongoose = require("mongoose");
-const { normalizeRouteProductCode, resolveCanonicalProductRoute } = require("./catalog/canonicalOperationalCatalog");
+const { normalizeRouteProductCode, resolveProductRoute } = require("./catalog/productRoute");
 const { LEGACY_ALIASES, PAGE_ROUTES, PRODUCT_RENDERERS, frontendFile, preserveQuery } = require("./config/storefrontRouteContract");
 const { getCatalogProductDetail } = require("./services/catalogService");
 const { createDingerDiagnosticCallbackRouter } = require("./routes/dingerDiagnosticCallback");
@@ -157,14 +157,14 @@ function configureBaseApplication(options = {}) {
     app.get("/product.html", (req, res, next) => {
         const productCode = normalizeRouteProductCode(req.query.product);
         if (!productCode) return res.status(404).sendFile(frontendFile("product-unavailable.html"));
-        return res.redirect(308, preserveQuery(req, resolveCanonicalProductRoute(productCode), ["product"]));
+        return res.redirect(308, preserveQuery(req, resolveProductRoute(productCode), ["product"]));
     });
 
     Object.entries(LEGACY_ALIASES).forEach(([legacy, clean]) => {
         app.get(legacy, (req, res) => {
             const productCode = normalizeRouteProductCode(req.query.product);
             const destination = productCode
-                ? resolveCanonicalProductRoute(productCode)
+                ? resolveProductRoute(productCode)
                 : clean;
             return res.redirect(308, preserveQuery(req, destination, productCode ? ["product"] : []));
         });

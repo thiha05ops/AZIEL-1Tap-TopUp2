@@ -575,7 +575,7 @@
         refresh: buildIndex
     };
 
-    window.addEventListener("aziel:locale-changed", () => {
+    window.addEventListener("aziel:languageChanged", () => {
         state.index = [];
         document.getElementById("azSearchOverlay")?.remove();
         if (state.open) open(state.lastFocused);
