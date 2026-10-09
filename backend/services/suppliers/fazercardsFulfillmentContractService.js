@@ -187,7 +187,20 @@ const CUSTOMER_INPUT_ALIASES = Object.freeze({
 function inputValue(input = {}, key = "") {
     const accountFields = Array.isArray(input.accountFields) ? input.accountFields : [];
     const aliases = CUSTOMER_INPUT_ALIASES[key] || [key];
-    return clean(aliases.map(alias => input[alias]).find(value => clean(value)) || accountFields.find(field => aliases.includes(clean(field?.key)) && clean(field?.value))?.value);
+    const values = [
+        ...aliases.map(alias => clean(input[alias])),
+        ...accountFields
+            .filter(field => aliases.includes(clean(field?.key)))
+            .map(field => clean(field?.value))
+    ].filter(value => value && value !== "-");
+    const distinct = [...new Set(values)];
+    if (distinct.length > 1) {
+        throw new FazerCardsFulfillmentContractError(
+            "SUPPLIER_INPUT_CONFLICT",
+            `${key} conflicts with another value for the same verified supplier field.`
+        );
+    }
+    return distinct[0] || "";
 }
 
 function contractErrorCode(contract = {}, neutralCode, fazerCardsCode = neutralCode) {

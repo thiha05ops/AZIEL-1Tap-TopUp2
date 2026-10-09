@@ -216,6 +216,50 @@ async function verifyBackend() {
     assert.deepStrictEqual({ routeType: persistedOrder.fulfilment.routeSnapshot.routeType, supplierCode: persistedOrder.fulfilment.routeSnapshot.supplierCode, supplierMappingId: persistedOrder.fulfilment.routeSnapshot.supplierMappingId, supplierMarket: persistedOrder.fulfilment.routeSnapshot.supplierMarket, customerMarket: persistedOrder.fulfilment.routeSnapshot.customerMarket, snapshotVersion: persistedOrder.fulfilment.routeSnapshot.snapshotVersion }, { routeType: "SUPPLIER_API", supplierCode: "FAZERCARDS", supplierMappingId: mapping._id, supplierMarket: "GLOBAL", customerMarket: "TH", snapshotVersion: 2 });
     assert.strictEqual(supplierCalls, 0, "Checkout verification must not call the supplier.");
 
+    const checkoutDependencies = overrides => ({
+        findOwnedQuote: async () => persistedQuote, findOrderByQuoteId: async () => null, findOrderByCheckoutIdempotency: async () => null,
+        validateOperationalPackageState: async () => ({ allowed: true, supplierRouteSnapshot }),
+        validateFulfilmentInput: async ({ customerInput }) => ({ allowed: true, normalisedFulfilmentInput: customerInput }),
+        validatePaymentMethod: async () => ({ allowed: true, paymentSnapshot: { paymentMethodId: "promptpay", paymentChannel: "MANUAL_PROMPTPAY", provider: "MANUAL_PROMPTPAY", nextAction: "OPEN_MANUAL_PAYMENT", paymentMethodBound: true }, nextAction: "OPEN_MANUAL_PAYMENT" }),
+        validatePromotionRedemption: async () => ({ allowed: true, promotionRedemptionSnapshot: null }),
+        getCheckoutTime: () => new Date(), generateOrderId: () => "AZL-MLBB-ALIASES", generateCheckoutId: () => "CHK-MLBB-ALIASES",
+        transactionRunner: async callback => callback({}), createOrderRecord: async ({ orderSnapshot }) => orderSnapshot, markQuoteUsed: async () => persistedQuote,
+        ...overrides
+    });
+    const mlbbSupplierContractInput = { gameAccount: { userId: "439488505", zoneId: "-", accountFields: [
+        { key: "playerId", label: "Player ID", value: "439488505" },
+        { key: "serverId", label: "Server ID", value: "2409" }
+    ] } };
+    const aliasCheckout = await checkoutFromQuote({
+        quoteId: persistedQuote.quoteId, owner: { userId: "customer" }, idempotencyKey: "checkout:mlbb-supplier-aliases",
+        paymentSelection: { paymentMethodId: "promptpay", paymentChannel: "MANUAL_PROMPTPAY" }, customerInput: mlbbSupplierContractInput
+    }, checkoutDependencies());
+    assert.strictEqual(aliasCheckout.checkout.orderId, "AZL-MLBB-ALIASES", "Verified MLBB playerId/serverId aliases must pass the shared manual-payment checkout boundary.");
+    for (const [suffix, gameAccount] of [
+        ["conflicting-player", { userId: "111111111", zoneId: "2409", accountFields: [{ key: "playerId", value: "439488505" }, { key: "serverId", value: "2409" }] }],
+        ["conflicting-server", { userId: "439488505", zoneId: "9999", accountFields: [{ key: "playerId", value: "439488505" }, { key: "serverId", value: "2409" }] }]
+    ]) {
+        await assert.rejects(() => checkoutFromQuote({
+            quoteId: persistedQuote.quoteId, owner: { userId: "customer" }, idempotencyKey: `checkout:mlbb-${suffix}`,
+            paymentSelection: { paymentMethodId: "promptpay", paymentChannel: "MANUAL_PROMPTPAY" }, customerInput: { gameAccount }
+        }, checkoutDependencies()), error => error.code === "INVALID_FULFILMENT_INPUT" && error.stage === "fulfilment" && error.causeCode === "SUPPLIER_INPUT_CONFLICT");
+    }
+    for (const [suffix, accountFields] of [
+        ["missing", [{ key: "playerId", value: "439488505" }]],
+        ["invalid", [{ key: "playerId", value: "439488505" }, { key: "serverId", value: "24O9" }]]
+    ]) {
+        await assert.rejects(() => checkoutFromQuote({
+            quoteId: persistedQuote.quoteId, owner: { userId: "customer" }, idempotencyKey: `checkout:mlbb-${suffix}`,
+            paymentSelection: { paymentMethodId: "truewallet", paymentChannel: "TRUE_MONEY_WALLET" }, customerInput: { gameAccount: { accountFields } }
+        }, checkoutDependencies({ generateOrderId: () => `AZL-MLBB-${suffix.toUpperCase()}` })), error => error.code === "INVALID_FULFILMENT_INPUT" && error.stage === "fulfilment");
+    }
+
+    const promptPaySource = fs.readFileSync(path.join(__dirname, "../services/commerce/customerManualPromptPayCheckoutService.js"), "utf8");
+    const manualPaymentSource = fs.readFileSync(path.join(__dirname, "../services/commerce/customerManualPaymentCheckoutService.js"), "utf8");
+    for (const [label, source] of [["PromptPay", promptPaySource], ["TrueMoney/manual", manualPaymentSource]]) {
+        assert(source.includes("accountFields: Array.isArray(input.accountFields) ? input.accountFields : []"), `${label} checkout must preserve verified accountFields into the shared checkout application.`);
+    }
+
     let resolvedInput = null;
     const operationalValidator = createMockOperationalPackageValidator(async input => {
         resolvedInput = input;

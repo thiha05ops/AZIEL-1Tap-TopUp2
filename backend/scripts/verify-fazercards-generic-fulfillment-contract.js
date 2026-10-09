@@ -109,6 +109,9 @@ const mlbbSemanticContract = { ...contract, fields: [
 ] };
 assert.deepStrictEqual(buildFieldsFromContract(mlbbSemanticContract, { userId: "439488505", zoneId: "2409" }), { player_id: "439488505", server_id: "2409" });
 assert.deepStrictEqual(buildFieldsFromContract(mlbbSemanticContract, { playerId: "439488505", serverId: "2409" }), { player_id: "439488505", server_id: "2409" });
+assert.deepStrictEqual(buildFieldsFromContract(mlbbSemanticContract, { userId: "439488505", zoneId: "-", accountFields: [{ key: "playerId", value: "439488505" }, { key: "serverId", value: "2409" }] }), { player_id: "439488505", server_id: "2409" });
+assert.throws(() => buildFieldsFromContract(mlbbSemanticContract, { userId: "111111111", zoneId: "2409", accountFields: [{ key: "playerId", value: "439488505" }, { key: "serverId", value: "2409" }] }), error => error.code === "SUPPLIER_INPUT_CONFLICT");
+assert.throws(() => buildFieldsFromContract(mlbbSemanticContract, { userId: "439488505", zoneId: "9999", accountFields: [{ key: "playerId", value: "439488505" }, { key: "serverId", value: "2409" }] }), error => error.code === "SUPPLIER_INPUT_CONFLICT");
 const reverseSemanticContract = { ...contract, fields: [
     { customerField: "userId", providerField: "player_id", required: true, label: "User ID", type: "text", constraints: {} },
     { customerField: "zoneId", providerField: "server_id", required: true, label: "Zone ID", type: "text", constraints: {} }
