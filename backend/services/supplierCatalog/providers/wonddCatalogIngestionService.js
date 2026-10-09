@@ -1,8 +1,8 @@
 "use strict";
 
 const crypto = require("crypto");
-const { WONDD_FAMILIES, familyForServiceId, resolveWonddCatalogIdentity } = require("../../suppliers/wonddCatalogConfig");
 const { sanitizeSupplierCatalogSnapshot, hashSupplierCatalogSnapshot, normalizeSupplierCost, normalizeOfferSemantics, observationTimestamps, canonicalJson } = require("../supplierCatalogNormalization");
+const { normalizedFields } = require("../../suppliers/fazercardsFulfillmentContractService");
 
 const NAMESPACE = "WONDD_PACKAGE_CATALOG";
 const COMPLETENESS_EVIDENCE = "SINGLE_RESPONSE_COMPLETENESS_UNPROVEN";
@@ -13,10 +13,21 @@ function createCatalogReader(adapter) {
     return Object.freeze({ listPackages: options => adapter.getPackageCatalog(options) });
 }
 
-function inputContract(family) {
-    if (family?.inputContract === "MLBB_USER_ZONE") return { contractId: family.inputContract, fields: [{ name: "userId", required: true }, { name: "zoneId", required: true }] };
-    if (family?.inputContract === "FREEFIRE_PLAYER_ID") return { contractId: family.inputContract, fields: [{ name: "userId", required: true }] };
-    return {};
+function supplierInputContract(row = {}, transactionalServiceCode = "") {
+    const source = row.inputSchema;
+    const rows = Array.isArray(source) ? source : Array.isArray(source?.fields) ? source.fields : [];
+    const fields = normalizedFields({ normalizedInputContract: { fields: rows.map(field => ({
+        customerField: field.customerField || field.customer_field || field.azielField,
+        providerField: field.providerField || field.provider_field || field.destination || field.parameter || field.key,
+        label: field.label,
+        type: field.type,
+        required: field.required,
+        options: field.options,
+        constraints: field.constraints,
+        transformationId: field.transformationId || field.transformation_id || "DIRECT"
+    })) } });
+    if (!fields.length && row.noCustomerInput !== true) return null;
+    return { version: 1, protocol: "WONDD_GAME_ID_TOPUP", transactionalServiceCode: clean(transactionalServiceCode), fields, noCustomerInput: row.noCustomerInput === true, authority: "WONDD_PACKAGE_CATALOG_INPUT_SCHEMA" };
 }
 
 function semantics(row = {}) {
@@ -30,16 +41,12 @@ function semantics(row = {}) {
 }
 
 function mappingIdentitySet(mappings = []) {
-    return new Set(mappings.filter(x => x.supplierCode === "WONDD").flatMap(x => {
-        const identity = resolveWonddCatalogIdentity(x.supplierProductCode);
-        return identity ? [`${identity.serviceId}/${clean(x.supplierPackageCode)}`] : [];
-    }));
+    return new Set(mappings.filter(x => x.supplierCode === "WONDD" && clean(x.supplierProductCode) && clean(x.supplierPackageCode))
+        .map(x => `${clean(x.supplierProductCode)}/${clean(x.supplierPackageCode)}`));
 }
 
-function classify(row, family, mapped) {
+function classify(row, mapped) {
     if (mapped) return "EXACT_CANONICAL_MATCH";
-    if (!family?.serviceCode || family.unsupportedReason) return "NO_CANONICAL_PACKAGE";
-    if (String(row.serviceid) === "9624" && typeof family.packageFilter === "function" && !family.packageFilter(row)) return "SPECIAL_VARIANT";
     if (/gift\s*box|association|event|pass|membership|bundle/i.test(clean(row.name))) return "SPECIAL_VARIANT";
     return "SEMANTIC_REVIEW_REQUIRED";
 }
@@ -66,12 +73,21 @@ async function stageCatalog({ reader, supplierId, mappings = [], observedAt = ne
     const mapped = mappingIdentitySet(mappings), grouped = new Map();
     valid.forEach(row => { if (!grouped.has(row.serviceid)) grouped.set(row.serviceid, []); grouped.get(row.serviceid).push(row); });
     const products = [...grouped].map(([serviceId, familyRows]) => {
-        const family = familyForServiceId(serviceId), safe = sanitizeSupplierCatalogSnapshot({ serviceid: serviceId, packageCount: familyRows.length, providerFields: [...new Set(familyRows.flatMap(Object.keys))].sort() });
-        return { supplierId, catalogNamespace: NAMESPACE, supplierProductCode: serviceId, supplierMarketCode: "UNSPECIFIED", displayName: family?.game || `WonDD service ${serviceId}`, rawName: family?.game || "", categoryCode: serviceId, supportState: family ? "SUPPORTED" : "REVIEW_REQUIRED", requiredFields: inputContract(family).fields || [], normalizedInputContract: inputContract(family), restrictions: [], metadata: { transactionalServiceCode: family?.serviceCode || "", canonicalProductCode: family?.productCode || "", serviceCodeAuthority: family?.serviceCode ? "WONDD_CATALOG_CONFIG" : "UNRESOLVED", snapshotTruncation: safe.truncation }, ...observationTimestamps({}, observedAt, { changed: true }), sourceRevision: "", rawSnapshotHash: hashSupplierCatalogSnapshot(safe.snapshot), rawSnapshot: safe.snapshot };
+        const observedServiceCodes = [...new Set(familyRows.map(row => clean(row.servicecode)).filter(Boolean))];
+        const observedServiceCode = observedServiceCodes.length === 1 ? observedServiceCodes[0] : "";
+        const transactionalServiceCode = observedServiceCode;
+        const discoveredContracts = familyRows.map(row => supplierInputContract(row, observedServiceCode)).filter(Boolean), contractKeys = [...new Set(discoveredContracts.map(canonicalJson))];
+        const automaticContract = discoveredContracts.length === familyRows.length && contractKeys.length === 1 ? discoveredContracts[0] : null;
+        const normalizedInputContract = automaticContract || {};
+        const safe = sanitizeSupplierCatalogSnapshot({ serviceid: serviceId, transactionalServiceCode, inputSchema: automaticContract || null, packageCount: familyRows.length, providerFields: [...new Set(familyRows.flatMap(Object.keys))].sort() });
+        const supplierName = clean(familyRows.find(row => clean(row.productName || row.serviceName || row.game))?.productName || familyRows.find(row => clean(row.serviceName || row.game))?.serviceName || familyRows.find(row => clean(row.game))?.game);
+        return { supplierId, catalogNamespace: NAMESPACE, supplierProductCode: serviceId, supplierMarketCode: "UNSPECIFIED", displayName: supplierName || `WonDD service ${serviceId}`, rawName: supplierName, categoryCode: serviceId, supportState: "SUPPORTED", requiredFields: normalizedInputContract.fields || [], normalizedInputContract, restrictions: [], metadata: { transactionalServiceCode, serviceCodeAuthority: observedServiceCode ? "WONDD_SUPPLIER_CATALOG" : observedServiceCodes.length > 1 ? "CONFLICTING_SUPPLIER_VALUES" : "UNRESOLVED", inputContractState: automaticContract ? "AUTO_CONTRACT" : contractKeys.length > 1 ? "CONFLICTING_SUPPLIER_SCHEMAS" : "SUPPLIER_METADATA_INSUFFICIENT", snapshotTruncation: safe.truncation }, ...observationTimestamps({}, observedAt, { changed: true }), sourceRevision: "", rawSnapshotHash: hashSupplierCatalogSnapshot(safe.snapshot), rawSnapshot: safe.snapshot };
     });
     const offers = valid.map(row => {
-        const family = familyForServiceId(row.serviceid), exact = Boolean(family?.serviceCode && mapped.has(`${row.serviceid}/${row.packcode}`)), safe = sanitizeSupplierCatalogSnapshot(row);
-        return { supplierId, catalogNamespace: NAMESPACE, supplierProductCode: row.serviceid, supplierOfferCode: row.packcode, supplierOfferName: row.name, rawName: row.name, supplierCost: normalizeSupplierCost({ amount: row.netpricedealer, currency: "THB", observedAt }), rawSemantics: { providerName: row.name, point: row.point ?? null, amount: row.amount ?? null, discount: row.discount ?? null }, normalizedSemantics: semantics(row), catalogLifecycleState: "ACTIVE", reconciliationState: classify(row, family, exact), reconciliationEvidence: exact ? { code: "EXACT_CONFIRMED_SERVICECODE_PACKCODE" } : { code: "NO_NUMERIC_INFERENCE" }, ...observationTimestamps({}, observedAt, { changed: true }), sourceRevision: "", rawSnapshotHash: hashSupplierCatalogSnapshot(safe.snapshot), rawSnapshot: safe.snapshot, metadata: { snapshotTruncation: safe.truncation }, availability: { state: "AVAILABLE", evidenceCode: "WONDD_PACKAGE_LISTED", observedAt, coverageComplete: false } };
+        const exact = mapped.has(`${row.serviceid}/${row.packcode}`), safe = sanitizeSupplierCatalogSnapshot(row);
+        const automaticContract = supplierInputContract(row, clean(row.servicecode)), productContracts = grouped.get(row.serviceid).map(item => supplierInputContract(item, clean(item.servicecode))).filter(Boolean), productContractKeys = [...new Set(productContracts.map(canonicalJson))];
+        const offerOverride = automaticContract && (productContracts.length !== grouped.get(row.serviceid).length || productContractKeys.length !== 1) ? automaticContract : null;
+        return { supplierId, catalogNamespace: NAMESPACE, supplierProductCode: row.serviceid, supplierOfferCode: row.packcode, supplierOfferName: row.name, rawName: row.name, supplierCost: normalizeSupplierCost({ amount: row.netpricedealer, currency: "THB", observedAt }), rawSemantics: { providerName: row.name, point: row.point ?? null, amount: row.amount ?? null, discount: row.discount ?? null }, normalizedSemantics: semantics(row), catalogLifecycleState: "ACTIVE", reconciliationState: classify(row, exact), reconciliationEvidence: exact ? { code: "EXACT_CONFIRMED_SERVICEID_PACKCODE" } : { code: "NO_IDENTITY_INFERENCE" }, ...observationTimestamps({}, observedAt, { changed: true }), sourceRevision: "", rawSnapshotHash: hashSupplierCatalogSnapshot(safe.snapshot), rawSnapshot: safe.snapshot, metadata: { ...(offerOverride ? { normalizedInputContract: offerOverride } : {}), snapshotTruncation: safe.truncation }, availability: { state: "AVAILABLE", evidenceCode: "WONDD_PACKAGE_LISTED", observedAt, coverageComplete: false } };
     });
     const contentRevision = meaningfulRevision(products, offers);
     return { supplierId, catalogNamespace: NAMESPACE, observedAt, rowsObserved: rows.length, validRows: valid.length, coverageState: "PARTIAL", completenessEvidence: payload?.completenessEvidence || COMPLETENESS_EVIDENCE, products, offers, errors, contentRevision };
@@ -79,8 +95,8 @@ async function stageCatalog({ reader, supplierId, mappings = [], observedAt = ne
 
 function planMutations(stage, existing = {}) {
     const productByKey = new Map((existing.products || []).map(x => [x.supplierProductCode, x])), offerByKey = new Map((existing.offers || []).map(x => [`${x.supplierProductCode}/${x.supplierOfferCode}`, x]));
-    const products = stage.products.map(x => { const old = productByKey.get(x.supplierProductCode), changed = !old || old.rawSnapshotHash !== x.rawSnapshotHash; return { ...x, ...observationTimestamps(old || {}, stage.observedAt, { changed }), operation: old ? "UPDATE" : "CREATE" }; });
-    const offers = stage.offers.map(x => { const old = offerByKey.get(`${x.supplierProductCode}/${x.supplierOfferCode}`), changed = !old || old.rawSnapshotHash !== x.rawSnapshotHash; return { ...x, reconciliationState: old?.reconciliationState || x.reconciliationState, ...observationTimestamps(old || {}, stage.observedAt, { changed }), operation: old ? "UPDATE" : "CREATE" }; });
+    const products = stage.products.map(x => { const old = productByKey.get(x.supplierProductCode), changed = !old || old.rawSnapshotHash !== x.rawSnapshotHash, reviewed = old?.normalizedInputContract?.review?.status === "OWNER_REVIEWED" && !changed; return { ...x, ...(reviewed ? { requiredFields: old.requiredFields || [], normalizedInputContract: old.normalizedInputContract } : {}), ...observationTimestamps(old || {}, stage.observedAt, { changed }), operation: old ? "UPDATE" : "CREATE" }; });
+    const offers = stage.offers.map(x => { const old = offerByKey.get(`${x.supplierProductCode}/${x.supplierOfferCode}`), changed = !old || old.rawSnapshotHash !== x.rawSnapshotHash, reviewed = old?.metadata?.normalizedInputContract?.review?.status === "OWNER_REVIEWED" && !changed; return { ...x, ...(reviewed ? { metadata: { ...(x.metadata || {}), normalizedInputContract: old.metadata.normalizedInputContract } } : {}), reconciliationState: old?.reconciliationState || x.reconciliationState, ...observationTimestamps(old || {}, stage.observedAt, { changed }), operation: old ? "UPDATE" : "CREATE" }; });
     const exact = offers.filter(x => x.reconciliationState === "EXACT_CANONICAL_MATCH").length;
     return { supplierId: stage.supplierId, catalogNamespace: NAMESPACE, observedAt: stage.observedAt, contentRevision: stage.contentRevision, products, offers, missing: [], mappingCoverage: { exactCanonicalMatch: exact, unmapped: offers.length - exact }, runStatus: stage.products.length || stage.offers.length ? "SUCCEEDED_PARTIAL" : "FAILED", coverageState: "PARTIAL", completenessEvidence: stage.completenessEvidence, errors: stage.errors, categoryResults: [{ category: "WONDD_PACKAGE_LIST", complete: false, pages: 1, offersObserved: stage.offers.length, evidence: stage.completenessEvidence }] };
 }
@@ -93,4 +109,4 @@ async function applyCatalogOnlyPlan(plan, repositories, { runKey } = {}) {
     return repositories.runs.finalize(run._id, plan);
 }
 
-module.exports = Object.freeze({ NAMESPACE, COMPLETENESS_EVIDENCE, WonddCatalogIngestionError, createCatalogReader, inputContract, semantics, classify, meaningfulRevision, stageCatalog, planMutations, applyCatalogOnlyPlan, WONDD_FAMILIES });
+module.exports = Object.freeze({ NAMESPACE, COMPLETENESS_EVIDENCE, WonddCatalogIngestionError, createCatalogReader, supplierInputContract, semantics, classify, meaningfulRevision, stageCatalog, planMutations, applyCatalogOnlyPlan });

@@ -40,15 +40,6 @@ const PAGE_ROUTES = Object.freeze([
     ["/policies/payment", "policies/payment.html", "legal"],
     ["/policies/refund", "policies/refund.html", "legal"],
     ["/policies/support", "policies/support.html", "legal"],
-    ["/games/mlbb", "mlbb.html", "product"],
-    ["/games/pubg", "pubg.html", "product"],
-    ["/games/freefire", "freefire.html", "product"],
-    ["/games/hok", "hok.html", "product"],
-    ["/games/pubg-rp", "pubg-rp.html", "product"],
-    ["/games/aov-id", "aov-id.html", "product"],
-    ["/games/genshin", "genshin.html", "product"],
-    ["/games/roblox", "roblox.html", "product"],
-    ["/products/telegram", "telegram.html", "product"]
 ].map(([route, file, group]) => Object.freeze({ route, file, group })));
 
 const LEGACY_ALIASES = Object.freeze({
@@ -86,21 +77,26 @@ const LEGACY_ALIASES = Object.freeze({
     "/policies/payment.html": "/policies/payment",
     "/policies/refund.html": "/policies/refund",
     "/policies/support.html": "/policies/support",
-    "/mlbb.html": "/games/mlbb",
-    "/pubg.html": "/games/pubg",
-    "/freefire.html": "/games/freefire",
-    "/hok.html": "/games/hok",
-    "/pubg-rp.html": "/games/pubg-rp",
-    "/aov-id.html": "/games/aov-id",
-    "/genshin.html": "/games/genshin",
-    "/roblox.html": "/games/roblox",
+    "/games/mlbb": "/products/mlbb",
+    "/games/pubg": "/products/pubg",
+    "/games/freefire": "/products/freefire",
+    "/games/hok": "/products/hok",
+    "/games/pubg-rp": "/products/pubgrp",
+    "/games/aov-id": "/products/aovid",
+    "/games/genshin": "/products/genshin",
+    "/games/roblox": "/products/roblox",
+    "/mlbb.html": "/products/mlbb",
+    "/pubg.html": "/products/pubg",
+    "/freefire.html": "/products/freefire",
+    "/hok.html": "/products/hok",
+    "/pubg-rp.html": "/products/pubgrp",
+    "/aov-id.html": "/products/aovid",
+    "/genshin.html": "/products/genshin",
+    "/roblox.html": "/products/roblox",
     "/telegram.html": "/products/telegram"
 });
 
-const PRODUCT_RENDERERS = Object.freeze({
-    "mlbb-twilight-weekly-pass": "mlbb.html",
-    "freefire-pass-membership": "freefire.html"
-});
+const PRODUCT_RENDERERS = Object.freeze({});
 
 function preserveQuery(req, destination, omitted = []) {
     const params = new URLSearchParams();

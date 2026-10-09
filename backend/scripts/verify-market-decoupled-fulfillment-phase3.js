@@ -72,8 +72,11 @@ async function verifyDualReadAuthority() {
 
     const dualManual = createRoutingAuthority({ legacyResolver: async () => manualRoute, eligibilityResolver: async () => unknownShadow, modeResolver: () => FULFILLMENT_ROUTING_MODES.DUAL_READ });
     const mm = await dualManual({ productCode: "mlbb", packageCode: "X", region: "MM", includeDiagnostics: true });
-    assert.strictEqual(mm.routeSnapshot.routeType, "MANUAL_ADMIN");
+    assert.strictEqual(mm.ready, false, "An unresolved supplier eligibility state must not be hidden by a manual fallback.");
+    assert.strictEqual(mm.routeSnapshot, null);
+    assert(mm.blockers.includes("FULFILLMENT_ELIGIBILITY_UNKNOWN"));
     assert.strictEqual(mm.diagnostics.comparisonClassification, "SHADOW_UNKNOWN");
+    assert.strictEqual(mm.diagnostics.manualFallbackSuppressed, true);
 
     const ambiguous = { outcome: OUTCOMES.AMBIGUOUS_PRIMARY_ROUTE, routeSnapshot: null, blockerCodes: ["AMBIGUOUS_PRIMARY_ROUTE"] };
     const dualAmbiguous = createRoutingAuthority({ legacyResolver: async () => supplierRoute, eligibilityResolver: async () => ambiguous, modeResolver: () => FULFILLMENT_ROUTING_MODES.DUAL_READ });
@@ -127,12 +130,12 @@ function verifyEligibilitySemantics() {
 
 function verifyStaticBoundaries() {
     const resolver = read("backend/services/supplierEligibilityRouteResolver.js");
-    assert(resolver.includes('productionRole: "PRIMARY", enabled: true, archivedAt: null'));
+    assert(resolver.includes('productionRole: "PRIMARY", archivedAt: null') && resolver.includes('if (mapping.enabled !== true) blockers.push("MAPPING_DISABLED")'), "PRIMARY candidates must remain scoped and disabled mappings must fail closed during assessment.");
     assert(!resolver.includes('packageCode: normalizedPackage, region:'), "Eligibility mapping query must not prefilter legacy mapping.region.");
     assert(!resolver.includes("submitTopup("));
     const paid = read("backend/services/paidFulfillmentRoutingService.js");
     assert(paid.includes("SUPPLIER_ROUTE_SNAPSHOT_BOUND"), "Paid fulfillment must remain bound to the immutable snapshot.");
-    assert(!paid.includes("resolveCheckoutRouteSnapshot"), "Paid fulfillment must not re-resolve a route.");
+    assert(paid.indexOf("if (routeSnapshot)") < paid.indexOf("options.resolveCurrentRoute || resolveCheckoutRouteSnapshot"), "A frozen route must be consumed before the historical no-snapshot compatibility resolver.");
     assert.strictEqual(compareRoutingDecisions({ legacy: { routeSnapshot: { routeType: "SUPPLIER_API", supplierCode: "A" } }, shadow: { outcome: OUTCOMES.ELIGIBLE, routeSnapshot: { supplierCode: "B" }, blockerCodes: [] } }).classification, "DIFFERENT_SUPPLIER");
 }
 

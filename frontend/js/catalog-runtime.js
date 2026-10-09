@@ -79,6 +79,7 @@
             const normalizedProduct = {
                 ...product,
                 productCode,
+                route: product.productRoute || product.route || "",
                 packages: Array.isArray(product.packages) ? product.packages : []
             };
 

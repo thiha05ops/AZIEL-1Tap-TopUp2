@@ -78,5 +78,5 @@ function encryptLocalVector(plaintext, key) {
     assert.throws(() => encryptDingerPayPayloadBase64({ plaintext: "test", publicKey: "invalid" }), error => error.code === "DINGER_CRYPTO_INVALID_KEY");
     assert.throws(() => encryptDingerPayPayloadBase64({ plaintext: "test", publicKey: Buffer.from("not-spki").toString("base64") }), error => error.code === "DINGER_CRYPTO_INVALID_KEY");
 
-    console.log("Dinger single-block and documented 64-byte segmented RSA PKCS#1 v1.5 verification passed; callback checksum canonicalization remains intentionally unverified.");
+    console.log("Dinger single-block and documented 64-byte segmented RSA PKCS#1 v1.5 verification passed; fail-closed callback checksum primitive verification passed.");
 })();

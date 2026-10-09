@@ -106,6 +106,7 @@ const MediaAssetMock = {
 };
 const transportMock = {
     classifyTransportError: error => error.code || "EMAIL_SEND_FAILED",
+    getEmailProvider: () => "brevo",
     hashRecipient: email => `hash:${email}`,
     maskEmail: email => email,
     async sendEmail(message) {
@@ -182,7 +183,8 @@ async function verifyEveryEvent() {
         const message = sent.at(-1);
         assert.strictEqual(message.messageType, event);
         assert.strictEqual(message.subject, `AZIEL Order ${item.orderId}`);
-        assert.strictEqual(message.transportProvider, "gmail_smtp");
+        assert.strictEqual(message.transportProvider, undefined, "Lifecycle email must defer send transport selection to EMAIL_PROVIDER authority.");
+        assert.strictEqual(deliveries.get(`${item.orderId}:${event}`).transport, "brevo", "Delivery audit metadata must use configured provider authority.");
         assert(/^<aziel-[a-f0-9]{36}@mail\.azielplay\.com>$/.test(message.messageId));
         assert(message.html.startsWith("<!doctype html>"));
         assert(message.html.includes('name="viewport"'));

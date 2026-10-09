@@ -100,5 +100,5 @@
         document.getElementById("methodContinue")?.addEventListener("click", continueToPayment);
         update();
     });
-    window.addEventListener("aziel:locale-changed", update);
+    window.addEventListener("aziel:languageChanged", update);
 })();

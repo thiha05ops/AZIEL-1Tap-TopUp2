@@ -30,6 +30,11 @@ function verifyProviderSelection() {
     assert(SUPPORTED_EMAIL_PROVIDERS.has("gmail_smtp"), "Gmail SMTP fallback provider must be supported.");
 
     assert.strictEqual(
+        getEmailProvider({ NODE_ENV: "production", EMAIL_PROVIDER: "brevo", BREVO_API_KEY: "brevo-key", EMAIL_FROM: "noreply@example.com" }),
+        "brevo",
+        "Explicit Brevo configuration must select the existing Brevo transport."
+    );
+    assert.strictEqual(
         getEmailProvider({ NODE_ENV: "production", BREVO_API_KEY: "brevo-key" }),
         "brevo",
         "Production with BREVO_API_KEY must default to Brevo."
@@ -152,6 +157,7 @@ function verifySourceContracts() {
     includes("backend/services/orderEmailService.js", "deliveryKey", "EmailDelivery idempotency key must remain.");
     includes("backend/services/orderEmailService.js", "duplicate_or_pending", "EmailDelivery duplicate protection must remain.");
     includes("backend/services/orderEmailService.js", "status: \"failed\"", "Order email failure isolation/retry state must remain.");
+    notMatches("backend/services/orderEmailService.js", /transportProvider:\s*["'](?:gmail_smtp|brevo)["']/, "Order lifecycle emails must use configured provider authority.");
     includes("backend/services/orderStateService.js", "orderEmailService.notifyOrderTransition(order, entry).catch", "Order lifecycle email failures must remain isolated.");
 }
 

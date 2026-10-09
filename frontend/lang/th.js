@@ -81,7 +81,6 @@ window.AZIEL_LANG.th = {
     nav_features: "ฟีเจอร์",
     nav_platform: "แพลตฟอร์ม",
     overview: "ภาพรวม",
-    security: "ความปลอดภัย",
     transactions: "ธุรกรรม",
     theme: "ธีม",
     "Safe & Trusted": "ระบบดูแลบัญชี",
@@ -206,7 +205,6 @@ window.AZIEL_LANG.th = {
     scanPay: "สแกนและชำระเงิน",
     orderId: "Order ID",
     amount: "จำนวนเงิน",
-    waitingPayment: "รอการชำระเงิน...",
     paymentExpiresIn: "การชำระเงินหมดอายุใน",
 
     pleaseWait: "กรุณารอสักครู่...",
@@ -278,13 +276,11 @@ window.AZIEL_LANG.th = {
     refundAbuseTitle: "การป้องกันการใช้งานผิดวิธี",
     refundAbuseText: "การขอคืนเงินปลอม การใช้งานผิดซ้ำ ๆ หรือการอ้างสิทธิ์ทุจริต อาจทำให้บัญชีถูกจำกัดหรือระงับ",
 
-    needHelp: "ต้องการความช่วยเหลือ?",
     refundHelpText: "หากคุณคิดว่าคำสั่งซื้อของคุณเข้าเงื่อนไขการคืนเงิน กรุณาติดต่อ AZIEL Support หรือส่งคำขอคืนเงินจากหน้าติดตามคำสั่งซื้อ",
     refundHelpItem1: "Order ID",
     refundHelpItem2: "วิธีชำระเงิน",
     refundHelpItem3: "ใบเสร็จหรือสลิปการชำระเงินถ้ามี",
     refundHelpItem4: "รายละเอียดของปัญหา",
-    contactSupport: "ติดต่อ Support",
     paymentPolicyTitle: "นโยบายการชำระเงิน",
 
     paymentMethodsTitle: "วิธีชำระเงินที่รองรับ",
@@ -617,7 +613,6 @@ window.AZIEL_LANG.th = {
     "Account - AZIEL": "บัญชี - AZIEL",
     "Region: MM": "Region: MM",
     "Track order": "Track คำสั่งซื้อ",
-    "Loading...": "กำลังโหลด...",
     "Password security status.": "รหัสผ่าน ความปลอดภัย status.",
     "Change Password": "Change รหัสผ่าน",
     "Extra account protection for your AZIEL account.": "Extra บัญชี protection for your AZIEL บัญชี.",

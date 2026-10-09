@@ -28,6 +28,11 @@ function mappingData(overrides = {}) {
         supplierProductCode: "mlbb",
         supplierPackageCode: "MLFT055",
         region: "TH",
+        supplierMarketEvidence: {
+            normalizedMarket: "TH",
+            supplierMarketCode: "TH",
+            marketClassification: "AUTHORITATIVE"
+        },
         ...overrides
     };
 }
@@ -77,7 +82,7 @@ function quoteAuthority(region) {
 
 async function verifySchemaCompatibility() {
     const legacy = new SupplierProductMapping(mappingData());
-    assert.strictEqual(legacy.fulfillmentEligibility, undefined, "Existing mapping shape must not receive implicit eligibility.");
+    assert.strictEqual(legacy.fulfillmentEligibility, undefined, "Supplier-route market evidence must not create customer-payment-market eligibility.");
     await legacy.validate();
     assert.strictEqual(legacy.region, "TH", "Legacy mapping.region remains required and unchanged.");
 

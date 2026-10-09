@@ -281,7 +281,7 @@ function projectCommerceManualAttempt(attempt = {}, order = {}, options = {}) {
         game: product.gameName || product.gameCode || "",
         productCode: product.gameCode || product.gameId || "",
         productName: product.gameName || product.gameCode || "",
-        userId: accountFields.find(field => field.key === "userId")?.value || "",
+        userId: accountFields.find(field => ["userId", "playerId"].includes(field.key))?.value || "",
         zoneId: accountFields.find(field => ["zoneId", "serverId"].includes(field.key))?.value || "",
         accountFields,
         customerAccount: {
@@ -338,6 +338,8 @@ function projectCommerceOrder(order = {}, options = {}) {
     const supplierSnapshot = businessRuntime.supplierCostSnapshot || pricing.supplierCostSnapshot || pricing.context?.supplierCostSnapshot || {};
     const exchangeSnapshot = businessRuntime.exchangeRateSnapshot || pricing.exchangeSnapshot || pricing.exchangeRate || pricing.context?.exchangeRateSnapshot || null;
     const fulfilmentInput = order.fulfilment?.input || {};
+    const routeSnapshot = order.fulfilment?.routeSnapshot || order.quoteSnapshot?.supplierRouteSnapshot || {};
+    const paidHandoff = order.fulfilment?.paidHandoff || null;
     const receiptSubmitted = Array.isArray(order.operationalReferences) && order.operationalReferences.some(reference => (
         reference?.type === "manual_payment_receipt"
     ));
@@ -388,7 +390,7 @@ function projectCommerceOrder(order = {}, options = {}) {
         game: product.gameName || product.gameCode || "",
         productCode: product.gameCode || product.gameId || "",
         productName: product.gameName || product.gameCode || "",
-        userId: accountFields.find(field => field.key === "userId")?.value || "",
+        userId: accountFields.find(field => ["userId", "playerId"].includes(field.key))?.value || "",
         zoneId: accountFields.find(field => ["zoneId", "serverId"].includes(field.key))?.value || "",
         accountFields,
         customerAccount: {
@@ -433,7 +435,15 @@ function projectCommerceOrder(order = {}, options = {}) {
         allowedNextStatuses: [],
         fulfillment: latestFulfillment || {
             status: normalizedFulfillmentStatus.toUpperCase(),
-            source: "commerce"
+            source: "commerce",
+            routeType: routeSnapshot.routeType || "",
+            supplierCode: routeSnapshot.supplierCode || "",
+            supplierCodeSnapshot: routeSnapshot.supplierCode || "",
+            supplierMappingId: routeSnapshot.supplierMappingId || null,
+            handoffStatus: paidHandoff?.status || "",
+            failureCode: paidHandoff?.lastError?.code || "",
+            failureReason: paidHandoff?.lastError?.reason || "",
+            failureBlockers: Array.isArray(paidHandoff?.lastError?.blockers) ? paidHandoff.lastError.blockers : []
         },
         fulfillmentAttempts,
         actions: {

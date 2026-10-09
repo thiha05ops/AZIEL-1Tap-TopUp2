@@ -14,9 +14,11 @@ const { getSupplierAdapter } = require("./supplierAdapterRegistry");
 const { basicCandidateBlockers } = require("./supplierEligibilityRouteResolver");
 const { publicationPackageKey, publicationPackageMap, setPackageMarketPublication } = require("./packageMarketPublicationService");
 const { assessExistingPreparedRoute } = require("./supplierCatalog/supplierRoutePreparationService");
+const { assessCanonicalEquivalenceProof } = require("./supplierCatalog/canonicalEquivalenceProofService");
 const { contractFromSupplierCatalog } = require("./suppliers/fazercardsFulfillmentContractService");
 const { supplierCapabilityProductCode } = require("./fulfillmentCapabilityService");
-const { transactionalServiceCode } = require("./suppliers/wonddCatalogConfig");
+const { transactionalServiceCode } = require("./suppliers/supplierExecutionIdentity");
+const { evaluateAddProductOffer } = require("./supplierCatalog/addProductPreparabilityService");
 
 const COMMERCE_MARKETS = Object.freeze(["TH", "MM"]);
 const clean = value => String(value == null ? "" : value).trim();
@@ -35,11 +37,7 @@ class AdminProductActivationError extends Error {
     }
 }
 
-function eligibilityAllows(mapping, customerMarket) {
-    if (!COMMERCE_MARKETS.includes(upper(customerMarket))) return false;
-    const mode = upper(mapping?.fulfillmentEligibility?.mode);
-    return mode === "GLOBAL" || mode === "CUSTOMER_MARKET_ALLOWLIST";
-}
+function eligibilityAllows(mapping, customerMarket) { return COMMERCE_MARKETS.includes(upper(customerMarket)); }
 
 function commerceSellingRegionsFrom(value, fallback = "TH") {
     return [...new Set(String(value || fallback || "TH").split(",").map(upper).filter(Boolean))].sort();
@@ -96,7 +94,6 @@ function mappingReadiness({ mapping, supplier, pkg, offer, availability, custome
     const assessment = basicCandidateBlockers({ mapping, supplier, pkg, customerMarket, now, adapter });
     const blockers = [...assessment.blockers];
     if (!COMMERCE_MARKETS.includes(upper(customerMarket))) blockers.push("CUSTOMER_COMMERCE_MARKET_UNSUPPORTED");
-    if (!eligibilityAllows(mapping, customerMarket)) blockers.push("FULFILLMENT_ELIGIBILITY_UNKNOWN");
     if (!offer) blockers.push("SUPPLIER_CATALOG_OFFER_MISSING");
     if (offer && offer.catalogLifecycleState !== "ACTIVE") blockers.push("SUPPLIER_OFFER_NOT_ACTIVE");
     if (!availability || availability.state !== "AVAILABLE") blockers.push("SUPPLIER_AVAILABILITY_NOT_CONFIRMED");
@@ -106,7 +103,7 @@ function mappingReadiness({ mapping, supplier, pkg, offer, availability, custome
 
 function supplierExecutionProductCode(mapping = {}, supplier = {}, supplierProduct = {}, offer = {}) {
     const supplierCode = upper(supplier?.supplierCode || mapping?.supplierCode);
-    if (supplierCode === "WONDD") return transactionalServiceCode(supplierProduct?.supplierProductCode || mapping?.supplierProductCode, mapping?.productCode);
+    if (supplierCode === "WONDD") return transactionalServiceCode({ mapping, supplierProduct, offer });
     return clean(offer?.supplierProductCode) || clean(supplierProduct?.supplierProductCode) || clean(mapping?.supplierProductCode);
 }
 
@@ -150,6 +147,54 @@ function canonicalEvidenceForOffer(offer = {}) {
     return productCode && packageCode ? { productCode, packageCode } : null;
 }
 
+function normalizedSuggestionIdentity(value = "") {
+    return lower(value)
+        .replace(/\([^)]*\)/g, " ")
+        .replace(/\b(global|thailand|thai|myanmar|burma|indonesia|special)\b/g, " ")
+        .replace(/[^a-z0-9]+/g, " ")
+        .trim()
+        .replace(/\s+/g, " ");
+}
+
+function canonicalProductSuggestion({ supplierProduct = {}, sourceMappings = [], offers = [], canonicalProducts = [] } = {}) {
+    const canonicalByCode = new Map(canonicalProducts.map(item => [lower(item.productCode), item]));
+    const authorityCode = lower(supplierProduct.metadata?.onboardingCanonicalProduct?.productCode);
+    const offerById = new Map(offers.map(offer => [id(offer), offer]));
+    const offerByNativeCode = new Map(offers.map(offer => [clean(offer.supplierOfferCode), offer]));
+    const evidenceByProduct = new Map();
+    const addEvidence = (productCode, offerId, evidence) => {
+        const code = lower(productCode);
+        if (!code || !offerId || !canonicalByCode.has(code)) return;
+        if (!evidenceByProduct.has(code)) evidenceByProduct.set(code, { offerIds: new Set(), evidence: new Set() });
+        evidenceByProduct.get(code).offerIds.add(offerId);
+        evidenceByProduct.get(code).evidence.add(evidence);
+    };
+    for (const mapping of sourceMappings) {
+        const offer = offerById.get(id(mapping.supplierCatalogOfferId)) || offerByNativeCode.get(clean(mapping.supplierPackageCode));
+        if (offer) addEvidence(mapping.productCode, id(offer), "EXACT_MAPPING");
+    }
+    for (const offer of offers) {
+        const canonical = canonicalEvidenceForOffer(offer);
+        if (canonical) addEvidence(canonical.productCode, id(offer), "RECONCILIATION_EVIDENCE");
+    }
+    const candidates = [...evidenceByProduct.entries()].map(([productCode, value]) => {
+        const product = canonicalByCode.get(productCode);
+        return { productCode, name: product.name || productCode, distinctOfferCount: value.offerIds.size, evidence: value.evidence.has("EXACT_MAPPING") ? "EXACT_MAPPING" : "RECONCILIATION_EVIDENCE" };
+    }).sort((a, b) => b.distinctOfferCount - a.distinctOfferCount || a.productCode.localeCompare(b.productCode));
+    const authoritative = authorityCode && canonicalByCode.has(authorityCode) ? authorityCode : "";
+    const uniqueLeader = candidates[0] && candidates[0].distinctOfferCount > (candidates[1]?.distinctOfferCount || 0) ? candidates[0] : null;
+    const durable = authoritative ? candidates.find(item => item.productCode === authoritative) || { productCode: authoritative, name: canonicalByCode.get(authoritative).name || authoritative, distinctOfferCount: 0, evidence: "ONBOARDING_AUTHORITY" } : uniqueLeader;
+    if (durable) {
+        const evidence = authoritative === durable.productCode ? "ONBOARDING_AUTHORITY" : durable.evidence;
+        return { ...durable, evidence, confidence: "AUTHORITATIVE", totalSourceOfferCount: new Set(offers.map(id).filter(Boolean)).size, alternatives: candidates.filter(item => item.productCode !== durable.productCode) };
+    }
+    const sourceIdentity = normalizedSuggestionIdentity(supplierProduct.displayName || supplierProduct.rawName || supplierProduct.supplierProductCode);
+    if (!sourceIdentity) return null;
+    const nameMatches = canonicalProducts.filter(item => normalizedSuggestionIdentity(item.name || item.productCode) === sourceIdentity);
+    if (nameMatches.length !== 1) return null;
+    return { productCode: lower(nameMatches[0].productCode), name: nameMatches[0].name || nameMatches[0].productCode, evidence: "DISPLAY_NAME_SUGGESTION_ONLY", confidence: "SUGGESTION", distinctOfferCount: 0, totalSourceOfferCount: new Set(offers.map(id).filter(Boolean)).size, alternatives: [] };
+}
+
 function syntheticMappingFromOffer({ offer, supplier, supplierProduct } = {}) {
     const canonical = canonicalEvidenceForOffer(offer);
     if (!canonical) return null;
@@ -175,22 +220,23 @@ function syntheticMappingFromOffer({ offer, supplier, supplierProduct } = {}) {
     };
 }
 
-function discoveryAssessment({ mapping, supplier, supplierProduct, offer, availability, product, pkg, customerMarkets, dependencies }) {
+function discoveryAssessment({ mapping, mappingIsDurable = true, supplier, supplierProduct, offer, availability, product, pkg, customerMarkets, dependencies }) {
     const blockers = [];
     if (!mapping) blockers.push("MISSING_MAPPING");
     if (!product || product.deletedAt) blockers.push("MISSING_CANONICAL_PRODUCT");
     if (!supplier || supplier.enabled !== true || upper(supplier.mode) !== "API") blockers.push("SUPPLIER_UNSUPPORTED");
     if (!supplierProduct || upper(supplierProduct.supportState) !== "SUPPORTED") blockers.push("SUPPLIER_PRODUCT_UNSUPPORTED");
     if (!offer || upper(offer.catalogLifecycleState) !== "ACTIVE") blockers.push("OFFER_NOT_ACTIVE");
-    if (offer && upper(offer.reconciliationState) !== "EXACT_CANONICAL_MATCH") blockers.push("CANONICAL_EQUIVALENCE_REVIEW_REQUIRED");
+    const equivalenceProof = assessCanonicalEquivalenceProof({ mapping: mappingIsDurable ? mapping : null, supplierProduct, offer, canonicalProduct: product, canonicalPackages: pkg ? [pkg] : [] });
+    if (!equivalenceProof.proven) blockers.push(...equivalenceProof.blockers);
     if (!availability || upper(availability.state) !== "AVAILABLE" || (availability.staleAt && new Date(availability.staleAt).getTime() <= Date.now())) blockers.push("AVAILABILITY_UNPROVEN");
     const supplierMarket = upper(supplierProduct?.supplierMarketCode);
     void supplierMarket;
     const markets = [...new Set((customerMarkets || []).map(upper).filter(Boolean))].sort();
     if (!markets.length) blockers.push("CUSTOMER_MARKET_REQUIRED");
-    if (markets.some(market => !COMMERCE_MARKETS.includes(market))) blockers.push("CUSTOMER_MARKET_ELIGIBILITY_UNPROVEN");
+    if (markets.some(market => !COMMERCE_MARKETS.includes(market))) blockers.push("CUSTOMER_COMMERCE_MARKET_UNSUPPORTED");
     const { proposed, fulfillmentContract } = discoveryMappingCandidate({ mapping, supplier, supplierProduct, offer });
-    if (!fulfillmentContract?.fields?.length) blockers.push("INPUT_CONTRACT_UNRESOLVED");
+    if (!fulfillmentContract || (!fulfillmentContract.fields?.length && fulfillmentContract.noCustomerInput !== true)) blockers.push("INPUT_CONTRACT_UNRESOLVED");
     let adapter = null, adapterConfigured = false, autoFulfillmentEnabled = false, processorSupported = false;
     const adapterResolver = dependencies.adapterResolver || getSupplierAdapter;
     try { adapter = supplier ? adapterResolver(supplier) : null; } catch { adapter = null; }
@@ -248,6 +294,14 @@ function projectActivation(data, { search = "", productCode = "", supplierMarket
     const normalizedSupplierMarket = upper(supplierMarket);
     const requestedSellingRegions = commerceSellingRegionsFrom(sellingRegions || customerMarkets || customerMarket, "TH");
     const market = requestedSellingRegions[0] || "TH";
+    const offersBySupplierProduct = new Map();
+    for (const offer of data.offers) {
+        const productId = id(offer.supplierCatalogProductId);
+        if (!offersBySupplierProduct.has(productId)) offersBySupplierProduct.set(productId, []);
+        offersBySupplierProduct.get(productId).push(offer);
+    }
+    const mappedSupplierProductIdentities = new Set(data.mappings.map(mapping => `${id(mapping.supplierId)}|${clean(mapping.supplierProductCode)}`));
+    const mappedOfferIdentities = new Set(data.mappings.map(mapping => id(mapping.supplierCatalogOfferId)).filter(Boolean));
 
     if (!normalizedProduct) {
         const publishedKeys = new Set(data.publications.filter(item => item.published === true).map(item => key(lower(item.productCode), upper(item.packageCode))));
@@ -266,10 +320,50 @@ function projectActivation(data, { search = "", productCode = "", supplierMarket
             };
         }).filter(product => !normalizedSearch || [product.name, product.productCode, product.productFamily, ...product.suppliers].some(value => lower(value).includes(normalizedSearch)))
           .sort((a, b) => a.name.localeCompare(b.name));
+        const logicalByKey = new Map(products.map(product => [`canonical:${product.productCode}`, {
+            logicalProductId: `canonical:${product.productCode}`, canonicalProductCode: product.productCode,
+            name: product.name, existingCanonical: true, packageCount: product.packageCount,
+            publishedPackageCount: product.publishedPackageCount, sources: []
+        }]));
+        for (const item of data.supplierProducts) {
+            const sourceMappings = data.mappings.filter(mapping => id(mapping.supplierId) === id(item.supplierId) && clean(mapping.supplierProductCode) === clean(item.supplierProductCode));
+            const authorityCode = lower(item.metadata?.onboardingCanonicalProduct?.productCode);
+            const mappedCodes = [...new Set(sourceMappings.map(mapping => lower(mapping.productCode)).filter(Boolean))];
+            const canonicalCode = mappedCodes.length === 1 ? mappedCodes[0] : authorityCode;
+            const logicalKey = canonicalCode ? `canonical:${canonicalCode}` : `supplier:${id(item)}`;
+            const offers = offersBySupplierProduct.get(id(item)) || [];
+            const supplier = supplierById.get(id(item.supplierId));
+            const hasSelectableOffer = offers.some(offer => {
+                const mapping = data.mappings.find(candidate => id(candidate.supplierCatalogOfferId) === id(offer));
+                const canonicalPackage = mapping ? packageByKey.get(key(lower(mapping.productCode), upper(mapping.packageCode))) : null;
+                return evaluateAddProductOffer({ supplier, product: item, offer, availability: availabilityByOffer.get(id(offer)), mapping, canonicalPackage, customerMarkets: requestedSellingRegions, newCanonicalProduct: !canonicalPackage }).selectable;
+            });
+            if (!hasSelectableOffer) continue;
+            if (!logicalByKey.has(logicalKey)) logicalByKey.set(logicalKey, {
+                logicalProductId: logicalKey, canonicalProductCode: "", name: item.displayName || item.rawName || item.supplierProductCode,
+                existingCanonical: false, packageCount: offers.length, publishedPackageCount: 0, sources: []
+            });
+            const logical = logicalByKey.get(logicalKey);
+            const suggestion = canonicalProductSuggestion({ supplierProduct: item, sourceMappings, offers, canonicalProducts: data.products });
+            logical.sources.push({ supplierCatalogProductId: id(item), supplierId: id(item.supplierId),
+                supplierProductCode: clean(item.supplierProductCode), supplierCode: upper(supplierById.get(id(item.supplierId))?.supplierCode),
+                supplierName: supplierById.get(id(item.supplierId))?.name || "", supplierMarket: upper(item.supplierMarketCode),
+                displayName: item.displayName || item.rawName || item.supplierProductCode, packageCount: offers.length,
+                mapped: sourceMappings.length > 0, sourceAuthority: canonicalCode ? (mappedCodes.length === 1 ? "EXACT_MAPPING" : "ONBOARDING_AUTHORITY") : "SUPPLIER_NATIVE",
+                suggestedCanonicalProduct: suggestion });
+        }
+        const logicalProducts = [...logicalByKey.values()].filter(item => item.sources.length > 0).filter(item => !normalizedSearch || [item.name, item.canonicalProductCode, ...item.sources.flatMap(source => [source.displayName, source.supplierName, source.supplierCode])].some(value => lower(value).includes(normalizedSearch))).sort((a,b)=>a.name.localeCompare(b.name));
         return {
             authority: { catalog: "CatalogProduct/CatalogPackage", route: "SupplierProductMapping.productionRole", cost: "SupplierProductMapping.supplierCostAuthority", pricing: "Daily Pricing/Pricing Engine", input: "SupplierCatalogProduct + mapping readiness", fulfillment: "supplier eligibility route resolver", publication: "PackageMarketPublication" },
-            projectionMode: "NAVIGATION", customerMarket: market, commerceMarketSupported: COMMERCE_MARKETS.includes(market), products,
-            markets: [], packages: [], automaticFailover: false, automaticPublicRepricing: false
+            projectionMode: "NAVIGATION", customerMarket: market, commerceMarketSupported: COMMERCE_MARKETS.includes(market), products, logicalProducts,
+            markets: [], packages: [], supplierInventory: data.supplierProducts.map(item => ({
+                supplierCatalogProductId: id(item), supplierId: id(item.supplierId), supplierProductCode: clean(item.supplierProductCode),
+                supplierCode: upper(supplierById.get(id(item.supplierId))?.supplierCode), supplierName: supplierById.get(id(item.supplierId))?.name || "",
+                displayName: item.displayName || item.rawName || item.supplierProductCode, supplierMarket: upper(item.supplierMarketCode), lifecycleState: item.supportState,
+                mapped: mappedSupplierProductIdentities.has(`${id(item.supplierId)}|${clean(item.supplierProductCode)}`),
+                onboardingState: (() => { const rows = offersBySupplierProduct.get(id(item)) || [], mapped = rows.filter(offer => mappedOfferIdentities.has(id(offer))).length, review = rows.filter(offer => !mappedOfferIdentities.has(id(offer)) && offer.reconciliationState !== "EXACT_CANONICAL_MATCH").length; return review ? (mapped ? "PARTIALLY_PREPARED" : "NEEDS_REVIEW") : mapped === rows.length && rows.length ? "PREPARED" : "NOT_ADDED"; })(),
+                offers: (offersBySupplierProduct.get(id(item)) || []).map(offer => ({ supplierCatalogOfferId: id(offer), supplierOfferCode: offer.supplierOfferCode, displayName: offer.supplierOfferName || offer.rawName || offer.supplierOfferCode, reconciliationState: offer.reconciliationState, lifecycleState: offer.catalogLifecycleState, availability: availabilityByOffer.get(id(offer))?.state || "UNKNOWN", mapped: mappedOfferIdentities.has(id(offer)), fulfillmentReady: false }))
+            })), automaticFailover: false, automaticPublicRepricing: false
         };
     }
 
@@ -294,8 +388,8 @@ function projectActivation(data, { search = "", productCode = "", supplierMarket
         const packagePublished = publicationRecords.some(item => item.published === true);
         const readiness = mappingReadiness({ mapping, supplier, pkg, offer, availability, customerMarket: market, now });
         const setup = mappingAvailability({ mapping, supplier, pkg, offer });
-        const discovery = discoveryAssessment({ mapping, supplier, supplierProduct, offer, availability, product, pkg, customerMarkets: requestedSellingRegions, dependencies });
-        const prepared = discovery.ready ? { ready: true, outcome: "FULFILLMENT_READY", blockers: [], fulfillmentContract: discovery.fulfillmentContract } : assessExistingPreparedRoute({ mapping, supplier, supplierProduct, offer, availability, canonicalProduct: product, canonicalPackages: pkg ? [pkg] : [] }, routeReadinessMarketsForMapping(mapping, requestedSellingRegions), dependencies);
+        const discovery = discoveryAssessment({ mapping, mappingIsDurable: !synthetic, supplier, supplierProduct, offer, availability, product, pkg, customerMarkets: requestedSellingRegions, dependencies });
+        const prepared = discovery.ready || synthetic ? { ready: discovery.ready, outcome: discovery.outcome, blockers: discovery.blockers, fulfillmentContract: discovery.fulfillmentContract } : assessExistingPreparedRoute({ mapping, supplier, supplierProduct, offer, availability, canonicalProduct: product, canonicalPackages: pkg ? [pkg] : [] }, routeReadinessMarketsForMapping(mapping, requestedSellingRegions), dependencies);
         const displayPackage = discoveryPackage(mapping, pkg, offer);
         const cost = mapping.supplierCostAuthority || {};
         const approvedCostPresent = cost.rawSupplierCost != null && Number.isFinite(Number(cost.rawSupplierCost));
@@ -372,12 +466,23 @@ function createAdminProductActivationService(models = {}) {
         const productCode = lower(query.productCode);
         const supplierMarket = upper(query.supplierMarket);
         if (!productCode) {
-            const [products, mappings, publications] = await Promise.all([
+            const [products, mappings, publications, supplierProducts, offers, suppliers, availability] = await Promise.all([
                 lean(M.CatalogProduct.find({ deletedAt: null }).select("productCode name enabled commerceState publicDiscoveryEnabled catalogCategory metadata"), session),
-                lean(M.Mapping.find({ archivedAt: null }).select("productCode packageCode supplierCode region"), session),
-                lean(M.Publication.find({ published: true }).select("productCode packageCode customerMarket published decisionVersion decisionNote"), session)
+                lean(M.Mapping.find({ archivedAt: null }).select("productCode packageCode supplierId supplierCode supplierProductCode supplierCatalogOfferId region fulfillmentEligibility"), session),
+                lean(M.Publication.find({ published: true }).select("productCode packageCode customerMarket published decisionVersion decisionNote"), session),
+                lean(M.SupplierProduct.find({}).select("_id supplierId supplierProductCode supplierMarketCode displayName rawName metadata normalizedInputContract requiredFields"), session),
+                lean(M.Offer.find({}).select("_id supplierId supplierCatalogProductId supplierProductCode supplierOfferCode supplierOfferName rawName reconciliationState reconciliationEvidence catalogLifecycleState metadata"), session),
+                lean(M.Supplier.find({}).select("_id supplierCode name enabled mode"), session),
+                lean(M.Availability.find({}).select("supplierCatalogOfferId state coverageComplete evidenceCode staleAt"), session)
             ]);
-            return { products, packages: [], suppliers: [], mappings, offers: [], supplierProducts: [], availability: [], publications };
+            const packageKeys = [...new Map(mappings.map(item => [key(item.productCode, item.packageCode), {
+                productCode: lower(item.productCode),
+                packageCode: upper(item.packageCode)
+            }])).values()];
+            const packages = packageKeys.length
+                ? await lean(M.CatalogPackage.find({ deletedAt: null, $or: packageKeys }).select("productCode packageCode name enabled deletedAt"), session)
+                : [];
+            return { products, packages, suppliers, mappings, offers, supplierProducts, availability, publications };
         }
         const mappingFilter = { productCode, archivedAt: null };
         if (supplierMarket) mappingFilter.region = supplierMarket;
@@ -455,4 +560,4 @@ async function publishSelectedPackages({ productCode, customerMarket, selections
 }
 
 const defaultService = createAdminProductActivationService();
-module.exports = Object.freeze({ COMMERCE_MARKETS, AdminProductActivationError, eligibilityAllows, mappingAvailability, mappingReadiness, blockerActions, canonicalEvidenceForOffer, syntheticMappingFromOffer, discoveryAssessment, discoveryMappingCandidate, discoveryPackage, routeReadinessMarketsForMapping, projectActivation, createAdminProductActivationService, getWorkspace: defaultService.getWorkspace, publishSelectedPackage, publishSelectedPackages });
+module.exports = Object.freeze({ COMMERCE_MARKETS, AdminProductActivationError, eligibilityAllows, mappingAvailability, mappingReadiness, blockerActions, canonicalEvidenceForOffer, normalizedSuggestionIdentity, canonicalProductSuggestion, syntheticMappingFromOffer, discoveryAssessment, discoveryMappingCandidate, discoveryPackage, routeReadinessMarketsForMapping, projectActivation, createAdminProductActivationService, getWorkspace: defaultService.getWorkspace, publishSelectedPackage, publishSelectedPackages });

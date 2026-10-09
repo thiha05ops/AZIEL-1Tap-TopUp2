@@ -41,7 +41,10 @@ function verify() {
     const base = [{ productCode: "mlbb", packages: [pkg("SAFE"), pkg("UNSAFE", false)] }];
     const legacyBefore = customerClone(base);
     const internal = customerClone(base);
-    applyPublicationMetadata(internal[0], [{ productCode: "mlbb", packageCode: "UNSAFE", customerMarket: "TH", published: true, decisionNote: "private", publishedBy: "owner", decisionVersion: 4, provenance: { migrationId: "secret" } }]);
+    applyPublicationMetadata(internal[0], [
+        { productCode: "mlbb", packageCode: "SAFE", customerMarket: "TH", published: true, decisionVersion: 1 },
+        { productCode: "mlbb", packageCode: "UNSAFE", customerMarket: "TH", published: true, decisionNote: "private", publishedBy: "owner", decisionVersion: 4, provenance: { migrationId: "secret" } }
+    ]);
     const proposed = [{ ...internal[0], packages: explicitPublishedPackages(internal[0]) }];
     const diagnostics = comparePublicationSets(base, proposed, "TH");
     const shadowReturned = customerClone(base);
@@ -51,7 +54,7 @@ function verify() {
     const serializedCustomer = JSON.stringify(proposed);
     for (const privateField of ["publishedBy", "unpublishedBy", "decisionNote", "decisionVersion", "migrationId", "provenance"]) assert(!serializedCustomer.includes(privateField), `${privateField} leaked to customer projection`);
 
-    const suppressed = projectPackagePublication(pkg("UNSAFE", false), { published: true, decisionVersion: 1 });
+    const suppressed = projectPackagePublication(pkg("UNSAFE", false), { customerMarket: "TH", published: true, decisionVersion: 1 });
     assert.strictEqual(suppressed.state, "SUPPRESSED");
     assert.strictEqual(suppressed.currentlyPurchasable, false);
     const product = { productCode: "mlbb", enabled: true, publicDiscoveryEnabled: true, commerceState: "PURCHASABLE", lifecycleStatus: "ACTIVE", supportedRegions: ["TH"] };

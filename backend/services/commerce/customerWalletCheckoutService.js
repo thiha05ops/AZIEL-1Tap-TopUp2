@@ -4,7 +4,6 @@ const crypto = require("crypto");
 const CatalogPackage = require("../../models/CatalogPackage");
 const { findCatalogPackageByIdentity } = require("./catalogPackageIdentityService");
 const PaymentMethod = require("../../models/PaymentMethod");
-const { loadFulfillmentCapability } = require("../fulfillmentCapabilityService");
 const { createAndPersistPricingQuote } = require("./pricingQuoteApplicationService");
 const { resolveCheckoutRouteSnapshot } = require("../supplierProductionSelectionService");
 const { checkoutFromQuote } = require("./checkoutApplicationService");
@@ -17,7 +16,7 @@ const {
     reserveCommercePromotion
 } = require("./commercePromotionBridgeService");
 const { debitWallet } = require("../walletService");
-const { ensurePaidOrderFulfillmentWork } = require("../paidFulfillmentRoutingService");
+const { processPaidFulfillmentHandoff } = require("../paidFulfillmentHandoffService");
 
 const ERROR_CODES = Object.freeze({
     INVALID_CHECKOUT_INPUT: "INVALID_CHECKOUT_INPUT",
@@ -87,18 +86,6 @@ async function loadCatalogPackage(input = {}) {
     return { pkg, price, region, currency, productCode, packageCode: pkg.packageCode };
 }
 
-async function assertAuthoritativeFulfillmentReady(catalog = {}, options = {}) {
-    const capability = await (options.loadCapability || loadFulfillmentCapability)(catalog);
-    if (!capability.fulfillmentAvailable) {
-        throw new CustomerWalletCheckoutError(
-            ERROR_CODES.FULFILLMENT_UNAVAILABLE,
-            "This product is not currently available in the selected region.",
-            409
-        );
-    }
-    return capability;
-}
-
 async function loadWalletMethod(region) {
     const method = await PaymentMethod.findOne({
         key: "wallet",
@@ -126,6 +113,14 @@ function repositoryOwner(owner = {}) {
     return owner.userId
         ? { type: "USER", userId: owner.userId }
         : { type: "SESSION", sessionId: owner.sessionId };
+}
+
+function walletGameAccount(input = {}) {
+    return {
+        userId: input.userId || "",
+        zoneId: input.zoneId || "",
+        accountFields: Array.isArray(input.accountFields) ? input.accountFields : []
+    };
 }
 
 async function markCommerceOrderPaid(orderId, owner, dependencies = {}) {
@@ -158,7 +153,15 @@ async function markCommerceOrderPaid(orderId, owner, dependencies = {}) {
 
     order = await repo.findOwnedOrderById({ orderId, owner: repositoryOwner(owner) }) || order;
     try {
-        await (dependencies.ensurePaidOrderFulfillmentWork || ensurePaidOrderFulfillmentWork)(order);
+        const processHandoff = dependencies.processPaidFulfillmentHandoff || (
+            dependencies.ensurePaidOrderFulfillmentWork
+                ? async () => dependencies.ensurePaidOrderFulfillmentWork(order)
+                : processPaidFulfillmentHandoff
+        );
+        const result = await processHandoff(orderId);
+        if (result?.processed === true && result?.created === false && result?.errorCode) {
+            await dependencies.onPaidFulfillmentError?.(Object.assign(new Error("Paid fulfillment handoff is blocked."), { code: result.errorCode }), order);
+        }
     } catch (error) {
         await dependencies.onPaidFulfillmentError?.(error, order);
     }
@@ -194,7 +197,6 @@ async function startCustomerWalletCheckout(input = {}, context = {}, dependencie
     }
 
     const catalog = await loadCatalogPackage(input);
-    await (dependencies.assertFulfillmentReady || assertAuthoritativeFulfillmentReady)(catalog);
     const method = await loadWalletMethod(catalog.region);
     const issuedAt = new Date();
     const pricingContext = await (dependencies.buildPricingContext || buildProductionPricingContext)({
@@ -266,10 +268,7 @@ async function startCustomerWalletCheckout(input = {}, context = {}, dependencie
                 paymentChannel: "AZIEL_WALLET"
             },
             customerInput: {
-                gameAccount: {
-                    userId: input.userId || "",
-                    zoneId: input.zoneId || ""
-                },
+                gameAccount: walletGameAccount(input),
                 customFields: {
                     username: input.username || username,
                     gameKey: input.gameKey || input.productCode || ""
@@ -391,7 +390,7 @@ async function startCustomerWalletCheckout(input = {}, context = {}, dependencie
 module.exports = Object.freeze({
     startCustomerWalletCheckout,
     markCommerceOrderPaid,
-    assertAuthoritativeFulfillmentReady,
     CustomerWalletCheckoutError,
-    ERROR_CODES
+    ERROR_CODES,
+    _test: Object.freeze({ walletGameAccount })
 });

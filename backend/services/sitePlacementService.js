@@ -2,7 +2,6 @@ const SitePlacement = require("../models/SitePlacement");
 const CatalogProduct = require("../models/CatalogProduct");
 const PromoCode = require("../models/PromoCode");
 const { normalizeRegion, toPublicCatalog } = require("./catalogService");
-const { isCanonicalProductCode } = require("../catalog/canonicalOperationalCatalog");
 
 const SUPPORTED_PLACEMENTS = Object.freeze({
     HOME_TOPUP_SHORTCUTS: {
@@ -152,14 +151,6 @@ async function assertProductsExist(items = [], placementCode = "") {
         );
     }
 
-    const unsupported = productCodes.find(productCode => !isCanonicalProductCode(productCode));
-    if (unsupported) {
-        throw new SitePlacementError(
-            "SITE_PLACEMENT_PRODUCT_UNSUPPORTED",
-            `Unsupported catalog product: ${unsupported}`
-        );
-    }
-
 }
 
 async function assertPromosExist(items = []) {
@@ -200,7 +191,6 @@ async function getAvailableProducts() {
     });
 
     return products
-        .filter(product => isCanonicalProductCode(product.productCode))
         .map(product => ({
             productCode: product.productCode,
             name: product.name,

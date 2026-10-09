@@ -26,6 +26,7 @@ assertIncludes(i18n, "document.documentElement.lang = activeLang", "Initial html
 assertIncludes(i18n, "ready()", "AZIEL_I18N.ready API");
 assertIncludes(i18n, "missingKeys()", "Missing key reporting API");
 assertIncludes(i18n, "detail: { lang: nextLang }", "Canonical languageChanged event detail");
+if (i18n.includes("aziel:locale-changed")) fail("The retired aziel:locale-changed event remains in the canonical runtime");
 
 if (/localStorage\.setItem\("language"/.test(i18n) || /localStorage\.setItem\("azielLang"/.test(i18n)) {
     fail("i18n.js must not write legacy language keys after migration");
@@ -45,5 +46,21 @@ if (/localStorage\.setItem\("language"/.test(i18n) || /localStorage\.setItem\("a
 
 assertIncludes(locale, "e.detail?.lang", "Locale switcher canonical event consumption");
 assertIncludes(recovery, "window.AZIEL_I18N.ready()", "Recovery overlay waits for i18n readiness");
+
+const activeListenerFiles = [
+    "frontend/js/campaign-runtime.js",
+    "frontend/js/game-flow.js",
+    "frontend/js/payment-method-page.js",
+    "frontend/js/payment-page-runtime.js",
+    "frontend/js/prices.js",
+    "frontend/js/product-detail-stage.js",
+    "frontend/js/search.js",
+    "frontend/js/support.js"
+];
+activeListenerFiles.forEach(file => {
+    const source = read(file);
+    assertIncludes(source, '"aziel:languageChanged"', `${file} canonical event listener`);
+    if (source.includes("aziel:locale-changed")) fail(`${file} still depends on the retired locale event`);
+});
 
 console.log("Global language authority verifier passed.");

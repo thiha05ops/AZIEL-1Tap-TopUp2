@@ -14,18 +14,13 @@ document.addEventListener("DOMContentLoaded", () => {
   renderGamePrices();
 
   window.addEventListener("aziel:shopRegionChanged", () => {
-    const selectedCode =
-      selectedPackage?.code ||
-      document.querySelector(".pack.active")?.dataset.code ||
-      "";
-
+    clearSelectedPackage("region_changed");
     renderGamePrices({
-      reselectCode: selectedCode,
       reason: "region_changed"
     });
   });
 
-  window.addEventListener("aziel:locale-changed", () => {
+  window.addEventListener("aziel:languageChanged", () => {
     const selectedCode = selectedPackage?.code || document.querySelector(".pack.active")?.dataset.code || "";
     renderGamePrices({ reselectCode: selectedCode, reason: "locale_changed" });
   });
@@ -338,8 +333,9 @@ async function renderGamePrices(options = {}) {
   familyGroups.sort((a, b) => Number(a.sortOrder || 90) - Number(b.sortOrder || 90));
   const renderPackage = item => {
     const artwork = String(item.artwork || "").trim();
+    const longNameClass = String(item.name || "").trim().length > 28 ? " pack--long-name" : "";
     return `
-    <div class="pack"
+    <div class="pack${longNameClass}"
          role="button"
          tabindex="0"
          aria-pressed="false"
@@ -362,17 +358,19 @@ async function renderGamePrices(options = {}) {
          data-show-discount="${item.showDiscount === true}"
          data-show-original-price="${item.showOriginalPrice === true}"
          data-catalog-synced="true">
-      ${artwork ? `<div class="pack-icon" data-package-media>
-        <img src="${escapeAttr(artwork)}" alt="${escapeAttr(item.artworkAlt || item.name)}" width="88" height="88" loading="lazy" decoding="async">
-      </div>` : ""}
+      <div class="pack-content">
+        ${artwork ? `<div class="pack-icon" data-package-media>
+          <img src="${escapeAttr(artwork)}" alt="${escapeAttr(item.artworkAlt || item.name)}" width="88" height="88" loading="lazy" decoding="async">
+        </div>` : ""}
 
-      <div class="pack-info">
-        <strong class="pack-name">${escapeHtml(item.name)}</strong>
+        <div class="pack-info">
+          <strong class="pack-name">${escapeHtml(item.name)}</strong>
 
-        ${item.showDiscount
+          ${item.showDiscount
       ? `<span class="pack-discount-text">${Number(item.discountPercent || 0).toLocaleString()}% ${escapeHtml(t("product.offerOff", "OFF"))}</span>`
       : ""
     }
+        </div>
       </div>
 
       <div class="pack-price-block">

@@ -14,7 +14,7 @@ const { ADMIN_AUDIT_ACTIONS, writeAdminAudit } = require("./adminAuditService");
 const { ORDER_STATES, getAllowedNextStatuses, transitionOrder } = require("./orderStateService");
 const { getSupplierAdapter, normalizeSupplierResult } = require("./supplierAdapterRegistry");
 const { assessProductionMapping, setProductionRole } = require("./supplierProductionSelectionService");
-const { basicCandidateBlockers } = require("./supplierEligibilityRouteResolver");
+const { READINESS_MODES, assessMappingReadiness } = require("./supplierMappingReadinessService");
 const { supplierCapabilityProductCode } = require("./fulfillmentCapabilityService");
 const commerceOrderRepository = require("./commerce/orderRepository");
 const {
@@ -34,13 +34,21 @@ const REGIONS = Object.freeze(["MM", "TH"]);
 const CODE_PATTERN = /^[A-Z0-9_-]{2,40}$/;
 
 class FulfillmentError extends Error {
-    constructor(code, message, statusCode = 400) {
+    constructor(code, message, statusCode = 400, details = null) {
         super(message);
         this.name = "FulfillmentError";
         this.code = code;
         this.statusCode = statusCode;
+        if (details) this.details = details;
     }
 }
+
+const FROZEN_ROUTE_BLOCKER_CODES = new Set([
+    "MAPPING_ARCHIVED", "MAPPING_DISABLED", "MAPPING_EXECUTION_NOT_API",
+    "EXACT_MAPPING_INCOMPLETE", "SUPPLIER_NOT_API_READY", "SUPPLIER_ADAPTER_NOT_READY",
+    "PROVIDER_FEATURE_GATE_OFF", "FULFILLMENT_PROCESSOR_NOT_READY",
+    "SUPPLIER_MAPPING_NOT_READY", "INPUT_NOT_READY", "FULFILLMENT_NOT_READY"
+]);
 
 function isMarketDecoupledV2RouteSnapshot({ routeSnapshot = null, mapping = null, customerMarket = "" } = {}) {
     if (!routeSnapshot || !mapping || Number(routeSnapshot.snapshotVersion) !== 2 || String(routeSnapshot.routeType || "").toUpperCase() !== "SUPPLIER_API") return false;
@@ -55,7 +63,7 @@ function isMarketDecoupledV2RouteSnapshot({ routeSnapshot = null, mapping = null
         String(routeSnapshot.supplierProductCode || "").trim() === String(mapping.supplierProductCode || "").trim() &&
         String(routeSnapshot.supplierPackageCode || "").trim() === String(mapping.supplierPackageCode || "").trim() &&
         String(routeSnapshot.executionMode || "").trim().toUpperCase() === "API" &&
-        String(routeSnapshot.selectedRole || "").trim().toUpperCase() === "PRIMARY" &&
+        ["PRIMARY", "PACKAGE_SUPPLIER_SELECTION", "UNIQUE_EXECUTABLE_ROUTE"].includes(String(routeSnapshot.selectedRole || "").trim().toUpperCase()) &&
         (!persistedSupplierMarket || persistedSupplierMarket === String(mapping.region || "").trim().toUpperCase());
 }
 
@@ -734,13 +742,12 @@ async function startFulfillmentForOrder(orderId, payload = {}, context = {}) {
         assertFulfillmentStartAllowed(order, financialAttempts);
     }
     if (!mapping || mapping.archivedAt || !mapping.enabled) throw new FulfillmentError("SUPPLIER_MAPPING_NOT_FOUND", "Supplier mapping not found.", 404);
-    if (mapping.productionRole !== "PRIMARY") throw new FulfillmentError("SUPPLIER_MAPPING_NOT_PRIMARY", "The mapping is not the explicitly selected PRIMARY production route.", 409);
-
     const supplier = await Supplier.findById(mapping.supplierId);
     if (!supplier) throw new FulfillmentError("SUPPLIER_NOT_FOUND", "Supplier not found.", 404);
     if (!supplier.enabled) throw new FulfillmentError("SUPPLIER_DISABLED", "Supplier is disabled.");
 
     const routeSnapshot = order.fulfilment?.routeSnapshot || order.quoteSnapshot?.supplierRouteSnapshot || null;
+    if (!routeSnapshot && mapping.productionRole !== "PRIMARY") throw new FulfillmentError("SUPPLIER_MAPPING_NOT_PRIMARY", "The mapping is not the explicitly selected PRIMARY production route.", 409);
     const customerMarket = normalizeRegion(order.commercial?.region || order.product?.region || order.region || "MM");
     const marketDecoupledV2 = isCommerceOrder && isMarketDecoupledV2RouteSnapshot({ routeSnapshot, mapping, customerMarket });
     if (
@@ -758,16 +765,26 @@ async function startFulfillmentForOrder(orderId, payload = {}, context = {}) {
     if (supplier.mode === SUPPLIER_MODES.API && !adapter.isConfigured()) {
         throw new FulfillmentError("SUPPLIER_ADAPTER_NOT_CONFIGURED", "Supplier API adapter is not configured.", 409);
     }
-    if (supplier.supplierCode === "WONDD") {
-        const { resolveWonddCatalogIdentity } = require("./suppliers/wonddCatalogConfig");
-        const { hasWonddGameIdFormatter } = require("./suppliers/wonddGameIdFormatters");
-        const catalogIdentity = resolveWonddCatalogIdentity(mapping.supplierProductCode);
-        const capabilityProductCode = supplierCapabilityProductCode(mapping, supplier);
-        if (mapping.executionMode !== SUPPLIER_EXECUTION_MODES.API || !catalogIdentity || catalogIdentity.family.serviceCode !== capabilityProductCode || !String(mapping.supplierPackageCode || "").trim()) {
-            throw new FulfillmentError("WONDD_PACKAGE_MAPPING_MISSING", "A verified WonDD serviceid and packcode mapping is required.", 409);
+    if (isCommerceOrder && routeSnapshot) {
+        const frozen = assessMappingReadiness({
+            mode: READINESS_MODES.FROZEN_ORDER_EXECUTABLE,
+            mapping: mapping.toObject ? mapping.toObject() : mapping,
+            supplier: supplier.toObject ? supplier.toObject() : supplier,
+            customerMarket,
+            adapter,
+            eligibilityOverride: routeSnapshot.eligibility || mapping.fulfillmentEligibility
+        });
+        if (!frozen.ready) {
+            const blockers = frozen.blockers.filter(code => FROZEN_ROUTE_BLOCKER_CODES.has(code));
+            throw new FulfillmentError("FROZEN_ROUTE_NOT_EXECUTABLE", `Frozen route is no longer executable: ${blockers.join(",")}`, 409, { blockers });
         }
-        if (!hasWonddGameIdFormatter(mapping.productCode)) {
-            throw new FulfillmentError("WONDD_INPUT_CONTRACT_NOT_CONFIGURED", "WonDD player input contract is not configured.", 409);
+    }
+    if (supplier.supplierCode === "WONDD") {
+        const { verifiedMappingContract } = require("./suppliers/fazercardsFulfillmentContractService");
+        const contract = routeSnapshot?.fulfillmentContract || verifiedMappingContract(mapping);
+        const capabilityProductCode = supplierCapabilityProductCode(mapping, supplier);
+        if (mapping.executionMode !== SUPPLIER_EXECUTION_MODES.API || contract?.protocol !== "WONDD_GAME_ID_TOPUP" || !String(contract?.transactionalServiceCode || "").trim() || !String(mapping.supplierProductCode || "").trim() || !String(mapping.supplierPackageCode || "").trim()) {
+            throw new FulfillmentError("WONDD_PACKAGE_MAPPING_MISSING", "A verified WonDD serviceid and packcode mapping is required.", 409);
         }
         const readiness = mapping.mappingMetadata?.readiness || {};
         const catalogPackage = await CatalogPackage.findOne({
@@ -779,11 +796,11 @@ async function startFulfillmentForOrder(orderId, payload = {}, context = {}) {
         const supplierCost = Number(regionalPrice?.supplierCost);
         const sellingPrice = Number(regionalPrice?.amount);
         const mappingForAssessment = mapping.toObject ? mapping.toObject() : mapping;
-        const marketDecoupledAssessment = marketDecoupledV2 ? basicCandidateBlockers({ mapping: { ...mappingForAssessment, fulfillmentEligibility: routeSnapshot.eligibility }, supplier: supplier.toObject ? supplier.toObject() : supplier, pkg: catalogPackage, customerMarket, adapter }) : null;
+        const marketDecoupledAssessment = marketDecoupledV2 ? assessMappingReadiness({ mode: READINESS_MODES.FROZEN_ORDER_EXECUTABLE, mapping: { ...mappingForAssessment, fulfillmentEligibility: routeSnapshot.eligibility }, supplier: supplier.toObject ? supplier.toObject() : supplier, customerMarket, adapter, eligibilityOverride: routeSnapshot.eligibility }) : null;
         if (marketDecoupledV2 && marketDecoupledAssessment.blockers.length) {
             throw new FulfillmentError("SUPPLIER_MARKET_DECOUPLED_ROUTE_NOT_PRODUCTION_READY", `Supplier market-decoupled readiness is incomplete: ${marketDecoupledAssessment.blockers.join(",")}`, 409);
         }
-        if (!marketDecoupledV2 && (
+        if (!routeSnapshot && !marketDecoupledV2 && (
             readiness.supplierMapped !== true ||
             readiness.inputReady !== true ||
             readiness.pricingReady !== true ||
@@ -803,7 +820,7 @@ async function startFulfillmentForOrder(orderId, payload = {}, context = {}) {
     }
     if (supplier.supplierCode === "FAZERCARDS") {
         const { validateFazerCardsMapping } = require("./suppliers/fazercardsFulfillmentProcessor");
-        try { validateFazerCardsMapping(mapping, { customerMarket }); } catch (error) { throw new FulfillmentError(error.code || "FAZERCARDS_PACKAGE_NOT_PRODUCTION_READY", error.message, 409); }
+        try { validateFazerCardsMapping(mapping, { customerMarket, frozenRoute: marketDecoupledV2 }); } catch (error) { throw new FulfillmentError(error.code || "FAZERCARDS_PACKAGE_NOT_PRODUCTION_READY", error.message, 409); }
         if (!adapter.isAutoFulfillmentEnabled(mapping.productCode)) {
             const gate = adapter.autoFulfillmentGateState?.(mapping.productCode);
             throw new FulfillmentError(gate?.blockerCode === "SUPPLIER_AUTO_FULFILLMENT_DISABLED" ? gate.blockerCode : "FAZERCARDS_AUTO_FULFILLMENT_DISABLED", "Live FazerCards fulfillment is disabled.", 409);

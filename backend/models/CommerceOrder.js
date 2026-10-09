@@ -80,6 +80,7 @@ const fulfilmentSchema = new mongoose.Schema(
         input: { type: mongoose.Schema.Types.Mixed, default: {}, immutable: true },
         routeSnapshot: { type: mongoose.Schema.Types.Mixed, default: null, immutable: true },
         status: { type: String, enum: FULFILMENT_STATUSES, default: "not_started" },
+        paidHandoff: { type: mongoose.Schema.Types.Mixed, default: null },
         references: { type: [mongoose.Schema.Types.Mixed], default: [] }
     },
     { _id: false, minimize: false }

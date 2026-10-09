@@ -120,6 +120,26 @@ function createModel() {
     assert.strictEqual(persisted.safeMetadata.rawPayload, undefined, "raw provider payload must not persist");
     assert(persisted.qr.image && persisted.expiresAt, "recovery-shaped read must see QR and expiry");
 
+    const redirectModel = createModel();
+    redirectModel.records.push({
+        ...clone(persisted),
+        attemptId: "ATT-REDIRECT-1",
+        providerReference: "",
+        providerTransactionId: "",
+        qr: { image: "existing-qr" },
+        redirect: null
+    });
+    const redirect = { url: "https://provider.example.test/pay/AZL-REF-2", mode: "REDIRECT" };
+    const redirectPersisted = await paymentAttemptRepository.setProviderReference({
+        attemptId: "ATT-REDIRECT-1",
+        providerReference: "AZL-REF-2",
+        providerTransactionId: "AZL-REF-2",
+        qr: { image: "existing-qr" },
+        redirect
+    }, { model: redirectModel });
+    assert.deepStrictEqual(redirectPersisted.redirect, redirect, "provider redirect must persist");
+    assert.deepStrictEqual(redirectPersisted.qr, { image: "existing-qr" }, "existing QR persistence must remain unchanged");
+
     console.log("Commerce provider-result persistence verification passed.");
 })().catch(error => {
     console.error(error);

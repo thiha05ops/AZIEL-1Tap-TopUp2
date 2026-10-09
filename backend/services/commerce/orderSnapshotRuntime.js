@@ -2,6 +2,7 @@ const {
     CUSTOMER_MARKETS,
     validateFulfillmentEligibility
 } = require("../supplierFulfillmentEligibilityService");
+const { verifiedMappingContract } = require("../suppliers/fazercardsFulfillmentContractService");
 
 const ORDER_SNAPSHOT_RUNTIME_VERSION = "2.5.2";
 const ORDER_SNAPSHOT_SPECIFICATION_VERSION = "2.5.2";
@@ -447,8 +448,9 @@ function normalizeSupplierRouteSnapshot(route, quote) {
     if (normalized.routeType === "MANUAL_ADMIN" && (normalized.supplierMappingId || normalized.supplierId || normalized.supplierCode !== "AZIEL_ADMIN")) {
         throw new OrderSnapshotRuntimeError(ORDER_SNAPSHOT_ERROR_CODES.INVALID_FULFILMENT_INPUT, "Manual Admin route must not contain supplier mapping identity.", { stage: "fulfilment-route" });
     }
-    if (normalized.routeType !== "MANUAL_ADMIN" && (!normalized.supplierMappingId || !normalized.supplierId || normalized.selectedRole !== "PRIMARY")) {
-        throw new OrderSnapshotRuntimeError(ORDER_SNAPSHOT_ERROR_CODES.INVALID_FULFILMENT_INPUT, "Supplier API route requires a PRIMARY mapping snapshot.", { stage: "fulfilment-route" });
+    const executableSupplierRoles = ["PRIMARY", "PACKAGE_SUPPLIER_SELECTION", "UNIQUE_EXECUTABLE_ROUTE"];
+    if (normalized.routeType !== "MANUAL_ADMIN" && (!normalized.supplierMappingId || !normalized.supplierId || !executableSupplierRoles.includes(normalized.selectedRole))) {
+        throw new OrderSnapshotRuntimeError(ORDER_SNAPSHOT_ERROR_CODES.INVALID_FULFILMENT_INPUT, "Supplier API route requires an exact executable mapping snapshot.", { stage: "fulfilment-route" });
     }
     if (snapshotVersion === 2 && normalized.routeType !== "MANUAL_ADMIN") {
         const eligibility = validateFulfillmentEligibility(route.eligibility);
@@ -459,6 +461,11 @@ function normalizeSupplierRouteSnapshot(route, quote) {
             throw new OrderSnapshotRuntimeError(ORDER_SNAPSHOT_ERROR_CODES.INVALID_FULFILMENT_INPUT, "Supplier API route requires exact provider identity.", { stage: "fulfilment-route" });
         }
         normalized.eligibility = clonePlain(eligibility.value);
+    }
+    if (normalized.routeType !== "MANUAL_ADMIN" && route.fulfillmentContract) {
+        const contract = verifiedMappingContract({ supplierCode: normalized.supplierCode, supplierProductCode: normalized.supplierProductCode, mappingMetadata: { fulfillmentContract: route.fulfillmentContract } });
+        if (!contract) throw new OrderSnapshotRuntimeError(ORDER_SNAPSHOT_ERROR_CODES.INVALID_FULFILMENT_INPUT, "Supplier route customer-information contract is invalid.", { stage: "fulfilment-route" });
+        normalized.fulfillmentContract = clonePlain(contract);
     }
     return normalized;
 }

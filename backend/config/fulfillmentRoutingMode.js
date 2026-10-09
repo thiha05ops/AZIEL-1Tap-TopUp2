@@ -3,12 +3,14 @@
 const FULFILLMENT_ROUTING_MODES = Object.freeze({
     LEGACY_REGION: "LEGACY_REGION",
     DUAL_READ: "DUAL_READ",
-    ELIGIBILITY_PRIMARY: "ELIGIBILITY_PRIMARY"
+    SHADOW: "SHADOW",
+    ELIGIBILITY_PRIMARY: "ELIGIBILITY_PRIMARY",
+    SELECTED: "SELECTED"
 });
 
 function resolveFulfillmentRoutingMode(env = process.env) {
     const configured = String(env.AZIEL_FULFILLMENT_ROUTING_MODE || "").trim().toUpperCase();
-    if (!configured) return FULFILLMENT_ROUTING_MODES.LEGACY_REGION;
+    if (!configured) return FULFILLMENT_ROUTING_MODES.SELECTED;
     if (!Object.values(FULFILLMENT_ROUTING_MODES).includes(configured)) {
         const error = new Error(`Unsupported fulfillment routing mode: ${configured}`);
         error.code = "FULFILLMENT_ROUTING_MODE_INVALID";

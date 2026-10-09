@@ -3,7 +3,6 @@
 const mongoose = require("mongoose");
 const CatalogProduct = require("../../models/CatalogProduct");
 const CatalogPackage = require("../../models/CatalogPackage");
-const { CANONICAL_OPERATIONAL_PRODUCTS } = require("../../catalog/canonicalOperationalCatalog");
 const PricingPolicy = require("../../models/PricingPolicy");
 const ExchangeRateAuthority = require("../../models/ExchangeRateAuthority");
 const PriceVersion = require("../../models/PriceVersion");
@@ -18,7 +17,6 @@ const {
 const BRANCH_KEY = "storefront";
 const QUERY_MAX_TIME_MS = 5000;
 const PRODUCT_LIMIT = 250;
-const CANONICAL_PRICING_PRODUCT_CODES = Object.freeze(CANONICAL_OPERATIONAL_PRODUCTS.map(product => product.productCode));
 const PRICING_BOOTSTRAP_DEADLINE_MS = 7500;
 const CONFIG_KEYS = Object.freeze([
     { region: "TH", currency: "THB" },
@@ -338,20 +336,18 @@ function affectedSummaryFromPackages(packages = []) {
 function productsFromPackages(packages = [], productMap = new Map(), supplierCostDraftRows = []) {
     const products = new Map();
     const savedDraftMap = draftRowMap(supplierCostDraftRows);
-    CANONICAL_OPERATIONAL_PRODUCTS.forEach(canonical => {
-        const productId = canonical.productCode;
-        const product = productMap.get(productId) || {};
+    productMap.forEach((product, productId) => {
         products.set(productId, {
             productId,
             productCode: productId,
-            productName: canonical.name,
-            family: canonical.family || "",
-            category: canonical.adminCategory || canonical.catalogCategory || canonical.category || "",
+            productName: product.name || product.displayName || productId,
+            family: product.family || "",
+            category: product.catalogCategory || product.category || "",
             enabled: true,
             catalogEnabled: product.productCode ? product.enabled !== false : null,
             supportedRegions: Array.isArray(product.supportedRegions) && product.supportedRegions.length
                 ? product.supportedRegions.map(upper)
-                : canonical.supportedRegions.map(upper),
+                : [],
             packages: []
         });
     });
@@ -453,7 +449,7 @@ async function readCatalogPackages(trace = null) {
         modelConnection: CatalogPackage.db?.name || "",
         limit: PRODUCT_LIMIT
     });
-    const query = CatalogPackage.find({ productCode: { $in: CANONICAL_PRICING_PRODUCT_CODES }, deletedAt: null })
+    const query = CatalogPackage.find({ deletedAt: null })
         .select("_id productCode packageCode name prices canonicalSupplierCost sortOrder metadata updatedAt")
         .sort({ productCode: 1, sortOrder: 1, packageCode: 1 })
         .limit(PRODUCT_LIMIT);
@@ -470,7 +466,7 @@ async function readCatalogProducts(trace = null) {
         limit: PRODUCT_LIMIT
     });
     const products = await boundedQuery(
-        CatalogProduct.find({ productCode: { $in: CANONICAL_PRICING_PRODUCT_CODES }, deletedAt: null })
+        CatalogProduct.find({ deletedAt: null })
             .select("productCode name displayName supportedRegions enabled")
             .sort({ productCode: 1 })
             .limit(PRODUCT_LIMIT)
@@ -675,7 +671,7 @@ async function runPricingEngineDiagnostics(trace = null) {
         return { count: row ? 1 : 0 };
     }));
     checks.push(await step("catalogPackageQuery", async () => {
-        const query = CatalogPackage.find({ productCode: { $in: CANONICAL_PRICING_PRODUCT_CODES }, enabled: true, deletedAt: null })
+        const query = CatalogPackage.find({ enabled: true, deletedAt: null })
             .select("_id productCode packageCode prices")
             .limit(1);
         const rows = await boundedQuery(query).lean();
