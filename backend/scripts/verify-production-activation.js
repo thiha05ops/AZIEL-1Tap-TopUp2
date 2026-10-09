@@ -12,7 +12,7 @@ const SupplierCatalogOffer = require("../models/SupplierCatalogOffer");
 const SupplierOfferAvailability = require("../models/SupplierOfferAvailability");
 const PackageSupplierSelection = require("../models/PackageSupplierSelection");
 const { projectCatalogProduct } = require("../services/catalogService");
-const { auditProductionActivation } = require("../services/productionActivationAuditService");
+const { auditProductionActivation, groupEnabledPackages } = require("../services/productionActivationAuditService");
 const timeoutMs = Math.max(10_000, Number(process.env.PRODUCTION_ACTIVATION_AUDIT_TIMEOUT_MS) || 120_000);
 const queryTimeoutMs = Math.max(5_000, Math.min(timeoutMs, Number(process.env.PRODUCTION_ACTIVATION_QUERY_TIMEOUT_MS) || 45_000));
 const startedAt = Date.now();
@@ -51,8 +51,7 @@ async function main() {
         read(FulfillmentAttempt.find({ supplierMappingId: { $in: mappingIds }, status: "SUCCEEDED", supplierReference: { $nin: [null, ""] } }).select("supplierMappingId"))
     ]), "bounded authority reads");
     progress("core-authorities-loaded", { mappings: mappings.length, products: products.length, packages: packages.length, suppliers: suppliers.length, offers: offers.length, availability: availabilityRows.length, selections: selections.length, successfulAttempts: successfulAttempts.length });
-    const packagesByProduct = new Map();
-    for (const pkg of packages.filter(row => row.enabled === true)) packagesByProduct.set(row.productCode, [...(packagesByProduct.get(row.productCode) || []), row]);
+    const packagesByProduct = groupEnabledPackages(packages);
     const catalog = products.map(product => projectCatalogProduct(product, packagesByProduct.get(product.productCode) || [], { includeDisabled: false, includeAdminPricing: false })).filter(Boolean);
     progress("evaluating", { publicProducts: catalog.length });
     const result = auditProductionActivation({ mappings, suppliers, offers, availabilityRows, packages, selections, successfulAttempts, catalog });
@@ -61,7 +60,11 @@ async function main() {
     if (result.violations.length) process.exitCode = 1;
 }
 
+const redact = value => String(value || "")
+    .replace(/mongodb(?:\+srv)?:\/\/[^\s]+/gi, "[REDACTED_MONGODB_URI]")
+    .replace(/(password|passwd|token|secret)=([^\s&]+)/gi, "$1=[REDACTED]");
 withDeadline(main(), "production activation audit").catch(error => {
-    console.error(JSON.stringify({ result: "FAIL", code: error.code || "AUDIT_FAILED", message: error.message }));
+    const safeStack = redact(error?.stack || "").split("\n").slice(0, 12).join("\n");
+    console.error(JSON.stringify({ result: "FAIL", code: error.code || "AUDIT_FAILED", message: redact(error.message), stack: safeStack || undefined }));
     process.exitCode = 1;
 }).finally(async () => { await mongoose.disconnect().catch(() => null); });

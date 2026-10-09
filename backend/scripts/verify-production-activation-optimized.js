@@ -11,7 +11,7 @@ Module._load = function(request, parent, isMain) {
     if (request.endsWith("suppliers/fazercardsFulfillmentProcessor")) return { supportsFazerCardsMapping: () => true };
     return originalLoad.call(this, request, parent, isMain);
 };
-const { auditProductionActivation } = require("../services/productionActivationAuditService");
+const { auditProductionActivation, groupEnabledPackages } = require("../services/productionActivationAuditService");
 Module._load = originalLoad;
 const runnerSource = fs.readFileSync(path.join(__dirname, "verify-production-activation.js"), "utf8");
 const evaluatorSource = fs.readFileSync(path.join(__dirname, "../services/productionActivationAuditService.js"), "utf8");
@@ -20,6 +20,7 @@ assert(!runnerSource.includes("assessProductionMapping(mapping)"), "audit must n
 assert(!evaluatorSource.includes("../models/"), "optimized evaluator must remain database-independent");
 assert(runnerSource.includes("maxTimeMS(queryTimeoutMs)") && runnerSource.includes("withDeadline(main()"), "query and audit timeouts must remain explicit");
 assert(runnerSource.includes('progress("loading-catalog-scope")') && runnerSource.includes('progress("evaluating"'), "audit progress milestones must remain visible");
+assert(runnerSource.includes("safeStack") && runnerSource.includes("[REDACTED_MONGODB_URI]"), "failure diagnostics must include a credential-sanitized stack");
 const now = new Date();
 const future = new Date(Date.now() + 60_000);
 const supplier = { _id: "supplier-1", supplierCode: "TEST", enabled: true, mode: "API" };
@@ -29,6 +30,8 @@ const mapping = { _id: "mapping-1", supplierId: "supplier-1", supplierCode: "TES
 const pkg = { productCode: "game", packageCode: "PKG1", enabled: true, deletedAt: null, prices: { TH: { enabled: true, amount: 100 } } };
 const catalog = [{ productCode: "game", packages: [{ packageCode: "PKG1", prices: { TH: { amount: 100 } } }] }];
 const base = { mappings: [mapping], suppliers: [supplier], offers: [offer], availabilityRows: [availability], packages: [pkg], selections: [], successfulAttempts: [], catalog };
+const grouped = groupEnabledPackages([pkg, { ...pkg, packageCode: "DISABLED", enabled: false }]);
+assert.deepStrictEqual(grouped.get("game").map(row => row.packageCode), ["PKG1"], "post-load package grouping must use the declared package row and exclude disabled packages");
 assert.strictEqual(auditProductionActivation(base).result, "PASS", "one exact executable route should pass");
 const unavailable = auditProductionActivation({ ...base, availabilityRows: [{ ...availability, state: "UNAVAILABLE" }] });
 assert(unavailable.violations.some(row => row.code === "PUBLIC_CHECKOUT_ROUTE_MISSING" && row.blockers.includes("SUPPLIER_AVAILABILITY_NOT_CONFIRMED")), "blocked checkout route must be reported");
@@ -39,3 +42,4 @@ assert(ambiguous.violations.some(row => row.blockers.includes("AMBIGUOUS_EXECUTA
 const archived = auditProductionActivation({ ...base, mappings: [{ ...mapping, archivedAt: now, enabled: true }] });
 assert(archived.violations.some(row => row.code === "ARCHIVED_MAPPING_ROUTABLE"), "archived routable mapping safety check must remain");
 console.log("verify-production-activation-optimized: PASS");
+process.exit(0);

@@ -9,6 +9,14 @@ const id = value => clean(value?._id || value);
 const routeKey = (p, k, m) => `${clean(p).toLowerCase()}:${upper(k)}:${upper(m)}`;
 const packageKey = (p, k) => `${clean(p).toLowerCase()}:${upper(k)}`;
 
+function groupEnabledPackages(packages) {
+    const packagesByProduct = new Map();
+    for (const pkg of packages.filter(row => row.enabled === true)) {
+        packagesByProduct.set(pkg.productCode, [...(packagesByProduct.get(pkg.productCode) || []), pkg]);
+    }
+    return packagesByProduct;
+}
+
 function indexAuthorities({ mappings, suppliers, offers, availabilityRows, packages, selections, successfulAttempts }) {
     const supplierById = new Map(suppliers.map(row => [id(row), row]));
     const offerById = new Map(offers.map(row => [id(row), row]));
@@ -85,4 +93,4 @@ function auditProductionActivation({ mappings, suppliers, offers, availabilityRo
     return { result: violations.length ? "FAIL" : "PASS", mappings: mappings.length, primaryMappings: mappings.filter(row => row.productionRole === "PRIMARY").length, archivedMappings: mappings.filter(row => row.archivedAt).length, publicProducts: catalog.length, publicPackages: publicPackages.length, violations };
 }
 
-module.exports = { auditProductionActivation, assessRouteFromContext, indexAuthorities };
+module.exports = { auditProductionActivation, assessRouteFromContext, groupEnabledPackages, indexAuthorities };
