@@ -16,7 +16,7 @@ const {
     reserveCommercePromotion
 } = require("./commercePromotionBridgeService");
 const { debitWallet } = require("../walletService");
-const { ensurePaidOrderFulfillmentWork } = require("../paidFulfillmentRoutingService");
+const { processPaidFulfillmentHandoff } = require("../paidFulfillmentHandoffService");
 
 const ERROR_CODES = Object.freeze({
     INVALID_CHECKOUT_INPUT: "INVALID_CHECKOUT_INPUT",
@@ -153,7 +153,15 @@ async function markCommerceOrderPaid(orderId, owner, dependencies = {}) {
 
     order = await repo.findOwnedOrderById({ orderId, owner: repositoryOwner(owner) }) || order;
     try {
-        await (dependencies.ensurePaidOrderFulfillmentWork || ensurePaidOrderFulfillmentWork)(order);
+        const processHandoff = dependencies.processPaidFulfillmentHandoff || (
+            dependencies.ensurePaidOrderFulfillmentWork
+                ? async () => dependencies.ensurePaidOrderFulfillmentWork(order)
+                : processPaidFulfillmentHandoff
+        );
+        const result = await processHandoff(orderId);
+        if (result?.processed === true && result?.created === false && result?.errorCode) {
+            await dependencies.onPaidFulfillmentError?.(Object.assign(new Error("Paid fulfillment handoff is blocked."), { code: result.errorCode }), order);
+        }
     } catch (error) {
         await dependencies.onPaidFulfillmentError?.(error, order);
     }

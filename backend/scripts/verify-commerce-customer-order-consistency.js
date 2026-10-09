@@ -54,6 +54,19 @@ function projectionRegressions() {
     const manual = projectCommerceManualAttempt({ attemptId: "PAY-FIELDS", ownerId: "customer-1", status: "PAID", amount: 54, currency: "THB" }, supplierFields);
     assert.strictEqual(manual.userId, "439488505", "Manual/Admin Commerce projection must display verified playerId as User ID.");
     assert.strictEqual(manual.zoneId, "16623", "Manual/Admin Commerce projection must display verified serverId.");
+
+    const blockedHandoff = commerceOrder({
+        fulfilment: {
+            status: "not_started",
+            input: { accountFields: [] },
+            routeSnapshot: { routeType: "SUPPLIER_API", supplierCode: "FAZERCARDS", supplierMappingId: "mapping-1" },
+            paidHandoff: { status: "BLOCKED", lastError: { code: "FROZEN_ROUTE_NOT_EXECUTABLE", reason: "SUPPLIER_FULFILLMENT_START_FAILED" } }
+        }
+    });
+    const projectedBlocked = projectCommerceOrder(blockedHandoff);
+    assert.strictEqual(projectedBlocked.fulfillment.supplierCode, "FAZERCARDS", "Admin must show frozen supplier identity before an attempt exists.");
+    assert.strictEqual(projectedBlocked.fulfillment.handoffStatus, "BLOCKED", "Admin must show durable paid-handoff state.");
+    assert.strictEqual(projectedBlocked.fulfillment.failureCode, "FROZEN_ROUTE_NOT_EXECUTABLE", "Admin must show the safe pre-attempt blocker.");
 }
 
 function main() {

@@ -322,6 +322,19 @@ function startBackgroundWorkers() {
     const couponCleanupTimer = setInterval(couponCleanup, Math.max(60_000, Number(process.env.COUPON_CLEANUP_INTERVAL_MS || 5 * 60 * 1000)));
     couponCleanupTimer.unref?.();
     backgroundTimers.add(couponCleanupTimer);
+    const paidFulfillmentRecovery = async () => {
+        try {
+            await require("./services/paidFulfillmentHandoffService").recoverPaidFulfillmentHandoffs({
+                limit: Math.max(1, Math.min(100, Number(process.env.PAID_FULFILLMENT_RECOVERY_BATCH_SIZE || 25)))
+            });
+        } catch (error) {
+            console.error("Paid fulfillment recovery failed:", error?.code || error?.name || "UNKNOWN");
+        }
+    };
+    paidFulfillmentRecovery();
+    const paidFulfillmentTimer = setInterval(paidFulfillmentRecovery, Math.max(60_000, Number(process.env.PAID_FULFILLMENT_RECOVERY_INTERVAL_MS || 5 * 60 * 1000)));
+    paidFulfillmentTimer.unref?.();
+    backgroundTimers.add(paidFulfillmentTimer);
     if (require("./services/suppliers/wonddAdapter").hasAnyAutoFulfillmentEnabled()) {
         const processor = require("./services/suppliers/wonddFulfillmentProcessor").processor;
         processor.recoverDue().catch(() => null);

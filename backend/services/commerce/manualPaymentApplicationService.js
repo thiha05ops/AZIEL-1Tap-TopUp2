@@ -6,7 +6,7 @@ const orderRepository = require("./orderRepository");
 const paymentAttemptRepository = require("./paymentAttemptRepository");
 const { settlePaidWalletTopup } = require("../walletTopupSettlementService");
 const { createPaymentOrchestrator, PaymentOrchestratorError } = require("./paymentOrchestrator");
-const { ensurePaidOrderFulfillmentWork } = require("../paidFulfillmentRoutingService");
+const { processPaidFulfillmentHandoff } = require("../paidFulfillmentHandoffService");
 const { createProviderRegistry } = require("./providerRegistry");
 const { createManualPromptPayProvider } = require("./manualPromptPayProviderFactory");
 const { createThunderPromptPayAdapter } = require("./providers/thunderPromptPayAdapter");
@@ -443,7 +443,7 @@ function createManualPaymentApplicationService(dependencies = {}) {
         clock: deps.clock,
         idGenerator: deps.idGenerator,
         logger: deps.logger,
-        paidFulfillmentHandler: dependencies.paidFulfillmentHandler || ensurePaidOrderFulfillmentWork,
+        paidFulfillmentHandler: dependencies.paidFulfillmentHandler || (order => processPaidFulfillmentHandoff(order.orderId)),
         walletTopupSettlementHandler: dependencies.walletTopupSettlementHandler || settlePaidWalletTopup,
         paidFulfillmentFailureRecorder: dependencies.paidFulfillmentFailureRecorder || (async failure => {
             if (typeof deps.commerceOrderRepository.appendOperationalReference !== "function") return null;

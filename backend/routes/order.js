@@ -338,6 +338,8 @@ function projectCommerceOrder(order = {}, options = {}) {
     const supplierSnapshot = businessRuntime.supplierCostSnapshot || pricing.supplierCostSnapshot || pricing.context?.supplierCostSnapshot || {};
     const exchangeSnapshot = businessRuntime.exchangeRateSnapshot || pricing.exchangeSnapshot || pricing.exchangeRate || pricing.context?.exchangeRateSnapshot || null;
     const fulfilmentInput = order.fulfilment?.input || {};
+    const routeSnapshot = order.fulfilment?.routeSnapshot || order.quoteSnapshot?.supplierRouteSnapshot || {};
+    const paidHandoff = order.fulfilment?.paidHandoff || null;
     const receiptSubmitted = Array.isArray(order.operationalReferences) && order.operationalReferences.some(reference => (
         reference?.type === "manual_payment_receipt"
     ));
@@ -433,7 +435,14 @@ function projectCommerceOrder(order = {}, options = {}) {
         allowedNextStatuses: [],
         fulfillment: latestFulfillment || {
             status: normalizedFulfillmentStatus.toUpperCase(),
-            source: "commerce"
+            source: "commerce",
+            routeType: routeSnapshot.routeType || "",
+            supplierCode: routeSnapshot.supplierCode || "",
+            supplierCodeSnapshot: routeSnapshot.supplierCode || "",
+            supplierMappingId: routeSnapshot.supplierMappingId || null,
+            handoffStatus: paidHandoff?.status || "",
+            failureCode: paidHandoff?.lastError?.code || "",
+            failureReason: paidHandoff?.lastError?.reason || ""
         },
         fulfillmentAttempts,
         actions: {
