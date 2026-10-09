@@ -128,6 +128,14 @@ function repositoryOwner(owner = {}) {
         : { type: "SESSION", sessionId: owner.sessionId };
 }
 
+function walletGameAccount(input = {}) {
+    return {
+        userId: input.userId || "",
+        zoneId: input.zoneId || "",
+        accountFields: Array.isArray(input.accountFields) ? input.accountFields : []
+    };
+}
+
 async function markCommerceOrderPaid(orderId, owner, dependencies = {}) {
     const repo = dependencies.orderRepository || orderRepository;
     const changedAt = dependencies.changedAt || new Date();
@@ -266,10 +274,7 @@ async function startCustomerWalletCheckout(input = {}, context = {}, dependencie
                 paymentChannel: "AZIEL_WALLET"
             },
             customerInput: {
-                gameAccount: {
-                    userId: input.userId || "",
-                    zoneId: input.zoneId || ""
-                },
+                gameAccount: walletGameAccount(input),
                 customFields: {
                     username: input.username || username,
                     gameKey: input.gameKey || input.productCode || ""
@@ -393,5 +398,6 @@ module.exports = Object.freeze({
     markCommerceOrderPaid,
     assertAuthoritativeFulfillmentReady,
     CustomerWalletCheckoutError,
-    ERROR_CODES
+    ERROR_CODES,
+    _test: Object.freeze({ walletGameAccount })
 });
