@@ -85,7 +85,7 @@ function verifyManagedRuntimeInteraction() {
     assert(!markup.includes('class="az-banner-arrow'), "Home markup must not provide a legacy second arrow pair.");
     assert(!runtime.includes("az-banner-arrow"), "Canonical runtime must not render arrow controls.");
     assert(!heroCss.includes("az-banner-arrow"), "Canonical Home CSS must not retain arrow-control presentation.");
-    assert(heroCss.includes("height: clamp(330px, 26.5vw, 390px) !important") && heroCss.includes("height: clamp(280px, 28vw, 330px) !important") && heroCss.includes("height: clamp(240px, 27vw, 280px) !important") && heroCss.includes("aspect-ratio: 16 / 9 !important"), "Hero height must be stable and substantial within each breakpoint.");
+    assert(heroCss.includes("height: clamp(330px, 26.5vw, 390px) !important") && heroCss.includes("height: clamp(280px, 28vw, 330px) !important") && heroCss.includes("height: clamp(240px, 27vw, 280px) !important") && heroCss.includes("width: calc(100% - 24px) !important") && heroCss.includes("aspect-ratio: 16 / 10 !important"), "Desktop hero heights must remain intact while mobile gains width and a slight proportional height increase.");
     assert(!runtime.includes("syncBannerAspectRatio") && !heroCss.includes("--az-active-banner-aspect-ratio"), "Banner source ratios must not change carousel geometry.");
     assert(!heroCss.includes("perspective:") && !runtime.includes("rotateY("), "The film strip must remain flat without 3D-card treatment.");
     assert(heroCss.includes("display: flex !important") && heroCss.includes("gap: var(--az-banner-slide-gap") && heroCss.includes("flex: 0 0 var(--az-banner-slide-width"), "Managed banners must form one continuous flex track.");

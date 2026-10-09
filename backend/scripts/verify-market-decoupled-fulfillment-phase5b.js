@@ -22,12 +22,12 @@ const read = relative => fs.readFileSync(path.join(ROOT, relative), "utf8");
 const now = new Date("2026-08-28T12:00:00.000Z");
 
 function verifyGateAuthority() {
-    assert.strictEqual(resolveSupplierGateMode({}), SUPPLIER_GATE_MODES.LEGACY_PRODUCT_ONLY);
+    assert.strictEqual(resolveSupplierGateMode({}), SUPPLIER_GATE_MODES.SUPPLIER_ONLY);
     assert.throws(() => resolveSupplierGateMode({ AZIEL_SUPPLIER_GATE_MODE: "BROKEN" }), error => error.code === "SUPPLIER_GATE_MODE_INVALID");
     assert.strictEqual(supplierAutoFulfillmentGateState("WONDD", {}).supplierGateEnabled, false);
     assert.strictEqual(supplierAutoFulfillmentGateState("WONDD", { WONDD_AUTO_FULFILLMENT_ENABLED: "TRUE" }).supplierGateEnabled, true);
     assert.strictEqual(supplierAutoFulfillmentGateState("WONDD", { WONDD_AUTO_FULFILLMENT_ENABLED: "yes" }).supplierGateEnabled, false);
-    assert.strictEqual(effectiveAutoFulfillmentGateState({ supplierCode: "WONDD", productGateEnabled: true, env: {} }).effectiveGateEnabled, true, "Default legacy mode must preserve product-only behavior.");
+    assert.strictEqual(effectiveAutoFulfillmentGateState({ supplierCode: "WONDD", productGateEnabled: true, env: {} }).effectiveGateEnabled, false, "Default supplier-owned gate must fail closed until the supplier emergency switch is explicitly enabled.");
     const mode = AZIEL_SUPPLIER_GATE_MODE => ({ AZIEL_SUPPLIER_GATE_MODE });
     assert.strictEqual(effectiveAutoFulfillmentGateState({ supplierCode: "WONDD", productGateEnabled: true, env: { ...mode("SUPPLIER_AND_PRODUCT"), WONDD_AUTO_FULFILLMENT_ENABLED: "true" } }).effectiveGateEnabled, true);
     assert.strictEqual(effectiveAutoFulfillmentGateState({ supplierCode: "WONDD", productGateEnabled: true, env: { ...mode("SUPPLIER_AND_PRODUCT"), WONDD_AUTO_FULFILLMENT_ENABLED: "false" } }).blockerCode, "SUPPLIER_AUTO_FULFILLMENT_DISABLED");
@@ -38,8 +38,10 @@ function verifyGateAuthority() {
 
 function verifyProductGateCompatibility() {
     const wonddLegacy = createWonddAdapter({ env: { WONDD_USERNAME: "u", WONDD_PASSWORD: "p", WONDD_MLBB_AUTO_FULFILLMENT_ENABLED: "true" } });
-    assert.strictEqual(wonddLegacy.isAutoFulfillmentEnabled("mlbb"), true);
+    assert.strictEqual(wonddLegacy.isAutoFulfillmentEnabled("mlbb"), false, "Product-specific legacy gates must not bypass the supplier emergency switch.");
     assert.strictEqual(wonddLegacy.autoFulfillmentGateState("mlbb").supplierGateEnabled, false);
+    const wonddEnabled = createWonddAdapter({ env: { WONDD_USERNAME: "u", WONDD_PASSWORD: "p", WONDD_AUTO_FULFILLMENT_ENABLED: "true" } });
+    assert.strictEqual(wonddEnabled.isAutoFulfillmentEnabled("mlbb"), true);
     const fazerLegacy = createFazerCardsAdapter({ env: { FAZERCARDS_API_KEY: "key", FAZERCARDS_AUTO_FULFILLMENT_ENABLED: "true" } });
     assert.strictEqual(fazerLegacy.isAutoFulfillmentEnabled("pubg"), true);
     assert.strictEqual(fazerLegacy.isAutoFulfillmentEnabled("valorant"), true);
@@ -68,13 +70,12 @@ async function verifySubmissionAndRecoveryKillSwitch() {
 }
 
 async function verifyRoutingCompatibility() {
-    const legacy = { ready: true, blockers: [], routeSnapshot: { routeType: "MANUAL_ADMIN", supplierCode: "AZIEL_ADMIN", region: "MM" } };
-    const eligible = { outcome: "ELIGIBLE", blockerCodes: [], eligibility: { mode: "CUSTOMER_MARKET_ALLOWLIST", allowedCustomerMarkets: ["MM", "TH"], evidenceCode: "CONTROLLED_TEST", evidenceSource: "fixture", verifiedAt: now, version: 1 }, routeSnapshot: { routeType: "SUPPLIER_API", supplierMappingId: "mapping-1", supplierId: "supplier-1", supplierCode: "WONDD", productCode: "mlbb", packageCode: "MLBB_55_DIA_FIRST_TOPUP", region: "MM", supplierProductCode: "mlbb", supplierPackageCode: "MLFT055", executionMode: "API", selectedRole: "PRIMARY", selectedAt: now.toISOString() } };
-    const dual = createRoutingAuthority({ legacyResolver: async () => legacy, eligibilityResolver: async () => eligible, modeResolver: () => FULFILLMENT_ROUTING_MODES.DUAL_READ, pilotEnabledResolver: () => false });
-    assert.strictEqual((await dual({ productCode: "mlbb", packageCode: "MLBB_55_DIA_FIRST_TOPUP", region: "MM" })).routeSnapshot.routeType, "SUPPLIER_API");
-    const pilotOn = createRoutingAuthority({ legacyResolver: async () => legacy, eligibilityResolver: async () => eligible, modeResolver: () => FULFILLMENT_ROUTING_MODES.DUAL_READ, pilotEnabledResolver: () => true });
-    assert.strictEqual((await pilotOn({ productCode: "mlbb", packageCode: "MLBB_55_DIA_FIRST_TOPUP", region: "MM" })).routeSnapshot.snapshotVersion, 2);
-    assert.strictEqual(resolveFulfillmentRoutingMode({}), "LEGACY_REGION");
+    const selectedRoute = { ready: true, blockers: [], routeSnapshot: { routeType: "SUPPLIER_API", snapshotVersion: 2, supplierMappingId: "mapping-1", supplierId: "supplier-1", supplierCode: "WONDD", productCode: "mlbb", packageCode: "MLBB_55_DIA_FIRST_TOPUP", region: "MM", customerMarket: "MM", supplierMarket: "TH", supplierProductCode: "mlbb", supplierPackageCode: "MLFT055", executionMode: "API", selectedRole: "PACKAGE_SUPPLIER_SELECTION", selectedAt: now.toISOString() } };
+    const selected = createRoutingAuthority({ selectedResolver: async () => selectedRoute });
+    const resolved = await selected({ productCode: "mlbb", packageCode: "MLBB_55_DIA_FIRST_TOPUP", region: "MM" });
+    assert.strictEqual(resolved.routeSnapshot.supplierMappingId, "mapping-1");
+    assert.strictEqual(resolved.routeSnapshot.selectedRole, "PACKAGE_SUPPLIER_SELECTION");
+    assert.strictEqual(resolveFulfillmentRoutingMode({}), "SELECTED");
 }
 
 function verifySnapshotsAndStaticSafety() {
@@ -85,7 +86,8 @@ function verifySnapshotsAndStaticSafety() {
     const wallet = read("backend/scripts/verify-wallet-paid-auto-fulfillment.js");
     assert(wallet.includes("walletDebitCount") && wallet.includes("repeatedProviderSubmissions"));
     const paid = read("backend/services/paidFulfillmentRoutingService.js");
-    assert(!paid.includes("resolveCheckoutRouteSnapshot"));
+    assert(paid.includes("SUPPLIER_ROUTE_SNAPSHOT_BOUND"));
+    assert(paid.indexOf("if (routeSnapshot)") < paid.indexOf("options.resolveCurrentRoute || resolveCheckoutRouteSnapshot"), "Frozen orders must never reach current-route resolution; only historical no-snapshot orders may use it.");
     const config = read("backend/config/supplierAutoFulfillmentGate.js");
     assert(!config.includes("submitTopup") && !config.includes("updateOne"));
 }
@@ -96,5 +98,5 @@ function verifySnapshotsAndStaticSafety() {
     await verifySubmissionAndRecoveryKillSwitch();
     await verifyRoutingCompatibility();
     verifySnapshotsAndStaticSafety();
-    console.log(JSON.stringify({ result: "PASS", defaultPolicy: "LEGACY_PRODUCT_ONLY", legacyBehaviorPreserved: true, supplierAndProductTruthTable: true, unknownSupplierBlocked: true, phase4PilotCompatible: true, submissionBlockedBeforeProvider: true, recoverySchedulingBlocked: true, acceptedAttemptPreserved: true, paidOrderReversed: false, duplicateProviderSubmissions: 0, productGatesRemoved: 0, eligibilityPrimaryActivated: false, providerCalls: 0, databaseWrites: 0 }, null, 2));
+    console.log(JSON.stringify({ result: "PASS", defaultPolicy: "SUPPLIER_ONLY", explicitSelectionRouting: true, supplierEmergencyGateRequired: true, unknownSupplierBlocked: true, submissionBlockedBeforeProvider: true, recoverySchedulingBlocked: true, acceptedAttemptPreserved: true, paidOrderReversed: false, duplicateProviderSubmissions: 0, providerCalls: 0, databaseWrites: 0 }, null, 2));
 })().catch(error => { console.error(`VERIFY_MARKET_DECOUPLED_FULFILLMENT_PHASE5B_FAILED: ${error.stack || error.message}`); process.exitCode = 1; });

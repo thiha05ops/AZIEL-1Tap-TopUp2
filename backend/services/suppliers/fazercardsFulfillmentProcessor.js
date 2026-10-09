@@ -7,15 +7,12 @@ const commerceOrderRepository = require("../commerce/orderRepository");
 const adapterDefault = require("./fazercardsAdapter");
 const { normalizeSupplierResult } = require("../supplierAdapterRegistry");
 const { classifySupplierFailure } = require("../supplierFailureClassificationService");
-const { buildFazerCardsFields, maskFazerCardsFields } = require("./fazercardsInputFormatters");
+const maskFazerCardsFields = (fields = {}) => Object.fromEntries(Object.entries(fields).map(([key, value]) => { const text = String(value || ""); return [key, text.length <= 4 ? "****" : `${text.slice(0, 2)}***${text.slice(-2)}`]; }));
 const { buildFieldsFromContract, verifiedMappingContract, mappingContractMatchesSupplierCatalog } = require("./fazercardsFulfillmentContractService");
-const { validateFulfillmentEligibility } = require("../supplierFulfillmentEligibilityService");
 
 const POLL_DELAYS_MS = Object.freeze([0, 5000, 10000, 20000, 30000, 60000]);
-const SUPPORTED_PRODUCT_CATEGORIES = Object.freeze({ pubg: "pubg_mobile_auto", mlbb: "mobile_legends_global", freefire: "free_fire_th", hok: "honor_of_kings", valorant: "valorant_th" });
-
 function supportsFazerCardsMapping(mapping = {}) {
-    return Boolean(verifiedMappingContract(mapping)) || SUPPORTED_PRODUCT_CATEGORIES[String(mapping.productCode || "").trim().toLowerCase()] === String(mapping.supplierProductCode || "").trim();
+    return Boolean(verifiedMappingContract(mapping));
 }
 
 function validateFazerCardsMapping(mapping = {}, { customerMarket = "" } = {}) {
@@ -23,8 +20,7 @@ function validateFazerCardsMapping(mapping = {}, { customerMarket = "" } = {}) {
     const legacyMarket = ["TH", "MM"].includes(String(mapping.region || "").trim().toUpperCase()) ? mapping.region : "";
     const market = String(customerMarket || legacyMarket).trim().toUpperCase();
     if (!mapping.enabled || mapping.supplierCode !== "FAZERCARDS" || mapping.executionMode !== "API" || !supportsFazerCardsMapping(mapping) || !String(mapping.supplierPackageCode || "").trim()) throw Object.assign(new Error("An exact supported FazerCards mapping is required."), { code: "FAZERCARDS_PACKAGE_MAPPING_MISSING" });
-    const eligibility = validateFulfillmentEligibility(mapping.fulfillmentEligibility);
-    if (!market || !eligibility.valid || eligibility.value.mode === "UNKNOWN") throw Object.assign(new Error("FazerCards supplier route eligibility evidence is not ready."), { code: "FAZERCARDS_CUSTOMER_MARKET_NOT_ELIGIBLE" });
+    if (!market) throw Object.assign(new Error("The order payment market is required."), { code: "ORDER_CUSTOMER_MARKET_MISSING" });
     if (readiness.supplierMapped !== true || readiness.inputReady !== true || readiness.pricingReady !== true || readiness.fulfillmentReady !== true) throw Object.assign(new Error("FazerCards package production readiness is incomplete."), { code: "FAZERCARDS_PACKAGE_NOT_PRODUCTION_READY" });
     return mapping;
 }
@@ -105,9 +101,8 @@ function createFazerCardsFulfillmentProcessor(deps = {}) {
             const supplierProduct = offer ? await CatalogProduct.findById(offer.supplierCatalogProductId).lean() : null;
             if (!offer || !supplierProduct || String(offer.catalogLifecycleState || "").toUpperCase() !== "ACTIVE" || !mappingContractMatchesSupplierCatalog(mapping, supplierProduct)) throw Object.assign(new Error("FazerCards supplier input contract changed and requires Owner re-review."), { code: "FAZERCARDS_INPUT_CONTRACT_STALE" });
         }
-        const fields = contract
-            ? buildFieldsFromContract(contract, order.fulfilment?.input || {})
-            : buildFazerCardsFields(mapping.productCode, order.fulfilment?.input || {});
+        if (!contract) throw Object.assign(new Error("FazerCards verified input contract is required."), { code: "FAZERCARDS_INPUT_CONTRACT_NOT_CONFIGURED" });
+        const fields = buildFieldsFromContract(contract, order.fulfilment?.input || {});
         attempt.supplierRequest = { ...(attempt.supplierRequest || {}), submissionState: "SUBMISSION_IN_FLIGHT", submissionStartedAt: new Date(), categoryId: mapping.supplierProductCode, offerId: mapping.supplierPackageCode, fields: maskFazerCardsFields(fields), inputContractFingerprint: contract?.fingerprint || "LEGACY_COMPATIBILITY", providerIdempotencyKey: attempt.idempotencyKey };
         await attempt.save();
         let result;
@@ -131,7 +126,7 @@ function createFazerCardsFulfillmentProcessor(deps = {}) {
     }
 
     async function recoverDue() {
-        if (!adapter.isAnyAutoFulfillmentEnabled?.() && !Object.keys(SUPPORTED_PRODUCT_CATEGORIES).some(product => adapter.isAutoFulfillmentEnabled(product))) return { recovered: 0, disabled: true };
+        if (!adapter.isAnyAutoFulfillmentEnabled?.()) return { recovered: 0, disabled: true };
         const attempts = await Attempt.find({ supplierCodeSnapshot: "FAZERCARDS", status: "IN_PROGRESS", supplierReference: { $ne: "" }, $or: [{ "supplierRequest.nextRecoveryAt": null }, { "supplierRequest.nextRecoveryAt": { $lte: new Date() } }] }).limit(50);
         attempts.forEach(item => schedule(() => poll(item._id, 0).catch(() => null), 0));
         return { recovered: attempts.length, disabled: false };
@@ -140,4 +135,4 @@ function createFazerCardsFulfillmentProcessor(deps = {}) {
     return { submit, poll, reconcileProviderStatus, recoverDue };
 }
 
-module.exports = { POLL_DELAYS_MS, SUPPORTED_PRODUCT_CATEGORIES, supportsFazerCardsMapping, validateFazerCardsMapping, createFazerCardsFulfillmentProcessor, processor: createFazerCardsFulfillmentProcessor() };
+module.exports = { POLL_DELAYS_MS, supportsFazerCardsMapping, validateFazerCardsMapping, createFazerCardsFulfillmentProcessor, processor: createFazerCardsFulfillmentProcessor() };

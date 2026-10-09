@@ -5,10 +5,7 @@ const commerceOrderRepository = require("../commerce/orderRepository");
 const wonddAdapter = require("./wonddAdapter");
 const { normalizeSupplierResult } = require("../supplierAdapterRegistry");
 const { classifySupplierFailure } = require("../supplierFailureClassificationService");
-const { resolveWonddCatalogIdentity, transactionalServiceCode } = require("./wonddCatalogConfig");
-const { buildWonddGameId, hasWonddGameIdFormatter } = require("./wonddGameIdFormatters");
 const { buildFieldsFromContract, verifiedMappingContract } = require("./fazercardsFulfillmentContractService");
-const { providerGameCodeForProduct } = require("../commerce/canonicalGameInputContract");
 
 const POLL_DELAYS_MS = Object.freeze([0, 5000, 10000, 20000, 30000, 60000]);
 
@@ -35,11 +32,8 @@ function validateWonddMapping(mapping = {}) {
         error.code = "WONDD_PACKAGE_MAPPING_MISSING";
         throw error;
     }
-    const productCode = providerGameCodeForProduct(mapping.productCode) || String(mapping.productCode || "").trim().toLowerCase();
-    const catalogIdentity = resolveWonddCatalogIdentity(mapping.supplierProductCode);
     const contract = verifiedMappingContract(mapping);
-    const exactLegacyIdentity = catalogIdentity?.family?.productCode === productCode;
-    if (String(mapping.executionMode || "API").toUpperCase() !== "API" || (!contract && !exactLegacyIdentity) || !String(mapping.supplierProductCode || "").trim() || !String(mapping.supplierPackageCode || "").trim()) {
+    if (String(mapping.executionMode || "API").toUpperCase() !== "API" || !contract || contract.protocol !== "WONDD_GAME_ID_TOPUP" || !String(contract.transactionalServiceCode || "").trim() || !String(mapping.supplierProductCode || "").trim() || !String(mapping.supplierPackageCode || "").trim()) {
         const error = new Error("WonDD mapping must explicitly contain its provider-native serviceid and packcode.");
         error.code = "WONDD_PACKAGE_MAPPING_MISSING";
         throw error;
@@ -67,8 +61,7 @@ function providerFieldsForOrder(mapping, order) {
         if (!Object.keys(fields).length && contract.noCustomerInput !== true) throw Object.assign(new Error("WonDD customer information is missing."), { code: "WONDD_INPUT_CONTRACT_NOT_CONFIGURED" });
         return fields;
     }
-    const productCode = providerGameCodeForProduct(mapping.productCode) || String(mapping.productCode).toLowerCase();
-    return { gameid: buildWonddGameId(productCode, input) };
+    throw Object.assign(new Error("WonDD verified input contract is required."), { code: "WONDD_INPUT_CONTRACT_NOT_CONFIGURED" });
 }
 
 function createWonddFulfillmentProcessor(deps = {}) {
@@ -126,9 +119,9 @@ function createWonddFulfillmentProcessor(deps = {}) {
         const [order, mapping] = await Promise.all([Order.findById(attempt.orderId), Mapping.findById(attempt.supplierMappingId)]);
         if (!order) throw Object.assign(new Error("CommerceOrder not found."), { code: "ORDER_NOT_FOUND" });
         validateWonddMapping(mapping);
-        const productCode = providerGameCodeForProduct(mapping.productCode) || String(mapping.productCode).toLowerCase();
+        const productCode = String(mapping.productCode).toLowerCase();
         const contract = contractForOrder(mapping, order);
-        const serviceCode = contract?.transactionalServiceCode || transactionalServiceCode(mapping.supplierProductCode, productCode);
+        const serviceCode = contract.transactionalServiceCode;
         const providerFields = providerFieldsForOrder(mapping, order);
         attempt.supplierRequest = { ...(attempt.supplierRequest || {}), submissionState: "SUBMISSION_IN_FLIGHT", submissionStartedAt: new Date(), serviceCode, packCodeConfigured: true, playerInputValidated: true, inputContractFingerprint: contract?.fingerprint || "LEGACY_COMPATIBILITY" };
         await attempt.save();
@@ -154,9 +147,9 @@ function createWonddFulfillmentProcessor(deps = {}) {
         const [order, mapping] = await Promise.all([Order.findById(orderId), Mapping.findById(mappingId)]);
         if (!order) throw Object.assign(new Error("CommerceOrder not found."), { code: "ORDER_NOT_FOUND" });
         validateWonddMapping(mapping);
-        const productCode = providerGameCodeForProduct(mapping.productCode) || String(mapping.productCode).toLowerCase();
+        const productCode = String(mapping.productCode).toLowerCase();
         const contract = contractForOrder(mapping, order);
-        return adapter.dryRunTopup({ productCode, serviceCode: contract?.transactionalServiceCode || transactionalServiceCode(mapping.supplierProductCode, productCode), packCode: mapping.supplierPackageCode, providerFields: providerFieldsForOrder(mapping, order), noCustomerInput: contract?.noCustomerInput === true });
+        return adapter.dryRunTopup({ productCode, serviceCode: contract.transactionalServiceCode, packCode: mapping.supplierPackageCode, providerFields: providerFieldsForOrder(mapping, order), noCustomerInput: contract.noCustomerInput === true });
     }
 
     async function dryRunForAttempt(attemptId) {
@@ -168,7 +161,7 @@ function createWonddFulfillmentProcessor(deps = {}) {
     async function recoverDue() {
         const recoveryEnabled = typeof adapter.hasAnyAutoFulfillmentEnabled === "function"
             ? adapter.hasAnyAutoFulfillmentEnabled()
-            : adapter.isAutoFulfillmentEnabled?.("mlbb") === true || adapter.isAutoFulfillmentEnabled?.("freefire") === true;
+            : adapter.isAutoFulfillmentEnabled?.() === true;
         if (!recoveryEnabled) return { recovered: 0, disabled: true };
         const attempts = await Attempt.find({ supplierCodeSnapshot: "WONDD", status: "IN_PROGRESS", supplierReference: { $ne: "" }, "supplierRequest.submissionState": "ACCEPTED", $or: [{ "supplierRequest.nextRecoveryAt": null }, { "supplierRequest.nextRecoveryAt": { $lte: new Date() } }] }).limit(50);
         attempts.forEach(item => schedule(() => poll(item._id, 0).catch(() => null), 0));
@@ -178,4 +171,4 @@ function createWonddFulfillmentProcessor(deps = {}) {
     return { submit, poll, recoverDue, dryRunForOrder, dryRunForAttempt };
 }
 
-module.exports = { POLL_DELAYS_MS, validateWonddMapping, contractForOrder, providerFieldsForOrder, gameIdForOrder: (mapping, order) => providerFieldsForOrder(mapping, order).gameid || "", hasWonddGameIdFormatter, createWonddFulfillmentProcessor, processor: createWonddFulfillmentProcessor() };
+module.exports = { POLL_DELAYS_MS, validateWonddMapping, contractForOrder, providerFieldsForOrder, gameIdForOrder: (mapping, order) => providerFieldsForOrder(mapping, order).gameid || "", createWonddFulfillmentProcessor, processor: createWonddFulfillmentProcessor() };

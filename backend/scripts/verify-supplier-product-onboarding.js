@@ -89,7 +89,7 @@ ok(route.includes("SUPPLIER_CATALOG_RECONCILE"), "reconciliation permission enfo
 ok(ui.includes("data-onboard-supplier-product") && ui.includes(">Select</button>"), "business-facing Admin selection action available");
 ok(ui.includes("confirmed:true"), "Admin confirmation sent");
 ok(ui.includes("openSupplierReconciliationReview"), "ambiguous review reuses reconciliation UI");
-ok(resolveFulfillmentRoutingMode({}) === "LEGACY_REGION", "legacy routing remains default");
+ok(resolveFulfillmentRoutingMode({}) === "SELECTED", "new-order routing defaults to explicit package selection");
 ok(!service.match(/productionRole\s*:\s*"PRIMARY"/), "no PRIMARY promotion");
 ok(!service.includes("prices:"), "no customer price mutation");
 ok(!service.includes("published:"), "no publication mutation");
@@ -112,13 +112,13 @@ const technical = { enabled: true, executionMode: "API", supplierProductCode: "H
 const supplier = { _id: "s1", supplierCode: "TEST", enabled: true, mode: "API" }, adapter = { isConfigured: () => true, isAutoFulfillmentEnabled: () => true }, availability = { supplierCatalogOfferId: "o1", state: "AVAILABLE" };
 ok(assessMappingReadiness({ mode: READINESS_MODES.NEW_ORDER_SELECTABLE, mapping: technical, supplier, offer: exact, availability, customerMarket: "TH", adapter }).blockers.includes("PRICING_NOT_READY") === false, "NEW_ORDER_SELECTABLE ignores retail pricing readiness");
 const publicAssessment = assessMappingReadiness({ mode: READINESS_MODES.PUBLIC_PURCHASABLE, mapping: technical, supplier, offer: exact, availability, customerMarket: "TH", adapter, pkg: { enabled: true, prices: {} }, publication: { published: true }, selection: { supplierMappingId: technical._id } });
-ok(!publicAssessment.blockers.includes("PRICING_NOT_READY") && publicAssessment.blockers.includes("NO_VALID_PRICE"), "PUBLIC_PURCHASABLE uses the published customer price and does not add mapping pricingReady as a second sales gate");
-ok(assessMappingReadiness({ mode: READINESS_MODES.NEW_ORDER_SELECTABLE, mapping: technical, supplier, offer: exact, availability, customerMarket: "MM", adapter }).blockers.includes("CUSTOMER_MARKET_NOT_ELIGIBLE"), "TH eligibility does not imply MM readiness");
+ok(publicAssessment.blockers.includes("NO_VALID_PRICE"), "PUBLIC_PURCHASABLE retains current commercial price checks");
+ok(!assessMappingReadiness({ mode: READINESS_MODES.NEW_ORDER_SELECTABLE, mapping: technical, supplier, offer: exact, availability, customerMarket: "MM", adapter }).blockers.includes("CUSTOMER_MARKET_NOT_ELIGIBLE"), "Customer payment market does not alter supplier route readiness");
 const globalEligibility = { ...technical, fulfillmentEligibility: { ...technical.fulfillmentEligibility, mode: "GLOBAL", allowedCustomerMarkets: [] } };
 ok(!assessMappingReadiness({ mode: READINESS_MODES.NEW_ORDER_SELECTABLE, mapping: globalEligibility, supplier, offer: exact, availability, customerMarket: "TH", adapter }).blockers.includes("CUSTOMER_MARKET_NOT_ELIGIBLE"), "GLOBAL eligibility permits supported TH market");
 ok(!assessMappingReadiness({ mode: READINESS_MODES.NEW_ORDER_SELECTABLE, mapping: globalEligibility, supplier, offer: exact, availability, customerMarket: "MM", adapter }).blockers.includes("CUSTOMER_MARKET_NOT_ELIGIBLE"), "GLOBAL eligibility permits supported MM market");
 const unknownEligibility = { ...technical, fulfillmentEligibility: { ...technical.fulfillmentEligibility, mode: "UNKNOWN", allowedCustomerMarkets: [] } };
-ok(assessMappingReadiness({ mode: READINESS_MODES.NEW_ORDER_SELECTABLE, mapping: unknownEligibility, supplier, offer: exact, availability, customerMarket: "TH", adapter }).blockers.includes("FULFILLMENT_ELIGIBILITY_UNKNOWN"), "UNKNOWN eligibility remains fail closed");
+ok(!assessMappingReadiness({ mode: READINESS_MODES.NEW_ORDER_SELECTABLE, mapping: unknownEligibility, supplier, offer: exact, availability, customerMarket: "TH", adapter }).blockers.includes("FULFILLMENT_ELIGIBILITY_UNKNOWN"), "Legacy customer-market eligibility metadata does not choose supplier routes");
 ok(service.includes("continuation") && service.includes("selectableCount") && service.includes("needsAttentionCount") && service.includes("unavailableCount"), "onboarding exposes sanitized four-state wizard continuation");
 ok(service.includes("WIZARD_STATE_INVARIANT_FAILED") && service.includes("summary.ready + summary.preparable + summary.needsAttention + summary.unavailable"), "state counts are guarded by an invariant");
 ok(service.includes("mutationsEnabled: () => canonicalProductAuthority.mutationsEnabled() === true"), "bounded onboarding uses only the dedicated default-off authority gate");

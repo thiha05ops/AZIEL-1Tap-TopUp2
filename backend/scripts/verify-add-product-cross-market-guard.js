@@ -20,16 +20,18 @@ const input = { productCode: "mlbb", customerMarkets: ["TH"] };
 (async () => {
     const th = mapping("mapping-th", "TH"), global = mapping("mapping-global", "GLOBAL", { enabled: false, productionRole: "DISABLED" });
     const thOnly = makePlan(context([th]), input).offers[0];
-    assert.strictEqual(thOnly.state, "NEEDS_ATTENTION");
-    assert.strictEqual(thOnly.selectable, false);
-    assert.deepStrictEqual(thOnly.blockers, ["SUPPLIER_MARKET_ROUTE_DECISION"]);
+    assert.strictEqual(thOnly.state, "READY");
+    assert.strictEqual(thOnly.selectable, true);
+    assert.deepStrictEqual(thOnly.blockers, []);
     assert.strictEqual(thOnly.mappingId, "");
     let creates = 0;
-    await assert.rejects(() => resolveOrCreateMarketMapping([th], { supplier, offer, productCode: "mlbb", packageCode: "MLBB_284", supplierMarket: "GLOBAL" }, async () => { creates++; return global; }), error => error.code === "SUPPLIER_MARKET_ROUTE_DECISION");
+    let result = await resolveOrCreateMarketMapping([th], { supplier, offer, productCode: "mlbb", packageCode: "MLBB_284", supplierMarket: "GLOBAL" }, async () => { creates++; return global; });
+    assert.strictEqual(result.mapping, th, "the exact native-offer relationship must be reused without fabricating a customer-market duplicate");
+    assert.strictEqual(result.created, false);
     assert.strictEqual(creates, 0);
     assert.deepStrictEqual({ region: th.region, enabled: th.enabled, productionRole: th.productionRole }, { region: "TH", enabled: true, productionRole: "PRIMARY" });
 
-    let result = await resolveOrCreateMarketMapping([global], { supplier, offer, productCode: "mlbb", packageCode: "MLBB_284", supplierMarket: "GLOBAL" }, async () => { creates++; return null; });
+    result = await resolveOrCreateMarketMapping([global], { supplier, offer, productCode: "mlbb", packageCode: "MLBB_284", supplierMarket: "GLOBAL" }, async () => { creates++; return null; });
     assert.strictEqual(result.mapping, global);
     assert.strictEqual(result.created, false);
     assert.strictEqual(storeCatalogEntry(result.mapping, { packageCode: "MLBB_284", supplierMarket: "GLOBAL" }).supplierProductMappingId, "mapping-global");
@@ -44,15 +46,16 @@ const input = { productCode: "mlbb", customerMarkets: ["TH"] };
     assert.strictEqual(result.mapping.enabled, false);
     assert.strictEqual(result.mapping.productionRole, "DISABLED");
     assert.strictEqual(storeCatalogEntry(result.mapping, { packageCode: "MLBB_284", supplierMarket: "GLOBAL" }).supplierProductMappingId, "mapping-new");
-    assert.throws(() => storeCatalogEntry(th, { packageCode: "MLBB_284", supplierMarket: "GLOBAL" }), error => error.code === "SUPPLIER_MARKET_ROUTE_DECISION");
+    assert.strictEqual(storeCatalogEntry(th, { packageCode: "MLBB_284", supplierMarket: "GLOBAL" }).supplierProductMappingId, "mapping-th");
 
     const source = fs.readFileSync(path.join(__dirname, "../services/supplierCatalog/addProductFinalizationService.js"), "utf8");
     const wizard = fs.readFileSync(path.join(__dirname, "../../frontend/js/admin-add-product-wizard.js"), "utf8");
     assert(source.includes("publicationWrites:0,priceWrites:0,packageSupplierSelectionWrites:0,primaryAssignments:0,supplierCalls:0"));
+    assert(!source.includes("applyPackageSupplierSelectionBootstrapPlan"), "Add Product must not choose fulfillment authority automatically");
     assert(!source.includes("mapping.region="));
     assert(wizard.includes("SUPPLIER_MARKET_ROUTE_DECISION"));
     assert(wizard.includes('labels=["Regions","Product","Supplier","Packages","Review"]'));
     assert.strictEqual(creates, 1);
 
-    console.log(JSON.stringify({ result: "PASS", scenarios: { thOnly: "NEEDS_ATTENTION/SUPPLIER_MARKET_ROUTE_DECISION", globalOnly: "REUSED", thAndGlobal: "GLOBAL_REUSED", newRelationship: "CREATED_DISABLED" }, mappingCreates: creates, foreignMappingIdsCommitted: 0, existingMappingsChanged: 0, pricingWrites: 0, publicationWrites: 0, packageSupplierSelectionWrites: 0, primaryAssignments: 0, supplierCalls: 0, productionWrites: 0 }, null, 2));
+    console.log(JSON.stringify({ result: "PASS", scenarios: { thOnly: "EXACT_RELATIONSHIP_REUSED", globalOnly: "REUSED", thAndGlobal: "GLOBAL_REUSED", newRelationship: "CREATED_DISABLED" }, mappingCreates: creates, customerMarketDuplicateMappings: 0, existingMappingsChanged: 0, pricingWrites: 0, publicationWrites: 0, packageSupplierSelectionWrites: 0, primaryAssignments: 0, supplierCalls: 0, productionWrites: 0 }, null, 2));
 })().catch(error => { console.error(error); process.exit(1); });

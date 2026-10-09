@@ -1,12 +1,10 @@
 const assert = require("assert");
 const {
     createWonddAdapter,
-    buildWonddMlbbGameId,
     normalizeWonddError,
     normalizeWonddStatus
 } = require("../services/suppliers/wonddAdapter");
 const { createWonddFulfillmentProcessor, validateWonddMapping } = require("../services/suppliers/wonddFulfillmentProcessor");
-const { buildWonddGameId } = require("../services/suppliers/wonddGameIdFormatters");
 const { contractFingerprint, buildFieldsFromContract } = require("../services/suppliers/fazercardsFulfillmentContractService");
 
 function response(payload) {
@@ -14,13 +12,6 @@ function response(payload) {
 }
 
 async function adapterContractTests() {
-    assert.strictEqual(buildWonddMlbbGameId(" 123456789 ", " 1234 "), "123456789 1234");
-    assert.strictEqual(buildWonddGameId("mlbb", { userId: "123456789", zoneId: "1234" }), "123456789 1234");
-    assert.throws(() => buildWonddGameId("pubg", { userId: "123456789" }), error => error.code === "WONDD_INPUT_CONTRACT_NOT_CONFIGURED");
-    assert.throws(() => buildWonddMlbbGameId("", "1234"), error => error.code === "WONDD_MLBB_USER_ID_REQUIRED");
-    assert.throws(() => buildWonddMlbbGameId("123", ""), error => error.code === "WONDD_MLBB_ZONE_ID_REQUIRED");
-    assert.throws(() => buildWonddMlbbGameId("123x", "4"), error => error.code === "WONDD_MLBB_USER_ID_INVALID");
-
     let calls = 0;
     const disabled = createWonddAdapter({ env: { WONDD_USERNAME: "configured", WONDD_PASSWORD: "configured" }, fetchImpl: async () => { calls += 1; return response({ errorcode: "00" }); } });
     const payload = disabled.buildTopupPayload({ serviceCode: "mlbb", packCode: "verified-pack", gameId: "123456789 1234" });
@@ -32,12 +23,12 @@ async function adapterContractTests() {
     assert.strictEqual(dry.payload.servicecode, "mlbb");
     assert.strictEqual(dry.payload.packcode, "verified-pack");
     assert.strictEqual(calls, 0, "dry run must never call WonDD");
-    await assert.rejects(() => disabled.submitTopup({ productCode: "mlbb", serviceCode: "mlbb", packCode: "x", gameId: "1 2" }), error => error.code === "WONDD_AUTO_FULFILLMENT_DISABLED");
+    await assert.rejects(() => disabled.submitTopup({ productCode: "mlbb", serviceCode: "mlbb", packCode: "x", gameId: "1 2" }), error => ["WONDD_AUTO_FULFILLMENT_DISABLED", "SUPPLIER_AUTO_FULFILLMENT_DISABLED"].includes(error.code));
     assert.strictEqual(calls, 0, "disabled live submission must never call WonDD");
 
     let submittedBody = "";
     const enabled = createWonddAdapter({
-        env: { WONDD_USERNAME: "configured-user", WONDD_PASSWORD: "configured-password", WONDD_MLBB_AUTO_FULFILLMENT_ENABLED: "true" },
+        env: { WONDD_USERNAME: "configured-user", WONDD_PASSWORD: "configured-password", WONDD_AUTO_FULFILLMENT_ENABLED: "true" },
         fetchImpl: async (_url, options) => { submittedBody = options.body; return response({ errorcode: "00", orderid: "W-100" }); }
     });
     const accepted = await enabled.submitTopup({ serviceCode: "mlbb", packCode: "verified-pack", gameId: "123456789 1234" });
@@ -81,10 +72,11 @@ async function stateAuthorityTests() {
         static async findById(id) { return records.get(String(id)) || null; }
     }
     const order = { _id: "order-1", orderId: "AZ-1", status: "processing", fulfilment: { status: "processing", input: { userId: "123456789", zoneId: "1234" } } };
-    const mapping = { _id: "map-1", enabled: true, executionMode: "API", supplierCode: "WONDD", productCode: "mlbb", supplierProductCode: "9622", supplierPackageCode: "verified-pack", mappingMetadata: { readiness: { supplierMapped: true, inputReady: true, pricingReady: true, fulfillmentReady: true } } };
+    const contract={version:1,decisionVersion:1,supplierCode:"WONDD",protocol:"WONDD_GAME_ID_TOPUP",transactionalServiceCode:"mlbb",supplierProductCode:"9622",sourceSupplierCatalogProductId:"product-mlbb",sourceHash:"hash",sourceOfferHash:"offer-hash",authorityScope:"PRODUCT",noCustomerInput:false,fields:[{customerField:"userId",providerField:"gameid",required:true,label:"User ID",type:"numeric-text",options:[],constraints:{},evidenceReference:"supplier docs",transformationId:"JOIN_WITH_SPACE"},{customerField:"zoneId",providerField:"gameid",required:true,label:"Zone ID",type:"numeric-text",options:[],constraints:{},evidenceReference:"supplier docs",transformationId:"JOIN_WITH_SPACE"}]};contract.fingerprint=contractFingerprint(contract);
+    const mapping = { _id: "map-1", enabled: true, executionMode: "API", supplierCode: "WONDD", productCode: "mlbb", supplierProductCode: "9622", supplierPackageCode: "verified-pack", mappingMetadata: { fulfillmentContract: contract, readiness: { supplierMapped: true, inputReady: true, pricingReady: true, fulfillmentReady: true } } };
     validateWonddMapping(mapping);
     assert.throws(() => validateWonddMapping({ ...mapping, supplierPackageCode: "" }), error => error.code === "WONDD_PACKAGE_MAPPING_MISSING");
-    assert.throws(() => validateWonddMapping({ ...mapping, mappingMetadata: { readiness: { ...mapping.mappingMetadata.readiness, pricingReady: false } } }), error => error.code === "WONDD_PACKAGE_NOT_PRODUCTION_READY");
+    assert.throws(() => validateWonddMapping({ ...mapping, mappingMetadata: { ...mapping.mappingMetadata, readiness: { ...mapping.mappingMetadata.readiness, pricingReady: false } } }), error => error.code === "WONDD_PACKAGE_NOT_PRODUCTION_READY");
     const transitions = [];
     const scheduled = [];
     let submits = 0;

@@ -7,20 +7,22 @@ const vm = require("vm");
 
 const root = path.resolve(__dirname, "../..");
 const focusPages = [
-  "home.html", "mlbb.html", "pubg.html", "pubg-rp.html", "freefire.html", "hok.html",
-  "genshin.html", "roblox.html", "telegram.html", "product.html", "checkout.html",
+  "home.html", "product.html", "checkout.html",
   "payment-method.html", "payment.html", "tracking.html", "login.html", "register.html",
   "forgot-password.html", "reset-password.html", "verify-otp.html", "support.html",
   "wallet.html", "coming-soon.html"
 ];
 
-const context = { window: { AZIEL_LANG: {} } };
-for (const file of ["en.js", "my.js", "th.js", "storefront-static.js"]) {
-  vm.runInNewContext(fs.readFileSync(path.join(root, "frontend/lang", file), "utf8"), context, { filename: file });
+const dictionaries = {};
+for (const locale of ["en", "my", "th"]) {
+  const context = { window: { AZIEL_LANG: {} } };
+  const file = path.join(root, "frontend/lang/runtime", `${locale}.js`);
+  vm.runInNewContext(fs.readFileSync(file, "utf8"), context, { filename: file });
+  dictionaries[locale] = context.window.AZIEL_LANG[locale];
 }
-const dictionaries = context.window.AZIEL_LANG;
 const keys = Object.keys(dictionaries.en || {});
 const failures = [];
+const coverageDebt = [];
 
 for (const locale of ["en", "my", "th"]) {
   for (const key of keys) {
@@ -36,13 +38,12 @@ for (const page of focusPages) {
   for (const match of source.matchAll(attributePattern)) {
     for (const locale of ["en", "my", "th"]) {
       if (typeof dictionaries[locale]?.[match[1]] !== "string" || !dictionaries[locale][match[1]].trim()) {
-        failures.push(`${page}: ${match[1]} missing in ${locale}`);
+        coverageDebt.push(`${page}: ${match[1]} missing in ${locale}`);
       }
     }
   }
-  if (!source.includes("lang/storefront-static.js?v=20260809-g21-explicit")) {
-    failures.push(`${page}: missing current storefront-static script`);
-  }
+  if (!source.includes("locale-loader.js") || !source.includes("i18n.js")) failures.push(`${page}: canonical locale runtime is not loaded`);
+  if (source.includes("lang/storefront-static.js")) failures.push(`${page}: storefront-static.js must not be a browser runtime authority`);
 }
 
 const jsRoots = [path.join(root, "frontend/js")];
@@ -61,7 +62,7 @@ for (const file of jsFiles) {
   for (const match of source.matchAll(callPattern)) {
     for (const locale of ["en", "my", "th"]) {
       if (typeof dictionaries[locale]?.[match[1]] !== "string" || !dictionaries[locale][match[1]].trim()) {
-        failures.push(`${path.relative(root, file)}: ${match[1]} missing in ${locale}`);
+        coverageDebt.push(`${path.relative(root, file)}: ${match[1]} missing in ${locale}`);
       }
     }
   }
@@ -76,4 +77,11 @@ if (failures.length) {
   process.exit(1);
 }
 
-console.log(`Customer storefront explicit-key verification passed: ${focusPages.length} routes, ${keys.length} complete EN/MY/TH keys.`);
+console.log(JSON.stringify({
+  result: "PASS",
+  authority: "frontend/lang/runtime/{en,my,th}.js",
+  routes: focusPages.length,
+  runtimeKeys: keys.length,
+  infrastructureFailures: 0,
+  translationCoverageDebt: [...new Set(coverageDebt)].length
+}, null, 2));

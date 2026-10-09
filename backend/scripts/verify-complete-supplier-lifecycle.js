@@ -60,7 +60,7 @@ async function main() {
     check("selection audit shares transaction session", source("backend/services/packageSupplierSelectionService.js").includes("session,") && source("backend/services/packageSupplierSelectionService.js").includes("await audit({"));
     check("consolidation never rewrites historical models", source("backend/services/catalogPackageConsolidationService.js").includes("HISTORICAL_IMMUTABLE") && source("backend/services/catalogPackageConsolidationService.js").includes("applyAvailable: false"));
     check("existing snapshots are not updated", !source("backend/services/fulfillmentService.js").includes("$set: { \"fulfilment.routeSnapshot\""));
-    check("default routing remains legacy", resolveFulfillmentRoutingMode({}) === FULFILLMENT_ROUTING_MODES.LEGACY_REGION);
+    check("default routing uses Storefront supplier authority", resolveFulfillmentRoutingMode({}) === FULFILLMENT_ROUTING_MODES.SELECTED);
     const shadowRoute = createRoutingAuthority({ legacyResolver: async () => ({ ready: true, routeSnapshot: { supplierMappingId: "a", routeType: "SUPPLIER_API" } }), selectedResolver: async () => ({ ready: true, routeSnapshot: { supplierMappingId: "b", supplierCode: "WONDD" }, blockers: [] }), modeResolver: () => FULFILLMENT_ROUTING_MODES.SHADOW });
     check("explicit Storefront selection overrides legacy mode", (await shadowRoute({})).routeSnapshot.supplierMappingId === "b");
     for (const failure of [

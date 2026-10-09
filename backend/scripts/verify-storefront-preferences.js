@@ -28,6 +28,7 @@ async function run() {
     const homeHtml = read("frontend/home.html");
     const userState = read("frontend/js/user-state.js");
     const i18n = read("frontend/js/i18n.js");
+    const prices = read("frontend/js/prices.js");
     const gameFlow = read("frontend/js/game-flow.js");
     const paymentTrust = read("frontend/js/payment-trust-display.js");
     const wallet = read("frontend/js/wallet.js");
@@ -36,6 +37,8 @@ async function run() {
     includes(userState, "AZIEL.setShopRegion", "Commerce region mutation authority must remain AZIEL.setShopRegion.");
     includes(userState, 'finalRegion === "TH" ? "THB" : "MMK"', "Region must derive the commerce currency.");
     includes(userState, "aziel:shopRegionChanged", "Region changes must continue notifying pricing/payment consumers.");
+    includes(prices, 'clearSelectedPackage("region_changed")', "Country changes must intentionally reset package selection before repricing.");
+    assert.ok(!/aziel:shopRegionChanged[\s\S]{0,300}reselectCode/.test(prices), "Country changes must not reselect the previous package.");
     includes(i18n, 'const LANG_KEY = "azielLanguage"', "Language authority must remain AZIEL i18n.");
     includes(i18n, 'SUPPORTED_LANGS = new Set(["en", "my", "th"])', "Only English, Myanmar, and Thai languages should be supported.");
 

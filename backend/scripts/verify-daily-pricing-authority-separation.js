@@ -5,6 +5,7 @@ const assert = require("assert");
 const fs = require("fs");
 const path = require("path");
 const {
+    canonicalPricingProductCode,
     canonicalPricingRegions,
     pricingTargetRegions
 } = require("../services/commerce/adminPricingControlCenterService");
@@ -16,6 +17,8 @@ const drafts = read("backend/services/commerce/pricingWorkspaceDraftService.js")
 const frontend = read("frontend/js/admin-pricing-engine.js");
 
 assert.deepStrictEqual(pricingTargetRegions("ALL"), ["TH", "MM"]);
+assert.strictEqual(canonicalPricingProductCode("valorant-th-a66e89e1e4"), "valorant-th-a66e89e1e4");
+assert.strictEqual(canonicalPricingProductCode("Mobile Legends"), "mobilelegends");
 for (const prices of [{}, { TH: { amount: 1 } }, { MM: { amount: 100 } }, { TH: { amount: 1, enabled: false }, MM: { amount: 100 } }]) {
     assert.deepStrictEqual(canonicalPricingRegions({ enabled: false, supportedRegions: [] }, { enabled: false, deletedAt: null, prices }, "ALL"), ["TH", "MM"]);
 }
@@ -42,6 +45,7 @@ assert(!publish.includes("enabled: true"));
 assert(publish.includes("expectedUpdatedAt"));
 assert(!drafts.includes("without active regional pricing"));
 assert(drafts.includes("active exact supplier mapping"));
+assert(drafts.includes('if (/^[a-z0-9][a-z0-9-]{0,79}$/.test(exact)) return exact;'));
 
 assert(frontend.includes('return "ALL"'));
 assert(frontend.includes('publishRows("PACKAGE"'));
@@ -63,4 +67,5 @@ console.log(JSON.stringify({
     publishModes: ["PACKAGE", "SELECTION", "PRODUCT_CHANGED", "WORKSPACE_CHANGED"],
     deterministicChunkSize: 200,
     staleDraftResponsesScoped: true
+    ,genericHyphenatedProductCodesPreserved: true
 }, null, 2));

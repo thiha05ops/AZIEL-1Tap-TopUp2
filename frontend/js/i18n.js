@@ -155,11 +155,6 @@
             })
         );
         return nextLang;
-        window.dispatchEvent(
-            new CustomEvent("aziel:locale-changed", {
-                detail: { locale: nextLang }
-            })
-        );
     }
 
     function translateError(code, fallback = "Something went wrong.", params = {}) {

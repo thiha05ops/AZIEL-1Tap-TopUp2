@@ -1,6 +1,5 @@
 "use strict";
 
-const { validateFulfillmentEligibility } = require("./supplierFulfillmentEligibilityService");
 const { supplierCapabilityProductCode } = require("./fulfillmentCapabilityService");
 
 const READINESS_MODES = Object.freeze({
@@ -38,11 +37,6 @@ function assessMappingReadiness({ mode, mapping = {}, supplier = null, offer = n
     if (readiness.supplierMapped !== true) blockers.push("SUPPLIER_MAPPING_NOT_READY");
     if (readiness.inputReady !== true) blockers.push("INPUT_NOT_READY");
     if (readiness.fulfillmentReady !== true) blockers.push("FULFILLMENT_NOT_READY");
-
-    const eligibility = validateFulfillmentEligibility(eligibilityOverride || mapping.fulfillmentEligibility);
-    if (!eligibility.valid) blockers.push(...eligibility.errors);
-    else if (eligibility.value.mode === "UNKNOWN") blockers.push("FULFILLMENT_ELIGIBILITY_UNKNOWN");
-    else if (mode !== READINESS_MODES.FROZEN_ORDER_EXECUTABLE && eligibility.value.mode === "CUSTOMER_MARKET_ALLOWLIST" && !eligibility.value.allowedCustomerMarkets.includes(upper(customerMarket))) blockers.push("CUSTOMER_MARKET_NOT_ELIGIBLE");
 
     if (mode !== READINESS_MODES.FROZEN_ORDER_EXECUTABLE) {
         const offerMatches = offer && objectId(offer) === objectId(mapping.supplierCatalogOfferId) && objectId(offer.supplierId) === objectId(mapping.supplierId) && clean(offer.supplierProductCode) === clean(mapping.supplierProductCode) && clean(offer.supplierOfferCode) === clean(mapping.supplierPackageCode) && upper(offer.catalogLifecycleState) === "ACTIVE";

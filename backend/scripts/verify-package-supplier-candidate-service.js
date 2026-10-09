@@ -55,7 +55,7 @@ service({ productCode: "game", packageCode: "PACK", customerMarket: "TH" }).then
     assert.strictEqual(disabled.readiness.selectable, false);
     assert(disabled.readiness.blockerCodes.includes("MAPPING_DISABLED"));
     assert(disabled.readiness.blockerCodes.includes("SUPPLIER_AVAILABILITY_NOT_CONFIRMED"));
-    assert.strictEqual(result.publication.state, "SUPPRESSED");
+    assert.strictEqual(result.publication.state, "RECORDED", "publication record remains the package Selling authority");
     assert.strictEqual(result.effectiveState.state, "BLOCKED", "multiple executable routes require an explicit Owner choice");
     assert(result.effectiveState.blockers.includes("AMBIGUOUS_EXECUTABLE_SUPPLIER_ROUTES"));
     const common = { productCode: "game", packageCode: "PACK", customerMarket: "TH", product: { enabled: true, publicDiscoveryEnabled: true, commerceState: "PURCHASABLE" }, storeCatalogMember: true, pkg: { productCode: "game", packageCode: "PACK", name: "Pack", enabled: true, prices: { TH: { amount: 100, enabled: true } } }, suppliers, offers, availabilityRows: availability, adapterFor: () => ({ isConfigured: () => true, isAutoFulfillmentEnabled: () => true }) };

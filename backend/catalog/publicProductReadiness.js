@@ -1,4 +1,4 @@
-const { resolveCanonicalProductRoute } = require("./canonicalOperationalCatalog");
+const { resolveProductRoute } = require("./productRoute");
 
 const REGIONS = Object.freeze(["MM", "TH"]);
 
@@ -71,13 +71,12 @@ function resolvePublicProductReadiness(product = {}, packages = [], commerceRead
     // operational list only selects dedicated legacy pages; it is not the
     // authority for Master Catalog membership.
     const canonical = /^[a-z0-9][a-z0-9-]{0,79}$/.test(String(product.productCode || "").trim().toLowerCase()) && !product.deletedAt;
-    const route = resolveCanonicalProductRoute(product.productCode);
+    const route = resolveProductRoute(product.productCode);
     const regions = Object.fromEntries(REGIONS.map(region => [region, regionReadiness(product, packages, region, commerceReadiness)]));
     const blockers = [];
     const warnings = [];
     if (!canonical) blockers.push("canonicalIdentity");
     if (!route) blockers.push("route");
-    if (!Array.isArray(product.supportedRegions) || !product.supportedRegions.length) blockers.push("regions");
     if (!Object.values(regions).some(item => item.pricingReady)) blockers.push("packagesAndPricing");
     if (!Object.values(regions).some(item => item.fulfillmentReady)) blockers.push("fulfillment");
     if (!Object.values(regions).some(item => item.availabilityReady)) blockers.push("availability");
@@ -94,6 +93,7 @@ function resolvePublicProductReadiness(product = {}, packages = [], commerceRead
     // applied by the caller; none of them may bypass this control.
     const requested = String(product.commerceState || product.requestedCommerceState || "HIDDEN").toUpperCase();
     const discoverable = product.publicDiscoveryEnabled === true && product.enabled !== false && !product.deletedAt;
+
     let state = "HIDDEN";
     if (canonical && discoverable && requested !== "HIDDEN") {
         const intentionallyComingSoon = String(product.lifecycleStatus || "").toUpperCase() === "COMING_SOON" || requested === "COMING_SOON";

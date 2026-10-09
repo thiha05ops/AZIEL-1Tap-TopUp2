@@ -178,6 +178,7 @@ function assertFrontendOverlay() {
     const sandbox = {
         window: {},
         document: {
+            getElementById() { return null; },
             dispatchEvent() {}
         },
         CustomEvent: function CustomEvent(type, options = {}) {
@@ -229,6 +230,7 @@ async function verifyIsolatedDatabase() {
 
     try {
         assertRouteSecurity();
+        await assertCanonicalAdminProjection();
         const missing = await resolveAdminCatalogProduct(TEST_PRODUCT, { includeAssetProjection: false, includeAdminPricing: false });
         assert(missing?.metadataRecordMissing === true, "Missing canonical record must remain Admin-manageable.");
         await createFixture();
@@ -402,9 +404,12 @@ async function verifyIsolatedDatabase() {
 async function main() {
     assertRouteSecurity();
     assertDatabaseSafetyContract();
-    await assertCanonicalAdminProjection();
-    await assertFrontendOverlay();
-    if (process.argv.includes("--isolated")) await verifyIsolatedDatabase();
+    if (process.argv.includes("--isolated")) {
+        await verifyIsolatedDatabase();
+    } else {
+        await assertFrontendOverlay();
+        await assertCanonicalAdminProjection();
+    }
     console.log("Admin catalog canonical control verification passed.");
 }
 

@@ -21,8 +21,8 @@ function normalizeCustomerMarket(value = "TH") {
 }
 
 function publicationMode(env = process.env) {
-    const mode = String(env.PACKAGE_MARKET_PUBLICATION_MODE || "LEGACY").trim().toUpperCase();
-    return PUBLICATION_MODES.includes(mode) ? mode : "LEGACY";
+    const mode = String(env.PACKAGE_MARKET_PUBLICATION_MODE || "EXPLICIT").trim().toUpperCase();
+    return PUBLICATION_MODES.includes(mode) ? mode : "EXPLICIT";
 }
 
 function publicationKey(productCode, packageCode, customerMarket = "TH") {
@@ -154,6 +154,59 @@ async function setPackageMarketPublication({ productCode, packageCode, customerM
     return { publication, changed: true };
 }
 
+async function publishPackageMarketBatch({ productCode, customerMarket = "TH", packages = [], actor = "admin", decisionNote = "", session = null, model = PackageMarketPublication } = {}) {
+    const market = normalizeCustomerMarket(customerMarket);
+    const normalizedProduct = String(productCode || "").trim().toLowerCase();
+    const normalizedActor = String(actor || "admin").trim().slice(0, 120);
+    const normalizedNote = String(decisionNote || "").trim().slice(0, 500);
+    const rows = [...new Map((packages || []).map(item => {
+        const packageCode = String(item?.packageCode || "").trim().toUpperCase();
+        return [packageCode, { packageCode, expectedDecisionVersion: Number(item?.expectedDecisionVersion || 0) }];
+    }).filter(([packageCode]) => packageCode)).values()];
+    if (!normalizedProduct) throw new PackageMarketPublicationError("PUBLICATION_PRODUCT_REQUIRED", "Product is required.");
+    if (!rows.length) return { matchedCount: 0, modifiedCount: 0, upsertedCount: 0, packageCodes: [] };
+    const now = new Date();
+    const operations = rows.map(row => ({
+        updateOne: {
+            filter: {
+                productCode: normalizedProduct,
+                packageCode: row.packageCode,
+                customerMarket: market,
+                ...(row.expectedDecisionVersion > 0
+                    ? { decisionVersion: row.expectedDecisionVersion }
+                    : { decisionVersion: { $exists: false } })
+            },
+            update: {
+                $set: {
+                    productCode: normalizedProduct,
+                    packageCode: row.packageCode,
+                    customerMarket: market,
+                    published: true,
+                    publishedAt: now,
+                    publishedBy: normalizedActor,
+                    unpublishedAt: null,
+                    unpublishedBy: "",
+                    decisionVersion: row.expectedDecisionVersion + 1,
+                    decisionNote: normalizedNote,
+                    "provenance.source": "ADMIN_BULK_READY"
+                }
+            },
+            upsert: row.expectedDecisionVersion === 0
+        }
+    }));
+    const result = await model.bulkWrite(operations, { ordered: true, session });
+    const changed = Number(result.modifiedCount || 0) + Number(result.upsertedCount || 0);
+    if (changed !== rows.length) {
+        throw new PackageMarketPublicationError("PUBLICATION_BATCH_STALE", "A package publication changed while the batch was being applied.", 409);
+    }
+    return {
+        matchedCount: Number(result.matchedCount || 0),
+        modifiedCount: Number(result.modifiedCount || 0),
+        upsertedCount: Number(result.upsertedCount || 0),
+        packageCodes: rows.map(row => row.packageCode)
+    };
+}
+
 module.exports = {
     PUBLICATION_MODES,
     PackageMarketPublicationError,
@@ -166,6 +219,7 @@ module.exports = {
     publicationPackageMap,
     publicationMap,
     publicationMode,
+    publishPackageMarketBatch,
     projectPackagePublication,
     setPackageMarketPublication,
     stripPublicationMetadata,
