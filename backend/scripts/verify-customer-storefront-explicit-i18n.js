@@ -7,8 +7,7 @@ const vm = require("vm");
 
 const root = path.resolve(__dirname, "../..");
 const focusPages = [
-  "home.html", "mlbb.html", "pubg.html", "pubg-rp.html", "freefire.html", "hok.html",
-  "genshin.html", "roblox.html", "telegram.html", "product.html", "checkout.html",
+  "home.html", "product.html", "checkout.html",
   "payment-method.html", "payment.html", "tracking.html", "login.html", "register.html",
   "forgot-password.html", "reset-password.html", "verify-otp.html", "support.html",
   "wallet.html", "coming-soon.html"

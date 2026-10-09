@@ -13,10 +13,14 @@ const desktopCss = read("frontend/css/game/product-detail-desktop.css");
 const productStage = read("frontend/js/product-detail-stage.js");
 const checkout = read("frontend/js/product-checkout.js");
 const gameFlow = read("frontend/js/game-flow.js");
-const productPages = [
-    "product.html", "mlbb.html", "aov-id.html", "freefire.html", "genshin.html",
-    "hok.html", "pubg-rp.html", "pubg.html", "roblox.html", "telegram.html"
-];
+const productDetail = read("frontend/js/product-detail.js");
+const server = read("backend/server.js");
+const routeContract = require("../config/storefrontRouteContract");
+const productPages = ["product.html"];
+
+assert(Object.keys(routeContract.PRODUCT_RENDERERS).length === 0, "all canonical products must use the shared Product Detail renderer");
+assert(server.includes('app.get("/products/:productCode"'), "canonical products must use /products/:productCode");
+assert(server.includes('const renderer = PRODUCT_RENDERERS[productCode] || "product.html"'), "canonical product routes must fall back to the shared Product Detail shell");
 
 assert(catalogRuntime.includes('artwork: String(item.iconUrl || "").trim()'), "catalog package artwork must come from managed package media");
 assert(prices.includes("const artwork = String(item.artwork || \"\").trim()"), "text-only packages must not reserve media");
@@ -57,7 +61,19 @@ assert(desktopCss.includes("object-fit: contain !important"), "mobile package ar
 assert(desktopCss.includes("border: 0 !important") && desktopCss.includes("background: transparent !important"), "mobile package artwork must not use a nested icon box");
 assert(desktopCss.includes("text-align: center !important") && desktopCss.includes("-webkit-line-clamp: 3"), "mobile package names must center and wrap within a controlled height");
 assert(desktopCss.includes(".pack.pack--long-name .pack-name") && desktopCss.includes("font-size: 11.5px !important"), "long mobile names must tighten instead of growing the card");
-assert(desktopCss.includes(".pack:not(:has(.pack-icon)) .pack-info") && desktopCss.includes("grid-row: 1 / 3 !important"), "text-only mobile packages must center naturally without an empty icon slot");
+assert(
+    desktopCss.includes(".pack:not(:has(.pack-icon)) .pack-info")
+        && desktopCss.includes(".pack.pack--text-only .pack-info")
+        && desktopCss.includes("align-self: stretch !important"),
+    "text-only mobile packages must stretch and center within the content row without an empty icon slot"
+);
+assert(
+    desktopCss.includes(".az-product-detail .pack-content")
+        && desktopCss.includes("grid-row: 1 !important")
+        && desktopCss.includes(".az-product-detail .pack-price-block")
+        && desktopCss.includes("grid-row: 2 !important"),
+    "text-only package content must not overlap the reserved price row"
+);
 
 productPages.forEach(page => {
     const html = read(`frontend/${page}`);
@@ -79,6 +95,13 @@ assert(productStage.includes('orderLayout.insertAdjacentElement("afterend", info
 assert(productStage.includes("product-identity-media"), "Product Detail must use compact product identity media");
 assert(productStage.includes('image.addEventListener("error", () => media.remove()'), "broken product artwork must collapse cleanly");
 assert(productStage.includes('button.setAttribute("aria-expanded", "false")'), "lower information rows must use accessible accordion state");
+assert(prices.includes('pack.onclick = () => selectPackage(pack)') && prices.includes('pack.onkeydown = event =>'), "package selection must support pointer and keyboard activation");
+assert(prices.includes('packEl.setAttribute("aria-pressed", "true")') && prices.includes('new CustomEvent("packageSelected"'), "package selection must update accessible state and notify the order flow");
+assert(productDetail.includes("product.customerInputContract?.verified === true"), "account inputs must come from the verified shared product contract");
+assert(productDetail.includes("resolvedAccountFields.slice(1)") && productDetail.includes("applyConstraints(input, field)"), "shared Product Detail must render and constrain additional account inputs");
+assert(productDetail.includes("window.location.pathname.match(/^\\/products\\/"), "shared Product Detail identity must come from the canonical product path");
+assert(!productDetail.includes('localStorage.getItem("region")'), "customer payment country must not choose product or game-server identity");
+assert(read("frontend/product.html").includes('id="summaryPackage"') && read("frontend/product.html").includes('id="summaryAmount"'), "shared Product Detail must retain package and total order summary fields");
 assert(gameFlow.includes('paymentSelectionStage: "checkout"'), "Product Detail flow must defer payment choice to Checkout");
 assert(gameFlow.includes('sessionStorage.setItem("azielProductCheckoutDraft"'), "Product Detail must stage the existing order payload for Checkout");
 assert(
@@ -86,9 +109,10 @@ assert(
         && checkout.includes("packageCode: draft.order.packageCode"),
     "Checkout must revalidate the selected canonical package"
 );
-assert(checkout.includes('window.location.href = "payment-method.html"'), "Checkout Review must hand off to the page-based Payment Method authority");
+assert(gameFlow.includes('window.location.href = flow.config.checkoutUrl || "/checkout"'), "Product Detail must hand the selected package to Checkout Review");
+assert(checkout.includes("validateReviewForHandoff(authoritativeReview)") && checkout.includes("window.AZIEL_PAYMENT.start({"), "Checkout Review must validate its quote before handing off to the selected payment authority");
 assert(read("frontend/checkout.html").includes('id="checkoutPayButton"'), "Checkout Review must retain its Payment Method handoff action");
-assert(!read("frontend/checkout.html").includes('id="paymentGrid"'), "Payment method selection must not be embedded in Checkout Review");
+assert(read("frontend/checkout.html").includes('id="paymentGrid"'), "Checkout Review must retain the current payment-method selection surface");
 assert(prices.includes("showPackageSkeletons(packageContainer)"), "package loading must use stable skeleton cards");
 assert(!prices.includes('showCatalogMessage(packageContainer, "Loading packages..."'), "raw package loading text must not be visible");
 
