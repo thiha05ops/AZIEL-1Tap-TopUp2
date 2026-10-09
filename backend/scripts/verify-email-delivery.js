@@ -111,8 +111,7 @@ function verifyOrderEmailOwnership() {
     includes("backend/services/orderEmailService.js", "status: \"delivered\"", "Delivered lifecycle emails must be marked.");
     includes("backend/services/orderEmailService.js", "status: \"failed\"", "Failed lifecycle emails must be retryable.");
     includes("backend/services/orderEmailService.js", "duplicate_or_pending", "Duplicate semantic lifecycle emails must be skipped.");
-    notMatches("backend/services/orderEmailService.js", /transportProvider:\s*["'](?:gmail_smtp|brevo)["']/, "Order lifecycle mail must defer transport selection to EMAIL_PROVIDER authority.");
-    includes("backend/services/orderEmailService.js", "getEmailProvider()", "Delivery audit metadata must use canonical provider authority.");
+    includes("backend/services/orderEmailService.js", "transportProvider: \"gmail_smtp\"", "Order lifecycle mail must explicitly use threading-capable SMTP.");
 }
 
 function verifyTemplateAndLinkSafety() {

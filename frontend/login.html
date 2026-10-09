@@ -13,7 +13,8 @@
     <link rel="stylesheet" href="css/core/main.css">
     <link rel="stylesheet" href="css/theme/aziel-header.css?v=20260829-p4">
     <link rel="stylesheet" href="css/theme/aziel-design-system.css?v=20260829-p4">
-    <link rel="stylesheet" href="css/auth/auth.css?v=20261002-auth-ui-1">
+    <link rel="stylesheet" href="css/auth/auth.css?v=20260829-p4">
+    <link rel="stylesheet" href="css/auth/login.css">
     <meta name="theme-color" content="#7c3aed">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
@@ -43,17 +44,14 @@
         </section>
 
         <section class="auth-card">
-            <a href="/" class="auth-mobile-logo">
-                <img class="auth-logo-dark" src="/assets/brand/aziel-logo-dark.svg" alt="AZIEL">
-                <img class="auth-logo-light" src="/assets/brand/aziel-logo-light.svg" alt="AZIEL">
-            </a>
+            <a href="/" class="auth-mobile-logo"><img src="/assets/brand/aziel-logo-dark.svg" alt="AZIEL"></a>
 
             <div class="auth-card-head">
                 <div>
                     <h2 data-i18n="auth.signIn">Sign in</h2>
                     <p data-i18n="auth.signInHelp">Use your username or email</p>
                 </div>
-                <a href="/register" class="auth-switch-top" data-i18n="login.create">Create</a>
+                <a href="/register" data-i18n="login.create">Create</a>
             </div>
 
             <div id="msg" class="auth-message"></div>

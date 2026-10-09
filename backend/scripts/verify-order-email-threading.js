@@ -58,7 +58,6 @@ const DeliveryModel = {
 
 const transportMock = {
     classifyTransportError: error => error.code || "EMAIL_SEND_FAILED",
-    getEmailProvider: () => "brevo",
     hashRecipient: email => require("crypto").createHash("sha256").update(String(email).toLowerCase()).digest("hex").slice(0, 16),
     maskEmail: () => "masked",
     async sendEmail(message) {
@@ -133,8 +132,7 @@ async function main() {
     assert.strictEqual(sent.length, 1, "Duplicate root event must send once.");
     const root = sent[0];
     assert.strictEqual(root.subject, "AZIEL Order AZL-THREAD-ONE");
-    assert.strictEqual(root.transportProvider, undefined, "Threaded lifecycle messages must defer transport selection to EMAIL_PROVIDER authority.");
-    assert.strictEqual(deliveries.get(`${first.orderId}:ORDER_CREATED_PENDING_PAYMENT`).transport, "brevo", "Delivery audit metadata must use configured provider authority.");
+    assert.strictEqual(root.transportProvider, "gmail_smtp");
     assert.strictEqual(root.inReplyTo, "");
     assert.deepStrictEqual(root.references, []);
     assert.strictEqual(threads.get(first.orderId).rootDeliveryKey, `${first.orderId}:ORDER_CREATED_PENDING_PAYMENT`);
