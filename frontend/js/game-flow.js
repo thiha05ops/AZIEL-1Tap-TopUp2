@@ -580,7 +580,12 @@
         const pkg = getSelectedPackage();
         const payment = getSelectedPayment();
         const readiness = getReadiness(flow);
-        const symbol = getSymbol();
+        const packageCurrency = String(pkg?.currency || "").toUpperCase();
+        const symbol = packageCurrency === "THB"
+            ? "฿"
+            : packageCurrency === "MMK"
+                ? "Ks"
+                : getSymbol();
         const promo = getActivePromoQuote(flow, pkg);
         const displayAmount = promo?.finalAmount ?? Number(pkg?.price || 0);
         const wasReady = Boolean(flow.lastReadinessReady);

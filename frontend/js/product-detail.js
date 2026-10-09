@@ -59,9 +59,28 @@
         applyText("[data-product-summary-name]", name);
         window.renderPackageSelectorState?.();
 
-        const hasPublicContract = product.customerInputContract?.verified === true;
-        const contract = hasPublicContract
-            ? { accountFields: product.customerInputContract.fields || [], noCustomerInput: product.customerInputContract.noCustomerInput === true }
+        const publicContract = product.customerInputContract?.verified === true
+            ? product.customerInputContract
+            : (() => {
+                const livePackages = (product.packages || []).filter(
+                    pkg => pkg.customerInputContract?.verified === true
+                );
+                if (!livePackages.length) return null;
+                const fingerprints = new Set(
+                    livePackages.map(pkg => JSON.stringify({
+                        fields: pkg.customerInputContract.fields,
+                        noCustomerInput: pkg.customerInputContract.noCustomerInput
+                    }))
+                );
+                return fingerprints.size === 1
+                    ? livePackages[0].customerInputContract
+                    : null;
+            })();
+        const contract = publicContract
+            ? {
+                accountFields: publicContract.fields || [],
+                noCustomerInput: publicContract.noCustomerInput === true
+            }
             : null;
         const accountCard = document.getElementById("userId")?.closest(".form-card");
         const firstField = contract?.accountFields?.[0];
@@ -113,7 +132,7 @@
             game: name,
             gameKey: productCode,
             userIdSelector: "#userId",
-            zoneIdSelector: contract.accountFields.find(field => field.key === "zoneId")?.selector || "",
+            zoneIdSelector: resolvedAccountFields.find(field => ["zoneId", "serverId"].includes(field.key))?.selector || "",
             zoneRequired: contract.accountFields.some(field => field.key === "zoneId" && field.required),
             userIdRequiredMessage: firstField?.requiredMessage || "",
             accountFields: resolvedAccountFields,
