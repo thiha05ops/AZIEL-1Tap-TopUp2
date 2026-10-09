@@ -14,13 +14,8 @@ document.addEventListener("DOMContentLoaded", () => {
   renderGamePrices();
 
   window.addEventListener("aziel:shopRegionChanged", () => {
-    const selectedCode =
-      selectedPackage?.code ||
-      document.querySelector(".pack.active")?.dataset.code ||
-      "";
-
+    clearSelectedPackage("region_changed");
     renderGamePrices({
-      reselectCode: selectedCode,
       reason: "region_changed"
     });
   });
