@@ -15,13 +15,13 @@ function supportsFazerCardsMapping(mapping = {}) {
     return Boolean(verifiedMappingContract(mapping));
 }
 
-function validateFazerCardsMapping(mapping = {}, { customerMarket = "" } = {}) {
+function validateFazerCardsMapping(mapping = {}, { customerMarket = "", frozenRoute = false } = {}) {
     const readiness = mapping.mappingMetadata?.readiness || {};
     const legacyMarket = ["TH", "MM"].includes(String(mapping.region || "").trim().toUpperCase()) ? mapping.region : "";
     const market = String(customerMarket || legacyMarket).trim().toUpperCase();
     if (!mapping.enabled || mapping.supplierCode !== "FAZERCARDS" || mapping.executionMode !== "API" || !supportsFazerCardsMapping(mapping) || !String(mapping.supplierPackageCode || "").trim()) throw Object.assign(new Error("An exact supported FazerCards mapping is required."), { code: "FAZERCARDS_PACKAGE_MAPPING_MISSING" });
     if (!market) throw Object.assign(new Error("The order payment market is required."), { code: "ORDER_CUSTOMER_MARKET_MISSING" });
-    if (readiness.supplierMapped !== true || readiness.inputReady !== true || readiness.pricingReady !== true || readiness.fulfillmentReady !== true) throw Object.assign(new Error("FazerCards package production readiness is incomplete."), { code: "FAZERCARDS_PACKAGE_NOT_PRODUCTION_READY" });
+    if (readiness.supplierMapped !== true || readiness.inputReady !== true || (!frozenRoute && readiness.pricingReady !== true) || readiness.fulfillmentReady !== true) throw Object.assign(new Error("FazerCards package production readiness is incomplete."), { code: "FAZERCARDS_PACKAGE_NOT_PRODUCTION_READY" });
     return mapping;
 }
 
@@ -92,9 +92,17 @@ function createFazerCardsFulfillmentProcessor(deps = {}) {
         const [order, mapping] = await Promise.all([Order.findById(attempt.orderId), Mapping.findById(attempt.supplierMappingId)]);
         if (!order) throw Object.assign(new Error("CommerceOrder not found."), { code: "ORDER_NOT_FOUND" });
         const customerMarket = String(order.commercial?.region || order.product?.region || order.region || "").trim().toUpperCase();
-        validateFazerCardsMapping(mapping, { customerMarket });
         const frozenContract = order.fulfilment?.routeSnapshot?.fulfillmentContract || order.quoteSnapshot?.supplierRouteSnapshot?.fulfillmentContract;
         const mappingValue = typeof mapping.toObject === "function" ? mapping.toObject() : mapping;
+        const frozenRoute = order.fulfilment?.routeSnapshot || order.quoteSnapshot?.supplierRouteSnapshot || null;
+        const verifiedFrozenV2 = Number(frozenRoute?.snapshotVersion) === 2 &&
+            String(frozenRoute?.routeType || "").toUpperCase() === "SUPPLIER_API" &&
+            String(frozenRoute?.supplierMappingId || "") === String(mappingValue?._id || "") &&
+            String(frozenRoute?.productCode || "").toLowerCase() === String(mappingValue?.productCode || "").toLowerCase() &&
+            String(frozenRoute?.packageCode || "").toUpperCase() === String(mappingValue?.packageCode || "").toUpperCase() &&
+            String(frozenRoute?.supplierProductCode || "") === String(mappingValue?.supplierProductCode || "") &&
+            String(frozenRoute?.supplierPackageCode || "") === String(mappingValue?.supplierPackageCode || "");
+        validateFazerCardsMapping(mapping, { customerMarket, frozenRoute: verifiedFrozenV2 });
         const contract = frozenContract ? verifiedMappingContract({ ...mappingValue, mappingMetadata: { ...(mappingValue.mappingMetadata || {}), fulfillmentContract: frozenContract } }) : verifiedMappingContract(mappingValue);
         if (contract && !frozenContract) {
             const offer = await CatalogOffer.findById(mapping.supplierCatalogOfferId).lean();

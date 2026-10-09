@@ -129,6 +129,18 @@ assert(supportsFazerCardsMapping(snapshotted), "A verified mapping snapshot must
 assert.strictEqual(supportsFazerCardsMapping(mapping), false, "An unknown generic mapping must remain unsupported.");
 validateFazerCardsMapping(snapshotted, { customerMarket: "TH" });
 validateFazerCardsMapping(snapshotted, { customerMarket: "MM" });
+const frozenPricingFalse = { ...snapshotted, mappingMetadata: { ...snapshotted.mappingMetadata, readiness: { ...snapshotted.mappingMetadata.readiness, pricingReady: false } } };
+assert.throws(() => validateFazerCardsMapping(frozenPricingFalse, { customerMarket: "TH" }), error => error.code === "FAZERCARDS_PACKAGE_NOT_PRODUCTION_READY", "New and legacy routes must continue to require pricing readiness.");
+validateFazerCardsMapping(frozenPricingFalse, { customerMarket: "TH", frozenRoute: true });
+assert.throws(() => validateFazerCardsMapping({ ...frozenPricingFalse, enabled: false }, { customerMarket: "TH", frozenRoute: true }), error => error.code === "FAZERCARDS_PACKAGE_MAPPING_MISSING", "Frozen execution must still reject disabled mappings.");
+assert.throws(() => validateFazerCardsMapping({ ...frozenPricingFalse, mappingMetadata: { ...frozenPricingFalse.mappingMetadata, fulfillmentContract: null } }, { customerMarket: "TH", frozenRoute: true }), error => error.code === "FAZERCARDS_PACKAGE_MAPPING_MISSING", "Frozen execution must still require a verified contract.");
+assert.throws(() => validateFazerCardsMapping({ ...frozenPricingFalse, mappingMetadata: { ...frozenPricingFalse.mappingMetadata, readiness: { ...frozenPricingFalse.mappingMetadata.readiness, inputReady: false } } }, { customerMarket: "TH", frozenRoute: true }), error => error.code === "FAZERCARDS_PACKAGE_NOT_PRODUCTION_READY", "Frozen execution must still require input readiness.");
+const fulfillmentSource = read("backend/services/fulfillmentService.js");
+const processorSource = read("backend/services/suppliers/fazercardsFulfillmentProcessor.js");
+assert(fulfillmentSource.includes("frozenRoute: marketDecoupledV2"), "Only an exact version-2 frozen route may use frozen FazerCards validation.");
+assert(fulfillmentSource.includes("SUPPLIER_DISABLED") && fulfillmentSource.includes("isAutoFulfillmentEnabled"), "Supplier state and provider feature gates must remain enforced before execution.");
+assert(processorSource.includes("verifiedFrozenV2") && processorSource.includes("supplierMappingId") && processorSource.includes("supplierProductCode") && processorSource.includes("supplierPackageCode"), "Processor submission must re-confirm exact frozen mapping and native identity.");
+assert(processorSource.includes("adapter.submitTopup") && processorSource.includes("idempotencyKey: attempt.idempotencyKey"), "Provider execution must preserve the fulfillment idempotency key.");
 assert.strictEqual(isCustomerMarketEligible(snapshotted.fulfillmentEligibility, "TH"), true);
 assert.strictEqual(isCustomerMarketEligible(snapshotted.fulfillmentEligibility, "MM"), true);
 assert.strictEqual(isCustomerMarketCompatible(snapshotted, "MM"), true, "Explicit fulfillment eligibility, not supplier market, authorizes MM commerce.");

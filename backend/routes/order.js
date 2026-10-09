@@ -281,7 +281,7 @@ function projectCommerceManualAttempt(attempt = {}, order = {}, options = {}) {
         game: product.gameName || product.gameCode || "",
         productCode: product.gameCode || product.gameId || "",
         productName: product.gameName || product.gameCode || "",
-        userId: accountFields.find(field => field.key === "userId")?.value || "",
+        userId: accountFields.find(field => ["userId", "playerId"].includes(field.key))?.value || "",
         zoneId: accountFields.find(field => ["zoneId", "serverId"].includes(field.key))?.value || "",
         accountFields,
         customerAccount: {
@@ -388,7 +388,7 @@ function projectCommerceOrder(order = {}, options = {}) {
         game: product.gameName || product.gameCode || "",
         productCode: product.gameCode || product.gameId || "",
         productName: product.gameName || product.gameCode || "",
-        userId: accountFields.find(field => field.key === "userId")?.value || "",
+        userId: accountFields.find(field => ["userId", "playerId"].includes(field.key))?.value || "",
         zoneId: accountFields.find(field => ["zoneId", "serverId"].includes(field.key))?.value || "",
         accountFields,
         customerAccount: {

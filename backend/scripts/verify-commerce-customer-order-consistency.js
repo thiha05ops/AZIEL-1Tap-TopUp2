@@ -6,7 +6,7 @@ const path = require("path");
 
 const ROOT = path.join(__dirname, "../..");
 const read = file => fs.readFileSync(path.join(ROOT, file), "utf8");
-const { projectCommerceOrder } = require("../routes/order")._test;
+const { projectCommerceOrder, projectCommerceManualAttempt } = require("../routes/order")._test;
 
 function commerceOrder(overrides = {}) {
     return {
@@ -42,6 +42,18 @@ function projectionRegressions() {
     assert.strictEqual(completed.paymentStatus, "paid");
     assert.strictEqual(completed.fulfillmentStatus, "completed");
     assert.strictEqual(completed.recoverable, false);
+
+    const supplierFields = commerceOrder({
+        fulfilment: { status: "not_started", input: { userId: "439488505", zoneId: "-", accountFields: [
+            { key: "playerId", label: "Player ID", value: "439488505" },
+            { key: "serverId", label: "Server ID", value: "16623" }
+        ] } }
+    });
+    assert.strictEqual(projectCommerceOrder(supplierFields).userId, "439488505", "Customer order projection must display verified playerId as User ID.");
+    assert.strictEqual(projectCommerceOrder(supplierFields).zoneId, "16623", "Customer order projection must display verified serverId.");
+    const manual = projectCommerceManualAttempt({ attemptId: "PAY-FIELDS", ownerId: "customer-1", status: "PAID", amount: 54, currency: "THB" }, supplierFields);
+    assert.strictEqual(manual.userId, "439488505", "Manual/Admin Commerce projection must display verified playerId as User ID.");
+    assert.strictEqual(manual.zoneId, "16623", "Manual/Admin Commerce projection must display verified serverId.");
 }
 
 function main() {
