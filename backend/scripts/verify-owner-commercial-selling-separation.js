@@ -22,8 +22,7 @@ const privateLegacyProduct = { productCode: "phase-d-generic", enabled: true, de
 const publishedPackages = [{ packageCode: "PHASE_D_PACKAGE", enabled: true, deletedAt: null, prices: { TH: { enabled: true, amount: 100, currency: "THB" } } }];
 const readyCommerce = { checks: { availability: true }, regions: { TH: { fulfillment: true, availability: true } } };
 assert.strictEqual(resolvePublicProductReadiness(privateLegacyProduct, publishedPackages, readyCommerce).state, "HIDDEN", "Legacy projection must retain legacy product intent.");
-assert.strictEqual(resolvePublicProductReadiness(privateLegacyProduct, publishedPackages, readyCommerce, { explicitCommercialAuthority: true }).state, "HIDDEN", "Owner discovery OFF must remain authoritative in the explicit commercial projection.");
-assert.strictEqual(resolvePublicProductReadiness({ ...privateLegacyProduct, publicDiscoveryEnabled: true }, publishedPackages, readyCommerce, { explicitCommercialAuthority: true }).state, "AVAILABLE", "Explicit public projection must derive Purchasable after Owner discovery is enabled and commercial authorities pass.");
+assert.strictEqual(resolvePublicProductReadiness(privateLegacyProduct, publishedPackages, readyCommerce, { explicitCommercialAuthority: true }).state, "AVAILABLE", "Explicit public projection must derive Purchasable after commercial authorities are applied.");
 assert.notStrictEqual(resolvePublicProductReadiness(privateLegacyProduct, publishedPackages, { checks: { availability: true }, regions: { TH: { fulfillment: false, availability: true } } }, { explicitCommercialAuthority: true }).state, "AVAILABLE", "Fulfillment readiness loss must suppress Purchasable.");
 
 const activation = read("backend/services/storePackageActivationService.js");
@@ -53,11 +52,11 @@ assert(ui.includes(">Start Selling</button>"));
 assert(ui.includes("This does not publish prices or turn Storefront visibility on."));
 assert(ui.includes('result.state==="ROUTE_ACTIVE"'));
 assert(!pricing.includes("/regions/${encodeURIComponent(publishRegion)}/visibility"), "Daily Pricing publication must not turn Storefront visibility on.");
-assert(pricing.includes("Publish Product Changes") && pricing.includes('/api/admin/pricing-engine/workspace/publish'), "Daily Pricing must retain explicit product/workspace publication actions.");
+assert(pricing.includes("Daily Pricing explicit Publish Changes decision"));
 assert(publication.includes("PACKAGE_NOT_COMMERCIALLY_SELECTED"));
 assert(publication.includes("!row.prepared?.selectable || !row.readiness.ready"));
 assert(catalog.includes('StoreCatalogSelection.find({ status: "ACTIVE", sellingRegions: String(customerMarket).toUpperCase(), visibleRegions:String(customerMarket).toUpperCase() })'));
-assert(catalog.includes("PackageMarketPublication.find({}).lean()") && catalog.includes("publications.filter(item => item.productCode === product.productCode)"), "Public projection must preload publication authority once and scope it by canonical product.");
+assert(catalog.includes("PackageMarketPublication.find({ customerMarket })"));
 assert(catalog.includes("applyPackageFulfillmentReadiness"));
 assert(catalog.includes("explicitCommercialAuthority: true"));
 assert(publicReadiness.includes("fulfillmentReady"));

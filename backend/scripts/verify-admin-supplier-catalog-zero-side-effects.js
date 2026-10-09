@@ -10,7 +10,6 @@ const root = path.resolve(__dirname, "../..");
 const serviceSource = fs.readFileSync(path.join(root, "backend/services/adminSupplierCatalogReadService.js"), "utf8");
 const routeSource = fs.readFileSync(path.join(root, "backend/routes/supplier.js"), "utf8");
 const frontendSource = fs.readFileSync(path.join(root, "frontend/js/admin-supplier-catalog.js"), "utf8");
-const onboardingAuthoritySource = fs.readFileSync(path.join(root, "backend/services/supplierCatalog/supplierCanonicalProductAuthorityService.js"), "utf8");
 const protectedModels = ["SupplierCatalogProduct", "SupplierCatalogOffer", "SupplierOfferAvailability", "SupplierCatalogIngestionRun", "SupplierProductMapping", "CatalogProduct", "CatalogPackage", "PackageMarketPublication", "PricingQuote", "CommerceOrder", "FulfillmentAttempt", "PackageInventoryState"];
 const fingerprint = value => crypto.createHash("sha256").update(JSON.stringify(value)).digest("hex");
 const stores = Object.fromEntries(protectedModels.map((name, index) => [name, [{ _id: String(index + 1), sentinel: `${name}-unchanged` }]]));
@@ -28,9 +27,8 @@ for (const token of forbiddenNetwork) assert(!serviceSource.includes(token), `Re
 const catalogRouteBlock = routeSource.slice(routeSource.indexOf('router.get("/admin/supplier-catalog"'), routeSource.indexOf('router.post("/supplier/mock-topup'));
 assert(catalogRouteBlock.includes("SUPPLIERS_READ"), "Supplier read permission missing");
 const catalogMutations = [...catalogRouteBlock.matchAll(/router\.(post|put|patch|delete)\("([^"]+)"/g)].map(match => `${match[1].toUpperCase()} ${match[2]}`);
-assert(catalogMutations.every(route => route === "POST /admin/supplier-catalog/products/:id/onboard" || route === "POST /admin/supplier-catalog/products/:id/input-contract/approve" || route === "POST /admin/supplier-catalog/offers/:id/reconciliation" || route === "POST /admin/supplier-catalog/offers/:id/reconciliation/reopen" || route === "POST /admin/supplier-catalog/offers/:id/cost-authority/promote" || route === "POST /admin/supplier-catalog/automation/:supplierCode/run"), "Unexpected Supplier Catalog mutation route");
+assert(catalogMutations.every(route => route === "POST /admin/supplier-catalog/offers/:id/reconciliation" || route === "POST /admin/supplier-catalog/offers/:id/reconciliation/reopen" || route === "POST /admin/supplier-catalog/offers/:id/cost-authority/promote" || route === "POST /admin/supplier-catalog/automation/:supplierCode/run"), "Unexpected Supplier Catalog mutation route");
 assert(catalogRouteBlock.includes("SUPPLIER_CATALOG_RECONCILE"), "Reconciliation mutations lack dedicated permission");
-assert(onboardingAuthoritySource.includes('SUPPLIER_PRODUCT_ONBOARDING_MUTATIONS_ENABLED === "true"'), "Product onboarding authority must be independently fail-closed");
 assert(catalogRouteBlock.includes("SUPPLIER_COST_MANAGE"), "Cost-authority mutation lacks dedicated permission");
 assert(catalogRouteBlock.includes("SUPPLIER_CATALOG_INGEST"), "Catalog ingestion lacks dedicated permission");
 assert(!/method\s*:\s*["'](PUT|PATCH|DELETE)/.test(frontendSource), "Frontend supplier catalog performs an arbitrary mutation request");

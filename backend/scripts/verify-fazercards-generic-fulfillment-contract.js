@@ -109,9 +109,6 @@ const mlbbSemanticContract = { ...contract, fields: [
 ] };
 assert.deepStrictEqual(buildFieldsFromContract(mlbbSemanticContract, { userId: "439488505", zoneId: "2409" }), { player_id: "439488505", server_id: "2409" });
 assert.deepStrictEqual(buildFieldsFromContract(mlbbSemanticContract, { playerId: "439488505", serverId: "2409" }), { player_id: "439488505", server_id: "2409" });
-assert.deepStrictEqual(buildFieldsFromContract(mlbbSemanticContract, { userId: "439488505", zoneId: "-", accountFields: [{ key: "playerId", value: "439488505" }, { key: "serverId", value: "2409" }] }), { player_id: "439488505", server_id: "2409" });
-assert.throws(() => buildFieldsFromContract(mlbbSemanticContract, { userId: "111111111", zoneId: "2409", accountFields: [{ key: "playerId", value: "439488505" }, { key: "serverId", value: "2409" }] }), error => error.code === "SUPPLIER_INPUT_CONFLICT");
-assert.throws(() => buildFieldsFromContract(mlbbSemanticContract, { userId: "439488505", zoneId: "9999", accountFields: [{ key: "playerId", value: "439488505" }, { key: "serverId", value: "2409" }] }), error => error.code === "SUPPLIER_INPUT_CONFLICT");
 const reverseSemanticContract = { ...contract, fields: [
     { customerField: "userId", providerField: "player_id", required: true, label: "User ID", type: "text", constraints: {} },
     { customerField: "zoneId", providerField: "server_id", required: true, label: "Zone ID", type: "text", constraints: {} }
@@ -129,18 +126,6 @@ assert(supportsFazerCardsMapping(snapshotted), "A verified mapping snapshot must
 assert.strictEqual(supportsFazerCardsMapping(mapping), false, "An unknown generic mapping must remain unsupported.");
 validateFazerCardsMapping(snapshotted, { customerMarket: "TH" });
 validateFazerCardsMapping(snapshotted, { customerMarket: "MM" });
-const frozenPricingFalse = { ...snapshotted, mappingMetadata: { ...snapshotted.mappingMetadata, readiness: { ...snapshotted.mappingMetadata.readiness, pricingReady: false } } };
-assert.throws(() => validateFazerCardsMapping(frozenPricingFalse, { customerMarket: "TH" }), error => error.code === "FAZERCARDS_PACKAGE_NOT_PRODUCTION_READY", "New and legacy routes must continue to require pricing readiness.");
-validateFazerCardsMapping(frozenPricingFalse, { customerMarket: "TH", frozenRoute: true });
-assert.throws(() => validateFazerCardsMapping({ ...frozenPricingFalse, enabled: false }, { customerMarket: "TH", frozenRoute: true }), error => error.code === "FAZERCARDS_PACKAGE_MAPPING_MISSING", "Frozen execution must still reject disabled mappings.");
-assert.throws(() => validateFazerCardsMapping({ ...frozenPricingFalse, mappingMetadata: { ...frozenPricingFalse.mappingMetadata, fulfillmentContract: null } }, { customerMarket: "TH", frozenRoute: true }), error => error.code === "FAZERCARDS_PACKAGE_MAPPING_MISSING", "Frozen execution must still require a verified contract.");
-assert.throws(() => validateFazerCardsMapping({ ...frozenPricingFalse, mappingMetadata: { ...frozenPricingFalse.mappingMetadata, readiness: { ...frozenPricingFalse.mappingMetadata.readiness, inputReady: false } } }, { customerMarket: "TH", frozenRoute: true }), error => error.code === "FAZERCARDS_PACKAGE_NOT_PRODUCTION_READY", "Frozen execution must still require input readiness.");
-const fulfillmentSource = read("backend/services/fulfillmentService.js");
-const processorSource = read("backend/services/suppliers/fazercardsFulfillmentProcessor.js");
-assert(fulfillmentSource.includes("frozenRoute: marketDecoupledV2"), "Only an exact version-2 frozen route may use frozen FazerCards validation.");
-assert(fulfillmentSource.includes("SUPPLIER_DISABLED") && fulfillmentSource.includes("isAutoFulfillmentEnabled"), "Supplier state and provider feature gates must remain enforced before execution.");
-assert(processorSource.includes("verifiedFrozenV2") && processorSource.includes("supplierMappingId") && processorSource.includes("supplierProductCode") && processorSource.includes("supplierPackageCode"), "Processor submission must re-confirm exact frozen mapping and native identity.");
-assert(processorSource.includes("adapter.submitTopup") && processorSource.includes("idempotencyKey: attempt.idempotencyKey"), "Provider execution must preserve the fulfillment idempotency key.");
 assert.strictEqual(isCustomerMarketEligible(snapshotted.fulfillmentEligibility, "TH"), true);
 assert.strictEqual(isCustomerMarketEligible(snapshotted.fulfillmentEligibility, "MM"), true);
 assert.strictEqual(isCustomerMarketCompatible(snapshotted, "MM"), true, "Explicit fulfillment eligibility, not supplier market, authorizes MM commerce.");
@@ -185,7 +170,7 @@ const productionFiles = [
 ];
 productionFiles.forEach(file => assert(!read(file).includes('productCode === "afk-journey"'), `${file} must not whitelist AFK.`));
 assert(read("backend/routes/supplier.js").includes("/input-contract/approve"));
-assert(read("frontend/js/admin-supplier-catalog.js").includes("Configure customer information"));
+assert(read("frontend/js/admin-supplier-catalog.js").includes("Never invent a provider API key"));
 assert(!read("backend/services/suppliers/fazercardsAdapter.js").includes("replace(/[^A-Z0-9]+/g"), "FazerCards must not derive per-product environment keys.");
 
 console.log(JSON.stringify({

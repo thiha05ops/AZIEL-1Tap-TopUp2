@@ -6,6 +6,7 @@ const CatalogPackage = require("../../models/CatalogPackage");
 const SupplierProductMapping = require("../../models/SupplierProductMapping");
 const { SUPPLIER_CURRENCY, REGION } = require("../../constants/commerce");
 const { normalizePackageCode, normalizeProductCode, normalizeRegion } = require("../../catalog/catalogProjection");
+const { CANONICAL_PRODUCT_CODES, isCanonicalProductCode } = require("../../catalog/canonicalOperationalCatalog");
 const { resolvePricingSupplier } = require("./pricingSupplierService");
 
 function text(value) {
@@ -18,8 +19,9 @@ function upper(value) {
 
 function canonicalPricingProductCode(value) {
     const exact = text(value).toLowerCase();
-    if (/^[a-z0-9][a-z0-9-]{0,79}$/.test(exact)) return exact;
-    return normalizeProductCode(exact) || exact;
+    if (isCanonicalProductCode(exact)) return exact;
+    const compact = normalizeProductCode(exact);
+    return CANONICAL_PRODUCT_CODES.find(code => normalizeProductCode(code) === compact) || exact;
 }
 
 function amount(value) {

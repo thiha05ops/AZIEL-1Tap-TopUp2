@@ -24,9 +24,9 @@ const mode = value => ({ AZIEL_SUPPLIER_GATE_MODE: value });
 const enabled = (supplierCode, productGateEnabled, env) => effectiveAutoFulfillmentGateState({ supplierCode, productGateEnabled, env }).effectiveGateEnabled;
 
 function verifyModeContract() {
-    assert.strictEqual(resolveSupplierGateMode({}), SUPPLIER_GATE_MODES.SUPPLIER_ONLY);
+    assert.strictEqual(resolveSupplierGateMode({}), SUPPLIER_GATE_MODES.LEGACY_PRODUCT_ONLY);
     assert.strictEqual(resolveSupplierGateMode(mode("SUPPLIER_ONLY")), SUPPLIER_GATE_MODES.SUPPLIER_ONLY);
-    assert.strictEqual(enabled("WONDD", true, {}), false);
+    assert.strictEqual(enabled("WONDD", true, {}), true);
     assert.strictEqual(enabled("WONDD", false, {}), false);
     assert.strictEqual(enabled("WONDD", true, { ...mode("SUPPLIER_AND_PRODUCT"), WONDD_AUTO_FULFILLMENT_ENABLED: "true" }), true);
     assert.strictEqual(enabled("WONDD", false, { ...mode("SUPPLIER_AND_PRODUCT"), WONDD_AUTO_FULFILLMENT_ENABLED: "true" }), false);
@@ -54,7 +54,7 @@ function verifyMappingAndEligibilityRemainAuthoritative() {
     const assessed = value => basicCandidateBlockers({ mapping: value, supplier, pkg, customerMarket: "MM", now, adapter }).blockers;
     assert.deepStrictEqual(assessed(mapping), [], "A valid new mapped product must pass the gate layer without a product env variable.");
     assert(assessed({ ...mapping, enabled: false }).includes("MAPPING_DISABLED"));
-    assert(!assessed({ ...mapping, fulfillmentEligibility: { ...eligibility, mode: "UNKNOWN", allowedCustomerMarkets: [] } }).includes("FULFILLMENT_ELIGIBILITY_UNKNOWN"), "Customer payment market eligibility must not choose or reject an exact supplier route.");
+    assert(assessed({ ...mapping, fulfillmentEligibility: { ...eligibility, mode: "UNKNOWN", allowedCustomerMarkets: [] } }).includes("FULFILLMENT_ELIGIBILITY_UNKNOWN"));
     assert(assessed({ ...mapping, supplierProductCode: "" }).includes("EXACT_MAPPING_INCOMPLETE"));
     assert.strictEqual(summarizeEligibilityResolution({ mappings: [], assessments: new Map(), productCode: "new-product", packageCode: "NEW_1", customerMarket: "MM" }).outcome, OUTCOMES.NO_ELIGIBLE_ROUTE);
     const assessments = new Map([["mapping-1", { blockers: [] }], ["mapping-2", { blockers: [] }]]);
@@ -79,15 +79,14 @@ async function verifySubmissionAndRecoveryBoundaries() {
 async function verifyRoutingAndPayloadCompatibility() {
     const legacy = { ready: true, blockers: [], routeSnapshot: { routeType: "MANUAL_ADMIN", region: "MM" } };
     const shadow = { outcome: "ELIGIBLE", blockerCodes: [], eligibility: { mode: "CUSTOMER_MARKET_ALLOWLIST", allowedCustomerMarkets: ["MM"], evidenceCode: "TEST", version: 1 }, routeSnapshot: { routeType: "SUPPLIER_API", supplierMappingId: "mapping-1", supplierId: "supplier-1", supplierCode: "WONDD", productCode: "mlbb", packageCode: "MLBB_55_DIA_FIRST_TOPUP", region: "MM", supplierMarket: "MM", supplierProductCode: "mlbb", supplierPackageCode: "MLFT055", executionMode: "API", selectedRole: "PRIMARY" } };
-    const selected = { ready: true, blockers: [], routeSnapshot: { ...shadow.routeSnapshot, snapshotVersion: 2, customerMarket: "MM" } };
-    const authority = createRoutingAuthority({ legacyResolver: async () => legacy, eligibilityResolver: async () => shadow, selectedResolver: async () => selected, modeResolver: () => FULFILLMENT_ROUTING_MODES.DUAL_READ });
+    const authority = createRoutingAuthority({ legacyResolver: async () => legacy, eligibilityResolver: async () => shadow, modeResolver: () => FULFILLMENT_ROUTING_MODES.DUAL_READ, pilotEnabledResolver: () => false });
     const resolved = await authority({ productCode: "mlbb", packageCode: "MLBB_55_DIA_FIRST_TOPUP", region: "MM" });
     assert.strictEqual(resolved.routeSnapshot.routeType, "SUPPLIER_API", "DUAL_READ must not let MANUAL_ADMIN shadow an executable eligible PRIMARY/API supplier route.");
     assert.strictEqual(resolved.routeSnapshot.supplierCode, "WONDD");
     assert.strictEqual(resolved.routeSnapshot.snapshotVersion, 2);
     assert.strictEqual(resolved.routeSnapshot.customerMarket, "MM");
-    const genuineManual = createRoutingAuthority({ legacyResolver: async () => legacy, selectedResolver: async () => ({ ready: false, blockers: ["PACKAGE_SUPPLIER_SELECTION_REQUIRED"], routeSnapshot: null }), modeResolver: () => FULFILLMENT_ROUTING_MODES.DUAL_READ });
-    assert.strictEqual((await genuineManual({ productCode: "manual-product", packageCode: "MANUAL_1", region: "MM" })).ready, false, "New manual-only orders must fail closed.");
+    const genuineManual = createRoutingAuthority({ legacyResolver: async () => legacy, eligibilityResolver: async () => ({ outcome: OUTCOMES.NO_ELIGIBLE_ROUTE, blockerCodes: ["NO_PRIMARY_MAPPING"], routeSnapshot: null }), modeResolver: () => FULFILLMENT_ROUTING_MODES.DUAL_READ });
+    assert.strictEqual((await genuineManual({ productCode: "manual-product", packageCode: "MANUAL_1", region: "MM" })).routeSnapshot.routeType, "MANUAL_ADMIN", "Genuine manual-only products must retain manual-admin routing.");
     const wondd = createWonddAdapter({ env: {} }).buildTopupPayload({ productCode: "mlbb", serviceCode: "mlbb", packCode: "MLFT055", gameId: "123 456" });
     assert.deepStrictEqual(Object.keys(wondd).sort(), ["gameid", "method", "packcode", "servicecode"]);
     for (const forbidden of ["region", "country", "customerMarket"]) assert.strictEqual(Object.hasOwn(wondd, forbidden), false);
@@ -111,5 +110,5 @@ function verifyStaticEnforcement() {
     await verifySubmissionAndRecoveryBoundaries();
     await verifyRoutingAndPayloadCompatibility();
     verifyStaticEnforcement();
-    console.log(JSON.stringify({ result: "PASS", defaultMode: "SUPPLIER_ONLY", supplierOnlyAdded: true, supplierOnlyProductGateAuthorizationEffect: 0, newProductEnvironmentVariablesRequired: 0, missingSupplierGateFailsClosed: true, unknownSupplierFailsClosed: true, mappingAuthorityPreserved: true, eligibilityAuthorityPreserved: true, ambiguousPrimaryFailsClosed: true, routeSelectionProtected: true, fulfillmentStartProtected: true, adapterSubmissionProtected: true, recoveryProtected: true, dualReadPreserved: true, mmPilotSemanticsChanged: false, wonddPayloadChanged: false, fazerCardsPayloadChanged: false, providerCalls: 0, supplierTransactionalCalls: 0, orderCreations: 0, fulfillmentAttemptCreations: 0, databaseWrites: 0, pricingMutations: 0, eligibilityMutations: 0 }, null, 2));
+    console.log(JSON.stringify({ result: "PASS", defaultMode: "LEGACY_PRODUCT_ONLY", supplierOnlyAdded: true, supplierOnlyProductGateAuthorizationEffect: 0, newProductEnvironmentVariablesRequired: 0, missingSupplierGateFailsClosed: true, unknownSupplierFailsClosed: true, mappingAuthorityPreserved: true, eligibilityAuthorityPreserved: true, ambiguousPrimaryFailsClosed: true, routeSelectionProtected: true, fulfillmentStartProtected: true, adapterSubmissionProtected: true, recoveryProtected: true, dualReadPreserved: true, mmPilotSemanticsChanged: false, wonddPayloadChanged: false, fazerCardsPayloadChanged: false, providerCalls: 0, supplierTransactionalCalls: 0, orderCreations: 0, fulfillmentAttemptCreations: 0, databaseWrites: 0, pricingMutations: 0, eligibilityMutations: 0 }, null, 2));
 })().catch(error => { console.error(`VERIFY_MARKET_DECOUPLED_FULFILLMENT_PHASE5C_FAILED: ${error.stack || error.message}`); process.exitCode = 1; });

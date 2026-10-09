@@ -9,7 +9,8 @@ const knowledgeSeeds = require("../catalog/verifiedProductKnowledge");
 
 const ROOT = path.resolve(__dirname, "../..");
 const ROUTES = [
-  "home.html", "product.html", "checkout.html",
+  "home.html", "mlbb.html", "pubg.html", "pubg-rp.html", "freefire.html", "hok.html",
+  "genshin.html", "roblox.html", "telegram.html", "product.html", "checkout.html",
   "payment-method.html", "payment.html", "tracking.html", "login.html", "register.html",
   "forgot-password.html", "reset-password.html", "verify-otp.html", "support.html",
   "wallet.html", "coming-soon.html"
@@ -88,13 +89,13 @@ assert(!/TreeWalker|createTreeWalker/.test(runtime), "DOM text scraping is forbi
 assert(!/MutationObserver/.test(runtime), "MutationObserver translation is forbidden");
 assert(!/google\s*translate|TranslateElement/i.test(runtime), "browser translation is forbidden");
 assert(runtime.includes('const LANG_KEY = "azielLanguage"'), "a second locale authority is forbidden");
-assert(runtime.includes('"aziel:languageChanged"') && !runtime.includes('"aziel:locale-changed"'), "aziel:languageChanged must be the only live locale event");
+assert(runtime.includes('"aziel:locale-changed"'), "live locale event must remain authoritative");
 assert(runtime.includes("document.documentElement.lang"), "html lang synchronization required");
 assert(runtime.includes("textContent"), "translations must use safe text rendering");
 assert(!runtime.includes("innerHTML = translated"), "translated strings must not become trusted HTML");
 
 const stage = read("frontend/js/product-detail-stage.js");
-assert(stage.includes('window.addEventListener("aziel:languageChanged", renderLowerProductContent)'), "Product Knowledge must update live");
+assert(stage.includes('window.addEventListener("aziel:locale-changed", renderLowerProductContent)'), "Product Knowledge must update live");
 assert(!stage.includes("selectedPackage = null"), "locale changes must preserve package state");
 const preferences = read("frontend/js/locale-switcher.js");
 const regionBranch = preferences.match(/if \(group === "region"\) \{([\s\S]*?)\n        \}/)?.[1] || "";

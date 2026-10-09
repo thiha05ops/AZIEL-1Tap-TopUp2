@@ -26,7 +26,6 @@ const id = value => clean(value?._id || value);
 const hash = value => crypto.createHash("sha256").update(clean(value)).digest("hex");
 const WIZARD_STATES = Object.freeze({ READY: "READY", PREPARABLE: "PREPARABLE", NEEDS_ATTENTION: "NEEDS_ATTENTION", UNAVAILABLE: "UNAVAILABLE" });
 const UNAVAILABLE_BLOCKERS = new Set(["SUPPLIER_OFFER_NOT_ACTIVE", "SUPPLIER_NOT_API_READY", "SUPPLIER_AVAILABILITY_NOT_CONFIRMED", "CUSTOMER_MARKET_NOT_ELIGIBLE"]);
-const ACTIVATION_ONLY_BLOCKERS = new Set(["MAPPING_DISABLED", "MAPPING_NOT_PRIMARY", "PROVIDER_FEATURE_GATE_OFF", "SUPPLIER_AUTO_FULFILLMENT_DISABLED"]);
 
 class SupplierProductOnboardingError extends Error {
     constructor(code, message, statusCode = 400, details = {}) { super(message); this.name = "SupplierProductOnboardingError"; this.code = code; this.statusCode = statusCode; this.details = details; }
@@ -51,7 +50,7 @@ function wizardStateFor({ mapping, classification, blockers = [], equivalenceCon
     if (equivalenceConflict || classification === "AMBIGUOUS") return WIZARD_STATES.NEEDS_ATTENTION;
     if (classification === "BLOCKED" || blockers.some(code => UNAVAILABLE_BLOCKERS.has(code))) return WIZARD_STATES.UNAVAILABLE;
     if (mapping && blockers.length === 0) return WIZARD_STATES.READY;
-    if (mapping && mapping.mappingMetadata?.technicalPreparation && blockers.every(code => ACTIVATION_ONLY_BLOCKERS.has(code))) return WIZARD_STATES.PREPARABLE;
+    if (mapping && mapping.mappingMetadata?.technicalPreparation && blockers.every(code => code === "MAPPING_DISABLED")) return WIZARD_STATES.PREPARABLE;
     if (!mapping && ["PROVEN_SAME", "PROVEN_NEW"].includes(classification) && blockers.length === 0) return WIZARD_STATES.PREPARABLE;
     return WIZARD_STATES.NEEDS_ATTENTION;
 }
@@ -142,7 +141,8 @@ function createSupplierProductOnboardingService(dependencies = {}) {
             if (mapping && !equivalenceConflict) {
                 const initialReadiness = assessRequestedMarkets({ mapping, supplier, offer, availability: availabilityByOffer.get(id(offer)), markets });
                 const existingContract = mapping.mappingMetadata?.fulfillmentContract;
-                if (!initialReadiness.ready) {
+                const intentionallyDisabled = action === "REUSED_MAPPING" && mapping.enabled === false && !mapping.mappingMetadata?.reconciliationDecision && !mapping.mappingMetadata?.technicalPreparation;
+                if (!initialReadiness.ready && !intentionallyDisabled) {
                     try {
                         const plan = await prepareRoute.generateSupplierRoutePreparationPlan({ mappingId: id(mapping), customerMarkets: markets });
                         if (plan.outcome === "FULFILLMENT_READY" && plan.proposedChanges) {
@@ -155,9 +155,10 @@ function createSupplierProductOnboardingService(dependencies = {}) {
                             }
                         } else blockers.push(...(plan.blockers || []));
                     } catch (error) { blockers.push(error.code || "PREPARATION_FAILED"); }
-                }
+                } else if (intentionallyDisabled) blockers.push("ADOPTION_REVIEW_REQUIRED");
                 const readiness = assessRequestedMarkets({ mapping, supplier, offer, availability: availabilityByOffer.get(id(offer)), markets });
                 blockers = [...blockers, ...readiness.blockers];
+                if (intentionallyDisabled) blockers.push("ADOPTION_REVIEW_REQUIRED");
             }
             blockers = [...new Set(blockers)].sort();
             const state = wizardStateFor({ mapping, classification, blockers, equivalenceConflict });

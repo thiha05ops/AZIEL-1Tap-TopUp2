@@ -14,13 +14,18 @@ document.addEventListener("DOMContentLoaded", () => {
   renderGamePrices();
 
   window.addEventListener("aziel:shopRegionChanged", () => {
-    clearSelectedPackage("region_changed");
+    const selectedCode =
+      selectedPackage?.code ||
+      document.querySelector(".pack.active")?.dataset.code ||
+      "";
+
     renderGamePrices({
+      reselectCode: selectedCode,
       reason: "region_changed"
     });
   });
 
-  window.addEventListener("aziel:languageChanged", () => {
+  window.addEventListener("aziel:locale-changed", () => {
     const selectedCode = selectedPackage?.code || document.querySelector(".pack.active")?.dataset.code || "";
     renderGamePrices({ reselectCode: selectedCode, reason: "locale_changed" });
   });

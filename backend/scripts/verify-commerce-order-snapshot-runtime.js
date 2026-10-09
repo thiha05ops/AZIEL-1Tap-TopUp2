@@ -15,7 +15,6 @@ const {
     checkoutFromQuote,
     createOrderSnapshot: checkoutCreateOrderSnapshot
 } = require("../services/commerce/checkoutApplicationService");
-const { contractFingerprint } = require("../services/suppliers/fazercardsFulfillmentContractService");
 
 const CHECKOUT_TIME = "2026-07-26T12:05:00.000Z";
 
@@ -272,30 +271,6 @@ function verifyImmutabilityAndDeterminism() {
     assert(validateOrderSnapshotInput(input()), "input validator returns normalized frozen data.");
 }
 
-function verifyFrozenFulfillmentContract() {
-    const contract = {
-        version: 1,
-        decisionVersion: 3,
-        supplierCode: "WONDD",
-        protocol: "WONDD_GAME_ID_TOPUP",
-        supplierProductCode: "mlbb",
-        sourceSupplierCatalogProductId: "catalog-product-1",
-        sourceHash: "a".repeat(64),
-        transactionalServiceCode: "mlbb",
-        noCustomerInput: false,
-        fields: [{ customerField: "playerId", providerField: "gameid", required: true, label: "Player ID", type: "numeric-text", options: [], constraints: {}, evidenceReference: "provider-doc", transformationId: "DIRECT" }]
-    };
-    contract.fingerprint = contractFingerprint(contract);
-    const route = { routeType: "SUPPLIER_API", supplierMappingId: "mapping-1", supplierId: "supplier-1", supplierCode: "WONDD", productCode: "mlbb", packageCode: "MLBB_7740", region: "TH", supplierProductCode: "mlbb", supplierPackageCode: "ML07740", executionMode: "API", selectedRole: "PRIMARY", selectedAt: CHECKOUT_TIME, fulfillmentContract: contract };
-    const snapshot = createOrderSnapshot(input({ supplierRouteSnapshot: route }));
-    assert.strictEqual(snapshot.fulfilment.routeSnapshot.fulfillmentContract.fingerprint, contract.fingerprint, "checkout freezes the verified customer-information contract fingerprint.");
-    assert.strictEqual(snapshot.fulfilment.routeSnapshot.fulfillmentContract.decisionVersion, 3, "checkout freezes the contract decision version.");
-    route.fulfillmentContract.decisionVersion = 99;
-    route.fulfillmentContract.fields[0].transformationId = "JOIN_WITH_PIPE";
-    assert.strictEqual(snapshot.fulfilment.routeSnapshot.fulfillmentContract.decisionVersion, 3, "later authority changes cannot reinterpret the frozen route.");
-    assert.strictEqual(snapshot.fulfilment.routeSnapshot.fulfillmentContract.fields[0].transformationId, "DIRECT", "frozen transformation remains deterministic for retries.");
-}
-
 async function verifyCheckoutIntegration() {
     const store = {
         quote: quote({ quoteId: "AZQ_CHECKOUT_0001" }),
@@ -378,7 +353,6 @@ async function run() {
     verifyStatusPolicy();
     verifyTimestampIdentityAndStructure();
     verifyImmutabilityAndDeterminism();
-    verifyFrozenFulfillmentContract();
     await verifyCheckoutIntegration();
     verifyNoRuntimeSideEffects();
     console.log("Commerce order snapshot runtime checks passed.");

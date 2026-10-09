@@ -111,14 +111,6 @@ function assertKeyParity(label, dictionaries) {
     });
 }
 
-function parityDebt(dictionaries) {
-    const english = new Set(Object.keys(dictionaries.en));
-    return Object.fromEntries(Object.entries(dictionaries).filter(([lang]) => lang !== "en").map(([lang, dict]) => [lang, {
-        missing: [...english].filter(key => !Object.prototype.hasOwnProperty.call(dict, key)),
-        extra: Object.keys(dict).filter(key => !english.has(key))
-    }]));
-}
-
 function main() {
     const publicDicts = {
         en: loadDictionary("frontend/lang/en.js", "AZIEL_LANG", "en"),
@@ -132,7 +124,7 @@ function main() {
     };
 
     assertKeyParity("public", publicDicts);
-    const adminCatalogDebt = parityDebt(adminDicts);
+    assertKeyParity("admin", adminDicts);
 
     const i18nRuntime = read("frontend/js/i18n.js");
     assert(i18nRuntime.includes("{ ...english, ...localized }"), "Public i18n must merge locale keys over English fallback.");
@@ -166,7 +158,7 @@ function main() {
         assert.notStrictEqual(adminDicts[lang].dashboard, adminDicts.en.dashboard, `Admin ${lang} dashboard must be translated.`);
     });
 
-    console.log(JSON.stringify({ result: "PASS", storefrontKeyParity: true, adminCatalogDebt }, null, 2));
+    console.log("i18n coverage verification passed.");
 }
 
 main();

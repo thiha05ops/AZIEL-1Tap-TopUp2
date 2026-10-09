@@ -10,6 +10,7 @@ const SupplierCatalogOffer = require("../../models/SupplierCatalogOffer");
 const StoreCatalogSelection = require("../../models/StoreCatalogSelection");
 const PackagePricingOverride = require("../../models/PackagePricingOverride");
 const { REGION_CURRENCIES, normalizePackageCode, normalizeProductCode, normalizeRegion } = require("../../catalog/catalogProjection");
+const { CANONICAL_PRODUCT_CODES, isCanonicalProductCode } = require("../../catalog/canonicalOperationalCatalog");
 const { buildProductionPricingContext, loadProductionPricingAuthoritySnapshot } = require("./productionPricingContextService");
 const { createPricingQuote } = require("./pricingQuoteRuntime");
 const { loadCommercePromotionContext } = require("./commercePromotionBridgeService");
@@ -416,8 +417,9 @@ function resolvePricingInventoryMappings({ mappings = [], packageMap = new Map()
 
 function canonicalPricingProductCode(value) {
     const exact = text(value).toLowerCase();
-    if (isStableCatalogProductCode(exact)) return exact;
-    return normalizeProductCode(exact) || exact;
+    if (isCanonicalProductCode(exact)) return exact;
+    const compact = normalizeProductCode(exact);
+    return CANONICAL_PRODUCT_CODES.find(code => normalizeProductCode(code) === compact) || exact;
 }
 
 function isStableCatalogProductCode(value) {
@@ -631,12 +633,16 @@ function storePublicationReadinessReasons({ mapping = {}, pkg = {}, selections =
         regions.every(region => (selection.sellingRegions || []).map(upper).includes(region)) &&
         (selection.packages || []).some(item => String(item.supplierProductMappingId) === String(mapping._id) && upper(item.packageCode) === upper(mapping.packageCode))
     );
+    const allowedMarkets = (mapping.fulfillmentEligibility?.allowedCustomerMarkets || []).map(upper);
     const reasons = [];
     if (!selected) reasons.push(readinessReason("STORE_CATALOG_SELECTION_REQUIRED", "Exact Store Catalog selection required"));
     if (pkg?.enabled !== true) reasons.push(readinessReason("CANONICAL_PACKAGE_DISABLED", "Package activation required"));
     if (mapping.enabled !== true) reasons.push(readinessReason("SUPPLIER_MAPPING_DISABLED", "Supplier mapping activation required"));
     if (upper(mapping.productionRole) !== "PRIMARY") reasons.push(readinessReason("PRIMARY_ROUTE_REQUIRED", "Primary supplier route required"));
     if (upper(mapping.executionMode) !== "API") reasons.push(readinessReason("API_EXECUTION_REQUIRED", "API execution readiness required"));
+    if (mapping.fulfillmentEligibility?.mode !== "CUSTOMER_MARKET_ALLOWLIST" || regions.some(region => !allowedMarkets.includes(region))) {
+        reasons.push(readinessReason("CUSTOMER_MARKET_ELIGIBILITY_REQUIRED", "Customer-market fulfillment eligibility required"));
+    }
     if (mapping.mappingMetadata?.readiness?.inputReady !== true) reasons.push(readinessReason("CUSTOMER_INPUT_NOT_READY", "Customer input readiness required"));
     if (mapping.mappingMetadata?.readiness?.fulfillmentReady !== true) reasons.push(readinessReason("FULFILLMENT_NOT_READY", "Fulfillment readiness required"));
     if (mapping.mappingMetadata?.readiness?.storefrontReady !== true) reasons.push(readinessReason("STOREFRONT_NOT_READY", "Storefront readiness required"));
@@ -1892,7 +1898,6 @@ async function bulkBackfillSupplierCosts({ rows = [], overwrite = false, actor =
 
 module.exports = Object.freeze({
     AdminPricingControlCenterError,
-    canonicalPricingProductCode,
     PROFITABILITY_STATUS,
     statusFromPricingEvidence,
     rowStatusFromRegional,

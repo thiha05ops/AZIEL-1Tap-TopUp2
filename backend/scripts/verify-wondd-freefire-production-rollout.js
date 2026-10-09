@@ -77,7 +77,7 @@ const { loadDailyPricingWorkspace } = require("../services/commerce/adminPricing
     const packageMap = new Map(packages.map(item => [item.packageCode, item]));
     for (const mapping of mappings) {
         assert.strictEqual(mapping.enabled, true);
-        assert.strictEqual(mapping.supplierProductCode, "9602", "WonDD mapping identity must retain serviceid rather than the transactional servicecode.");
+        assert.strictEqual(mapping.supplierProductCode, "freefire");
         assert.strictEqual(mapping.executionMode, "API");
         for (const readinessKey of ["supplierMapped", "inputReady", "pricingReady", "storefrontReady", "fulfillmentReady", "enabled"]) {
             assert.strictEqual(mapping.mappingMetadata?.readiness?.[readinessKey], true, `${mapping.packageCode} missing ${readinessKey}`);
@@ -112,11 +112,9 @@ const { loadDailyPricingWorkspace } = require("../services/commerce/adminPricing
     assert([...storefront.packages, ...passStorefront.packages].every(pkg => !/[\u0E00-\u0E7F]/.test(pkg.name)));
     const daily = await loadDailyPricingWorkspace({ supplierId: String(supplier._id), productCode: "freefire", region: "TH" });
     const passDaily = await loadDailyPricingWorkspace({ supplierId: String(supplier._id), productCode: "freefire-pass-membership", region: "TH" });
-    const dailyRows = daily.rows.filter(row => row.productCode === "freefire");
-    const passDailyRows = passDaily.rows.filter(row => row.productCode === "freefire-pass-membership");
-    assert.strictEqual(dailyRows.length, 18);
-    assert.strictEqual(passDailyRows.length, 20);
-    assert(dailyRows.every(row => row.mappingRegion === "TH" && row.supplierProductCode === "9602" && row.supplierPackageCode && ["TH", "MM"].includes(row.region)));
+    assert.strictEqual(daily.rows.length, 9);
+    assert.strictEqual(passDaily.rows.length, 10);
+    assert(daily.rows.every(row => row.mappingRegion === "TH" && row.supplierProductCode === "freefire" && row.supplierPackageCode));
     assert.strictEqual(transportCalls, 0);
     const disabledMapping = { ...mappings[0], enabled: false };
     assert.throws(() => validateWonddMapping(disabledMapping), error => error.code === "WONDD_PACKAGE_MAPPING_MISSING");
@@ -126,5 +124,5 @@ const { loadDailyPricingWorkspace } = require("../services/commerce/adminPricing
     assert(checkoutJs.includes('zoneIdSelector: ""'));
     assert(!checkoutJs.includes('zoneIdSelector: "#serverId"'));
     await mongoose.disconnect();
-    console.log(JSON.stringify({ result: "PASS", mappings: mappings.length, diamondsMappings: mappings.filter(item => item.productCode === "freefire").length, passMappings: mappings.filter(item => item.productCode === "freefire-pass-membership").length, inputReady: 19, pricingReady: 19, storefrontReady: storefront.packages.length + passStorefront.packages.length, fulfillmentReady: 19, enabled: mappings.filter(item => item.enabled).length, dailyPricingRows: dailyRows.length + passDailyRows.length, unsupportedRetained: unsupported.length, gate: "OFF", realTopupCalls: transportCalls, mockedAcceptanceCalls: mockCalls }, null, 2));
-})().catch(async error => { await mongoose.disconnect().catch(() => null); console.error("WonDD Free Fire rollout verifier failed:", error.stack || error.message); process.exitCode = 1; });
+    console.log(JSON.stringify({ result: "PASS", mappings: mappings.length, diamondsMappings: mappings.filter(item => item.productCode === "freefire").length, passMappings: mappings.filter(item => item.productCode === "freefire-pass-membership").length, inputReady: 19, pricingReady: 19, storefrontReady: storefront.packages.length + passStorefront.packages.length, fulfillmentReady: 19, enabled: mappings.filter(item => item.enabled).length, dailyPricingRows: daily.rows.length + passDaily.rows.length, unsupportedRetained: unsupported.length, gate: "OFF", realTopupCalls: transportCalls, mockedAcceptanceCalls: mockCalls }, null, 2));
+})().catch(async error => { await mongoose.disconnect().catch(() => null); console.error("WonDD Free Fire rollout verifier failed:", error.message); process.exitCode = 1; });

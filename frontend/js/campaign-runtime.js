@@ -464,7 +464,7 @@
         refreshPlacements();
         window.addEventListener("aziel:shopRegionChanged", refreshPlacements);
         window.addEventListener("aziel:productChanged", refreshPlacements);
-        window.addEventListener("aziel:languageChanged", () => {
+        window.addEventListener("aziel:locale-changed", () => {
             [...renderedCampaigns.values()].forEach(campaign => renderPlacement(campaign));
         });
     }

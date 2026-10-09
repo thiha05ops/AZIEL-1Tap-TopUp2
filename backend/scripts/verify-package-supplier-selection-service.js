@@ -143,21 +143,19 @@ async function rejectsCode(promise, code) {
     await rejectsCode(call("TH", ids.mappingWrong, 2), "SUPPLIER_MAPPING_SCOPE_MISMATCH");
     await rejectsCode(call("TH", ids.mappingDisabled, 2), "SUPPLIER_MAPPING_NOT_READY");
     await rejectsCode(call("TH", ids.mappingArchived, 2), "SUPPLIER_MAPPING_NOT_READY");
-    const marketDecoupled = await call("MM", ids.mappingIneligible, 1);
-    assert.strictEqual(marketDecoupled.selection.decisionVersion, 2, "customer payment market must not reject an otherwise exact executable supplier route");
-    assert.strictEqual(marketDecoupled.selection.supplierMappingId, String(ids.mappingIneligible));
+    await rejectsCode(call("MM", ids.mappingIneligible, 1), "CUSTOMER_MARKET_NOT_ELIGIBLE");
 
     suppliers[0].enabled = false;
-    await rejectsCode(call("MM", ids.mappingA, 2), "SUPPLIER_DISABLED");
+    await rejectsCode(call("MM", ids.mappingA, 1), "SUPPLIER_DISABLED");
     suppliers[0].enabled = true;
     const savedAvailability = availability.splice(availability.findIndex(item => same(item.supplierCatalogOfferId, ids.offerA)), 1)[0];
-    await rejectsCode(call("MM", ids.mappingA, 2), "SUPPLIER_NOT_AVAILABLE");
+    await rejectsCode(call("MM", ids.mappingA, 1), "SUPPLIER_NOT_AVAILABLE");
     availability.push(savedAvailability);
 
     const beforeAuditFailure = { ...selections.find(item => item.customerMarket === "MM") };
     const auditCountBeforeFailure = audits.length;
     auditFailure = new Error("simulated audit failure");
-    await assert.rejects(call("MM", ids.mappingB, 2), error => error === auditFailure);
+    await assert.rejects(call("MM", ids.mappingB, 1), error => error === auditFailure);
     auditFailure = null;
     const afterAuditFailure = selections.find(item => item.customerMarket === "MM");
     assert.strictEqual(afterAuditFailure.supplierMappingId, beforeAuditFailure.supplierMappingId, "simulated transaction must roll back selection when audit fails");

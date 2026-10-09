@@ -57,7 +57,7 @@ assert(prices.includes("resolved !== key ? resolved : fallback"), "missing selec
 assert(prices.includes("function renderSelectedPackagePreview"), "compact package selector state must have one authoritative renderer");
 assert(prices.includes("window.renderPackageSelectorState = renderSelectedPackagePreview"), "generic product bootstrap must be able to request selector-state refresh");
 assert(prices.includes("[title, subtitle, code].forEach(claimRuntimeSelectorText)"), "selector renderer must claim runtime text ownership from static i18n");
-assert(prices.includes("setPackagePreviewIcon(icon, pkg.icon, pkg.fallbackIcon)"), "selected package preview must prefer managed package artwork and use its explicit fallback safely");
+assert(prices.includes("pkg.icon || defaultIcon"), "selected package preview must prefer package icon and fall back to mobile package preview");
 assert(prices.includes("list.appendChild(packageContainer)"), "mobile picker must reuse the authoritative #packages DOM instead of duplicating package rendering");
 assert(prices.includes("inlineParent.insertBefore(packageContainer"), "desktop must restore the existing inline package grid");
 assert(prices.includes("openMobilePackagePicker"), "summary control must open the mobile package picker");
@@ -76,7 +76,7 @@ assert(css.includes("width: 64px !important") && css.includes("height: 64px !imp
 assert(css.includes("object-fit: cover !important") && css.includes("object-position: center !important"), "mobile compact package selector artwork must fill the slot intentionally");
 assert(css.includes("text-align: left !important"), "mobile compact package selector content must remain left aligned");
 assert(css.includes("font-weight: 750"), "mobile compact package selector title must use a cleaner semibold hierarchy");
-assert(css.includes(".mobile-selected-package.has-package span") && css.includes("color: var(--primary, #7c3aed) !important"), "selected mobile package price must preserve the current AZIEL primary accent color");
+assert(css.includes(".mobile-selected-package.has-package span") && css.includes("color: var(--warning)"), "selected mobile package price must use AZIEL accent color");
 assert(css.includes(".mobile-selected-package b") && css.includes("font-size: 22px"), "mobile compact package selector must retain a clear tap affordance");
 assert(prices.includes('t("product.choosePackage", "Choose a package")'), "mobile selector title must have English fallback copy");
 assert(prices.includes('t("product.tapToSelectPackage", "Tap to select")'), "mobile selector subtitle must have English fallback copy");

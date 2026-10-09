@@ -20,7 +20,7 @@ assert(guided.includes("No Store Catalog products yet."), "Normal Products empty
 assert(guided.includes("Add a Store Catalog product first."), "Normal Storefront empty state is missing");
 assert(!supplier.includes('event.detail?.section==="products"&&!productActivationState.loaded'), "Product Activation must not race normal Products rendering");
 assert(catalog.includes("catalogStoreSelectionScope") && catalog.includes("setAdminCatalogStoreSelectionScope"), "Normal Storefront canonical presentation must be selection-scoped");
-assert(guided.includes("legacyViews.forEach(view => view.hidden = false)"), "Canonical Storefront controls must remain visible as the sole sales authority");
+assert(guided.includes("command.hidden=!selections.length"), "Canonical presentation must be hidden when Store Catalog is empty");
 assert(admin.includes('data-admin-open-section="catalog" data-admin-context-view="advanced"'), "Canonical catalog editor must remain reachable from Advanced Settings");
 assert(admin.includes('/js/admin-add-product-wizard.js?v=20260901-empty-store-v2'), "Add Product must remain available with the repaired cache version");
 assert(admin.includes('/js/admin-catalog.js?v=20260901-storefront-loading-v3'), "Admin catalog loading repair must use a fresh immutable asset URL");

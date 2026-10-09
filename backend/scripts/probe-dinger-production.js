@@ -20,7 +20,7 @@ const DOCUMENTED_PAY_FIELDS = Object.freeze({
 const SAFE_STRUCTURAL_FIELDS = new Set([
     "code", "response", "data", "status", "transactionStatus", "totalAmount", "createdAt",
     "methodName", "merchantOrderId", "merchOrderId", "orderId", "transactionId",
-    "transactionNum", "providerName", "amount", "currency", "errorCode", "qrCode"
+    "transactionNum", "providerName", "amount", "currency", "errorCode"
 ]);
 const DOCUMENTED_TRANSACTION_STATUSES = new Set(["SUCCESS", "ERROR", "CANCELLED", "TIMEOUT", "DECLINED", "SYSTEM_ERROR"]);
 
@@ -91,37 +91,6 @@ function safeObjectShape(value) {
     const fields = names.filter(name => SAFE_STRUCTURAL_FIELDS.has(name)).sort().map(name => Object.freeze({ name, type: fieldType(value[name]), present: true }));
     return Object.freeze({ fields: Object.freeze(fields), excludedFieldCount: names.length - fields.length });
 }
-function safeQrDiagnostic(parsed) {
-    const qr = parsed?.response?.qrCode;
-    if (qr === undefined || qr === null) {
-        return Object.freeze({ present: false });
-    }
-    if (typeof qr !== "string") {
-        return Object.freeze({ present: true, type: fieldType(qr) });
-    }
-
-    const value = qr.trim();
-    let format = "OPAQUE_TEXT";
-
-    if (/^data:image\/(png|jpeg|webp);base64,/i.test(value)) {
-        format = "DATA_IMAGE";
-    } else if (/^https:\/\//i.test(value)) {
-        format = "HTTPS_URL";
-    } else if (/^<svg[\s>]/i.test(value)) {
-        format = "SVG";
-    } else if (/^[A-Za-z0-9+/]+={0,2}$/.test(value) &&
-               value.length >= 100 && value.length % 4 === 0) {
-        format = "POSSIBLE_BASE64";
-    }
-
-    return Object.freeze({
-        present: true,
-        type: "string",
-        nonempty: value.length > 0,
-        format
-    });
-}
-
 function documentedPayResponse(parsed) {
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return false;
     if (!Object.entries(DOCUMENTED_PAY_FIELDS).every(([field, expectedType]) => Object.prototype.hasOwnProperty.call(parsed, field) && fieldType(parsed[field]) === expectedType)) return false;
@@ -159,8 +128,7 @@ function classifyPayResponse(parsed, responseContext = {}) {
         qrCreationStatus: "UNCONFIRMED",
         ...context,
         topLevel,
-        nested: Object.freeze(nested),
-        qrDiagnostic: safeQrDiagnostic(parsed)
+        nested: Object.freeze(nested)
     });
 }
 function failureClassification(error) {

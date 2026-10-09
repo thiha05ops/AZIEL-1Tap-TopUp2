@@ -3,7 +3,6 @@
 const crypto = require("crypto");
 const mongoose = require("mongoose");
 const SupplierCatalogProduct = require("../../models/SupplierCatalogProduct");
-const Supplier = require("../../models/Supplier");
 const SupplierCatalogOffer = require("../../models/SupplierCatalogOffer");
 const SupplierOfferAvailability = require("../../models/SupplierOfferAvailability");
 const SupplierProductMapping = require("../../models/SupplierProductMapping");
@@ -11,7 +10,6 @@ const CatalogProduct = require("../../models/CatalogProduct");
 const AdminAuditLog = require("../../models/AdminAuditLog");
 const { canonicalJson } = require("./supplierCatalogNormalization");
 const { sourceLock: reconciliationSourceLock, validateSourceLock: validateReconciliationSourceLock } = require("./supplierCatalogReconciliationService");
-const { evaluateAddProductOffer } = require("./addProductPreparabilityService");
 
 const clean = value => String(value == null ? "" : value).trim();
 const lower = value => clean(value).toLowerCase();
@@ -92,7 +90,6 @@ function defaultRepos() {
             finally { await session.endSession(); }
         },
         productById: (value, session) => sessionize(SupplierCatalogProduct.findById(value), session).lean(),
-        supplierById: (value, session) => sessionize(Supplier.findById(value), session).lean(),
         offersByProduct: (value, session) => sessionize(SupplierCatalogOffer.find({ supplierCatalogProductId: value }).sort({ supplierOfferCode: 1 }), session).lean(),
         availabilityByOffers: (values, session) => sessionize(SupplierOfferAvailability.find({ supplierCatalogOfferId: { $in: values } }), session).lean(),
         mappingsByProduct: (product, offerIds, session) => sessionize(SupplierProductMapping.find({ supplierId: product.supplierId, $or: [{ supplierCatalogOfferId: { $in: offerIds } }, { supplierProductCode: product.supplierProductCode }] }), session).lean(),
@@ -109,7 +106,7 @@ function defaultRepos() {
     };
 }
 
-function createSupplierCanonicalProductAuthorityService({ repos = defaultRepos(), gate = mutationsEnabled, clock = () => new Date(), routePlanner = null } = {}) {
+function createSupplierCanonicalProductAuthorityService({ repos = defaultRepos(), gate = mutationsEnabled, clock = () => new Date() } = {}) {
     const concurrencyCodes = new Set([11000, 112, 244, 251]);
     function isConcurrentMongoFailure(error) {
         const labels = Array.isArray(error?.errorLabels) ? error.errorLabels : [];
@@ -150,10 +147,9 @@ function createSupplierCanonicalProductAuthorityService({ repos = defaultRepos()
         if (!audit) throw new SupplierCanonicalProductAuthorityError("CANONICAL_PRODUCT_AUTHORITY_AUDIT_MISSING", "Canonical product authority exists without its mandatory creation audit.", 409);
         return { canonicalProduct: prior, authority, idempotentReplay: true, concurrentReplay: true };
     }
-    async function plan(productId, options = {}) {
+    async function plan(productId) {
         const product = await repos.productById(productId, null);
         if (!product) throw new SupplierCanonicalProductAuthorityError("SUPPLIER_CATALOG_PRODUCT_NOT_FOUND", "Persisted supplier catalog product was not found.", 404);
-        const supplier = typeof repos.supplierById === "function" ? await repos.supplierById(product.supplierId, null) : { _id: product.supplierId, supplierCode: product.metadata?.supplierCode || "" };
         const offers = await repos.offersByProduct(product._id, null);
         const availability = typeof repos.availabilityByOffers === "function" ? await repos.availabilityByOffers(offers.map(item => item._id), null) : [];
         const availabilityByOffer = new Map(availability.map(item => [id(item.supplierCatalogOfferId), item]));
@@ -168,38 +164,12 @@ function createSupplierCanonicalProductAuthorityService({ repos = defaultRepos()
         const proposedProductCode = lower(authority?.productCode || existing?.productCode || deterministicProductCode(product));
         const collision = await repos.canonicalByCode(proposedProductCode, null);
         const collisionConflict = Boolean(collision && id(collision.metadata?.preparedFromSupplierCatalogProductId) !== id(product));
-        const mappingByOffer = new Map(mappings.filter(item => id(item.supplierCatalogOfferId)).map(item => [id(item.supplierCatalogOfferId), item]));
-        const requestedMarkets = [...new Set((options.customerMarkets || []).map(value => clean(value).toUpperCase()).filter(value => ["TH", "MM"].includes(value)))].sort();
-        const projectedOffers = [];
-        for (const offer of offers) {
-            const baseState = offerWizardState(offer), mapping = mappingByOffer.get(id(offer));
-            let state = baseState, disposition = offerDisposition(offer), blockers = [];
-            if (!mapping) {
-                const assessment = evaluateAddProductOffer({ supplier, product, offer, availability: availabilityByOffer.get(id(offer)), mapping: null, canonicalPackage: null, customerMarkets: requestedMarkets, newCanonicalProduct: !existing });
-                state = assessment.state; blockers = assessment.blockers; disposition = assessment.packageDisposition.create ? "READY_TO_CREATE" : "REVIEW_REQUIRED";
-            } else if (clean(offer.catalogLifecycleState).toUpperCase() === "ACTIVE" && clean(offer.reconciliationState).toUpperCase() === "EXACT_CANONICAL_MATCH") {
-                if (routePlanner && requestedMarkets.length) {
-                    const routePlan = await routePlanner({ mappingId: id(mapping), customerMarkets: requestedMarkets });
-                    blockers = [...new Set(routePlan.blockers || [])].sort();
-                    const readiness = mapping.mappingMetadata?.readiness || {};
-                    const liveReady = mapping.enabled === true && clean(mapping.productionRole).toUpperCase() === "PRIMARY" && readiness.inputReady === true && readiness.validationReady === true && readiness.fulfillmentReady === true;
-                    state = routePlan.outcome === "FULFILLMENT_READY" ? (liveReady ? "READY" : "PREPARABLE") : "NEEDS_ATTENTION";
-                    disposition = routePlan.outcome === "FULFILLMENT_READY" ? "READY_TO_PREPARE" : "REVIEW_REQUIRED";
-                } else {
-                    blockers = mapping.mappingMetadata?.technicalPreparation ? ["MAPPING_DISABLED"] : ["TECHNICAL_PREPARATION_REQUIRED"];
-                    state = mapping.mappingMetadata?.technicalPreparation ? "PREPARABLE" : "NEEDS_ATTENTION";
-                    disposition = mapping.mappingMetadata?.technicalPreparation ? "READY_TO_PREPARE" : "REVIEW_REQUIRED";
-                }
-            } else if (baseState === "NEEDS_ATTENTION") blockers = ["PACKAGE_IDENTITY_REVIEW"];
-            if (baseState === "UNAVAILABLE") blockers = ["SUPPLIER_OFFER_NOT_ACTIVE"];
-            projectedOffers.push({ supplierCatalogOfferId: id(offer), supplierOfferCode: offer.supplierOfferCode, name: clean(offer.supplierOfferName || offer.rawName || offer.supplierOfferCode), state, disposition, blockers, mappingId: id(mapping), sourceLock: reconciliationSourceLock({ offer, product, availability: availabilityByOffer.get(id(offer)) }) });
-        }
         return {
             capability: { mutationEnabled: gate() === true, ownerConfirmationRequired: true },
             product: { supplierCatalogProductId: id(product), name: clean(product.displayName || product.rawName || product.supplierProductCode), supplierId: id(product.supplierId), catalogNamespace: product.catalogNamespace, supplierProductCode: product.supplierProductCode, supplierMarket: product.supplierMarketCode, sourceLock: sourceLock(product) },
             canonical: { exists: Boolean(existing), productCode: existing?.productCode || proposedProductCode, name: existing?.name || clean(product.displayName || product.rawName || product.supplierProductCode), collisionConflict },
             state: identityConflict ? "CANONICAL_PRODUCT_IDENTITY_CONFLICT" : existing ? "EXISTING_CANONICAL_PRODUCT" : collisionConflict ? "CANONICAL_PRODUCT_CODE_CONFLICT" : "NEW_TO_AZIEL",
-            offers: projectedOffers
+            offers: offers.map(offer => ({ supplierCatalogOfferId: id(offer), supplierOfferCode: offer.supplierOfferCode, name: clean(offer.supplierOfferName || offer.rawName || offer.supplierOfferCode), state: offerWizardState(offer), disposition: offerDisposition(offer), sourceLock: reconciliationSourceLock({ offer, product, availability: availabilityByOffer.get(id(offer)) }) }))
         };
     }
 
@@ -270,5 +240,5 @@ function createSupplierCanonicalProductAuthorityService({ repos = defaultRepos()
     return { plan, authorize, sourceLock, validateSourceLock, deterministicProductCode, offerLock, offerDisposition, offerWizardState, mutationsEnabled: gate, isConcurrentMongoFailure, recoverConcurrentAuthority };
 }
 
-const service = createSupplierCanonicalProductAuthorityService({ routePlanner: require("./supplierRoutePreparationService").generateSupplierRoutePreparationPlan });
+const service = createSupplierCanonicalProductAuthorityService();
 module.exports = Object.freeze({ SupplierCanonicalProductAuthorityError, createSupplierCanonicalProductAuthorityService, sourceLock, validateSourceLock, deterministicProductCode, offerLock, offerDisposition, offerWizardState, mutationsEnabled, plan: service.plan, authorize: service.authorize });

@@ -28,6 +28,7 @@
         if (e.detail?.lang) pending = null;
         syncPreferenceControls();
     });
+    window.addEventListener("aziel:locale-changed", syncPreferenceControls);
 
     function initStorefrontPreferences() {
         const desktopBtn = document.getElementById("storefrontPreferenceBtn");

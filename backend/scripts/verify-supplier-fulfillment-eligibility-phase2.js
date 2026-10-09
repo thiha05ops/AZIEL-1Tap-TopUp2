@@ -190,11 +190,11 @@ async function verifyScopedApplySafety() {
     assert.throws(() => buildMigrationPlan([outsideSupplier], options({ supplier: "WONDD" })), error => error.code === "SCOPE_NOT_FOUND");
 }
 
-function verifyRuntimeUsesExplicitSelection() {
-    assert.strictEqual(resolveFulfillmentRoutingMode({}), "SELECTED");
+function verifyRuntimeRemainsLegacy() {
+    assert.strictEqual(resolveFulfillmentRoutingMode({}), "LEGACY_REGION");
     assert.deepStrictEqual(parseArgs([]), { apply: false, overrideExisting: false, supplier: "", product: "", verifiedAt: null });
     const selection = read("backend/services/supplierProductionSelectionService.js");
-    assert(selection.includes("PackageSupplierSelection"));
+    assert(!selection.includes("supplierFulfillmentEligibilityService"));
     assert(selection.includes("region: clean(region).toUpperCase()"));
     assert(selection.includes("region: mapping.region"));
     assert(selection.includes("snapshotVersion: 2") && selection.includes("supplierMappingId: String(mapping._id)"), "v2 routes must freeze one exact mapping identity.");
@@ -214,7 +214,7 @@ function verifyRuntimeUsesExplicitSelection() {
     verifyEvidenceSafety();
     verifyExistingPreservationAndIdempotency();
     await verifyScopedApplySafety();
-    verifyRuntimeUsesExplicitSelection();
+    verifyRuntimeRemainsLegacy();
     console.log(JSON.stringify({
         result: "PASS",
         dryRunWrites: 0,
@@ -226,7 +226,7 @@ function verifyRuntimeUsesExplicitSelection() {
         wonddMlft055Markets: [],
         scopedApplyIsolation: true,
         idempotent: true,
-        routingMode: "SELECTED",
+        routingMode: "LEGACY_REGION",
         routeSnapshotChanges: 0,
         providerCalls: 0
     }, null, 2));

@@ -1,6 +1,5 @@
 const express = require("express");
 const router = express.Router();
-const CatalogProduct = require("../models/CatalogProduct");
 
 const adminMiddleware = require("../middleware/adminMiddleware");
 const upload = require("../middleware/imageMemoryUpload");
@@ -49,7 +48,7 @@ const {
     listPublicExclusiveOffers,
     toPublicCatalog
 } = require("../services/catalogService");
-const { resolveProductRoute } = require("../catalog/productRoute");
+const { CANONICAL_OPERATIONAL_PRODUCTS, getCanonicalProduct, resolveCanonicalProductRoute } = require("../catalog/canonicalOperationalCatalog");
 const { availabilityReason } = require("../catalog/publicProductReadiness");
 const {
     getHomePresentation,
@@ -75,30 +74,15 @@ const {
 } = require("../services/packageMarketPublicationService");
 const {
     PackageSupplierCandidateError,
-    getPackageSupplierCandidates,
-    getProductPackageSupplierOverview
+    getPackageSupplierCandidates
 } = require("../services/packageSupplierCandidateService");
 const {
     PackageSupplierSelectionError,
     setPackageSupplierSelection
 } = require("../services/packageSupplierSelectionService");
-const {
-    BulkPackageSupplierSelectionError,
-    setBulkPackageSupplierSelection
-} = require("../services/bulkPackageSupplierSelectionService");
-const {
-    ProductReadyPublicationError,
-    applyProductReadyPublicationPlan,
-    getProductReadyPublicationPlan
-} = require("../services/productReadyPublicationService");
-const {
-    PackageSupplierSelectionBootstrapError,
-    applyPackageSupplierSelectionBootstrapPlan,
-    getPackageSupplierSelectionBootstrapPlan
-} = require("../services/packageSupplierSelectionBootstrapService");
 
 function sendAdminCatalogError(res, error) {
-    if (error instanceof CatalogAdminError || error instanceof PackageMarketPublicationError || error instanceof ProductReadyPublicationError || error instanceof PackageSupplierSelectionBootstrapError || error instanceof PackageSupplierCandidateError || error instanceof PackageSupplierSelectionError || error instanceof BulkPackageSupplierSelectionError || error instanceof MediaError || error instanceof StorageError || error instanceof GameBannerError || error instanceof StorefrontSectionError || error instanceof AdminPricingControlCenterError) {
+    if (error instanceof CatalogAdminError || error instanceof PackageMarketPublicationError || error instanceof PackageSupplierCandidateError || error instanceof PackageSupplierSelectionError || error instanceof MediaError || error instanceof StorageError || error instanceof GameBannerError || error instanceof StorefrontSectionError || error instanceof AdminPricingControlCenterError) {
         return res.status(error.statusCode || 400).json({
             success: false,
             code: error.code,
@@ -129,13 +113,14 @@ function projectAdminSource() {
 }
 
 function projectAdminCatalogMetadata(product = {}) {
+    const canonical = getCanonicalProduct(product.productCode) || {};
     return {
-        operationalCategory: product.catalogCategory || product.category || "",
-        platform: product.presentation?.platform || "",
-        market: product.presentation?.marketScope || "",
-        adminCategory: product.catalogCategory || "",
-        family: product.family || "",
-        canonicalRoute: resolveProductRoute(product.productCode)
+        operationalCategory: canonical.category || "",
+        platform: canonical.platform || "",
+        market: canonical.market || "",
+        adminCategory: canonical.adminCategory || "",
+        family: canonical.family || "",
+        canonicalRoute: resolveCanonicalProductRoute(product.productCode)
     };
 }
 
@@ -392,9 +377,8 @@ router.get("/catalog/:productCode", async (req, res) => {
 
 router.get("/admin/catalog/products", adminMiddleware, requireAdminPermission(PERMISSIONS.CATALOG_READ), async (req, res) => {
     try {
-        const catalogProducts = await CatalogProduct.find({ deletedAt: null }).select("productCode").sort({ sortOrder: 1, productCode: 1 }).lean();
-        const adminProducts = (await Promise.all(catalogProducts.map(product => (
-            resolveAdminCatalogProduct(product.productCode, {
+        const adminProducts = (await Promise.all(CANONICAL_OPERATIONAL_PRODUCTS.map(canonical => (
+            resolveAdminCatalogProduct(canonical.productCode, {
                 includeAssetProjection: true,
                 includeAdminPricing: false
             })
@@ -551,18 +535,6 @@ router.get("/admin/catalog/products/:productCode/packages", adminMiddleware, req
     }
 });
 
-router.get("/admin/catalog/products/:productCode/storefront-package-overview", adminMiddleware, requireAdminPermission(PERMISSIONS.CATALOG_READ), async (req, res) => {
-    try {
-        const result = await getProductPackageSupplierOverview({
-            productCode: req.params.productCode,
-            customerMarket: req.query?.customerMarket
-        });
-        return res.json({ success: true, ...result });
-    } catch (error) {
-        return sendAdminCatalogError(res, error);
-    }
-});
-
 router.get("/admin/catalog/products/:productCode/packages/:packageCode/supplier-selection", adminMiddleware, requireAdminPermission(PERMISSIONS.CATALOG_READ), async (req, res) => {
     try {
         const result = await getPackageSupplierCandidates({
@@ -584,21 +556,6 @@ router.put("/admin/catalog/products/:productCode/packages/:packageCode/supplier-
             customerMarket: req.body?.customerMarket,
             supplierMappingId: req.body?.supplierMappingId,
             expectedDecisionVersion: req.body?.expectedDecisionVersion,
-            reason: req.body?.reason
-        }, { actor: req.admin, req });
-        return res.json({ success: true, ...result });
-    } catch (error) {
-        return sendAdminCatalogError(res, error);
-    }
-});
-
-router.put("/admin/catalog/products/:productCode/packages/bulk-supplier-selection", adminMiddleware, requireAdminPermission(PERMISSIONS.OWNER_ROUTING_MANAGE), async (req, res) => {
-    try {
-        const result = await setBulkPackageSupplierSelection({
-            productCode: req.params.productCode,
-            customerMarket: req.body?.customerMarket,
-            supplierId: req.body?.supplierId,
-            packages: req.body?.packages,
             reason: req.body?.reason
         }, { actor: req.admin, req });
         return res.json({ success: true, ...result });
@@ -815,46 +772,6 @@ router.patch("/admin/catalog/products/:productCode/packages/:packageCode/publica
             product,
             package: product?.packages?.find(item => item.packageCode === result.publication.packageCode) || null
         });
-    } catch (error) {
-        return sendAdminCatalogError(res, error);
-    }
-});
-
-router.get("/admin/catalog/products/:productCode/publication-ready-plan", adminMiddleware, requireAdminPermission(PERMISSIONS.CATALOG_READ), async (req, res) => {
-    try {
-        res.set("Cache-Control", "no-store");
-        return res.json({ success: true, ...(await getProductReadyPublicationPlan({ productCode: req.params.productCode, markets: ["TH", "MM"] })) });
-    } catch (error) {
-        return sendAdminCatalogError(res, error);
-    }
-});
-
-router.post("/admin/catalog/products/:productCode/publication-ready-apply", adminMiddleware, requireAdminPermission(PERMISSIONS.CATALOG_MANAGE), async (req, res) => {
-    try {
-        const result = await applyProductReadyPublicationPlan({
-            productCode: req.params.productCode,
-            markets: req.body?.markets,
-            marketPlanTokens: req.body?.marketPlanTokens,
-            decisionNote: req.body?.decisionNote || "Publish all ready packages"
-        }, { actor: req.admin, req });
-        return res.json({ success: true, ...result });
-    } catch (error) {
-        return sendAdminCatalogError(res, error);
-    }
-});
-
-router.get("/admin/catalog/products/:productCode/supplier-selection-bootstrap-plan", adminMiddleware, requireAdminPermission(PERMISSIONS.CATALOG_READ), async (req, res) => {
-    try {
-        res.set("Cache-Control", "no-store");
-        return res.json({ success: true, ...(await getPackageSupplierSelectionBootstrapPlan({ productCode: req.params.productCode, markets: ["TH", "MM"] })) });
-    } catch (error) {
-        return sendAdminCatalogError(res, error);
-    }
-});
-
-router.post("/admin/catalog/products/:productCode/supplier-selection-bootstrap-apply", adminMiddleware, requireAdminPermission(PERMISSIONS.CATALOG_MANAGE), async (req, res) => {
-    try {
-        return res.json({ success: true, ...(await applyPackageSupplierSelectionBootstrapPlan({ productCode: req.params.productCode, markets: req.body?.markets, marketPlanTokens: req.body?.marketPlanTokens, decisionNote: req.body?.decisionNote || "Apply missing safe supplier selections" }, { actor: req.admin, req })) });
     } catch (error) {
         return sendAdminCatalogError(res, error);
     }

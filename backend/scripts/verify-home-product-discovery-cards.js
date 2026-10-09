@@ -1,10 +1,6 @@
 const assert = require("assert");
 const fs = require("fs");
 const path = require("path");
-const {
-    PRESENTATION_SECTIONS,
-    buildPresentationPayload
-} = require("../services/homePresentationService");
 
 const ROOT = path.join(__dirname, "../..");
 const NON_CANONICAL_CODES = Object.freeze([
@@ -41,31 +37,6 @@ async function run() {
     const mobileGamesHtml = read("frontend/mobile-games.html");
     const footerRuntime = read("frontend/js/home-footer-accordion.js");
 
-    assert(PRESENTATION_SECTIONS.includes("POPULAR_PC_GAMES"), "Home presentation must retain the existing Owner-controlled PC placement.");
-    const pcPresentation = buildPresentationPayload({
-        region: "TH",
-        products: [{
-            productCode: "future-pc-game",
-            name: "Future PC Game",
-            description: "Supplier-driven PC game",
-            enabled: true,
-            publicDiscoveryEnabled: true,
-            homepageEnabled: true,
-            homepageCategory: "PC_GAME",
-            homepageSections: ["POPULAR_PC_GAMES"],
-            commerceState: "PURCHASABLE",
-            lifecycleStatus: "ACTIVE",
-            presentation: { imageAssetId: "pc-art" }
-        }],
-        selections: [{ productCode: "future-pc-game" }],
-        media: [{ assetId: "pc-art", status: "active", url: "/uploads/media-assets/product_image/pc.webp" }]
-    });
-    assert.deepStrictEqual(
-        pcPresentation.sections.find(section => section.key === "POPULAR_PC_GAMES").products.map(product => product.productCode),
-        ["future-pc-game"],
-        "A generic PC product must remain in its explicit Owner placement."
-    );
-
     assertNotIncludes(presentation, "CANONICAL_HOME_PRODUCT_GROUPS", "Presentation metadata must not own Home membership.");
     assertNotIncludes(presentation, "getCanonicalHomeProductCodes", "Presentation must not expose code-based Home membership.");
 
@@ -81,9 +52,8 @@ async function run() {
     assertNotIncludes(homeRuntime, "FEATURED_GAME_ORDER", "Home runtime must not own duplicate Popular product list.");
     assertNotIncludes(homeRuntime, "ALL_MOBILE_GAME_ORDER", "Home runtime must not own duplicate All Mobile product list.");
     assertIncludes(homeRuntime, "resolveProductRoute", "Home cards must consume the backend-projected route with a generic defensive fallback.");
-    assertIncludes(homeRuntime, "selectSocialProducts", "Social Top Up placement selector missing.");
-    assertIncludes(homeRuntime, "productCard(product, groupId", "All Home sections must use the generic supplier-driven product-card renderer.");
-    assertIncludes(homeRuntime, "data-panel-size=\"${items.length}\"", "Home runtime must expose chunk sizes for panel verification.");
+    assertIncludes(homeRuntime, "renderSocialTopUp", "Social Top Up renderer missing.");
+    assertIncludes(homeRuntime, "data-panel-size=\"${chunk.length}\"", "Home runtime must expose chunk sizes for panel verification.");
     assertNotIncludes(homeRuntime, "selected.slice(0", "Mobile Home rails must not artificially truncate renderable products.");
     assertIncludes(homeProductCss, "overflow-x: auto;", "Mobile Home product discovery must use native horizontal rails.");
     assertIncludes(homeProductCss, "scroll-snap-type: x proximity;", "Mobile Home rails may use restrained individual-card snapping.");
@@ -91,14 +61,14 @@ async function run() {
     assertIncludes(homeProductCss, "display: none;", "Mobile Home compact rail cards must remove description text.");
     assertIncludes(homeProductCss, "display: contents;", "Mobile Home must avoid a large enclosing product-panel card.");
     const popularSelection = functionSnippet(homeRuntime, "selectPopularProducts");
-    const homeSafety = functionSnippet(homeRuntime, "isHomeSafe");
-    assertIncludes(homeSafety, "product.enabled !== false", "Home placement must reject disabled products.");
-    assertIncludes(homeSafety, "product.discoverable !== false", "Home placement must reject products explicitly marked undiscoverable.");
-    assertIncludes(homeSafety, "product.homepageEnabled === true", "Home placement must require the Owner Home switch.");
+    assertIncludes(popularSelection, "product?.enabled !== false", "Popular placement must reject disabled products.");
+    assertIncludes(popularSelection, "product.discoverable === true", "Popular placement must require computed discoverability.");
     assertIncludes(popularSelection, 'product.publicCategory === "mobile"', "Popular placement must remain Mobile-only.");
 
-    const genericCard = functionSnippet(homeRuntime, "productCard");
-    [genericCard].forEach(snippet => {
+    const allCard = functionSnippet(homeRuntime, "renderAllMobileGame");
+    const popularCard = functionSnippet(homeRuntime, "renderPopularGame");
+    const socialCard = functionSnippet(homeRuntime, "renderSocialTopUpProduct");
+    [allCard, popularCard, socialCard].forEach(snippet => {
         assertNotIncludes(snippet, "packageCode", "Home cards must not render package identities.");
         assertNotIncludes(snippet, "priceMarkup", "Home cards must not render package/pricing details.");
         assertNotIncludes(snippet, "authoritativePrice", "Home cards must not render package/pricing details.");
@@ -150,7 +120,6 @@ async function run() {
         popularMobileGames: "Admin SitePlacement membership and order",
         allMobileGames: "eligible homepage-enabled publicCategory=mobile products",
         socialTopUp: "eligible homepage-enabled publicCategory=social products",
-        popularPcGames: "explicit Owner placement",
         visualTreatment: "artwork-first product discovery cards",
         mobile375Treatment: "individual-card horizontal rails, 16px gutters, partial next-card peek, no giant panels or truncation",
         canonicalRouting: true,

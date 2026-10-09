@@ -28,20 +28,6 @@ let catalogKnowledgeLocale = "en";
 let catalogKnowledgeDrafts = { en: {}, my: {}, th: {} };
 let catalogStoreSelectionScope = null;
 const catalogSupplierCandidateCache = new Map();
-const catalogPackageOverviewCache = new Map();
-const catalogPackageOverviewPending = new Map();
-const catalogPackageOverviewVersions = new Map();
-const catalogPublicationReadyPlanCache = new Map();
-const catalogPublicationReadyPlanPending = new Map();
-const catalogPublicationReadyResults = new Map();
-const catalogSupplierBootstrapPlanCache = new Map();
-const catalogSupplierBootstrapPlanPending = new Map();
-const catalogSupplierBootstrapResults = new Map();
-let catalogPackageOperationalFilter = "AUTO";
-let catalogPackageOverviewRequestId = 0;
-const catalogBulkSelectedPackages = new Set();
-let catalogBulkSelectionScope = "";
-let catalogBulkAssignment = null;
 const PRODUCT_COMPATIBILITY_MARKETS = Object.freeze([
     ["GLOBAL", "Global"],
     ["TH", "Thailand"],
@@ -83,15 +69,16 @@ function initAdminCatalogController() {
         if (event.detail?.section === "catalog") {
             if (event.detail?.context?.view === "advanced") {
                 setAdminCatalogStoreSelectionScope(null);
-                setCatalogView(activeCatalogView);
+                loadAdminCatalog(true);
+                loadStorefrontSections(true);
             }
         }
     });
 
     window.addEventListener("aziel:admin-locale-changed", () => {
-        if (activeCatalogView === "products") renderCatalogProducts();
-        if (activeCatalogView === "storefront") renderStorefrontSections();
-        if (activeCatalogView === "products" && selectedCatalogProductCode) {
+        renderCatalogProducts();
+        renderStorefrontSections();
+        if (selectedCatalogProductCode) {
             selectCatalogProduct(selectedCatalogProductCode, false);
         } else {
             renderCatalogEmpty();
@@ -100,7 +87,8 @@ function initAdminCatalogController() {
 
     if (document.getElementById("section-catalog")?.classList.contains("active") && document.body.dataset.adminEntry === "advanced") {
         setAdminCatalogStoreSelectionScope(null);
-        setCatalogView(activeCatalogView);
+        loadAdminCatalog();
+        loadStorefrontSections();
     }
 }
 
@@ -282,12 +270,6 @@ function renderCatalogProductRow(product) {
     const statusKey = deleted ? "deleted" : (!product.enabled ? "inactive" : publicState === "AVAILABLE" ? "purchasable" : publicState === "COMING_SOON" ? "needs_setup" : "hidden");
     const statusText = deleted ? "Deleted" : (!product.enabled ? "Disabled" : publicState === "AVAILABLE" ? "Purchasable" : publicState === "COMING_SOON" ? "Needs Setup" : "Hidden");
     const market = marketLabel(product.canonicalMarket || product.market, product.displayMarketLabel);
-    const overview = catalogPackageOverviewCache.get(catalogPackageOverviewKey(product.productCode));
-    const operationalCounts = (overview?.packages || []).reduce((counts, item) => {
-        const state = storefrontOperationalState(item);
-        counts[state] = (counts[state] || 0) + 1;
-        return counts;
-    }, { LIVE: 0, BLOCKED: 0 });
 
     return `
         <button class="catalog-product-row ${active} ${deleted ? "is-deleted" : ""}" type="button"
@@ -299,8 +281,8 @@ function renderCatalogProductRow(product) {
                 <small>Canonical Market: ${escapeHtml(market)}</small>
             </span>
             <span class="catalog-row-meta">
-                <b>${overview ? `${operationalCounts.LIVE} Live` : adminT(statusKey, statusText)}</b>
-                <small>${overview ? `${operationalCounts.BLOCKED} Blocked · ${operationalCounts.LIVE + operationalCounts.BLOCKED} Total` : `${Number(product.packageCount || 0)} ${adminT("packages", "Packages")}`}</small>
+                <b>${adminT(statusKey, statusText)}</b>
+                <small>${Number(product.packageCount || 0)} ${adminT("packages", "Packages")}</small>
             </span>
             <span class="catalog-row-edit">${adminT("edit", "Edit")}</span>
         </button>
@@ -350,7 +332,6 @@ function marketLabel(market = "", fallback = "") {
 }
 
 async function selectCatalogProduct(productCode, rerenderList = true) {
-    ensureCatalogBulkSelectionScope(productCode, catalogCustomerMarket);
     selectedCatalogProductCode = productCode || "";
     const requestId = ++catalogProductRequestId;
     catalogProductRequestController?.abort();
@@ -450,9 +431,9 @@ function renderCatalogDetail(product) {
                     <div class="catalog-action-menu-popover">
                         ${productDeleted
             ? `<button type="button" data-product-restore><i class="fa-solid fa-rotate-left" aria-hidden="true"></i>${adminT("restore_product", "Restore Product")}</button>`
-            : `<button class="${product.publicDiscoveryEnabled ? "danger" : ""}" type="button" data-product-toggle="${product.publicDiscoveryEnabled ? "hide" : "show"}">
-                                <i class="fa-solid ${product.publicDiscoveryEnabled ? "fa-eye-slash" : "fa-eye"}" aria-hidden="true"></i>
-                                ${product.publicDiscoveryEnabled ? "Hide Product" : "Show Product"}
+            : `<button class="${product.enabled ? "danger" : ""}" type="button" data-product-toggle="${product.enabled ? "disable" : "enable"}">
+                                <i class="fa-solid ${product.enabled ? "fa-eye-slash" : "fa-eye"}" aria-hidden="true"></i>
+                                ${adminT(product.enabled ? "disable_product" : "enable_product", product.enabled ? "Disable Product" : "Enable Product")}
                             </button>`}
                     </div>
                 </details>
@@ -500,482 +481,6 @@ function renderCatalogTabButton(tab, label) {
     `;
 }
 
-function catalogPackageOverviewKey(productCode, market = catalogCustomerMarket) {
-    return `${String(productCode || "").toLowerCase()}:${market === "MM" ? "MM" : "TH"}`;
-}
-
-function invalidateCatalogPublicationReadiness(productCode) {
-    catalogPublicationReadyPlanCache.delete(String(productCode || "").toLowerCase());
-}
-
-async function loadCatalogPublicationReadyPlan(product, { force = false } = {}) {
-    const productCode = String(product?.productCode || "").toLowerCase();
-    if (!productCode) return null;
-    if (!force && catalogPublicationReadyPlanCache.has(productCode)) return catalogPublicationReadyPlanCache.get(productCode);
-    if (!force && catalogPublicationReadyPlanPending.has(productCode)) return catalogPublicationReadyPlanPending.get(productCode);
-    const request = adminFetch(`/api/admin/catalog/products/${encodeURIComponent(productCode)}/publication-ready-plan`)
-        .then(data => {
-            if (!data?.success) throw new Error(data?.message || "Market publication readiness is unavailable.");
-            catalogPublicationReadyPlanCache.set(productCode, data);
-            if (selectedCatalogProductCode === productCode && activeCatalogTab === "merchandising") renderCatalogDetail(selectedCatalogProduct || product);
-            return data;
-        })
-        .finally(() => {
-            if (catalogPublicationReadyPlanPending.get(productCode) === request) catalogPublicationReadyPlanPending.delete(productCode);
-        });
-    catalogPublicationReadyPlanPending.set(productCode, request);
-    return request;
-}
-
-function renderPublicationReadyResult(result = {}) {
-    const rows = ["TH", "MM"].filter(market => result.markets?.[market]).map(market => {
-        const item = result.markets[market];
-        return `<div><strong>${market === "MM" ? "Myanmar" : "Thailand"}</strong><span>Published ${Number(item.published || 0)} · Already public ${Number(item.alreadyPublic || 0)} · Blocked ${Number(item.blocked || 0)} · Conflicted ${Number(item.conflicted || 0)}</span></div>`;
-    }).join("");
-    return rows ? `<div class="catalog-market-availability-result">${rows}</div>` : "";
-}
-
-async function loadCatalogSupplierBootstrapPlan(product, { force = false } = {}) {
-    const productCode = String(product?.productCode || "").toLowerCase();
-    if (!productCode) return null;
-    if (!force && catalogSupplierBootstrapPlanCache.has(productCode)) return catalogSupplierBootstrapPlanCache.get(productCode);
-    if (!force && catalogSupplierBootstrapPlanPending.has(productCode)) return catalogSupplierBootstrapPlanPending.get(productCode);
-    const request = adminFetch(`/api/admin/catalog/products/${encodeURIComponent(productCode)}/supplier-selection-bootstrap-plan`)
-        .then(data => {
-            if (!data?.success) throw new Error(data?.message || "Supplier setup is unavailable.");
-            catalogSupplierBootstrapPlanCache.set(productCode, data);
-            if (selectedCatalogProductCode === productCode && activeCatalogTab === "merchandising") renderCatalogDetail(selectedCatalogProduct || product);
-            return data;
-        })
-        .finally(() => {
-            if (catalogSupplierBootstrapPlanPending.get(productCode) === request) catalogSupplierBootstrapPlanPending.delete(productCode);
-        });
-    catalogSupplierBootstrapPlanPending.set(productCode, request);
-    return request;
-}
-
-function renderCatalogSupplierSetup(product) {
-    const productCode = String(product?.productCode || "").toLowerCase();
-    const plan = catalogSupplierBootstrapPlanCache.get(productCode);
-    const result = catalogSupplierBootstrapResults.get(productCode);
-    if (!plan) return `<section class="catalog-supplier-setup" aria-busy="true"><div><span>Supplier Setup</span><strong>Loading exact supplier-selection authority…</strong></div></section>`;
-    const marketRow = market => {
-        const counts = plan.markets?.[market]?.counts || {};
-        const selected = Number(counts.ALREADY_SELECTED || 0) + Number(counts.PROTECTED_EXISTING_SELECTION || 0);
-        const safe = Number(counts.SAFE_TO_CREATE || 0);
-        const blocked = Number(counts.BLOCKED || 0) + Number(counts.INELIGIBLE || 0);
-        const ambiguous = Number(counts.AMBIGUOUS || 0);
-        const protectedCount = Number(counts.PROTECTED_EXISTING_SELECTION || 0);
-        return `<div class="catalog-supplier-setup-row"><div><strong>${market === "MM" ? "Myanmar" : "Thailand"}</strong><span>Selected ${selected} · Safe to apply ${safe} · Blocked ${blocked}${ambiguous ? ` · Ambiguous ${ambiguous}` : ""}${protectedCount ? ` · Protected ${protectedCount}` : ""}</span></div></div>`;
-    };
-    const exceptions = ["TH", "MM"].map(market => {
-        const rows = (plan.markets?.[market]?.packages || []).filter(row => !["SAFE_TO_CREATE", "ALREADY_SELECTED"].includes(row.state));
-        if (!rows.length) return "";
-        return `<details class="catalog-supplier-setup-details"><summary>${market === "MM" ? "Myanmar" : "Thailand"} details (${rows.length})</summary><div>${rows.map(row => `<p><strong>${escapeHtml(row.packageName || row.packageCode)}</strong><span>${escapeHtml(row.state.replaceAll("_", " "))}${row.blockers?.length ? ` · ${escapeHtml(row.blockers.join(" · "))}` : ""}</span></p>`).join("")}</div></details>`;
-    }).join("");
-    const safeTotal = ["TH", "MM"].reduce((sum, market) => sum + Number(plan.markets?.[market]?.counts?.SAFE_TO_CREATE || 0), 0);
-    const applied = ["TH", "MM"].map(market => result?.markets?.[market]?.status === "APPLIED" ? `${market}: ${Number(result.markets[market].created || 0)} created` : "").filter(Boolean).join(" · ");
-    return `<section class="catalog-supplier-setup"><header><div><span>Supplier Setup</span><h4>Exact fulfillment selections</h4><p>Missing selections can be created only from durable Store Catalog mapping authority. Existing selections are preserved.</p></div><button type="button" class="admin-primary-btn" data-apply-safe-supplier-selections ${safeTotal ? "" : "disabled"}>Review / Apply Missing Safe Selections</button></header>${marketRow("TH")}${marketRow("MM")}${exceptions ? `<div class="catalog-supplier-setup-exceptions">${exceptions}</div>` : ""}${applied ? `<p class="catalog-supplier-setup-result">${escapeHtml(applied)} · Prices and publication unchanged.</p>` : ""}</section>`;
-}
-
-async function applyCatalogSupplierBootstrap(product) {
-    const productCode = String(product?.productCode || "").toLowerCase();
-    const plan = await loadCatalogSupplierBootstrapPlan(product, { force: true });
-    const markets = ["TH", "MM"].filter(market => Number(plan.markets?.[market]?.counts?.SAFE_TO_CREATE || 0) > 0);
-    const createCount = markets.reduce((sum, market) => sum + Number(plan.markets[market].counts.SAFE_TO_CREATE || 0), 0);
-    if (!createCount) return;
-    const confirmed = await confirmCatalogAction({ title: "Apply missing safe supplier selections?", message: `${createCount} missing selection${createCount === 1 ? "" : "s"} will be created from exact Store Catalog mapping provenance.\n\nExisting explicit selections are preserved. Prices, publication, mappings, and supplier data will not change.`, confirmText: `Apply ${createCount} Safe` });
-    if (!confirmed) return;
-    const response = await adminFetch(`/api/admin/catalog/products/${encodeURIComponent(productCode)}/supplier-selection-bootstrap-apply`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ markets, marketPlanTokens: Object.fromEntries(markets.map(market => [market, plan.markets[market].marketPlanToken])), decisionNote: "Product-level safe supplier selection bootstrap" }) });
-    if (!response?.success) throw new Error(response?.message || "Safe supplier selections could not be applied.");
-    catalogSupplierBootstrapResults.set(productCode, response);
-    catalogSupplierBootstrapPlanCache.delete(productCode);
-    catalogPublicationReadyPlanCache.delete(productCode);
-    catalogPackageOverviewCache.delete(catalogPackageOverviewKey(productCode, "TH"));
-    catalogPackageOverviewCache.delete(catalogPackageOverviewKey(productCode, "MM"));
-    await Promise.all([loadCatalogSupplierBootstrapPlan(product, { force: true }), loadCatalogPublicationReadyPlan(product, { force: true }), loadCatalogPackageOverview(product, { force: true })]);
-    const createdCount = markets.reduce((sum, market) => sum + Number(response.markets?.[market]?.created || 0), 0);
-    showAdminToast?.(`${createdCount} safe supplier selection${createdCount === 1 ? "" : "s"} applied. Prices and publication are unchanged.`, "success");
-}
-
-function renderCatalogMarketAvailability(product) {
-    const productCode = String(product?.productCode || "").toLowerCase();
-    const plan = catalogPublicationReadyPlanCache.get(productCode);
-    const result = catalogPublicationReadyResults.get(productCode);
-    if (!plan) return `<section class="catalog-market-availability" aria-busy="true"><div><span>Market Availability</span><strong>Loading publication readiness…</strong></div></section>`;
-    const row = market => {
-        const item = plan.markets?.[market] || {};
-        const name = market === "MM" ? "Myanmar" : "Thailand";
-        return `<div class="catalog-market-availability-row"><div><strong>${name}</strong><span>Public ${Number(item.public || 0)} · Ready ${Number(item.ready || 0)} · Blocked ${Number(item.blocked || 0)}</span></div><button type="button" class="admin-secondary-btn" data-publish-ready-market="${market}" ${Number(item.ready || 0) ? "" : "disabled"}>Publish Ready</button></div>`;
-    };
-    const blockedDetails = ["TH", "MM"].map(market => {
-        const packages = plan.markets?.[market]?.blockedPackages || [];
-        if (!packages.length) return "";
-        return `<details class="catalog-market-blocked"><summary>${market === "MM" ? "Myanmar" : "Thailand"} blocked packages (${packages.length})</summary><div>${packages.map(pkg => `<p><strong>${escapeHtml(pkg.packageName || pkg.packageCode)}</strong><span>${escapeHtml((pkg.blockers || []).map(item => item.label || item.code).join(" · "))}</span></p>`).join("")}</div></details>`;
-    }).join("");
-    const totalReady = Number(plan.markets?.TH?.ready || 0) + Number(plan.markets?.MM?.ready || 0);
-    return `<section class="catalog-market-availability"><header><div><span>Storefront publication</span><h4>Market Availability</h4><p>Published means publication intent is recorded. Blocked packages are skipped.</p></div><button type="button" class="admin-primary-btn" data-publish-ready-all ${totalReady ? "" : "disabled"}>Publish All Ready Markets</button></header>${row("TH")}${row("MM")}${blockedDetails ? `<div class="catalog-market-blocked-list">${blockedDetails}</div>` : ""}${renderPublicationReadyResult(result)}</section>`;
-}
-
-function publicationBlockerSummary(plan, markets) {
-    const grouped = new Map();
-    markets.forEach(market => (plan.markets?.[market]?.blockedPackages || []).forEach(pkg => (pkg.blockers || []).forEach(item => grouped.set(item.label || item.code, (grouped.get(item.label || item.code) || 0) + 1))));
-    return [...grouped.entries()].map(([label, count]) => `${count} × ${label}`).join("\n") || "No blocked packages";
-}
-
-async function applyCatalogPublicationReady(product, markets) {
-    const productCode = String(product?.productCode || "").toLowerCase();
-    const plan = await loadCatalogPublicationReadyPlan(product);
-    const requested = [...new Set(markets)].filter(market => ["TH", "MM"].includes(market));
-    const ready = requested.reduce((sum, market) => sum + Number(plan.markets?.[market]?.ready || 0), 0);
-    const alreadyPublic = requested.reduce((sum, market) => sum + Number(plan.markets?.[market]?.public || 0), 0);
-    const blocked = requested.reduce((sum, market) => sum + Number(plan.markets?.[market]?.blocked || 0), 0);
-    const confirmed = await confirmCatalogAction({
-        title: requested.length === 2 ? "Publish all ready markets?" : `Publish ready packages in ${requested[0] === "MM" ? "Myanmar" : "Thailand"}?`,
-        message: `${ready} ready package${ready === 1 ? "" : "s"} will receive publication intent.\n${alreadyPublic} already public · ${blocked} blocked\n\nBlocked reasons:\n${publicationBlockerSummary(plan, requested)}\n\nNo supplier, price, mapping, Store Catalog membership, or routing will be created automatically.`,
-        confirmText: `Publish ${ready} Ready`
-    });
-    if (!confirmed) return;
-    const response = await adminFetch(`/api/admin/catalog/products/${encodeURIComponent(productCode)}/publication-ready-apply`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-            markets: requested,
-            marketPlanTokens: Object.fromEntries(requested.map(market => [market, plan.markets[market].marketPlanToken])),
-            decisionNote: "Product-level Publish Ready"
-        })
-    });
-    if (!response?.success) throw new Error(response?.message || "Ready packages could not be published.");
-    catalogPublicationReadyResults.set(productCode, response);
-    catalogPublicationReadyPlanCache.delete(productCode);
-    catalogPackageOverviewCache.delete(catalogPackageOverviewKey(productCode, "TH"));
-    catalogPackageOverviewCache.delete(catalogPackageOverviewKey(productCode, "MM"));
-    [...catalogSupplierCandidateCache.keys()].filter(key => key.startsWith(`${productCode}:`)).forEach(key => catalogSupplierCandidateCache.delete(key));
-    await Promise.all([loadCatalogPublicationReadyPlan(product, { force: true }), loadCatalogPackageOverview(product, { force: true })]);
-    const published = requested.reduce((sum, market) => sum + Number(response.markets?.[market]?.published || 0), 0);
-    const conflicts = requested.reduce((sum, market) => sum + Number(response.markets?.[market]?.conflicted || 0), 0);
-    showAdminToast?.(conflicts ? `${published} packages published; ${conflicts} require a refreshed review.` : `${published} ready packages published.`, conflicts ? "info" : "success");
-}
-
-function ensureCatalogBulkSelectionScope(productCode, market = catalogCustomerMarket) {
-    const scope = catalogPackageOverviewKey(productCode, market);
-    if (catalogBulkSelectionScope !== scope) {
-        catalogBulkSelectedPackages.clear();
-        catalogBulkSelectionScope = scope;
-        catalogBulkAssignment = null;
-    }
-}
-
-function clearCatalogBulkSelection({ render = true } = {}) {
-    catalogBulkSelectedPackages.clear();
-    catalogBulkAssignment = null;
-    if (render && selectedCatalogProduct && activeCatalogTab === "merchandising") renderCatalogDetail(selectedCatalogProduct);
-}
-
-function renderCatalogBulkActionBar() {
-    return catalogBulkSelectedPackages.size ? `<div class="catalog-bulk-action-bar" role="region" aria-label="Bulk package actions"><strong>${catalogBulkSelectedPackages.size} selected</strong><div><button type="button" class="admin-primary-btn" data-open-bulk-supplier>Set fulfillment supplier</button><button type="button" class="admin-secondary-btn" data-clear-bulk-packages>Clear selection</button></div></div>` : "";
-}
-
-function catalogScrollOwner(element) {
-    for (let current = element?.parentElement; current; current = current.parentElement) {
-        const overflowY = getComputedStyle(current).overflowY;
-        if (/(auto|scroll|overlay)/.test(overflowY) && current.scrollHeight > current.clientHeight) return current;
-    }
-    return document.scrollingElement || document.documentElement;
-}
-
-function preserveCatalogAnchorPosition(anchor, update) {
-    const scrollOwner = catalogScrollOwner(anchor);
-    const before = anchor?.getBoundingClientRect?.().top;
-    update();
-    if (!Number.isFinite(before) || !anchor?.isConnected) return;
-    const delta = anchor.getBoundingClientRect().top - before;
-    if (!delta) return;
-    if (scrollOwner === document.scrollingElement || scrollOwner === document.documentElement || scrollOwner === document.body) {
-        window.scrollBy(0, delta);
-    } else {
-        scrollOwner.scrollTop += delta;
-    }
-}
-
-function bindCatalogBulkActionBar(detail, product) {
-    detail.querySelector("[data-clear-bulk-packages]")?.addEventListener("click", () => clearCatalogBulkSelection());
-    detail.querySelector("[data-open-bulk-supplier]")?.addEventListener("click", () => {
-        const overview = catalogPackageOverviewCache.get(catalogPackageOverviewKey(product.productCode));
-        if (overview) openCatalogBulkSupplierModal(product, overview);
-    });
-}
-
-function syncCatalogBulkSelectionUi(detail, product, anchor) {
-    const host = detail.querySelector("[data-catalog-bulk-action-host]");
-    if (!host) return;
-    preserveCatalogAnchorPosition(anchor, () => { host.innerHTML = renderCatalogBulkActionBar(); });
-    bindCatalogBulkActionBar(detail, product);
-}
-
-function bulkCandidatePlan(overview, selectedCodes, supplierId) {
-    const selected = new Set(selectedCodes.map(code => String(code || "").toUpperCase()));
-    return (overview.packages || []).filter(item => selected.has(String(item.package?.packageCode || "").toUpperCase())).map(item => {
-        const matches = (item.candidates || []).filter(candidate => String(candidate.supplier?.supplierId || "") === String(supplierId || ""));
-        const eligible = matches.filter(candidate => candidate.readiness?.selectable === true);
-        const blockerCodes = eligible.length > 1
-            ? ["AMBIGUOUS_SUPPLIER_MAPPING_IDENTITY"]
-            : eligible.length === 1
-                ? []
-                : matches.length
-                    ? [...new Set(matches.flatMap(candidate => candidate.readiness?.blockerCodes || ["SUPPLIER_MAPPING_NOT_READY"]))]
-                    : ["NO_EXACT_SUPPLIER_MAPPING"];
-        return { item, candidate: eligible.length === 1 ? eligible[0] : null, blockerCodes };
-    });
-}
-
-function catalogBulkSupplierOptions(overview, selectedCodes) {
-    const selected = new Set(selectedCodes.map(code => String(code || "").toUpperCase()));
-    const suppliers = new Map();
-    (overview.packages || []).filter(item => selected.has(String(item.package?.packageCode || "").toUpperCase())).forEach(item => {
-        (item.candidates || []).forEach(candidate => {
-            const supplierId = String(candidate.supplier?.supplierId || "");
-            if (!supplierId) return;
-            if (!suppliers.has(supplierId)) suppliers.set(supplierId, { supplierId, name: candidate.supplier?.name || candidate.supplier?.supplierCode || "Supplier" });
-        });
-    });
-    return [...suppliers.values()].map(supplier => {
-        const plan = bulkCandidatePlan(overview, selectedCodes, supplier.supplierId);
-        return { ...supplier, eligible: plan.filter(item => item.candidate).length, blocked: plan.filter(item => !item.candidate).length };
-    }).sort((left, right) => right.eligible - left.eligible || left.name.localeCompare(right.name) || left.supplierId.localeCompare(right.supplierId));
-}
-
-function ensureCatalogBulkSupplierModal() {
-    if (document.getElementById("catalogBulkSupplierModal")) return;
-    const modal = document.createElement("div");
-    modal.id = "catalogBulkSupplierModal";
-    modal.className = "admin-action-modal catalog-bulk-supplier-modal";
-    modal.innerHTML = `<div class="admin-action-modal-box catalog-bulk-supplier-box" role="dialog" aria-modal="true" aria-labelledby="catalogBulkSupplierTitle"><header class="catalog-merch-modal-header"><div><span>Bulk fulfillment assignment</span><h3 id="catalogBulkSupplierTitle">Set fulfillment supplier</h3><p data-bulk-supplier-subtitle></p></div><button type="button" class="admin-icon-btn" data-close-bulk-supplier aria-label="Close"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button></header><div class="catalog-bulk-supplier-body" data-bulk-supplier-body></div></div>`;
-    modal.addEventListener("click", event => {
-        if (event.target === modal || event.target.closest("[data-close-bulk-supplier]")) closeCatalogBulkSupplierModal();
-        const option = event.target.closest("[data-bulk-supplier-option]");
-        if (option && catalogBulkAssignment) {
-            catalogBulkAssignment.supplierId = option.dataset.bulkSupplierOption;
-            renderCatalogBulkSupplierModal();
-        }
-        if (event.target.closest("[data-bulk-supplier-back]") && catalogBulkAssignment) {
-            catalogBulkAssignment.supplierId = "";
-            renderCatalogBulkSupplierModal();
-        }
-        if (event.target.closest("[data-confirm-bulk-supplier]")) submitCatalogBulkSupplierAssignment().catch(error => showAdminToast?.(error.message, "error"));
-    });
-    document.body.appendChild(modal);
-}
-
-function closeCatalogBulkSupplierModal() {
-    document.getElementById("catalogBulkSupplierModal")?.classList.remove("show");
-    catalogBulkAssignment = null;
-}
-
-function openCatalogBulkSupplierModal(product, overview) {
-    ensureCatalogBulkSupplierModal();
-    catalogBulkAssignment = {
-        product,
-        productCode: product.productCode,
-        customerMarket: catalogCustomerMarket,
-        overview,
-        selectedCodes: [...catalogBulkSelectedPackages],
-        supplierId: "",
-        saving: false,
-        result: null
-    };
-    renderCatalogBulkSupplierModal();
-    document.getElementById("catalogBulkSupplierModal")?.classList.add("show");
-}
-
-function renderCatalogBulkSupplierModal() {
-    const modal = document.getElementById("catalogBulkSupplierModal");
-    const assignment = catalogBulkAssignment;
-    if (!modal || !assignment) return;
-    const body = modal.querySelector("[data-bulk-supplier-body]");
-    const marketName = assignment.customerMarket === "MM" ? "Myanmar" : "Thailand";
-    modal.querySelector("[data-bulk-supplier-subtitle]").textContent = `${assignment.selectedCodes.length} canonical packages · Customer market: ${marketName}`;
-    if (assignment.result) {
-        const summary = assignment.result.summary || {};
-        body.innerHTML = `<section class="catalog-bulk-review-summary"><div><span>Assigned</span><strong>${Number(summary.assigned || 0)}</strong></div><div><span>Unchanged</span><strong>${Number(summary.unchanged || 0)}</strong></div><div><span>Conflicted</span><strong>${Number(summary.conflicted || 0)}</strong></div><div><span>Blocked</span><strong>${Number(summary.blocked || 0)}</strong></div></section><div class="catalog-bulk-result-list">${(assignment.result.results || []).map(item => `<div><strong>${escapeHtml(item.packageCode)}</strong><span class="catalog-supplier-status">${escapeHtml(item.status)}</span>${item.code ? `<small>${escapeHtml(catalogPackageBlockerLabel(item.code))}</small>` : ""}</div>`).join("")}</div><footer class="catalog-bulk-footer"><button type="button" class="admin-primary-btn" data-close-bulk-supplier>Done</button></footer>`;
-        return;
-    }
-    const options = catalogBulkSupplierOptions(assignment.overview, assignment.selectedCodes);
-    if (!assignment.supplierId) {
-        body.innerHTML = `<div class="catalog-bulk-supplier-options">${options.map(option => `<button type="button" data-bulk-supplier-option="${escapeHtml(option.supplierId)}"><span><strong>${escapeHtml(option.name)}</strong><small>${option.eligible} eligible · ${option.blocked} blocked</small></span><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></button>`).join("") || `<div class="catalog-empty-state"><strong>No exact supplier candidates</strong><span>The selected packages do not share an authoritative supplier candidate.</span></div>`}</div>`;
-        return;
-    }
-    const option = options.find(item => item.supplierId === assignment.supplierId);
-    const plan = bulkCandidatePlan(assignment.overview, assignment.selectedCodes, assignment.supplierId);
-    const eligible = plan.filter(item => item.candidate);
-    const blocked = plan.filter(item => !item.candidate);
-    body.innerHTML = `<section class="catalog-bulk-review-summary"><div><span>Customer market</span><strong>${marketName}</strong></div><div><span>Supplier</span><strong>${escapeHtml(option?.name || "Supplier")}</strong></div><div><span>Selected</span><strong>${plan.length}</strong></div><div><span>Ready to assign</span><strong>${eligible.length}</strong></div><div><span>Blocked</span><strong>${blocked.length}</strong></div></section>${blocked.length ? `<section class="catalog-bulk-blocked"><h4>Blocked packages</h4>${blocked.map(item => `<div><strong>${escapeHtml(item.item.package?.name || item.item.package?.packageCode)}</strong><small>${escapeHtml(item.blockerCodes.map(catalogPackageBlockerLabel).join(" · "))}</small></div>`).join("")}</section>` : ""}<label class="catalog-supplier-reason"><span>Reason <small>Optional</small></span><input type="text" maxlength="500" data-bulk-supplier-reason placeholder="Why is this supplier being assigned?"></label><footer class="catalog-bulk-footer"><button type="button" class="admin-secondary-btn" data-bulk-supplier-back>Back</button><button type="button" class="admin-primary-btn" data-confirm-bulk-supplier ${eligible.length && !assignment.saving ? "" : "disabled"}>${assignment.saving ? "Assigning…" : `Confirm ${eligible.length} package${eligible.length === 1 ? "" : "s"}`}</button></footer>`;
-}
-
-async function submitCatalogBulkSupplierAssignment() {
-    const assignment = catalogBulkAssignment;
-    if (!assignment || assignment.saving || !assignment.supplierId) return;
-    const scope = catalogPackageOverviewKey(assignment.productCode, assignment.customerMarket);
-    assignment.saving = true;
-    assignment.reason = document.querySelector("[data-bulk-supplier-reason]")?.value || "";
-    renderCatalogBulkSupplierModal();
-    try {
-        const packageByCode = new Map((assignment.overview.packages || []).map(item => [String(item.package?.packageCode || "").toUpperCase(), item]));
-        const result = await adminFetch(`/api/admin/catalog/products/${encodeURIComponent(assignment.productCode)}/packages/bulk-supplier-selection`, {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                customerMarket: assignment.customerMarket,
-                supplierId: assignment.supplierId,
-                reason: assignment.reason,
-                packages: assignment.selectedCodes.map(packageCode => ({ packageCode, expectedDecisionVersion: packageByCode.get(String(packageCode).toUpperCase())?.selection?.decisionVersion ?? null }))
-            })
-        });
-        if (!result?.success) throw new Error(result?.message || "Bulk supplier assignment failed.");
-        if (catalogPackageOverviewKey(selectedCatalogProductCode, catalogCustomerMarket) === scope) {
-            (result.results || []).filter(item => ["ASSIGNED", "UNCHANGED"].includes(item.status)).forEach(item => catalogBulkSelectedPackages.delete(String(item.packageCode).toUpperCase()));
-            invalidateCatalogPublicationReadiness(assignment.productCode);
-            await loadCatalogPackageOverview(assignment.product, { force: true });
-        }
-        assignment.result = result;
-        renderCatalogBulkSupplierModal();
-    } catch (error) {
-        assignment.saving = false;
-        renderCatalogBulkSupplierModal();
-        throw error;
-    }
-}
-
-function catalogPackageBlockerLabel(code = "") {
-    return ({
-        PACKAGE_DISABLED: "Canonical package is disabled",
-        PACKAGE_DELETED: "Canonical package is deleted",
-        NO_VALID_PRICE: `Price missing for ${catalogCustomerMarket}`,
-        PRODUCT_UNAVAILABLE: "Product is disabled or unavailable",
-        PACKAGE_SUPPLIER_SELECTION_REQUIRED: `No fulfillment supplier is selected for ${catalogCustomerMarket === "MM" ? "Myanmar" : "Thailand"}`,
-        FULFILLMENT_NOT_READY: "Selected supplier mapping is not ready for new orders",
-        NO_EXACT_SUPPLIER_MAPPING: "No exact supplier mapping",
-        AMBIGUOUS_SUPPLIER_MAPPING_IDENTITY: "Multiple exact mapping identities require individual review",
-        MAPPING_DISABLED: "Supplier mapping is disabled",
-        MAPPING_ARCHIVED: "Supplier mapping is archived",
-        CUSTOMER_MARKET_NOT_ELIGIBLE: "Supplier mapping is not eligible for this customer market",
-        FULFILLMENT_ELIGIBILITY_UNKNOWN: "Fulfillment eligibility is unresolved",
-        INPUT_CONTRACT_NOT_READY: "Customer input contract is not ready",
-        MAPPING_EXECUTION_NOT_API: "Supplier execution identity is unresolved",
-        SUPPLIER_ADAPTER_NOT_READY: "Supplier adapter is not ready"
-    })[code] || String(code || "Setup is required").replaceAll("_", " ").toLowerCase();
-}
-
-function storefrontOperationalState(item = {}) {
-    return item.operational?.state === "LIVE" ? "LIVE" : "BLOCKED";
-}
-
-function sortStorefrontPackages(packages = []) {
-    return [...packages].sort((left, right) => {
-        const leftOrder = Number(left.pkg?.sortOrder);
-        const rightOrder = Number(right.pkg?.sortOrder);
-        const leftAuthoritative = Number.isFinite(leftOrder) && leftOrder > 0;
-        const rightAuthoritative = Number.isFinite(rightOrder) && rightOrder > 0;
-        if (leftAuthoritative !== rightAuthoritative) return leftAuthoritative ? -1 : 1;
-        if (leftAuthoritative && leftOrder !== rightOrder) return leftOrder - rightOrder;
-        const familyDifference = Number(left.pkg?.packageFamily?.sortOrder || 90) - Number(right.pkg?.packageFamily?.sortOrder || 90);
-        if (familyDifference) return familyDifference;
-        return String(left.pkg?.packageCode || "").localeCompare(String(right.pkg?.packageCode || ""));
-    });
-}
-
-async function loadCatalogPackageOverview(product, { force = false } = {}) {
-    const key = catalogPackageOverviewKey(product.productCode);
-    if (!force && catalogPackageOverviewCache.has(key)) return catalogPackageOverviewCache.get(key);
-    if (!force && catalogPackageOverviewPending.has(key)) return catalogPackageOverviewPending.get(key);
-    const requestId = ++catalogPackageOverviewRequestId;
-    const requestVersion = (catalogPackageOverviewVersions.get(key) || 0) + 1;
-    catalogPackageOverviewVersions.set(key, requestVersion);
-    const request = adminFetch(`/api/admin/catalog/products/${encodeURIComponent(product.productCode)}/storefront-package-overview?customerMarket=${encodeURIComponent(catalogCustomerMarket)}`)
-        .then(data => {
-            if (!data?.success) throw new Error(data?.message || "Package storefront state is unavailable.");
-            if (catalogPackageOverviewVersions.get(key) !== requestVersion) return catalogPackageOverviewCache.get(key) || data;
-            catalogPackageOverviewCache.set(key, data);
-            if (requestId === catalogPackageOverviewRequestId && selectedCatalogProductCode === product.productCode && activeCatalogTab === "merchandising") {
-                renderCatalogProducts();
-                renderCatalogDetail(selectedCatalogProduct || product);
-            }
-            return data;
-        })
-        .catch(error => {
-            if (selectedCatalogProductCode === product.productCode && activeCatalogTab === "merchandising") {
-                document.querySelector("[data-package-overview-error]")?.removeAttribute("hidden");
-            }
-            throw error;
-        })
-        .finally(() => {
-            if (catalogPackageOverviewPending.get(key) === request) catalogPackageOverviewPending.delete(key);
-        });
-    catalogPackageOverviewPending.set(key, request);
-    return request;
-}
-
-function reconcileCatalogPackageOverview(product, pkg, authoritativeState) {
-    const key = catalogPackageOverviewKey(product.productCode, authoritativeState.customerMarket);
-    const overview = catalogPackageOverviewCache.get(key);
-    if (overview) {
-        const packageCode = String(pkg.packageCode || "").toUpperCase();
-        const index = (overview.packages || []).findIndex(item => String(item.package?.packageCode || "").toUpperCase() === packageCode);
-        if (index >= 0) overview.packages[index] = authoritativeState;
-        else overview.packages.push(authoritativeState);
-        renderCatalogProducts();
-        if (selectedCatalogProductCode === product.productCode && activeCatalogTab === "merchandising") renderCatalogDetail(selectedCatalogProduct || product);
-    }
-}
-
-function renderOperationalPackageRows(product, packages, overview) {
-    const region = catalogCustomerMarket === "MM" ? "MM" : "TH";
-    const marketName = region === "MM" ? "Myanmar" : "Thailand";
-    ensureCatalogBulkSelectionScope(product.productCode, region);
-    const byCode = new Map((overview.packages || []).map(item => [String(item.package?.packageCode || "").toUpperCase(), item]));
-    const joined = packages.filter(pkg => !pkg.deleted && !pkg.deletedAt).map(pkg => ({ pkg, state: byCode.get(String(pkg.packageCode).toUpperCase()) || null }));
-    const availableCodes = new Set(joined.map(item => String(item.pkg.packageCode).toUpperCase()));
-    [...catalogBulkSelectedPackages].forEach(code => { if (!availableCodes.has(code)) catalogBulkSelectedPackages.delete(code); });
-    const counts = joined.reduce((result, item) => {
-        const state = storefrontOperationalState(item.state);
-        result[state] = (result[state] || 0) + 1;
-        return result;
-    }, { LIVE: 0, BLOCKED: 0 });
-    const effectiveFilter = catalogPackageOperationalFilter === "AUTO"
-        ? (counts.LIVE ? "LIVE" : counts.BLOCKED ? "BLOCKED" : "ALL")
-        : catalogPackageOperationalFilter;
-    const query = catalogPackageSearch.trim().toLowerCase();
-    const visible = sortStorefrontPackages(joined.filter(item => {
-        const matchesState = effectiveFilter === "ALL" || storefrontOperationalState(item.state) === effectiveFilter;
-        const matchesQuery = !query || [item.pkg.name, item.pkg.packageCode].some(value => String(value || "").toLowerCase().includes(query));
-        return matchesState && matchesQuery;
-    }));
-    const filter = (value, label, count) => `<button type="button" class="catalog-package-state-filter ${effectiveFilter === value ? "active" : ""}" data-package-operational-filter="${value}" aria-pressed="${effectiveFilter === value}">${label} <b>${count}</b></button>`;
-    const rows = visible.map(({ pkg, state }) => {
-        const operational = storefrontOperationalState(state);
-        const price = state?.customerPrice;
-        const selected = (state?.candidates || []).find(candidate => candidate.selected);
-        const blockers = operational === "BLOCKED" ? (state?.operational?.blockerCodes || []) : [];
-        const statusLabel = operational === "LIVE" ? "Live" : "Blocked";
-        return `<article class="catalog-merch-row operational-${operational.toLowerCase()}" data-merch-package="${escapeHtml(pkg.packageCode)}">
-            <div class="catalog-merch-summary">
-                <div class="catalog-merch-package"><label class="catalog-bulk-package-check"><input type="checkbox" data-bulk-package-select="${escapeHtml(pkg.packageCode)}" aria-label="Select ${escapeHtml(pkg.name || pkg.packageCode)} for bulk supplier assignment" ${catalogBulkSelectedPackages.has(String(pkg.packageCode).toUpperCase()) ? "checked" : ""}></label><div class="catalog-merch-package-icon">${pkg.iconUrl ? `<img src="${escapeHtml(pkg.iconUrl)}" alt="">` : `<span>${escapeHtml((pkg.name || "?").slice(0,1).toUpperCase())}</span>`}</div><div><strong>${escapeHtml(pkg.name || pkg.packageCode)}</strong><small>${escapeHtml(marketName)}</small></div></div>
-                <div class="catalog-merch-price"><span>Customer price</span><strong>${price && Number(price.amount) > 0 ? escapeHtml(`${Number(price.amount).toLocaleString()} ${price.currency || (region === "MM" ? "MMK" : "THB")}`) : "—"}</strong></div>
-                <div class="catalog-merch-offer-preview" data-package-supplier-summary="${escapeHtml(pkg.packageCode)}"><span>Fulfillment supplier</span><strong>${escapeHtml(selected?.supplier?.name || "No supplier")}</strong><small>${selected ? escapeHtml(selected.readiness?.summary || "") : "Supplier decision required"}</small></div>
-                <div class="catalog-merch-state"><span class="catalog-operational-status is-${operational.toLowerCase()}"><i class="fa-solid ${operational === "LIVE" ? "fa-circle-check" : "fa-triangle-exclamation"}" aria-hidden="true"></i>${statusLabel}</span>${blockers.length ? `<small title="${escapeHtml(blockers.map(catalogPackageBlockerLabel).join(" · "))}">${escapeHtml(catalogPackageBlockerLabel(blockers[0]))}</small>` : ""}</div>
-                <div class="catalog-merch-actions"><button type="button" class="admin-secondary-btn catalog-merch-manage-btn" data-manage-merchandising="${escapeHtml(pkg.packageCode)}">Manage</button></div>
-            </div></article>`;
-    }).join("");
-    return `<section class="catalog-merchandising-panel">
-        <div class="catalog-merchandising-head"><div><span>Storefront Merchandising</span><h3>Package Offers</h3><p>One canonical package per row. Pricing and fulfillment authorities remain separate.</p></div><label class="catalog-merch-market"><span>Customer market</span><select data-merch-market><option value="TH" ${region === "TH" ? "selected" : ""}>Thailand · THB</option><option value="MM" ${region === "MM" ? "selected" : ""}>Myanmar · MMK</option></select></label></div>
-        <section class="catalog-market-availability"><header><div><span>Store Status</span><h4>${escapeHtml(marketName)}</h4><p>Live ${counts.LIVE} · Blocked ${counts.BLOCKED} · Total ${joined.length}</p></div></header></section>
-        <div class="catalog-package-operations"><div class="catalog-package-state-filters" role="group" aria-label="Package state">${filter("LIVE", "Live", counts.LIVE)}${filter("BLOCKED", "Blocked", counts.BLOCKED)}${filter("ALL", "All", joined.length)}</div><label><span class="sr-only">Search packages</span><input type="search" data-merch-package-search value="${escapeHtml(catalogPackageSearch)}" placeholder="Search packages"></label></div>
-        <div data-catalog-bulk-action-host>${renderCatalogBulkActionBar()}</div>
-        <p class="catalog-package-result-count">${visible.length} package${visible.length === 1 ? "" : "s"} shown · ordered by canonical package order</p>
-        <div class="catalog-merch-list">${rows || `<div class="catalog-empty-state"><strong>No ${effectiveFilter === "ALL" ? "matching" : effectiveFilter.toLowerCase().replace("_", " ")} packages</strong><span>Choose another operational state or adjust the package search.</span></div>`}</div>
-    </section>`;
-}
-
 function renderCatalogMerchandisingPanel(product, packages) {
     const region = ["TH", "MM"].includes(catalogCustomerMarket)
         ? catalogCustomerMarket
@@ -983,9 +488,6 @@ function renderCatalogMerchandisingPanel(product, packages) {
 
     const currency = region === "MM" ? "MMK" : "THB";
     const activePackages = packages.filter(pkg => !pkg.deleted && !pkg.deletedAt);
-    const overview = catalogPackageOverviewCache.get(catalogPackageOverviewKey(product.productCode));
-    if (overview) return renderOperationalPackageRows(product, activePackages, overview);
-    return `<section class="catalog-merchandising-panel"><div class="catalog-merchandising-head"><div><span>Storefront Merchandising</span><h3>Package Offers</h3><p>Loading automatic sellability status…</p></div></div><div class="catalog-merch-list" aria-busy="true"><div class="admin-dashboard-skeleton"></div><div class="admin-dashboard-skeleton"></div></div><div class="admin-empty-state" data-package-overview-error hidden><strong>Package storefront state is unavailable</strong><span>Use Refresh to retry without changing catalog data.</span></div></section>`;
 
     const rows = activePackages.map(pkg => {
         const price = pkg.prices?.[region] || null;
@@ -1073,7 +575,7 @@ function renderCatalogMerchandisingPanel(product, packages) {
                             <span class="catalog-merch-public-toggle__track" aria-hidden="true">
                                 <span></span>
                             </span>
-                            <strong>${published ? "Selling ON" : "Selling OFF"}</strong>
+                            <strong>${published ? "Public" : "Private"}</strong>
                         </label>
                     </div>
 
@@ -1113,12 +615,6 @@ function renderCatalogMerchandisingPanel(product, packages) {
                     </p>
                 </div>
 
-                <label class="catalog-merch-public-toggle" title="Allow technically ready packages in this product to be purchased">
-                    <input type="checkbox" data-product-purchasable ${product.publicDiscoveryEnabled === true && product.commerceState === "PURCHASABLE" ? "checked" : ""}>
-                    <span class="catalog-merch-public-toggle__track" aria-hidden="true"><span></span></span>
-                    <strong>Purchasable ${product.publicDiscoveryEnabled === true && product.commerceState === "PURCHASABLE" ? "ON" : "OFF"}</strong>
-                </label>
-
                 <label class="catalog-merch-market">
                     <span>Market</span>
                     <select data-merch-market>
@@ -1137,16 +633,13 @@ function renderCatalogMerchandisingPanel(product, packages) {
                 </span>
             </div>
 
-            <div class="catalog-merch-package-groups">
-                <section><h4>Live Packages (<span data-live-package-count>0</span>)</h4><div class="catalog-merch-list" data-live-package-list></div></section>
-                <section><h4>Disabled / Blocked Packages (<span data-inactive-package-count>${activePackages.length}</span>)</h4><div class="catalog-merch-list" data-inactive-package-list>
+            <div class="catalog-merch-list">
                 ${rows || `
                     <div class="catalog-empty-state">
                         <strong>No packages available</strong>
                         <span>This product has no packages to merchandise.</span>
                     </div>
                 `}
-                </div></section>
             </div>
         </section>
     `;
@@ -1814,9 +1307,9 @@ function ensureCatalogMerchandisingModal() {
 
                 <section class="catalog-merch-modal-section" data-manage-package-section="public">
                     <div class="catalog-merch-modal-section-head">
-                        <span>Store status</span>
+                        <span>Public state</span>
                         <h4 data-manage-package-public-state>Loading…</h4>
-                        <p data-manage-package-public-detail>Checking current price and fulfillment readiness.</p>
+                        <p data-manage-package-public-detail>Checking publication and storefront readiness.</p>
                     </div>
                 </section>
 
@@ -2003,6 +1496,8 @@ function ensureCatalogMerchandisingModal() {
         content.prepend(supplierSection);
         supplierSection.after(priceSection);
         priceSection.after(mediaSection);
+        const publicSection = modal.querySelector('[data-manage-package-section="public"]');
+        if (publicSection) publicSection.hidden = true;
         const advanced = document.createElement("details");
         advanced.className = "catalog-manage-advanced";
         advanced.innerHTML = '<summary>Offer presentation <span data-manage-package-advanced-dirty></span></summary><div class="catalog-manage-advanced-body"></div>';
@@ -2040,12 +1535,12 @@ function formatCandidateCost(cost = {}) {
 
 function candidateCostState(cost = {}) {
     if (cost.amount === null || cost.amount === undefined || cost.amount === "" || cost.state === "UNAVAILABLE") return "Cost unavailable";
-    return cost.stale === true || cost.state === "STALE" ? "Cost stale" : "Cost current";
+    return cost.stale === true || cost.state === "STALE" ? "Stale" : "Current";
 }
 
 function candidateOperatorStatus(candidate = {}) {
     const blockers = candidate.readiness?.blockerCodes || [];
-    if (candidate.readiness?.selectable === true) return "Route ready";
+    if (candidate.readiness?.selectable === true) return "Ready";
     if (blockers.includes("MAPPING_DISABLED") || blockers.includes("MAPPING_ARCHIVED")) return "Mapping disabled";
     if (blockers.includes("MAPPING_EXECUTION_NOT_API") || blockers.includes("SUPPLIER_ADAPTER_NOT_READY") || blockers.includes("PROVIDER_FEATURE_GATE_OFF")) return "Not configured for API fulfillment";
     if (blockers.includes("FULFILLMENT_ELIGIBILITY_UNKNOWN") || blockers.includes("CUSTOMER_MARKET_NOT_ELIGIBLE")) return "Customer-market eligibility unverified";
@@ -2074,7 +1569,7 @@ function renderSupplierMappingRow(candidate, repeatedSupplier = false) {
     return `<label class="catalog-supplier-candidate ${candidate.readiness.selectable ? "" : "is-disabled"}">
         <input type="radio" name="manage-package-supplier" value="${escapeHtml(candidate.supplierMappingId)}" ${candidate.readiness.selectable ? "" : "disabled"} ${candidate.selected ? "checked" : ""}>
         <span class="catalog-supplier-candidate-body">
-            <span class="catalog-supplier-candidate-head"><strong>${escapeHtml(candidate.supplier.name)}</strong><span class="catalog-supplier-badges">${candidate.selected ? `<span class="catalog-supplier-status is-selected">Selected for ${catalogCustomerMarket === "MM" ? "MM" : "TH"}</span>` : ""}<span class="catalog-supplier-status">${escapeHtml(status)}</span></span></span>
+            <span class="catalog-supplier-candidate-head"><strong>${escapeHtml(candidate.supplier.name)}</strong><span class="catalog-supplier-badges">${candidate.selected ? '<span class="catalog-supplier-status is-selected">Selected</span>' : ""}<span class="catalog-supplier-status">${escapeHtml(status)}</span></span></span>
             <small>${escapeHtml(account)}${repeatedSupplier && providerIdentity ? ` · ${escapeHtml(providerIdentity)}` : ""}</small>
             ${!repeatedSupplier && providerIdentity ? `<small class="catalog-supplier-provider">${escapeHtml(providerIdentity)}</small>` : ""}
             <small class="catalog-supplier-cost"><span>${escapeHtml(costLabel)}</span><span>${escapeHtml(candidateCostState(candidate.cost))}</span></small>
@@ -2089,16 +1584,23 @@ function candidateRouteLabel(candidate = {}) {
 }
 
 function storefrontPackageState(data = {}) {
-    return data.effectiveState?.state || "BLOCKED";
+    const market = data.customerMarket === "MM" ? "MM" : "TH";
+    if (data.publication?.published !== true) return "Unpublished";
+    if (!data.customerPrice || data.customerPrice.enabled === false || !(Number(data.customerPrice.amount) > 0)) return `No ${market} price`;
+    if (!data.selection) return "Supplier selection required";
+    const selected = (data.candidates || []).find(item => item.selected);
+    if (!selected || selected.availability?.state !== "AVAILABLE") return "Supplier unavailable";
+    if (selected.readiness?.selectable !== true) return "Fulfillment not ready";
+    return "Public";
 }
 
 function renderPackageSupplierSummary(container, data = {}) {
     if (!container) return;
-    const selected = (data.candidates || []).find(item => item.supplierMappingId === data.effectiveState?.supplierMappingId);
+    const selected = (data.candidates || []).find(item => item.selected);
     const state = storefrontPackageState(data);
     container.innerHTML = `
         <span>Fulfillment supplier</span>
-        <strong>${escapeHtml(selected?.supplier?.name || "No executable supplier")}</strong>
+        <strong>${escapeHtml(selected?.supplier?.name || "Selection required")}</strong>
         <small>${escapeHtml(selected ? formatCandidateCost(selected.cost) : state)}</small>
     `;
 }
@@ -2111,15 +1613,7 @@ async function hydratePackageSupplierSummaries(product, packages, root = documen
             const data = await loadPackageSupplierCandidateData(product, pkg);
             renderPackageSupplierSummary(container, data);
             const state = root.querySelector(`[data-package-public-state="${CSS.escape(pkg.packageCode)}"]`);
-            if (state) state.textContent = [storefrontPackageState(data), ...(data.effectiveState?.blockers || []).map(code => code.replaceAll("_", " ").toLowerCase())].join(" · ");
-            const row = root.querySelector(`[data-merch-package="${CSS.escape(pkg.packageCode)}"]`);
-            const liveList = root.querySelector("[data-live-package-list]");
-            const inactiveList = root.querySelector("[data-inactive-package-list]");
-            if (row && liveList && inactiveList) (data.effectiveState?.state === "LIVE" ? liveList : inactiveList).append(row);
-            const liveCount = root.querySelector("[data-live-package-count]");
-            const inactiveCount = root.querySelector("[data-inactive-package-count]");
-            if (liveCount) liveCount.textContent = String(liveList?.querySelectorAll("[data-merch-package]").length || 0);
-            if (inactiveCount) inactiveCount.textContent = String(inactiveList?.querySelectorAll("[data-merch-package]").length || 0);
+            if (state) state.textContent = storefrontPackageState(data);
         } catch (_) {
             container.innerHTML = `<span>Fulfillment supplier</span><strong>Unavailable</strong><small>Could not load supplier state</small>`;
             const state = root.querySelector(`[data-package-public-state="${CSS.escape(pkg.packageCode)}"]`);
@@ -2165,10 +1659,10 @@ async function updateManagePackageImage(product, pkg, asset = null) {
 function renderManagePackageCandidates(modal, data = {}) {
     const marketName = data.customerMarket === "MM" ? "Myanmar" : "Thailand";
     const candidates = data.candidates || [];
-    const selected = candidates.find(item => item.supplierMappingId === data.effectiveState?.supplierMappingId);
+    const selected = candidates.find(item => item.selected);
     modal.querySelector("[data-manage-package-selection-state]").textContent = selected
         ? selected.supplier.name
-        : "No executable supplier";
+        : "Supplier selection required";
     const supplierCounts = candidates.reduce((counts, candidate) => counts.set(candidate.supplier.supplierId, (counts.get(candidate.supplier.supplierId) || 0) + 1), new Map());
     const usable = candidates.filter(candidate => candidate.readiness?.selectable === true);
     const unavailable = candidates.filter(candidate => candidate.readiness?.selectable !== true);
@@ -2180,10 +1674,9 @@ function renderManagePackageCandidates(modal, data = {}) {
     const helper = modal.querySelector("[data-manage-package-supplier-helper]");
     if (helper) helper.textContent = `Choose who fulfills this package for ${marketName}.`;
     modal.querySelector("[data-manage-package-public-state]").textContent = `${state} · Customer market: ${marketName}`;
-    const operationalBlockers = data.operational?.blockerCodes || data.publication?.blockers || [];
-    modal.querySelector("[data-manage-package-public-detail]").textContent = operationalBlockers.length
-        ? operationalBlockers.map(catalogPackageBlockerLabel).join(" · ")
-        : data.publication?.published ? "Selling is enabled and the effective route is ready for this customer market." : "Selling is disabled for this customer market.";
+    modal.querySelector("[data-manage-package-public-detail]").textContent = data.publication?.blockers?.length
+        ? data.publication.blockers.map(code => code.replaceAll("_", " ").toLowerCase()).join(" · ")
+        : data.publication?.published ? "Publication is enabled for this customer market." : "This package is not published for this customer market.";
     const price = data.customerPrice;
     modal.querySelector("[data-manage-package-customer-price]").textContent = price && Number.isFinite(Number(price.amount))
         ? `${Number(price.amount).toLocaleString()} ${price.currency}` : "Price unavailable";
@@ -2222,7 +1715,7 @@ async function saveManagePackageSupplier(product, pkg, modal) {
     const marketName = data.customerMarket === "MM" ? "Myanmar" : "Thailand";
     const confirmed = await confirmCatalogAction({
         title: "Change fulfillment supplier?",
-        message: `Package\n${pkg.name || pkg.packageCode}\n\nCustomer market\n${marketName}\n\nPrevious supplier route\n${previous ? `${candidateRouteLabel(previous)}\n${formatCandidateCost(previous.cost)}` : "No explicit supplier selected"}\n\nNew supplier route\n${candidateRouteLabel(next)}\n${formatCandidateCost(next.cost)}\n\nCustomer price\n${price ? `${Number(price.amount).toLocaleString()} ${price.currency}` : "Price unavailable"}\n\nCustomer price will not change.\nSelling state will not change.\nNew checkouts will use this exact supplier; existing frozen orders will not change.`,
+        message: `Package\n${pkg.name || pkg.packageCode}\n\nCustomer market\n${marketName}\n\nPrevious supplier route\n${previous ? `${candidateRouteLabel(previous)}\n${formatCandidateCost(previous.cost)}` : "No explicit supplier selected"}\n\nNew supplier route\n${candidateRouteLabel(next)}\n${formatCandidateCost(next.cost)}\n\nCustomer price\n${price ? `${Number(price.amount).toLocaleString()} ${price.currency}` : "Price unavailable"}\n\nCustomer price will not change.\nPublication state will not change.\nThis supplier selection remains Storefront intent until routing cutover is separately enabled.`,
         confirmText: "Change Supplier"
     });
     if (!confirmed) return;
@@ -2262,42 +1755,10 @@ async function saveManagePackageSupplier(product, pkg, modal) {
     save.textContent = priorSaveText;
     const latest = await loadPackageSupplierCandidateData(product, pkg, { refresh: true });
     renderManagePackageCandidates(modal, latest);
-    reconcileCatalogPackageOverview(product, pkg, latest);
+    renderPackageSupplierSummary(document.querySelector(`[data-package-supplier-summary="${CSS.escape(pkg.packageCode)}"]`), latest);
+    const state = document.querySelector(`[data-package-public-state="${CSS.escape(pkg.packageCode)}"]`);
+    if (state) state.textContent = storefrontPackageState(latest);
     showAdminToast?.(result.changed ? "Fulfillment supplier selection saved" : "Supplier selection is already current", result.changed ? "success" : "info");
-}
-
-async function updateManagePackagePublication(product, pkg, modal) {
-    const current = modal._supplierCandidateData || {};
-    const published = current.publication?.published !== true;
-    const market = current.customerMarket === "MM" ? "MM" : "TH";
-    const marketName = market === "MM" ? "Myanmar" : "Thailand";
-    const confirmed = await confirmCatalogAction({
-        title: published ? `Make this package public in ${marketName}?` : `Make this package private in ${marketName}?`,
-        message: `${pkg.name || pkg.packageCode}\n\n${published ? "Publication will be enabled, but the package will only become live when price and fulfillment requirements are satisfied." : "New customer purchases will no longer see this package."}\n\nPricing, supplier mappings, selections and historical orders will not change.`,
-        confirmText: published ? "Make Public" : "Make Private"
-    });
-    if (!confirmed) return;
-    const button = modal.querySelector("[data-manage-package-publication]");
-    button.disabled = true;
-    button.textContent = "Saving…";
-    try {
-        const result = await adminFetch(`/api/admin/catalog/products/${encodeURIComponent(product.productCode)}/packages/${encodeURIComponent(pkg.packageCode)}/publication`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ customerMarket: market, published, decisionNote: "Storefront package drawer visibility" })
-        });
-        if (!result?.success) throw new Error(result?.message || "Package visibility could not be changed.");
-        if (result.product) selectedCatalogProduct = result.product;
-        catalogSupplierCandidateCache.delete(`${product.productCode}:${pkg.packageCode}:${market}`);
-        invalidateCatalogPublicationReadiness(product.productCode);
-        const latest = await loadPackageSupplierCandidateData(result.product || product, pkg, { refresh: true });
-        renderManagePackageCandidates(modal, latest);
-        reconcileCatalogPackageOverview(result.product || product, pkg, latest);
-        showAdminToast?.(published ? `Publication enabled for ${pkg.name || pkg.packageCode} in ${marketName}` : `${pkg.name || pkg.packageCode} is private in ${marketName}`, "success");
-    } catch (error) {
-        renderManagePackageCandidates(modal, current);
-        throw error;
-    }
 }
 
 function openCatalogMerchandisingModal(product, pkg) {
@@ -2583,8 +2044,8 @@ async function updateMerchandisingPublication(product, pkg, input) {
 
     const confirmed = await confirmCatalogAction({
         title: published
-            ? `Turn Selling ON in ${marketName}?`
-            : `Turn Selling OFF in ${marketName}?`,
+            ? `Make this package public in ${marketName}?`
+            : `Hide this package from ${marketName}?`,
         message:
             `${pkg.name || pkg.packageCode}\n\n` +
             (
@@ -2593,7 +2054,7 @@ async function updateMerchandisingPublication(product, pkg, input) {
                     : `Customers in ${marketName} will no longer see or start a new purchase for this package.`
             ) +
             `\n\nSupplier mapping, fulfillment configuration, pricing history and past orders will not change.`,
-        confirmText: published ? "Enable Selling" : "Disable Selling"
+        confirmText: published ? "Make Public" : "Hide from Storefront"
     });
 
     if (!confirmed) {
@@ -2609,7 +2070,7 @@ async function updateMerchandisingPublication(product, pkg, input) {
             {
                 customerMarket: market,
                 published,
-                decisionNote: "Storefront package Selling decision"
+                decisionNote: "Storefront Merchandising public visibility"
             }
         );
 
@@ -2628,8 +2089,8 @@ async function updateMerchandisingPublication(product, pkg, input) {
 
         showAdminToast?.(
             published
-                ? `${pkg.name || pkg.packageCode} Selling is ON in ${marketName}`
-                : `${pkg.name || pkg.packageCode} Selling is OFF in ${marketName}`,
+                ? `${pkg.name || pkg.packageCode} is public in ${marketName}`
+                : `${pkg.name || pkg.packageCode} is hidden in ${marketName}`,
             "success"
         );
     } catch (error) {
@@ -2638,28 +2099,6 @@ async function updateMerchandisingPublication(product, pkg, input) {
             error?.message || "Package visibility could not be changed.",
             "error"
         );
-    } finally {
-        input.disabled = false;
-    }
-}
-
-async function updateProductPurchasable(product, input) {
-    const previous = product.publicDiscoveryEnabled === true && product.commerceState === "PURCHASABLE";
-    const enabled = input.checked === true;
-    input.disabled = true;
-    try {
-        const result = await mutateCatalog(`/api/admin/catalog/products/${encodeURIComponent(product.productCode)}`, {
-            publicDiscoveryEnabled: enabled,
-            commerceState: enabled ? "PURCHASABLE" : "HIDDEN",
-            expectedUpdatedAt: product.updatedAt
-        });
-        if (!result?.success) throw new Error(result?.message || "Product Purchasable state could not be changed.");
-        selectedCatalogProduct = result.product || selectedCatalogProduct;
-        renderCatalogDetail(result.product || selectedCatalogProduct || product);
-        showAdminToast?.(`Product Purchasable is ${enabled ? "ON" : "OFF"}`, "success");
-    } catch (error) {
-        input.checked = previous;
-        showAdminToast?.(error?.message || "Product Purchasable state could not be changed.", "error");
     } finally {
         input.disabled = false;
     }
@@ -2777,42 +2216,15 @@ async function removePackageFromStorefront(product, pkg, button) {
 
 function bindActiveCatalogTab(detail, product, packages) {
     if (activeCatalogTab === "merchandising") {
-        if (!catalogPackageOverviewCache.has(catalogPackageOverviewKey(product.productCode))) {
-            loadCatalogPackageOverview(product).catch(error => showAdminToast?.(error?.message || "Package storefront state is unavailable.", "error"));
-        }
         hydratePackageSupplierSummaries(product, packages, detail);
-        detail.querySelector("[data-product-purchasable]")?.addEventListener("change", event => {
-            updateProductPurchasable(product, event.target).catch(error => showAdminToast?.(error?.message || "Product Purchasable state could not be changed.", "error"));
-        });
         detail.querySelector("[data-merch-market]")?.addEventListener("change", event => {
             catalogCustomerMarket = event.target.value === "MM" ? "MM" : "TH";
-            catalogPackageOperationalFilter = "AUTO";
-            ensureCatalogBulkSelectionScope(product.productCode, catalogCustomerMarket);
             sessionStorage.setItem(
                 "aziel.catalog.customerMarket",
                 catalogCustomerMarket
             );
             renderCatalogDetail(product);
         });
-        detail.querySelectorAll("[data-package-operational-filter]").forEach(button => {
-            button.addEventListener("click", () => {
-                catalogPackageOperationalFilter = button.dataset.packageOperationalFilter || "ALL";
-                renderCatalogDetail(product);
-            });
-        });
-        detail.querySelector("[data-merch-package-search]")?.addEventListener("input", event => {
-            catalogPackageSearch = event.target.value || "";
-            renderCatalogDetail(product);
-            detail.querySelector("[data-merch-package-search]")?.focus();
-        });
-        detail.querySelectorAll("[data-bulk-package-select]").forEach(input => {
-            input.addEventListener("change", () => {
-                const packageCode = String(input.dataset.bulkPackageSelect || "").toUpperCase();
-                input.checked ? catalogBulkSelectedPackages.add(packageCode) : catalogBulkSelectedPackages.delete(packageCode);
-                syncCatalogBulkSelectionUi(detail, product, input);
-            });
-        });
-        bindCatalogBulkActionBar(detail, product);
 
         detail.querySelectorAll("[data-manage-merchandising]").forEach(button => {
             button.addEventListener("click", () => {
@@ -4191,21 +3603,20 @@ function fromDatetimeInputValue(value) {
 }
 
 async function toggleProductAvailability(product) {
-    const show = product.publicDiscoveryEnabled !== true;
+    const nextEnabled = !product.enabled;
     const confirmed = await confirmCatalogAction({
-        title: show ? "Show Product" : "Hide Product",
-        message: show
-            ? "The product will be visible again. Packages whose price and fulfillment route are currently valid become immediately sellable."
-            : "The product will be hidden from customers. Prices, supplier routes, package readiness, and existing orders will be preserved.",
-        confirmText: show ? "Show Product" : "Hide Product",
-        danger: !show
+        title: adminT(nextEnabled ? "enable_product" : "disable_product", nextEnabled ? "Enable Product" : "Disable Product"),
+        message: nextEnabled
+            ? `${adminT("enable_product_message", "New purchases for this product will be allowed.")}`
+            : `${adminT("disable_product_message", "New purchases for this product will be blocked. Existing orders will not be changed.")}`,
+        confirmText: adminT(nextEnabled ? "enable_product" : "disable_product", nextEnabled ? "Enable Product" : "Disable Product"),
+        danger: !nextEnabled
     });
 
     if (!confirmed) return;
 
     await mutateCatalog(`/api/admin/catalog/products/${encodeURIComponent(product.productCode)}`, {
-        publicDiscoveryEnabled: show,
-        commerceState: show ? "PURCHASABLE" : "HIDDEN",
+        enabled: nextEnabled,
         expectedUpdatedAt: product.updatedAt
     });
 }
@@ -5221,19 +4632,9 @@ async function mutateCatalog(url, body, options) {
 
     showAdminToast?.(data.unchanged ? adminT("no_changes_to_save", "No changes to save.") : adminT("catalog_updated", "Catalog updated"), data.unchanged ? "info" : "success");
     const productCodeToKeep = data.product?.productCode || selectedCatalogProductCode;
+    catalogProducts = [];
     selectedCatalogProductCode = productCodeToKeep;
-    if (data.product) {
-        const index = catalogProducts.findIndex(item => item.productCode === data.product.productCode);
-        if (index >= 0) catalogProducts[index] = { ...catalogProducts[index], ...data.product };
-        selectedCatalogProduct = data.product;
-        invalidateCatalogPublicationReadiness(productCodeToKeep);
-        catalogPackageOverviewCache.delete(catalogPackageOverviewKey(productCodeToKeep, "TH"));
-        catalogPackageOverviewCache.delete(catalogPackageOverviewKey(productCodeToKeep, "MM"));
-        renderCatalogProducts();
-        renderCatalogDetail(data.product);
-    } else if (productCodeToKeep) {
-        await selectCatalogProduct(productCodeToKeep, false);
-    }
+    await loadAdminCatalog(true);
 
     return data;
 }

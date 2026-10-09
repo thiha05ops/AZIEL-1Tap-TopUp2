@@ -1131,7 +1131,7 @@ body.theme-light .az-home + .site-footer {
     }
 
     .az-home .az-home-hero.az-banner-zone {
-        width: calc(100% - 24px) !important;
+        width: calc(100% - 32px) !important;
         aspect-ratio: 16 / 10 !important;
         min-height: 0 !important;
         max-height: none !important;

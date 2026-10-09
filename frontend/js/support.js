@@ -31,7 +31,7 @@ document.addEventListener("DOMContentLoaded", () => {
     startSupportSocket();
     loadMyTickets();
 });
-window.addEventListener("aziel:languageChanged", () => {
+window.addEventListener("aziel:locale-changed", () => {
     renderFaq();
     renderTickets();
 });

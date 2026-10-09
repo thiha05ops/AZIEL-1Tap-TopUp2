@@ -444,7 +444,7 @@ function createPaymentOrchestrator(dependencies = {}) {
                 reason: result.reason,
                 errorCode: normalizeString(result.errorCode)
             });
-            if (result?.durablyRecorded !== true && typeof deps.paidFulfillmentFailureRecorder === "function") {
+            if (typeof deps.paidFulfillmentFailureRecorder === "function") {
                 await Promise.resolve(deps.paidFulfillmentFailureRecorder({
                     order: committedOrder || applied.order,
                     orderId,

@@ -11,8 +11,7 @@ const FULFILLMENT_ELIGIBILITY_EVIDENCE_CODES = Object.freeze([
     "PROVIDER_CONFIRMED",
     "OPERATOR_CONFIRMED_CAPABILITY",
     "CONTROLLED_TEST",
-    "LEGACY_EFFECTIVE_SCOPE",
-    "PAYMENT_MARKET_DECOUPLED"
+    "LEGACY_EFFECTIVE_SCOPE"
 ]);
 
 const text = value => String(value == null ? "" : value).trim();

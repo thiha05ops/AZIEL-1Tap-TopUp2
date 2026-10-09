@@ -531,23 +531,7 @@ async function validateFulfilment(quote, context, deps) {
     const contract = inputContractForProduct(productCode);
     if (contract) {
         const accountFields = Array.isArray(gameAccount.accountFields) ? gameAccount.accountFields : [];
-        const aliases = Object.freeze({
-            userId: ["userId", "playerId"],
-            playerId: ["playerId", "userId"],
-            zoneId: ["zoneId", "serverId"],
-            serverId: ["serverId", "zoneId"]
-        });
-        const value = key => {
-            const keys = aliases[key] || [key];
-            for (const candidate of keys) {
-                const direct = normalizeString(gameAccount[candidate]);
-                if (direct && direct !== "-") return direct;
-                const field = accountFields.find(item => normalizeString(item?.key) === candidate);
-                const fieldValue = normalizeString(field?.value);
-                if (fieldValue && fieldValue !== "-") return fieldValue;
-            }
-            return "";
-        };
+        const value = key => normalizeString(gameAccount[key] || accountFields.find(field => normalizeString(field?.key) === key)?.value);
         for (const key of contract.required) {
             if (!value(key)) throw new CheckoutApplicationError(ERROR_CODES.INVALID_FULFILMENT_INPUT, `${key} is required for ${contract.family}.`, { stage: "fulfilment", metadata: { productCode, field: key } });
         }

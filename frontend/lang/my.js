@@ -81,6 +81,7 @@ window.AZIEL_LANG.my = {
     nav_features: "Feature များ",
     nav_platform: "Platform",
     overview: "အကျဉ်းချုပ်",
+    security: "လုံခြုံရေး",
     transactions: "ငွေလွှဲမှတ်တမ်း",
     theme: "Theme",
     "Safe & Trusted": "အကောင့်ကာကွယ်မှုများ",
@@ -205,6 +206,7 @@ window.AZIEL_LANG.my = {
     scanPay: "Scan & Pay",
     orderId: "Order ID",
     amount: "ငွေပမာဏ",
+    waitingPayment: "Payment စောင့်နေသည်...",
     paymentExpiresIn: "Payment အချိန်ကျန်",
 
     pleaseWait: "ခဏစောင့်ပါ...",
@@ -276,11 +278,13 @@ window.AZIEL_LANG.my = {
     refundAbuseTitle: "Abuse ကာကွယ်ရေး",
     refundAbuseText: "Fake refund request များ၊ ထပ်ခါထပ်ခါ abuse လုပ်ခြင်း သို့မဟုတ် fraudulent claim များသည် account restriction သို့မဟုတ် suspension ဖြစ်စေနိုင်ပါသည်။",
 
+    needHelp: "အကူအညီလိုပါသလား?",
     refundHelpText: "သင့် order သည် refund အခြေအနေနှင့်ကိုက်ညီသည်ဟု ယုံကြည်ပါက AZIEL Support ကိုဆက်သွယ်ပါ သို့မဟုတ် order tracking page မှ refund request တင်ပါ။",
     refundHelpItem1: "Order ID",
     refundHelpItem2: "Payment Method",
     refundHelpItem3: "Payment receipt သို့မဟုတ် slip ရှိပါက",
     refundHelpItem4: "ပြဿနာအကြောင်းအရာ",
+    contactSupport: "Support ကိုဆက်သွယ်ရန်",
     paymentPolicyTitle: "ငွေပေးချေမှု မူဝါဒ",
 
     paymentMethodsTitle: "အသုံးပြုနိုင်သော Payment Methods",
@@ -612,6 +616,7 @@ window.AZIEL_LANG.my = {
     "Account - AZIEL": "အကောင့် - AZIEL",
     "Region: MM": "Region: MM",
     "Track order": "Track အော်ဒါ",
+    "Loading...": "ဖွင့်နေသည်...",
     "Password security status.": "စကားဝှက် လုံခြုံရေး status.",
     "Change Password": "Change စကားဝှက်",
     "Extra account protection for your AZIEL account.": "Extra အကောင့် protection for your AZIEL အကောင့်.",

@@ -385,20 +385,6 @@ async function updateStatusField(input, options, config) {
     if (config.nestedField) {
         update.$set[config.nestedField] = normalized.toStatus;
     }
-    if (config.queryField === "paymentStatus" && normalized.toStatus === "paid") {
-        update.$set["fulfilment.paidHandoff"] = {
-            version: 1,
-            status: "PENDING",
-            requestedAt: normalized.changedAt,
-            availableAt: normalized.changedAt,
-            attemptCount: 0,
-            claimToken: "",
-            claimedAt: null,
-            leaseExpiresAt: null,
-            completedAt: null,
-            lastError: null
-        };
-    }
     try {
         const updated = await execQuery(opts.model.findOneAndUpdate(query, update, { returnDocument: "after", runValidators: true }), opts);
         if (!updated) {

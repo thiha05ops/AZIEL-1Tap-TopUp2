@@ -19,9 +19,7 @@ assert(!routes.includes('router.post("/admin/catalog/products/:productCode/packa
 assert(routes.includes("CATALOG_PACKAGE_ICON_ATTACHED") && routes.includes("CATALOG_PACKAGE_ICON_CLEARED"));
 assert(ui.includes("catalog-manage-package-drawer"));
 assert(ui.includes('category: "package_icon"'));
-assert(ui.includes("No executable supplier"));
-assert(ui.includes("data-product-purchasable") && ui.includes("Purchasable"));
-assert(ui.includes("Selling ON") && ui.includes("Selling OFF"));
+assert(ui.includes("Supplier selection required"));
 assert(ui.includes("Customer price is managed in Pricing."));
 assert(ui.includes("data-merch-modal-reference") && ui.includes("data-save-merch-modal"), "existing merchandising controls must remain");
 assert(css.includes(".catalog-manage-package-drawer") && css.includes(".catalog-supplier-candidate"));
