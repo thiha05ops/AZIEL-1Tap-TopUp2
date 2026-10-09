@@ -442,7 +442,8 @@ function projectCommerceOrder(order = {}, options = {}) {
             supplierMappingId: routeSnapshot.supplierMappingId || null,
             handoffStatus: paidHandoff?.status || "",
             failureCode: paidHandoff?.lastError?.code || "",
-            failureReason: paidHandoff?.lastError?.reason || ""
+            failureReason: paidHandoff?.lastError?.reason || "",
+            failureBlockers: Array.isArray(paidHandoff?.lastError?.blockers) ? paidHandoff.lastError.blockers : []
         },
         fulfillmentAttempts,
         actions: {

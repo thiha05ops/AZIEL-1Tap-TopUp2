@@ -34,13 +34,21 @@ const REGIONS = Object.freeze(["MM", "TH"]);
 const CODE_PATTERN = /^[A-Z0-9_-]{2,40}$/;
 
 class FulfillmentError extends Error {
-    constructor(code, message, statusCode = 400) {
+    constructor(code, message, statusCode = 400, details = null) {
         super(message);
         this.name = "FulfillmentError";
         this.code = code;
         this.statusCode = statusCode;
+        if (details) this.details = details;
     }
 }
+
+const FROZEN_ROUTE_BLOCKER_CODES = new Set([
+    "MAPPING_ARCHIVED", "MAPPING_DISABLED", "MAPPING_EXECUTION_NOT_API",
+    "EXACT_MAPPING_INCOMPLETE", "SUPPLIER_NOT_API_READY", "SUPPLIER_ADAPTER_NOT_READY",
+    "PROVIDER_FEATURE_GATE_OFF", "FULFILLMENT_PROCESSOR_NOT_READY",
+    "SUPPLIER_MAPPING_NOT_READY", "INPUT_NOT_READY", "FULFILLMENT_NOT_READY"
+]);
 
 function isMarketDecoupledV2RouteSnapshot({ routeSnapshot = null, mapping = null, customerMarket = "" } = {}) {
     if (!routeSnapshot || !mapping || Number(routeSnapshot.snapshotVersion) !== 2 || String(routeSnapshot.routeType || "").toUpperCase() !== "SUPPLIER_API") return false;
@@ -766,7 +774,10 @@ async function startFulfillmentForOrder(orderId, payload = {}, context = {}) {
             adapter,
             eligibilityOverride: routeSnapshot.eligibility || mapping.fulfillmentEligibility
         });
-        if (!frozen.ready) throw new FulfillmentError("FROZEN_ROUTE_NOT_EXECUTABLE", `Frozen route is no longer executable: ${frozen.blockers.join(",")}`, 409);
+        if (!frozen.ready) {
+            const blockers = frozen.blockers.filter(code => FROZEN_ROUTE_BLOCKER_CODES.has(code));
+            throw new FulfillmentError("FROZEN_ROUTE_NOT_EXECUTABLE", `Frozen route is no longer executable: ${blockers.join(",")}`, 409, { blockers });
+        }
     }
     if (supplier.supplierCode === "WONDD") {
         const { verifiedMappingContract } = require("./suppliers/fazercardsFulfillmentContractService");

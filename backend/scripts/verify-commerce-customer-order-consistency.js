@@ -60,13 +60,14 @@ function projectionRegressions() {
             status: "not_started",
             input: { accountFields: [] },
             routeSnapshot: { routeType: "SUPPLIER_API", supplierCode: "FAZERCARDS", supplierMappingId: "mapping-1" },
-            paidHandoff: { status: "BLOCKED", lastError: { code: "FROZEN_ROUTE_NOT_EXECUTABLE", reason: "SUPPLIER_FULFILLMENT_START_FAILED" } }
+            paidHandoff: { status: "BLOCKED", lastError: { code: "FROZEN_ROUTE_NOT_EXECUTABLE", reason: "SUPPLIER_FULFILLMENT_START_FAILED", blockers: ["PROVIDER_FEATURE_GATE_OFF"] } }
         }
     });
     const projectedBlocked = projectCommerceOrder(blockedHandoff);
     assert.strictEqual(projectedBlocked.fulfillment.supplierCode, "FAZERCARDS", "Admin must show frozen supplier identity before an attempt exists.");
     assert.strictEqual(projectedBlocked.fulfillment.handoffStatus, "BLOCKED", "Admin must show durable paid-handoff state.");
     assert.strictEqual(projectedBlocked.fulfillment.failureCode, "FROZEN_ROUTE_NOT_EXECUTABLE", "Admin must show the safe pre-attempt blocker.");
+    assert.deepStrictEqual(projectedBlocked.fulfillment.failureBlockers, ["PROVIDER_FEATURE_GATE_OFF"], "Admin must show safe frozen-readiness blocker codes.");
 }
 
 function main() {

@@ -4,6 +4,7 @@ const assert = require("assert");
 const fs = require("fs");
 const path = require("path");
 const { createPaidFulfillmentHandoffService } = require("../services/paidFulfillmentHandoffService");
+const { ensurePaidOrderFulfillmentWork } = require("../services/paidFulfillmentRoutingService");
 
 const ROOT = path.join(__dirname, "../..");
 const read = file => fs.readFileSync(path.join(ROOT, file), "utf8");
@@ -83,7 +84,7 @@ function fakeRepositories(initial, clock) {
         async block(orderId, claimToken, now, failure) {
             const order = orders.get(orderId); const handoff = order?.fulfilment?.paidHandoff;
             if (!handoff || handoff.claimToken !== claimToken) return null;
-            Object.assign(handoff, { status: "BLOCKED", retryable: failure.retryable, availableAt: failure.availableAt, claimToken: "", leaseExpiresAt: null, lastError: { code: failure.errorCode, reason: failure.reason, recordedAt: now } });
+            Object.assign(handoff, { status: "BLOCKED", retryable: failure.retryable, availableAt: failure.availableAt, claimToken: "", leaseExpiresAt: null, lastError: { code: failure.errorCode, reason: failure.reason, blockers: failure.blockers, recordedAt: now } });
             order.operationalReferences.push({ type: "paid_fulfillment_start_failed", reason: failure.reason, errorCode: failure.errorCode, recordedAt: now });
             return clone(order);
         },
@@ -109,12 +110,50 @@ async function main() {
     await Promise.all([concurrentService.processOrder("AZL-CONCURRENT"), concurrentService.processOrder("AZL-CONCURRENT")]);
     assert.strictEqual(concurrentStarts, 1, "Atomic handoff claim must allow only one fulfillment starter.");
 
-    const blockedRepos = fakeRepositories([newPaidFixture("AZL-BLOCKED", now)], clock);
-    const blockedService = createPaidFulfillmentHandoffService({ repositories: blockedRepos, clock, ensurePaidOrderFulfillmentWork: async () => ({ created: false, reason: "SUPPLIER_FULFILLMENT_START_FAILED", errorCode: "FROZEN_ROUTE_NOT_EXECUTABLE" }) });
-    const blocked = await blockedService.processOrder("AZL-BLOCKED");
-    assert.strictEqual(blocked.retryable, true);
-    assert.strictEqual(blockedRepos.orders.get("AZL-BLOCKED").fulfilment.paidHandoff.lastError.code, "FROZEN_ROUTE_NOT_EXECUTABLE");
-    assert.strictEqual(blockedRepos.orders.get("AZL-BLOCKED").operationalReferences.length, 1, "Pre-attempt failures must be durable and Admin-visible.");
+    const diagnosticOrder = newPaidFixture("AZL-DIAGNOSTIC", now);
+    diagnosticOrder.product = { gameCode: "mlbb", packageCode: "MLBB-WEEKLY.PASS" };
+    diagnosticOrder.commercial = { region: "TH" };
+    Object.assign(diagnosticOrder.fulfilment.routeSnapshot, { productCode: "mlbb", packageCode: "MLBB-WEEKLY.PASS", customerMarket: "TH" });
+    const diagnosticResults = new Map();
+    const diagnosticLogs = [];
+    const originalConsoleError = console.error;
+    console.error = (...args) => { diagnosticLogs.push(args); };
+    try {
+        for (const blocker of ["SUPPLIER_ADAPTER_NOT_READY", "PROVIDER_FEATURE_GATE_OFF"]) {
+            const result = await ensurePaidOrderFulfillmentWork(diagnosticOrder, {
+                findAttemptByIdempotency: async () => null,
+                startSupplierFulfillment: async () => {
+                    throw Object.assign(new Error("safe diagnostic"), {
+                        code: "FROZEN_ROUTE_NOT_EXECUTABLE",
+                        details: { blockers: [blocker, "NOT_AN_ALLOWLISTED_BLOCKER"] }
+                    });
+                }
+            });
+            diagnosticResults.set(blocker, result);
+            assert.deepStrictEqual(result.blockers, [blocker], `${blocker} must survive routing as an allowlisted diagnostic.`);
+        }
+    } finally {
+        console.error = originalConsoleError;
+    }
+    assert.strictEqual(diagnosticLogs.length, 2, "Each failed start must emit one sanitized diagnostic log.");
+    diagnosticLogs.forEach(([, fields]) => {
+        assert.deepStrictEqual(Object.keys(fields).sort(), ["blockers", "errorCode", "orderId"], "Diagnostic logs must contain only safe fields.");
+        assert.strictEqual(fields.orderId, "AZL-DIAGNOSTIC");
+        assert.strictEqual(fields.errorCode, "FROZEN_ROUTE_NOT_EXECUTABLE");
+        assert(!JSON.stringify(fields).includes("NOT_AN_ALLOWLISTED_BLOCKER"), "Unapproved diagnostic values must not reach logs.");
+    });
+
+    for (const blocker of ["SUPPLIER_ADAPTER_NOT_READY", "PROVIDER_FEATURE_GATE_OFF"]) {
+        const orderId = `AZL-BLOCKED-${blocker}`;
+        const blockedRepos = fakeRepositories([newPaidFixture(orderId, now)], clock);
+        const blockedService = createPaidFulfillmentHandoffService({ repositories: blockedRepos, clock, ensurePaidOrderFulfillmentWork: async () => diagnosticResults.get(blocker) });
+        const blocked = await blockedService.processOrder(orderId);
+        const persisted = blockedRepos.orders.get(orderId);
+        assert.strictEqual(blocked.retryable, true);
+        assert.strictEqual(persisted.fulfilment.paidHandoff.lastError.code, "FROZEN_ROUTE_NOT_EXECUTABLE");
+        assert.deepStrictEqual(persisted.fulfilment.paidHandoff.lastError.blockers, [blocker], `${blocker} must be durable.`);
+        assert.strictEqual(persisted.operationalReferences.length, 1, "Pre-attempt failures must be durable and Admin-visible.");
+    }
 
     const restartOrder = fixture("AZL-RESTART");
     restartOrder.fulfilment.paidHandoff = { version: 1, status: "CLAIMED", requestedAt: now, availableAt: now, attemptCount: 1, retryable: true, claimToken: "dead-worker", claimedAt: now, leaseExpiresAt: new Date(now.getTime() - 1), completedAt: null, lastError: null };
@@ -190,7 +229,7 @@ async function main() {
     assert(!handoffSource.includes("repos.ensure"), "Immediate processing must require an already persisted handoff.");
     assert(handoffSource.includes('"fulfilment.paidHandoff.status": "PENDING"'), "Recovery selection must require explicit paidHandoff state.");
 
-    console.log(JSON.stringify({ result: "PASS", walletPaidHandoff: true, verifiedWebhookHandoff: true, durableFailure: true, restartRecovery: true, concurrentClaims: 1, safePreProviderResumes: safeDispatches, uncertainProviderResubmissions: unsafeDispatches, historicalOrdersSelected: historicalRecovery.processed, historicalSupplierStarts: historicalStarts, historicalSupplierDispatches: historicalDispatches, providerCalls: 0, walletDebits: 0, productionWrites: 0 }, null, 2));
+    console.log(JSON.stringify({ result: "PASS", walletPaidHandoff: true, verifiedWebhookHandoff: true, durableFailure: true, frozenDiagnostics: [...diagnosticResults.keys()], sanitizedDiagnosticLogs: diagnosticLogs.length, restartRecovery: true, concurrentClaims: 1, safePreProviderResumes: safeDispatches, uncertainProviderResubmissions: unsafeDispatches, historicalOrdersSelected: historicalRecovery.processed, historicalSupplierStarts: historicalStarts, historicalSupplierDispatches: historicalDispatches, providerCalls: 0, walletDebits: 0, productionWrites: 0 }, null, 2));
 }
 
 main().catch(error => { console.error("VERIFY_PAID_FULFILLMENT_HANDOFF_FAILED:", error.stack || error); process.exitCode = 1; });

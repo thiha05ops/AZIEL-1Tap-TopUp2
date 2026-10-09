@@ -304,6 +304,34 @@ function stopBackgroundWorkers() {
     backgroundWorkersStarted = false;
 }
 
+function isPaidFulfillmentRecoveryEnabled(env = process.env) {
+    return String(env.PAID_FULFILLMENT_RECOVERY_ENABLED || "").trim().toLowerCase() === "true";
+}
+
+function startPaidFulfillmentBackgroundRecovery(options = {}) {
+    const env = options.env || process.env;
+    if (!isPaidFulfillmentRecoveryEnabled(env)) return { enabled: false, initialRun: null, timer: null };
+    const recover = options.recover || (input => require("./services/paidFulfillmentHandoffService").recoverPaidFulfillmentHandoffs(input));
+    const schedule = options.setInterval || setInterval;
+    const registerTimer = options.registerTimer || (timer => backgroundTimers.add(timer));
+    const reportError = options.reportError || (error => console.error("Paid fulfillment recovery failed:", error?.code || error?.name || "UNKNOWN"));
+    const paidFulfillmentRecovery = async () => {
+        try {
+            return await recover({
+                limit: Math.max(1, Math.min(100, Number(env.PAID_FULFILLMENT_RECOVERY_BATCH_SIZE || 25)))
+            });
+        } catch (error) {
+            reportError(error);
+            return null;
+        }
+    };
+    const initialRun = paidFulfillmentRecovery();
+    const timer = schedule(paidFulfillmentRecovery, Math.max(60_000, Number(env.PAID_FULFILLMENT_RECOVERY_INTERVAL_MS || 5 * 60 * 1000)));
+    timer?.unref?.();
+    registerTimer(timer);
+    return { enabled: true, initialRun, timer };
+}
+
 function startBackgroundWorkers() {
     if (backgroundWorkersStarted || !startup.databaseReady || shuttingDown) return;
     const workersStartedAt = performance.now();
@@ -322,19 +350,7 @@ function startBackgroundWorkers() {
     const couponCleanupTimer = setInterval(couponCleanup, Math.max(60_000, Number(process.env.COUPON_CLEANUP_INTERVAL_MS || 5 * 60 * 1000)));
     couponCleanupTimer.unref?.();
     backgroundTimers.add(couponCleanupTimer);
-    const paidFulfillmentRecovery = async () => {
-        try {
-            await require("./services/paidFulfillmentHandoffService").recoverPaidFulfillmentHandoffs({
-                limit: Math.max(1, Math.min(100, Number(process.env.PAID_FULFILLMENT_RECOVERY_BATCH_SIZE || 25)))
-            });
-        } catch (error) {
-            console.error("Paid fulfillment recovery failed:", error?.code || error?.name || "UNKNOWN");
-        }
-    };
-    paidFulfillmentRecovery();
-    const paidFulfillmentTimer = setInterval(paidFulfillmentRecovery, Math.max(60_000, Number(process.env.PAID_FULFILLMENT_RECOVERY_INTERVAL_MS || 5 * 60 * 1000)));
-    paidFulfillmentTimer.unref?.();
-    backgroundTimers.add(paidFulfillmentTimer);
+    startPaidFulfillmentBackgroundRecovery();
     if (require("./services/suppliers/wonddAdapter").hasAnyAutoFulfillmentEnabled()) {
         const processor = require("./services/suppliers/wonddFulfillmentProcessor").processor;
         processor.recoverDue().catch(() => null);
@@ -492,6 +508,7 @@ if (require.main === module) {
 module.exports = {
     app, attemptMongoConnection, configureApplication: configureDatabaseApplication,
     configureBaseApplication, configureDatabaseApplication, databaseReadinessGate, io,
-    readinessSnapshot, server, shutdown, startBackgroundWorkers, startServer, startup,
+    isPaidFulfillmentRecoveryEnabled, readinessSnapshot, server, shutdown, startBackgroundWorkers,
+    startPaidFulfillmentBackgroundRecovery, startServer, startup,
     stopBackgroundWorkers
 };

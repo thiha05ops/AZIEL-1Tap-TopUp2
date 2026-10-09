@@ -23,6 +23,12 @@ const RETRYABLE_PRE_ATTEMPT_ERRORS = new Set([
     "SUPPLIER_NOT_FOUND"
 ]);
 const UNSAFE_SUBMISSION_STATES = new Set(["SUBMISSION_IN_FLIGHT", "SUBMISSION_UNCERTAIN", "ACCEPTED"]);
+const FROZEN_ROUTE_BLOCKER_CODES = new Set([
+    "MAPPING_ARCHIVED", "MAPPING_DISABLED", "MAPPING_EXECUTION_NOT_API",
+    "EXACT_MAPPING_INCOMPLETE", "SUPPLIER_NOT_API_READY", "SUPPLIER_ADAPTER_NOT_READY",
+    "PROVIDER_FEATURE_GATE_OFF", "FULFILLMENT_PROCESSOR_NOT_READY",
+    "SUPPLIER_MAPPING_NOT_READY", "INPUT_NOT_READY", "FULFILLMENT_NOT_READY"
+]);
 
 const clean = value => String(value == null ? "" : value).trim();
 const token = () => crypto.randomBytes(16).toString("hex");
@@ -105,7 +111,7 @@ function defaultRepositories(Order = CommerceOrder, Attempt = FulfillmentAttempt
                     "fulfilment.paidHandoff.availableAt": failure.availableAt,
                     "fulfilment.paidHandoff.claimToken": "",
                     "fulfilment.paidHandoff.leaseExpiresAt": null,
-                    "fulfilment.paidHandoff.lastError": { code: failure.errorCode, reason: failure.reason, recordedAt: now },
+                    "fulfilment.paidHandoff.lastError": { code: failure.errorCode, reason: failure.reason, blockers: failure.blockers, recordedAt: now },
                     updatedAt: now
                 },
                 $push: { operationalReferences: { type: "paid_fulfillment_start_failed", reason: failure.reason, errorCode: failure.errorCode, recordedAt: now } }
@@ -159,10 +165,14 @@ function createPaidFulfillmentHandoffService(dependencies = {}) {
         }
         const attemptCount = Number(order.fulfilment?.paidHandoff?.attemptCount || 1);
         const errorCode = clean(result?.errorCode || result?.reason || "PAID_FULFILLMENT_START_FAILED");
+        const blockers = errorCode === "FROZEN_ROUTE_NOT_EXECUTABLE"
+            ? [...new Set((Array.isArray(result?.blockers) ? result.blockers : []).filter(code => FROZEN_ROUTE_BLOCKER_CODES.has(code)))].sort()
+            : [];
         const retryable = RETRYABLE_PRE_ATTEMPT_ERRORS.has(errorCode) && attemptCount < MAX_ATTEMPTS;
         await repos.block(orderId, claimToken, clock(), {
             reason: clean(result?.reason || "PAID_FULFILLMENT_START_FAILED"),
             errorCode,
+            blockers,
             retryable,
             availableAt: retryable ? new Date(clock().getTime() + retryMs) : null
         });

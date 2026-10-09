@@ -6,6 +6,14 @@ const { FULFILLMENT_ROUTE_TYPES, FULFILLMENT_STATUSES } = require("../models/Ful
 const { isManualFulfillmentAllowed } = require("./fulfillmentCapabilityService");
 const { resolveCheckoutRouteSnapshot } = require("./supplierProductionSelectionService");
 
+const FROZEN_ROUTE_BLOCKER_CODES = new Set([
+    "MAPPING_ARCHIVED", "MAPPING_DISABLED", "MAPPING_EXECUTION_NOT_API",
+    "EXACT_MAPPING_INCOMPLETE", "SUPPLIER_NOT_API_READY", "SUPPLIER_ADAPTER_NOT_READY",
+    "PROVIDER_FEATURE_GATE_OFF", "FULFILLMENT_PROCESSOR_NOT_READY",
+    "SUPPLIER_MAPPING_NOT_READY", "INPUT_NOT_READY", "FULFILLMENT_NOT_READY"
+]);
+const safeFrozenRouteBlockers = value => [...new Set((Array.isArray(value) ? value : []).filter(code => FROZEN_ROUTE_BLOCKER_CODES.has(code)))].sort();
+
 function fulfillmentIdentity(order = {}) {
     return {
         orderId: order._id,
@@ -63,7 +71,10 @@ async function ensurePaidOrderFulfillmentWork(order = {}, options = {}) {
             } catch (error) {
                 const racedAttempt = await findAttempt(idempotencyKey).catch(() => null);
                 if (racedAttempt) return { created: false, reason: "SUPPLIER_FULFILLMENT_ALREADY_BOUND", attempt: racedAttempt, routeSnapshot };
-                return { created: false, reason: "SUPPLIER_FULFILLMENT_START_FAILED", attempt: null, routeSnapshot, errorCode: error?.code || error?.name || "SUPPLIER_FULFILLMENT_START_FAILED" };
+                const errorCode = error?.code || error?.name || "SUPPLIER_FULFILLMENT_START_FAILED";
+                const blockers = errorCode === "FROZEN_ROUTE_NOT_EXECUTABLE" ? safeFrozenRouteBlockers(error?.details?.blockers) : [];
+                if (errorCode === "FROZEN_ROUTE_NOT_EXECUTABLE") console.error("Paid supplier fulfillment start failed:", { orderId: identity.orderCode, errorCode, blockers });
+                return { created: false, reason: "SUPPLIER_FULFILLMENT_START_FAILED", attempt: null, routeSnapshot, errorCode, blockers };
             }
         }
         if (routeSnapshot.routeType !== FULFILLMENT_ROUTE_TYPES.MANUAL_ADMIN) return { created: false, reason: "SUPPLIER_ROUTE_SNAPSHOT_BOUND", attempt: null, routeSnapshot };
