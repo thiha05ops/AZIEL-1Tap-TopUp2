@@ -26,7 +26,7 @@ async function transitionCommerceOrder(order, target, reason) {
     }
 }
 
-function validateWonddMapping(mapping = {}) {
+function validateWonddMapping(mapping = {}, { frozenRoute = false } = {}) {
     if (!mapping || !mapping.enabled || String(mapping.supplierCode || "").toUpperCase() !== "WONDD") {
         const error = new Error("A verified WonDD package mapping is required.");
         error.code = "WONDD_PACKAGE_MAPPING_MISSING";
@@ -39,12 +39,28 @@ function validateWonddMapping(mapping = {}) {
         throw error;
     }
     const readiness = mapping.mappingMetadata?.readiness || {};
-    if (readiness.supplierMapped !== true || readiness.inputReady !== true || readiness.pricingReady !== true || readiness.fulfillmentReady !== true) {
+    if (readiness.supplierMapped !== true || readiness.inputReady !== true || (!frozenRoute && readiness.pricingReady !== true) || readiness.fulfillmentReady !== true) {
         const error = new Error("WonDD package production readiness is incomplete.");
         error.code = "WONDD_PACKAGE_NOT_PRODUCTION_READY";
         throw error;
     }
     return mapping;
+}
+
+function exactFrozenV2Route(mapping = {}, order = {}) {
+    const route = order?.fulfilment?.routeSnapshot || order?.quoteSnapshot?.supplierRouteSnapshot || null;
+    const customerMarket = String(order?.commercial?.region || order?.product?.region || order?.region || "").trim().toUpperCase();
+    return Number(route?.snapshotVersion) === 2 &&
+        String(route?.routeType || "").toUpperCase() === "SUPPLIER_API" &&
+        String(route?.customerMarket || "").trim().toUpperCase() === customerMarket &&
+        String(route?.supplierMappingId || "") === String(mapping?._id || "") &&
+        String(route?.supplierId || "") === String(mapping?.supplierId || "") &&
+        String(route?.supplierCode || "").trim().toUpperCase() === "WONDD" &&
+        String(route?.productCode || "").trim().toLowerCase() === String(mapping?.productCode || "").trim().toLowerCase() &&
+        String(route?.packageCode || "").trim().toUpperCase() === String(mapping?.packageCode || "").trim().toUpperCase() &&
+        String(route?.supplierProductCode || "") === String(mapping?.supplierProductCode || "") &&
+        String(route?.supplierPackageCode || "") === String(mapping?.supplierPackageCode || "") &&
+        String(route?.executionMode || "").trim().toUpperCase() === "API";
 }
 
 function contractForOrder(mapping, order) {
@@ -118,7 +134,7 @@ function createWonddFulfillmentProcessor(deps = {}) {
         if (attempt.supplierReference || ["SUBMISSION_IN_FLIGHT", "SUBMISSION_UNCERTAIN", "ACCEPTED"].includes(attempt.supplierRequest?.submissionState)) return attempt;
         const [order, mapping] = await Promise.all([Order.findById(attempt.orderId), Mapping.findById(attempt.supplierMappingId)]);
         if (!order) throw Object.assign(new Error("CommerceOrder not found."), { code: "ORDER_NOT_FOUND" });
-        validateWonddMapping(mapping);
+        validateWonddMapping(mapping, { frozenRoute: exactFrozenV2Route(mapping, order) });
         const productCode = String(mapping.productCode).toLowerCase();
         const contract = contractForOrder(mapping, order);
         const serviceCode = contract.transactionalServiceCode;

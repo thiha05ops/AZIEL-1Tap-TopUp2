@@ -6,6 +6,13 @@ const path = require("path");
 const { createFazerCardsAdapter, normalizeProviderOrder, normalizeStatus } = require("../services/suppliers/fazercardsAdapter");
 const { buildFazerCardsFields, buildFazerCardsOrderFields, buildFazerCardsValidationFields } = require("../services/suppliers/fazercardsInputFormatters");
 const { validateFazerCardsMapping, supportsFazerCardsMapping, createFazerCardsFulfillmentProcessor } = require("../services/suppliers/fazercardsFulfillmentProcessor");
+const { contractFingerprint } = require("../services/suppliers/fazercardsFulfillmentContractService");
+
+function withVerifiedContract(mapping) {
+    const contract = { version: 1, decisionVersion: 1, supplierCode: "FAZERCARDS", protocol: "FAZERCARDS_TOPUPS_ORDER_V2", transactionalServiceCode: "", supplierProductCode: mapping.supplierProductCode, sourceSupplierCatalogProductId: "fixture-product", sourceHash: "fixture-source", sourceOfferHash: "fixture-offer", authorityScope: "PRODUCT", noCustomerInput: false, fields: [{ customerField: "userId", providerField: "player_id", required: true, label: "Player ID", type: "text", options: [], constraints: {}, evidenceReference: "fixture", transformationId: "DIRECT" }] };
+    contract.fingerprint = contractFingerprint(contract);
+    return { ...mapping, mappingMetadata: { ...(mapping.mappingMetadata || {}), fulfillmentContract: contract } };
+}
 
 async function main() {
     const requests = [];
@@ -45,16 +52,16 @@ async function main() {
     assert.strictEqual(invalidValidation.providerStatus, "INVALID");
     await assert.rejects(() => adapter.submitTopup({ categoryId: "pubg_mobile_auto", offerId: "60_uc", fields: { player_id: "123456789" }, idempotencyKey: "FUL-1", productCode: "pubg" }), error => error.code === "SUPPLIER_AUTO_FULFILLMENT_DISABLED");
     assert.strictEqual(requests.length, 1, "gate-off submission must make zero transport calls");
-    const mapping = { enabled: true, supplierCode: "FAZERCARDS", productCode: "pubg", region: "TH", executionMode: "API", supplierProductCode: "pubg_mobile_auto", supplierPackageCode: "60_uc", fulfillmentEligibility: { mode: "CUSTOMER_MARKET_ALLOWLIST", allowedCustomerMarkets: ["TH"], evidenceCode: "OPERATOR_CONFIRMED_CAPABILITY", evidenceSource: "isolated verifier", verifiedAt: new Date(), version: 1 }, mappingMetadata: { readiness: { supplierMapped: true, inputReady: true, pricingReady: true, fulfillmentReady: true } } };
+    const mapping = withVerifiedContract({ _id: "m1", supplierId: "supplier-1", enabled: true, supplierCode: "FAZERCARDS", productCode: "pubg", packageCode: "PUBG-60", region: "TH", executionMode: "API", supplierProductCode: "pubg_mobile_auto", supplierPackageCode: "60_uc", fulfillmentEligibility: { mode: "CUSTOMER_MARKET_ALLOWLIST", allowedCustomerMarkets: ["TH"], evidenceCode: "OPERATOR_CONFIRMED_CAPABILITY", evidenceSource: "isolated verifier", verifiedAt: new Date(), version: 1 }, mappingMetadata: { readiness: { supplierMapped: true, inputReady: true, pricingReady: true, fulfillmentReady: true } } });
     assert.strictEqual(validateFazerCardsMapping(mapping), mapping);
     [
         ["mlbb", "mobile_legends_global"], ["freefire", "free_fire_th"], ["hok", "honor_of_kings"], ["valorant", "valorant_th"]
     ].forEach(([productCode, supplierProductCode]) => {
-        const exact = { ...mapping, productCode, supplierProductCode, supplierPackageCode: "provider-offer" };
+        const exact = withVerifiedContract({ ...mapping, productCode, supplierProductCode, supplierPackageCode: "provider-offer" });
         assert(supportsFazerCardsMapping(exact));
         assert.strictEqual(validateFazerCardsMapping(exact), exact);
     });
-    assert(!supportsFazerCardsMapping({ productCode: "freefire", supplierProductCode: "free_fire_global" }));
+    assert(!supportsFazerCardsMapping({ productCode: "freefire", supplierProductCode: "free_fire_global" }), "A mapping without a verified contract must remain unsupported.");
     for (const productCode of ["mlbb", "freefire", "hok", "valorant"]) {
         assert.strictEqual(adapter.isAutoFulfillmentEnabled(productCode), false);
         await assert.rejects(() => adapter.submitTopup({ categoryId: "blocked", offerId: "blocked", fields: { player_id: "123456789" }, idempotencyKey: `BLOCKED-${productCode}`, productCode }), error => error.code === "SUPPLIER_AUTO_FULFILLMENT_DISABLED");
@@ -82,7 +89,7 @@ async function main() {
     const raw = Buffer.from('{"event_id":"evt-1"}'); const signature = `sha256=${crypto.createHmac("sha256", env.FAZERCARDS_WEBHOOK_SECRET).update(raw).digest("hex")}`;
     assert(adapter.verifyWebhookSignature(raw, signature)); assert(!adapter.verifyWebhookSignature(Buffer.from("changed"), signature));
     const attempt = { _id: "a1", fulfillmentId: "FUL-1", orderId: "o1", supplierMappingId: "m1", supplierCodeSnapshot: "FAZERCARDS", status: "IN_PROGRESS", idempotencyKey: "stable-intent-key", supplierReference: "", supplierRequest: {}, async save() { return this; } };
-    const order = { _id: "o1", orderId: "AZL-1", status: "processing", fulfilment: { status: "processing", input: { userId: "123456789" } } };
+    const order = { _id: "o1", orderId: "AZL-1", status: "processing", commercial: { region: "TH" }, product: { gameCode: "pubg", packageCode: "PUBG-60" }, fulfilment: { status: "processing", input: { userId: "123456789" }, routeSnapshot: { snapshotVersion: 2, routeType: "SUPPLIER_API", supplierMappingId: "m1", supplierId: "supplier-1", supplierCode: "FAZERCARDS", productCode: "pubg", packageCode: "PUBG-60", supplierProductCode: "pubg_mobile_auto", supplierPackageCode: "60_uc", supplierMarket: "TH", customerMarket: "TH", executionMode: "API", selectedRole: "PACKAGE_SUPPLIER_SELECTION", fulfillmentContract: mapping.mappingMetadata.fulfillmentContract } } };
     const submitted = [];
     const processor = createFazerCardsFulfillmentProcessor({
         Attempt: { async findById() { return attempt; }, async findOne(query) { return query.status === "IN_PROGRESS" && attempt.status === "IN_PROGRESS" ? attempt : null; } },

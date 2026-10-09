@@ -782,6 +782,7 @@ async function startFulfillmentForOrder(orderId, payload = {}, context = {}) {
     if (supplier.supplierCode === "WONDD") {
         const { verifiedMappingContract } = require("./suppliers/fazercardsFulfillmentContractService");
         const contract = routeSnapshot?.fulfillmentContract || verifiedMappingContract(mapping);
+        const capabilityProductCode = supplierCapabilityProductCode(mapping, supplier);
         if (mapping.executionMode !== SUPPLIER_EXECUTION_MODES.API || contract?.protocol !== "WONDD_GAME_ID_TOPUP" || !String(contract?.transactionalServiceCode || "").trim() || !String(mapping.supplierProductCode || "").trim() || !String(mapping.supplierPackageCode || "").trim()) {
             throw new FulfillmentError("WONDD_PACKAGE_MAPPING_MISSING", "A verified WonDD serviceid and packcode mapping is required.", 409);
         }

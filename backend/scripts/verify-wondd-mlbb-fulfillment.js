@@ -1,4 +1,6 @@
 const assert = require("assert");
+const fs = require("fs");
+const path = require("path");
 const {
     createWonddAdapter,
     normalizeWonddError,
@@ -6,6 +8,8 @@ const {
 } = require("../services/suppliers/wonddAdapter");
 const { createWonddFulfillmentProcessor, validateWonddMapping } = require("../services/suppliers/wonddFulfillmentProcessor");
 const { contractFingerprint, buildFieldsFromContract } = require("../services/suppliers/fazercardsFulfillmentContractService");
+
+const ROOT = path.resolve(__dirname, "../..");
 
 function response(payload) {
     return { ok: true, status: 200, async text() { return JSON.stringify(payload); } };
@@ -65,18 +69,24 @@ async function adapterContractTests() {
 }
 
 async function stateAuthorityTests() {
+    const fulfillmentSource = fs.readFileSync(path.join(ROOT, "backend/services/fulfillmentService.js"), "utf8");
+    const capabilityDeclaration = fulfillmentSource.indexOf("const capabilityProductCode = supplierCapabilityProductCode(mapping, supplier);");
+    assert(capabilityDeclaration >= 0 && fulfillmentSource.indexOf("adapter.isAutoFulfillmentEnabled(capabilityProductCode)", capabilityDeclaration) > capabilityDeclaration, "WonDD fulfillment must derive its supplier capability identity before checking the feature gate.");
     const records = new Map();
     class Attempt {
         constructor(value) { Object.assign(this, value); this.saves = 0; records.set(String(this._id), this); }
         async save() { this.saves += 1; return this; }
         static async findById(id) { return records.get(String(id)) || null; }
     }
-    const order = { _id: "order-1", orderId: "AZ-1", status: "processing", fulfilment: { status: "processing", input: { userId: "123456789", zoneId: "1234" } } };
+    const order = { _id: "order-1", orderId: "AZ-1", status: "processing", commercial: { region: "TH" }, product: { gameCode: "mlbb", packageCode: "MLBB-PACKAGE" }, fulfilment: { status: "processing", input: { userId: "123456789", zoneId: "1234" } } };
     const contract={version:1,decisionVersion:1,supplierCode:"WONDD",protocol:"WONDD_GAME_ID_TOPUP",transactionalServiceCode:"mlbb",supplierProductCode:"9622",sourceSupplierCatalogProductId:"product-mlbb",sourceHash:"hash",sourceOfferHash:"offer-hash",authorityScope:"PRODUCT",noCustomerInput:false,fields:[{customerField:"userId",providerField:"gameid",required:true,label:"User ID",type:"numeric-text",options:[],constraints:{},evidenceReference:"supplier docs",transformationId:"JOIN_WITH_SPACE"},{customerField:"zoneId",providerField:"gameid",required:true,label:"Zone ID",type:"numeric-text",options:[],constraints:{},evidenceReference:"supplier docs",transformationId:"JOIN_WITH_SPACE"}]};contract.fingerprint=contractFingerprint(contract);
-    const mapping = { _id: "map-1", enabled: true, executionMode: "API", supplierCode: "WONDD", productCode: "mlbb", supplierProductCode: "9622", supplierPackageCode: "verified-pack", mappingMetadata: { fulfillmentContract: contract, readiness: { supplierMapped: true, inputReady: true, pricingReady: true, fulfillmentReady: true } } };
+    const mapping = { _id: "map-1", supplierId: "supplier-wondd", enabled: true, executionMode: "API", supplierCode: "WONDD", productCode: "mlbb", packageCode: "MLBB-PACKAGE", supplierProductCode: "9622", supplierPackageCode: "verified-pack", mappingMetadata: { fulfillmentContract: contract, readiness: { supplierMapped: true, inputReady: true, pricingReady: true, fulfillmentReady: true } } };
     validateWonddMapping(mapping);
     assert.throws(() => validateWonddMapping({ ...mapping, supplierPackageCode: "" }), error => error.code === "WONDD_PACKAGE_MAPPING_MISSING");
-    assert.throws(() => validateWonddMapping({ ...mapping, mappingMetadata: { ...mapping.mappingMetadata, readiness: { ...mapping.mappingMetadata.readiness, pricingReady: false } } }), error => error.code === "WONDD_PACKAGE_NOT_PRODUCTION_READY");
+    const frozenPricingFalse = { ...mapping, mappingMetadata: { ...mapping.mappingMetadata, readiness: { ...mapping.mappingMetadata.readiness, pricingReady: false } } };
+    assert.throws(() => validateWonddMapping(frozenPricingFalse), error => error.code === "WONDD_PACKAGE_NOT_PRODUCTION_READY");
+    validateWonddMapping(frozenPricingFalse, { frozenRoute: true });
+    order.fulfilment.routeSnapshot = { snapshotVersion: 2, routeType: "SUPPLIER_API", supplierMappingId: "map-1", supplierId: "supplier-wondd", supplierCode: "WONDD", productCode: "mlbb", packageCode: "MLBB-PACKAGE", supplierProductCode: "9622", supplierPackageCode: "verified-pack", customerMarket: "TH", supplierMarket: "GLOBAL", executionMode: "API", selectedRole: "PACKAGE_SUPPLIER_SELECTION", fulfillmentContract: contract };
     const transitions = [];
     const scheduled = [];
     let submits = 0;
@@ -92,10 +102,11 @@ async function stateAuthorityTests() {
         async checkStatus() { return statusResult; },
         dryRunTopup(input) { return { status: "DRY_RUN_VALID", payload: input }; }
     };
+    let processorMapping = mapping;
     const processor = createWonddFulfillmentProcessor({
         Attempt,
         Order: { async findById() { return order; } },
-        Mapping: { async findById() { return mapping; } },
+        Mapping: { async findById() { return processorMapping; } },
         adapter,
         transitionOrder: async (_order, target) => transitions.push(target),
         schedule: (fn, delay) => scheduled.push({ fn, delay })
@@ -103,6 +114,7 @@ async function stateAuthorityTests() {
     const attempt = new Attempt({ _id: "attempt-1", fulfillmentId: "FUL-1", orderId: "order-1", supplierMappingId: "map-1", supplierCodeSnapshot: "WONDD", status: "IN_PROGRESS", supplierRequest: {}, supplierResult: {} });
     const resolvedDryRun = await processor.dryRunForAttempt(attempt._id);
     assert.strictEqual(resolvedDryRun.payload.packCode, "verified-pack", "dry run must resolve authoritative mapping");
+    processorMapping = frozenPricingFalse;
     await processor.submit(attempt._id);
     assert.strictEqual(submits, 1);
     assert.strictEqual(attempt.supplierReference, "W-100", "supplier orderid must persist");
