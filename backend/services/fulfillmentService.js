@@ -14,7 +14,7 @@ const { ADMIN_AUDIT_ACTIONS, writeAdminAudit } = require("./adminAuditService");
 const { ORDER_STATES, getAllowedNextStatuses, transitionOrder } = require("./orderStateService");
 const { getSupplierAdapter, normalizeSupplierResult } = require("./supplierAdapterRegistry");
 const { assessProductionMapping, setProductionRole } = require("./supplierProductionSelectionService");
-const { READINESS_MODES, assessMappingReadiness } = require("./supplierMappingReadinessService");
+const { basicCandidateBlockers } = require("./supplierEligibilityRouteResolver");
 const { supplierCapabilityProductCode } = require("./fulfillmentCapabilityService");
 const commerceOrderRepository = require("./commerce/orderRepository");
 const {
@@ -55,7 +55,7 @@ function isMarketDecoupledV2RouteSnapshot({ routeSnapshot = null, mapping = null
         String(routeSnapshot.supplierProductCode || "").trim() === String(mapping.supplierProductCode || "").trim() &&
         String(routeSnapshot.supplierPackageCode || "").trim() === String(mapping.supplierPackageCode || "").trim() &&
         String(routeSnapshot.executionMode || "").trim().toUpperCase() === "API" &&
-        ["PRIMARY", "PACKAGE_SUPPLIER_SELECTION"].includes(String(routeSnapshot.selectedRole || "").trim().toUpperCase()) &&
+        String(routeSnapshot.selectedRole || "").trim().toUpperCase() === "PRIMARY" &&
         (!persistedSupplierMarket || persistedSupplierMarket === String(mapping.region || "").trim().toUpperCase());
 }
 
@@ -734,12 +734,13 @@ async function startFulfillmentForOrder(orderId, payload = {}, context = {}) {
         assertFulfillmentStartAllowed(order, financialAttempts);
     }
     if (!mapping || mapping.archivedAt || !mapping.enabled) throw new FulfillmentError("SUPPLIER_MAPPING_NOT_FOUND", "Supplier mapping not found.", 404);
+    if (mapping.productionRole !== "PRIMARY") throw new FulfillmentError("SUPPLIER_MAPPING_NOT_PRIMARY", "The mapping is not the explicitly selected PRIMARY production route.", 409);
+
     const supplier = await Supplier.findById(mapping.supplierId);
     if (!supplier) throw new FulfillmentError("SUPPLIER_NOT_FOUND", "Supplier not found.", 404);
     if (!supplier.enabled) throw new FulfillmentError("SUPPLIER_DISABLED", "Supplier is disabled.");
 
     const routeSnapshot = order.fulfilment?.routeSnapshot || order.quoteSnapshot?.supplierRouteSnapshot || null;
-    if (!routeSnapshot && mapping.productionRole !== "PRIMARY") throw new FulfillmentError("SUPPLIER_MAPPING_NOT_PRIMARY", "The mapping is not the explicitly selected PRIMARY production route.", 409);
     const customerMarket = normalizeRegion(order.commercial?.region || order.product?.region || order.region || "MM");
     const marketDecoupledV2 = isCommerceOrder && isMarketDecoupledV2RouteSnapshot({ routeSnapshot, mapping, customerMarket });
     if (
@@ -756,17 +757,6 @@ async function startFulfillmentForOrder(orderId, payload = {}, context = {}) {
     const adapter = getSupplierAdapter(supplier);
     if (supplier.mode === SUPPLIER_MODES.API && !adapter.isConfigured()) {
         throw new FulfillmentError("SUPPLIER_ADAPTER_NOT_CONFIGURED", "Supplier API adapter is not configured.", 409);
-    }
-    if (isCommerceOrder && routeSnapshot) {
-        const frozen = assessMappingReadiness({
-            mode: READINESS_MODES.FROZEN_ORDER_EXECUTABLE,
-            mapping: mapping.toObject ? mapping.toObject() : mapping,
-            supplier: supplier.toObject ? supplier.toObject() : supplier,
-            customerMarket,
-            adapter,
-            eligibilityOverride: routeSnapshot.eligibility || mapping.fulfillmentEligibility
-        });
-        if (!frozen.ready) throw new FulfillmentError("FROZEN_ROUTE_NOT_EXECUTABLE", `Frozen route is no longer executable: ${frozen.blockers.join(",")}`, 409);
     }
     if (supplier.supplierCode === "WONDD") {
         const { resolveWonddCatalogIdentity } = require("./suppliers/wonddCatalogConfig");
@@ -789,11 +779,11 @@ async function startFulfillmentForOrder(orderId, payload = {}, context = {}) {
         const supplierCost = Number(regionalPrice?.supplierCost);
         const sellingPrice = Number(regionalPrice?.amount);
         const mappingForAssessment = mapping.toObject ? mapping.toObject() : mapping;
-        const marketDecoupledAssessment = marketDecoupledV2 ? assessMappingReadiness({ mode: READINESS_MODES.FROZEN_ORDER_EXECUTABLE, mapping: { ...mappingForAssessment, fulfillmentEligibility: routeSnapshot.eligibility }, supplier: supplier.toObject ? supplier.toObject() : supplier, customerMarket, adapter, eligibilityOverride: routeSnapshot.eligibility }) : null;
+        const marketDecoupledAssessment = marketDecoupledV2 ? basicCandidateBlockers({ mapping: { ...mappingForAssessment, fulfillmentEligibility: routeSnapshot.eligibility }, supplier: supplier.toObject ? supplier.toObject() : supplier, pkg: catalogPackage, customerMarket, adapter }) : null;
         if (marketDecoupledV2 && marketDecoupledAssessment.blockers.length) {
             throw new FulfillmentError("SUPPLIER_MARKET_DECOUPLED_ROUTE_NOT_PRODUCTION_READY", `Supplier market-decoupled readiness is incomplete: ${marketDecoupledAssessment.blockers.join(",")}`, 409);
         }
-        if (!routeSnapshot && !marketDecoupledV2 && (
+        if (!marketDecoupledV2 && (
             readiness.supplierMapped !== true ||
             readiness.inputReady !== true ||
             readiness.pricingReady !== true ||

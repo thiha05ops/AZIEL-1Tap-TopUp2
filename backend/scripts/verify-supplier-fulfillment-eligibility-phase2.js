@@ -197,13 +197,9 @@ function verifyRuntimeRemainsLegacy() {
     assert(!selection.includes("supplierFulfillmentEligibilityService"));
     assert(selection.includes("region: clean(region).toUpperCase()"));
     assert(selection.includes("region: mapping.region"));
-    assert(selection.includes("snapshotVersion: 2") && selection.includes("supplierMappingId: String(mapping._id)"), "v2 routes must freeze one exact mapping identity.");
-    assert(selection.includes("customerMarket: upper(customerMarket)") && selection.includes("supplierMarket: upper(mapping.region)"), "customer and supplier markets must remain distinct.");
-    assert(selection.includes("PACKAGE_SUPPLIER_SELECTION_REQUIRED") && selection.includes("SELECTED_MAPPING_INVALID"), "selected routing must fail closed.");
-    assert(!selection.match(/resolveSelectedCheckoutRouteSnapshot[\s\S]{0,1800}productionRole:\s*ROLES\.BACKUP/), "selected routing must not scan BACKUP mappings.");
+    assert(selection.includes("pilotSelected") && selection.includes("snapshotVersion: 2"), "v2 emission must be limited to the later exact scoped pilot.");
     const capability = read("backend/services/fulfillmentCapabilityService.js");
-    assert(capability.includes("normalizeRegion(context.region || mapping.region)"), "capability evaluation must normalize the explicit customer region.");
-    assert(capability.includes("supplierRouteMarket: mapping.region"), "supplier-account market must remain mapping-authoritative and distinct from customer region.");
+    assert(capability.includes("normalizeRegion(mapping.region) !== normalizedRegion"));
     const phase2 = read("backend/scripts/backfill-supplier-fulfillment-eligibility.js");
     assert(!phase2.includes("submitTopup("));
     assert(!phase2.includes("/topups/order"));

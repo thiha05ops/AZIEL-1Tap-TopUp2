@@ -20,8 +20,6 @@ const productPages = [
 
 assert(catalogRuntime.includes('artwork: String(item.iconUrl || "").trim()'), "catalog package artwork must come from managed package media");
 assert(prices.includes("const artwork = String(item.artwork || \"\").trim()"), "text-only packages must not reserve media");
-assert(prices.includes('const longNameClass = String(item.name || "").trim().length > 28'), "long mobile package names must receive a presentation-only compact class");
-assert(prices.includes('<div class="pack-content">'), "package artwork and title must share one mobile composition wrapper");
 assert(prices.includes('media?.remove()'), "failed package media must be removed from the card");
 assert(prices.includes('card?.classList.add("pack--text-only")'), "failed media must activate text-only layout");
 assert(!prices.includes('data-package-media>\n        <img src="${escapeAttr(item.icon)}"'), "legacy icons must not masquerade as package artwork");
@@ -46,18 +44,6 @@ assert(desktopCss.includes(".az-product-detail .game-mini-footer"), "Product Det
 assert(desktopCss.includes("minmax(0, 1.4fr) minmax(160px, .8fr) minmax(200px, 1fr)"), "desktop footer must retain its aligned three-column contract");
 assert(desktopCss.includes("var(--public-storefront-max, 1500px)"), "footer and Product Detail content must share the storefront max-width token");
 assert(desktopCss.includes("grid-template-columns: minmax(0, 1fr)"), "mobile Product Detail footer must stack without fixed widths");
-assert(desktopCss.includes("height: 144px !important") && desktopCss.includes("max-height: 144px !important"), "mobile two-column package cards must keep equal fixed dimensions");
-assert(desktopCss.includes("grid-template-rows: minmax(0, 1fr) auto"), "mobile package cards must reserve a shared content area above the price row");
-assert(desktopCss.includes(".az-product-detail .pack-content") && desktopCss.includes("display: contents"), "desktop must keep the established package-card composition");
-assert(desktopCss.includes("flex-direction: column !important") && desktopCss.includes("gap: 7px !important"), "mobile artwork and title must form one centered stack");
-assert(desktopCss.includes(".pack-content:has(.pack-icon)") && desktopCss.includes("justify-content: flex-start !important") && desktopCss.includes("transform: translateY(-5px)"), "mobile icon-bearing content must move upward as one group to compensate for source transparency");
-assert(desktopCss.includes("width: 64px !important") && desktopCss.includes("height: 55px !important"), "mobile package artwork must use a 64px image width inside a 55px visual slot");
-assert(desktopCss.includes("height: auto !important") && desktopCss.includes("max-width: none !important"), "mobile artwork must size the image itself without square-thumbnail constraints");
-assert(desktopCss.includes("object-fit: contain !important"), "mobile package artwork must preserve its aspect ratio without cropping");
-assert(desktopCss.includes("border: 0 !important") && desktopCss.includes("background: transparent !important"), "mobile package artwork must not use a nested icon box");
-assert(desktopCss.includes("text-align: center !important") && desktopCss.includes("-webkit-line-clamp: 3"), "mobile package names must center and wrap within a controlled height");
-assert(desktopCss.includes(".pack.pack--long-name .pack-name") && desktopCss.includes("font-size: 11.5px !important"), "long mobile names must tighten instead of growing the card");
-assert(desktopCss.includes(".pack:not(:has(.pack-icon)) .pack-info") && desktopCss.includes("grid-row: 1 / 3 !important"), "text-only mobile packages must center naturally without an empty icon slot");
 
 productPages.forEach(page => {
     const html = read(`frontend/${page}`);

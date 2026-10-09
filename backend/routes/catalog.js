@@ -72,17 +72,9 @@ const {
     PackageMarketPublicationError,
     setPackageMarketPublication
 } = require("../services/packageMarketPublicationService");
-const {
-    PackageSupplierCandidateError,
-    getPackageSupplierCandidates
-} = require("../services/packageSupplierCandidateService");
-const {
-    PackageSupplierSelectionError,
-    setPackageSupplierSelection
-} = require("../services/packageSupplierSelectionService");
 
 function sendAdminCatalogError(res, error) {
-    if (error instanceof CatalogAdminError || error instanceof PackageMarketPublicationError || error instanceof PackageSupplierCandidateError || error instanceof PackageSupplierSelectionError || error instanceof MediaError || error instanceof StorageError || error instanceof GameBannerError || error instanceof StorefrontSectionError || error instanceof AdminPricingControlCenterError) {
+    if (error instanceof CatalogAdminError || error instanceof PackageMarketPublicationError || error instanceof MediaError || error instanceof StorageError || error instanceof GameBannerError || error instanceof StorefrontSectionError || error instanceof AdminPricingControlCenterError) {
         return res.status(error.statusCode || 400).json({
             success: false,
             code: error.code,
@@ -532,35 +524,6 @@ router.get("/admin/catalog/products/:productCode/packages", adminMiddleware, req
             success: false,
             message: "Catalog data unavailable"
         });
-    }
-});
-
-router.get("/admin/catalog/products/:productCode/packages/:packageCode/supplier-selection", adminMiddleware, requireAdminPermission(PERMISSIONS.CATALOG_READ), async (req, res) => {
-    try {
-        const result = await getPackageSupplierCandidates({
-            productCode: req.params.productCode,
-            packageCode: req.params.packageCode,
-            customerMarket: req.query?.customerMarket
-        });
-        return res.json({ success: true, ...result });
-    } catch (error) {
-        return sendAdminCatalogError(res, error);
-    }
-});
-
-router.put("/admin/catalog/products/:productCode/packages/:packageCode/supplier-selection", adminMiddleware, requireAdminPermission(PERMISSIONS.OWNER_ROUTING_MANAGE), async (req, res) => {
-    try {
-        const result = await setPackageSupplierSelection({
-            productCode: req.params.productCode,
-            packageCode: req.params.packageCode,
-            customerMarket: req.body?.customerMarket,
-            supplierMappingId: req.body?.supplierMappingId,
-            expectedDecisionVersion: req.body?.expectedDecisionVersion,
-            reason: req.body?.reason
-        }, { actor: req.admin, req });
-        return res.json({ success: true, ...result });
-    } catch (error) {
-        return sendAdminCatalogError(res, error);
     }
 });
 
@@ -1309,21 +1272,6 @@ router.patch("/admin/catalog/products/:productCode/packages/:packageCode/present
             includeAssetProjection: true,
             includeAdminPricing: true
         });
-        if (result.changed) {
-            await writeAdminAudit({
-                actor: req.admin,
-                req,
-                action: ADMIN_AUDIT_ACTIONS.CATALOG_PACKAGE_ICON_ATTACHED,
-                resourceType: "CatalogPackage",
-                resourceId: `${result.package.productCode}/${result.package.packageCode}`,
-                metadata: {
-                    productCode: result.package.productCode,
-                    packageCode: result.package.packageCode,
-                    oldIconAssetId: result.previousIconAssetId,
-                    newIconAssetId: result.newIconAssetId
-                }
-            }).catch(error => console.log("Admin audit failed:", error.message));
-        }
 
         return res.json({
             success: true,
@@ -1352,21 +1300,6 @@ router.delete("/admin/catalog/products/:productCode/packages/:packageCode/presen
             includeAssetProjection: true,
             includeAdminPricing: true
         });
-        if (result.changed) {
-            await writeAdminAudit({
-                actor: req.admin,
-                req,
-                action: ADMIN_AUDIT_ACTIONS.CATALOG_PACKAGE_ICON_CLEARED,
-                resourceType: "CatalogPackage",
-                resourceId: `${result.package.productCode}/${result.package.packageCode}`,
-                metadata: {
-                    productCode: result.package.productCode,
-                    packageCode: result.package.packageCode,
-                    oldIconAssetId: result.previousIconAssetId,
-                    newIconAssetId: result.newIconAssetId
-                }
-            }).catch(error => console.log("Admin audit failed:", error.message));
-        }
 
         return res.json({
             success: true,

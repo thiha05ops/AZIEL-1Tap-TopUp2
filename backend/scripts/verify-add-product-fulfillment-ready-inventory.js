@@ -63,7 +63,8 @@ assert.strictEqual(offerSourcedProjection.packages[0].prepared.selectable, true,
 assert.strictEqual(offerSourcedProjection.packages[0].prepared.adoptionCreatesMapping, true);
 
 const missingCanonicalProjection = projectActivation({ products: [product], packages: [], suppliers: [supplier], mappings: [mapping], offers: [offer], supplierProducts: [supplierProduct], availability: [availability], publications: [] }, { productCode: "pubg", supplierMarket: "GLOBAL", customerMarkets: "TH" }, dependencies);
-assert.strictEqual(missingCanonicalProjection.packages[0].prepared.selectable, false, "Package discovery must not bypass bounded onboarding when its canonical package is still missing.");
+assert.strictEqual(missingCanonicalProjection.packages[0].prepared.selectable, true, "A current exact supplier offer must be selectable before its CatalogPackage is adopted.");
+assert.strictEqual(missingCanonicalProjection.packages[0].prepared.adoptionCreatesCanonicalPackage, true, "Discovery must disclose that adoption will create the missing canonical package.");
 
 const secondSupplier = { ...supplier, _id: "s2", supplierCode: "WONDD", name: "WonDD" };
 const secondProduct = { ...supplierProduct, _id: "sp2", supplierId: "s2", supplierProductCode: "9621", displayName: "PUBG WonDD" };
@@ -157,14 +158,20 @@ function fixture(selectedMapping = mapping) {
 
     const missingCanonical = fixture();
     missingCanonical.state.pkg = null;
-    await assert.rejects(() => missingCanonical.service.save(input, { actor: { username: "owner" }, transaction: missingCanonical.transaction }), error => error instanceof StoreCatalogSelectionError && error.code === "STORE_SELECTION_MAPPING_NOT_PREPARED");
-    assert.strictEqual(missingCanonical.state.createdPackages.length, 0, "Store Catalog finalization must not create a canonical package that bounded onboarding did not prepare.");
-    assert.strictEqual(missingCanonical.state.mappingUpdates.length, 0, "Store Catalog finalization must not prepare supplier routes.");
+    const adopted = await missingCanonical.service.save(input, { actor: { username: "owner" }, transaction: missingCanonical.transaction });
+    assert.strictEqual(adopted.selection.packages[0].packageCode, "PUBG_325_UC");
+    assert.strictEqual(missingCanonical.state.createdPackages.length, 1, "Store Catalog adoption must create the missing CatalogPackage idempotently.");
+    assert.strictEqual(missingCanonical.state.mappingUpdates.length, 1, "Store Catalog adoption must prepare the exact mapping from supplier offer evidence.");
+    assert.strictEqual(missingCanonical.state.mappingUpdates[0].update.$set.executionMode, "API");
+    assert.strictEqual(missingCanonical.state.mappingUpdates[0].update.$set.fulfillmentEligibility.mode, "CUSTOMER_MARKET_ALLOWLIST");
+    assert.deepStrictEqual(missingCanonical.state.mappingUpdates[0].update.$set.fulfillmentEligibility.allowedCustomerMarkets, ["TH"]);
+    assert.strictEqual(missingCanonical.state.mappingUpdates[0].update.$set.mappingMetadata.readiness.inputReady, true);
+    assert.strictEqual(missingCanonical.state.mappingUpdates[0].update.$set.mappingMetadata.readiness.fulfillmentReady, true);
 
     const offerSourced = fixture(null);
     const adoptedOffer = await offerSourced.service.save({ ...input, mappingIds: ["offer:o-source"] }, { actor: { username: "owner" }, transaction: offerSourced.transaction });
     assert.strictEqual(adoptedOffer.selection.packages[0].supplierProductMappingId, "created-mapping-1");
-    assert.strictEqual(offerSourced.state.createdMappings.length, 1, "The legacy exact-offer adoption path remains idempotent for existing callers.");
+    assert.strictEqual(offerSourced.state.createdMappings.length, 1, "Offer-sourced adoption must create exactly one SupplierProductMapping.");
     assert.strictEqual(offerSourced.state.createdMappings[0].supplierCatalogOfferId, "o-source");
 
     const rejected = fixture({ ...mapping, supplierCode: "UNKNOWN_SUPPLIER" });
@@ -173,7 +180,7 @@ function fixture(selectedMapping = mapping) {
 
     const wizard = fs.readFileSync(path.resolve(__dirname, "../../frontend/js/admin-add-product-wizard.js"), "utf8");
     assert(wizard.includes("row.prepared?.selectable===true"));
-    assert(wizard.includes("No packages are available yet."));
+    assert(wizard.includes("No fulfillment-ready packages available."));
     assert(wizard.includes("data-wizard-package=\"${apwEsc(row.mappingId)}\""));
     assert(!wizard.includes("new Map(apwValidRows().map(row=>[row.packageCode,row]))"));
     assert(wizard.includes("valid.map(row=>[row.supplierId,row])"), "Add Product supplier step must aggregate by real supplier, not supplier-native product.");
@@ -181,6 +188,6 @@ function fixture(selectedMapping = mapping) {
     assert(!wizard.includes("!!addProductWizard.supplierProductCode&&apwValidRows().length>0"), "Continuing from Supplier step must not require a supplier-native product.");
     assert(wizard.includes("function apwRouteRank"), "Owner-facing duplicate package candidates must prefer an existing PRIMARY/API route when available.");
     assert(wizard.includes("routeAlternatives:rows.map"), "Collapsed package candidates must preserve exact supplier route identities internally.");
-    assert(wizard.includes("routeAlternatives:rows.map"), "Collapsed package candidates must preserve alternate route evidence without exposing supplier internals in the business UI.");
-    console.log(JSON.stringify({ result: "PASS", preparedDisabledNonPrimarySelectable: true, supplierOfferDiscoveryWithoutMapping: true, storeSelectionRequiresPreparedCanonicalLink: true, legacyOfferSourcedAdoptionRetained: true, staleManualStateIgnoredForDiscovery: true, staleInputReadyFlagIgnoredForDiscovery: true, commercialStateIgnoredForDiscovery: true, missingCanonicalPackageSelectable: false, rejectedAdvancedOnlyCases: 5, distinctSupplierCandidates: multi.packages.length, sameSupplierNativeRoutes: sameSupplierNativeRoutes.packages.length, supplierNativeGrouping: true, duplicateCommercialPackagesCollapsed: true, exactRouteIdentityPreserved: true, storeSelectionGuard: true, automaticPrimaryAssignments: 0, pricingWrites: 0, publicationWrites: 0, supplierCalls: 0, productionWrites: 0 }, null, 2));
+    assert(wizard.includes("row.routeAlternatives?.length>1"), "The package step must disclose reviewed alternate route evidence without presenting duplicate commercial packages.");
+    console.log(JSON.stringify({ result: "PASS", preparedDisabledNonPrimarySelectable: true, supplierOfferDiscoveryWithoutMapping: true, offerSourcedAdoptionCreatesMapping: true, staleManualStateIgnoredForDiscovery: true, staleInputReadyFlagIgnoredForDiscovery: true, commercialStateIgnoredForDiscovery: true, missingCanonicalPackageSelectable: true, adoptionCreatesCanonicalPackage: true, adoptionPreparesExactMapping: true, rejectedAdvancedOnlyCases: 4, distinctSupplierCandidates: multi.packages.length, sameSupplierNativeRoutes: sameSupplierNativeRoutes.packages.length, supplierNativeGrouping: true, duplicateCommercialPackagesCollapsed: true, exactRouteIdentityPreserved: true, storeSelectionGuard: true, automaticPrimaryAssignments: 0, pricingWrites: 0, publicationWrites: 0, supplierCalls: 0, productionWrites: 0 }, null, 2));
 })().catch(error => { console.error("VERIFY_ADD_PRODUCT_FULFILLMENT_READY_INVENTORY_FAILED:", error); process.exitCode = 1; });

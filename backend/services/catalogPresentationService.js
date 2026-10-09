@@ -179,7 +179,6 @@ async function setPackageIconAsset({
         return { changed: false, package: item.toObject() };
     }
 
-    const previousIconAssetId = item.iconAssetId || "";
     item.iconAssetId = assetId;
     await item.save();
 
@@ -192,7 +191,7 @@ async function setPackageIconAsset({
         timestamp: new Date().toISOString()
     });
 
-    return { changed: true, package: item.toObject(), previousIconAssetId, newIconAssetId: assetId };
+    return { changed: true, package: item.toObject() };
 }
 
 async function clearPackageIconAsset({
@@ -218,7 +217,6 @@ async function clearPackageIconAsset({
         return { changed: false, package: item.toObject() };
     }
 
-    const previousIconAssetId = item.iconAssetId || "";
     item.iconAssetId = "";
     await item.save();
 
@@ -230,7 +228,7 @@ async function clearPackageIconAsset({
         timestamp: new Date().toISOString()
     });
 
-    return { changed: true, package: item.toObject(), previousIconAssetId, newIconAssetId: "" };
+    return { changed: true, package: item.toObject() };
 }
 
 module.exports = {
