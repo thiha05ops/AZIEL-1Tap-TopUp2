@@ -41,5 +41,11 @@ const ambiguous = auditProductionActivation({ ...base, mappings: [mapping, { ...
 assert(ambiguous.violations.some(row => row.blockers.includes("AMBIGUOUS_EXECUTABLE_SUPPLIER_ROUTES")), "multiple executable routes must fail closed");
 const archived = auditProductionActivation({ ...base, mappings: [{ ...mapping, archivedAt: now, enabled: true }] });
 assert(archived.violations.some(row => row.code === "ARCHIVED_MAPPING_ROUTABLE"), "archived routable mapping safety check must remain");
+const scoped = auditProductionActivation({ ...base, customerFacingRoutes: [{ productCode: "game", packageCode: "PKG1", region: "TH" }] });
+assert.strictEqual(scoped.result, "PASS", "non-customer-facing PRIMARY readiness findings must not fail production activation.");
+assert.strictEqual(scoped.violations.length, 0);
+assert(Array.isArray(scoped.nonCustomerFacingFindings), "scoped audit must preserve non-customer-facing findings.");
+const scopedBlocked = auditProductionActivation({ ...base, availabilityRows: [{ ...availability, state: "UNAVAILABLE" }], customerFacingRoutes: [{ productCode: "game", packageCode: "PKG1", region: "TH" }] });
+assert(scopedBlocked.violations.some(row => row.code === "PUBLIC_CHECKOUT_ROUTE_MISSING"), "a blocked customer-facing route must remain deployment-blocking.");
 console.log("verify-production-activation-optimized: PASS");
 process.exit(0);

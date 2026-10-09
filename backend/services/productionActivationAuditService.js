@@ -61,9 +61,11 @@ function assessRouteFromContext({ productCode, packageCode, region }, context) {
     return { ready: true, blockers: [], routeSnapshot: selectedRouteSnapshot(ready[0].mapping, selection, customerMarket, resolution), resolution };
 }
 
-function auditProductionActivation({ mappings, suppliers, offers, availabilityRows, packages, selections, successfulAttempts, catalog }) {
+function auditProductionActivation({ mappings, suppliers, offers, availabilityRows, packages, selections, successfulAttempts, catalog, customerFacingRoutes = null }) {
     const context = indexAuthorities({ mappings, suppliers, offers, availabilityRows, packages, selections, successfulAttempts });
     const violations = [];
+    const nonCustomerFacingFindings = [];
+    const mappingFindings = Array.isArray(customerFacingRoutes) ? nonCustomerFacingFindings : violations;
     const groups = new Map();
     for (const mapping of mappings) {
         const key = routeKey(mapping.productCode, mapping.packageCode, mapping.region);
@@ -71,26 +73,28 @@ function auditProductionActivation({ mappings, suppliers, offers, availabilityRo
     }
     for (const [key, rows] of groups) {
         const primary = rows.filter(row => row.productionRole === "PRIMARY");
-        if (primary.length > 1) violations.push({ key, code: "MULTIPLE_PRIMARY" });
+        if (primary.length > 1) mappingFindings.push({ key, code: "MULTIPLE_PRIMARY" });
         for (const mapping of primary) {
             const assessment = assessProductionMappingFromContext(mapping, { supplier: context.supplierById.get(id(mapping.supplierId)) || null, pkg: context.packageByKey.get(packageKey(mapping.productCode, mapping.packageCode)) || null, controlledTest: context.successfulAttemptIds.has(id(mapping)) ? { _id: true } : null });
             const blockers = [...assessment.blockers];
             if (mapping.archivedAt) blockers.push("ORPHAN_OR_ARCHIVED_PRIMARY");
-            if (blockers.length) violations.push({ key, mappingId: id(mapping), supplier: mapping.supplierCode, blockers: [...new Set(blockers)] });
+            if (blockers.length) mappingFindings.push({ key, mappingId: id(mapping), supplier: mapping.supplierCode, blockers: [...new Set(blockers)] });
         }
     }
-    for (const mapping of mappings.filter(row => row.archivedAt && (row.enabled || row.productionRole !== "DISABLED"))) violations.push({ mappingId: id(mapping), code: "ARCHIVED_MAPPING_ROUTABLE" });
+    for (const mapping of mappings.filter(row => row.archivedAt && (row.enabled || row.productionRole !== "DISABLED"))) mappingFindings.push({ mappingId: id(mapping), code: "ARCHIVED_MAPPING_ROUTABLE" });
     const sensitiveKeys = /supplierCost|landedCost|rawSupplier|providerOffer|supplierPackage|costAuthority|supplierProduct/i;
     const leaked = [];
     function scan(value, trail = "catalog") { if (!value || typeof value !== "object") return; for (const [key, child] of Object.entries(value)) sensitiveKeys.test(key) ? leaked.push(`${trail}.${key}`) : scan(child, `${trail}.${key}`); }
     scan(catalog);
     if (leaked.length) violations.push({ code: "SUPPLIER_COST_PUBLIC_LEAKAGE", fields: leaked.slice(0, 20) });
-    const publicPackages = catalog.flatMap(product => (product.packages || []).map(pkg => ({ productCode: product.productCode, packageCode: pkg.packageCode, regions: Object.keys(pkg.prices || {}) })));
-    for (const pkg of publicPackages) for (const region of pkg.regions) {
-        const route = assessRouteFromContext({ ...pkg, region }, context);
-        if (!route.ready || !route.routeSnapshot) violations.push({ key: routeKey(pkg.productCode, pkg.packageCode, region), code: "PUBLIC_CHECKOUT_ROUTE_MISSING", blockers: route.blockers });
+    const publicPackages = Array.isArray(customerFacingRoutes)
+        ? customerFacingRoutes
+        : catalog.flatMap(product => (product.packages || []).flatMap(pkg => Object.keys(pkg.prices || {}).map(region => ({ productCode: product.productCode, packageCode: pkg.packageCode, region }))));
+    for (const pkg of publicPackages) {
+        const route = assessRouteFromContext(pkg, context);
+        if (!route.ready || !route.routeSnapshot) violations.push({ key: routeKey(pkg.productCode, pkg.packageCode, pkg.region), code: "PUBLIC_CHECKOUT_ROUTE_MISSING", blockers: route.blockers });
     }
-    return { result: violations.length ? "FAIL" : "PASS", mappings: mappings.length, primaryMappings: mappings.filter(row => row.productionRole === "PRIMARY").length, archivedMappings: mappings.filter(row => row.archivedAt).length, publicProducts: catalog.length, publicPackages: publicPackages.length, violations };
+    return { result: violations.length ? "FAIL" : "PASS", mappings: mappings.length, primaryMappings: mappings.filter(row => row.productionRole === "PRIMARY").length, archivedMappings: mappings.filter(row => row.archivedAt).length, publicProducts: catalog.length, publicPackages: publicPackages.length, violations, nonCustomerFacingFindings };
 }
 
 module.exports = { auditProductionActivation, assessRouteFromContext, groupEnabledPackages, indexAuthorities };
