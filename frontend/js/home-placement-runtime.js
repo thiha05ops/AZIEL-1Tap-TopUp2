@@ -25,7 +25,7 @@
     function validSnapshot(value, market) {
         if (!value || typeof value !== "object" || Array.isArray(value)) return false;
         if (value.region !== market || !String(value.revision || "").trim() || !Array.isArray(value.sections)) return false;
-        return value.sections.every(section => section && typeof section === "object" && !Array.isArray(section) && CONFIG.some(config => config.key === section.key) && Array.isArray(section.products) && section.products.every(validProduct));
+        return value.sections.every(section => section && typeof section === "object" && !Array.isArray(section) && typeof section.key === "string" && section.key.trim().length > 0 && Array.isArray(section.products) && section.products.every(validProduct));
     }
     function removeCache(market) { try { localStorage.removeItem(key(market)); } catch { /* storage is optional */ } }
     function readCache(market) {
