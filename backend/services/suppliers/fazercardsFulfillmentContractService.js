@@ -173,7 +173,7 @@ function verifiedMappingContract(mapping = {}) {
     const normalized = { ...value, fields };
     if (value.protocol === "WONDD_GAME_ID_TOPUP" && inputFields !== value.fields) return { ...normalized, legacyCompatibility: true };
     if (clean(value.fingerprint) === contractFingerprint(normalized)) return normalized;
-    if (clean(value.fingerprint) === legacyContractFingerprint(value)) return { ...normalized, legacyCompatibility: true };
+    if (clean(value.fingerprint) === legacyContractFingerprint(value)) return { ...normalized, fingerprint: contractFingerprint(normalized), legacyCompatibility: true };
     return null;
 }
 
