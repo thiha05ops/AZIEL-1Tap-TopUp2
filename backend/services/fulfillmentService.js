@@ -768,7 +768,7 @@ async function startFulfillmentForOrder(orderId, payload = {}, context = {}) {
     if (isCommerceOrder && routeSnapshot) {
         const frozen = assessMappingReadiness({
             mode: READINESS_MODES.FROZEN_ORDER_EXECUTABLE,
-            mapping: mapping.toObject ? mapping.toObject() : mapping,
+            mapping: mapping.toObject ? mapping.toObject({ minimize: false }) : mapping,
             supplier: supplier.toObject ? supplier.toObject() : supplier,
             customerMarket,
             adapter,
