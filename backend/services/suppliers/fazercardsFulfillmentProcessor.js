@@ -93,7 +93,7 @@ function createFazerCardsFulfillmentProcessor(deps = {}) {
         if (!order) throw Object.assign(new Error("CommerceOrder not found."), { code: "ORDER_NOT_FOUND" });
         const customerMarket = String(order.commercial?.region || order.product?.region || order.region || "").trim().toUpperCase();
         const frozenContract = order.fulfilment?.routeSnapshot?.fulfillmentContract || order.quoteSnapshot?.supplierRouteSnapshot?.fulfillmentContract;
-        const mappingValue = typeof mapping.toObject === "function" ? mapping.toObject() : mapping;
+        const mappingValue = typeof mapping.toObject === "function" ? mapping.toObject({ minimize: false }) : mapping;
         const frozenRoute = order.fulfilment?.routeSnapshot || order.quoteSnapshot?.supplierRouteSnapshot || null;
         const verifiedFrozenV2 = Number(frozenRoute?.snapshotVersion) === 2 &&
             String(frozenRoute?.routeType || "").toUpperCase() === "SUPPLIER_API" &&
