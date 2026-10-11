@@ -3990,6 +3990,10 @@
     justify-content:flex-end;
     padding:0!important;
 }
+.admin-confirm-over-package-drawer .az-ui-confirm-backdrop.show,
+.admin-confirm-over-package-drawer .admin-action-modal.show:not(.catalog-manage-package-drawer){
+    z-index:1000001;
+}
 .catalog-manage-package-drawer .catalog-merch-modal-box{
     width:min(620px,100vw);
     max-height:100dvh;

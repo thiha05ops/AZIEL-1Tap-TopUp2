@@ -2282,11 +2282,17 @@ async function updateManagePackagePublication(product, pkg, modal) {
     const current = modal._supplierCandidateData || {};
     const published = current.publication?.published !== true;
     const market = current.customerMarket === "MM" ? "MM" : "TH";
-    const confirmed = await confirmCatalogAction({
-        title: published ? "Turn Selling ON globally?" : "Turn Selling OFF globally?",
-        message: `${pkg.name || pkg.packageCode}\n\n${published ? "The package will be offered in both Thailand and Myanmar when each storefront's price, payment, and fulfillment requirements are satisfied." : "New purchases will no longer see this package in either storefront."}\n\nRegional prices, payment methods, supplier mappings, selections and historical orders will not change.`,
-        confirmText: published ? "Selling ON" : "Selling OFF"
-    });
+    let confirmed = false;
+    document.body.classList.add("admin-confirm-over-package-drawer");
+    try {
+        confirmed = await confirmCatalogAction({
+            title: published ? "Turn Selling ON globally?" : "Turn Selling OFF globally?",
+            message: `${pkg.name || pkg.packageCode}\n\n${published ? "The package will be offered in both Thailand and Myanmar when each storefront's price, payment, and fulfillment requirements are satisfied." : "New purchases will no longer see this package in either storefront."}\n\nRegional prices, payment methods, supplier mappings, selections and historical orders will not change.`,
+            confirmText: published ? "Selling ON" : "Selling OFF"
+        });
+    } finally {
+        document.body.classList.remove("admin-confirm-over-package-drawer");
+    }
     if (!confirmed) return;
     const toggle = modal.querySelector("[data-manage-package-publication]");
     const label = modal.querySelector("[data-manage-package-publication-label]");

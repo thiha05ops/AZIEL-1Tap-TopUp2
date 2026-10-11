@@ -8,6 +8,7 @@ const { projectPackagePublication } = require("../services/packageMarketPublicat
 
 const root = path.join(__dirname, "../..");
 const frontend = fs.readFileSync(path.join(root, "frontend/js/admin-catalog.js"), "utf8");
+const componentsCss = fs.readFileSync(path.join(root, "frontend/css/admin-v2/components.css"), "utf8");
 const route = fs.readFileSync(path.join(root, "backend/routes/catalog.js"), "utf8");
 
 const checks = [];
@@ -29,6 +30,10 @@ ok(projectPackagePublication(pkg, globalOffOverLegacyOn, "TH").published === fal
 ok(projectPackagePublication(pkg, globalOffOverLegacyOn, "MM").published === false, "GLOBAL OFF projects OFF in MM");
 ok(frontend.includes('data-manage-package-publication aria-label="Global Selling ON/OFF"'), "Manage Package drawer exposes the Global Selling switch");
 ok(frontend.includes("Turn Selling ON globally?"), "Selling ON requires explicit confirmation");
+ok(frontend.includes('document.body.classList.add("admin-confirm-over-package-drawer")'), "Global Selling confirmation enables a drawer-scoped top layer");
+ok(frontend.includes('document.body.classList.remove("admin-confirm-over-package-drawer")'), "Confirmation cleanup runs after Cancel or Confirm");
+ok(componentsCss.includes(".admin-confirm-over-package-drawer .az-ui-confirm-backdrop.show") && componentsCss.includes("z-index:1000001"), "Shared confirmation backdrop renders above the 1000000 drawer layer");
+ok(componentsCss.includes(".admin-action-modal.show:not(.catalog-manage-package-drawer)"), "Fallback Admin confirmation modal is also layered above the drawer without raising the drawer itself");
 ok(frontend.includes("updateManagePackagePublication(product, pkg, modal)"), "Drawer switch uses the existing publication mutation path");
 ok(frontend.includes("await loadCatalogPackageOverview(result.product || product, { force: true })"), "Successful mutation refreshes package rows and counters");
 ok(frontend.includes('filter("DISABLED", "Disabled", counts.DISABLED)'), "Package Offers exposes a DISABLED filter and counter");
