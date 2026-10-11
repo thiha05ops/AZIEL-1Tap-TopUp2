@@ -277,6 +277,7 @@
     width: 100%;
     overflow-y: auto;
     overflow-x: hidden;
+    container-type: inline-size;
 }
 
 .admin-v2 #section-orders .orders-queue-row {
@@ -434,9 +435,10 @@
         padding-inline: var(--v2-content-pad);
     }
 
-    /* Mobile header is light-only under V2 */
+    /* Mobile header follows the explicit Admin theme tokens. */
     .admin-v2 .admin-topbar {
-        background: rgba(255,255,255,.97) !important;
+        color: var(--v2-text);
+        background: color-mix(in srgb, var(--v2-surface) 97%, transparent) !important;
         border-bottom-color: var(--v2-line);
         backdrop-filter: blur(14px);
     }
@@ -3192,6 +3194,285 @@
     .admin-v2 #section-pricing-settings .pricing-fx-row {
         grid-template-columns: 1fr;
     }
+}
+
+/* =========================================================
+   AZIEL OS V2.2 — RESPONSIVE WORKSPACE REFINEMENT
+   Layout-only authority for nested Admin workspaces.
+   ========================================================= */
+
+/* Nested panes respond to their own available width rather than the viewport. */
+.admin-v2 #section-products,
+.admin-v2 #section-orders,
+.admin-v2 #section-wallet,
+.admin-v2 #section-pricing-engine,
+.admin-v2 #section-pricing-settings {
+    container-type: inline-size;
+}
+
+.admin-v2 #section-products .catalog-detail-panel {
+    container-type: inline-size;
+}
+
+.admin-v2 #section-products .catalog-detail-panel,
+.admin-v2 #section-products .catalog-workspace-tab-panel,
+.admin-v2 #section-products .catalog-merch-package-groups,
+.admin-v2 #section-products .catalog-merch-row,
+.admin-v2 #section-orders .orders-command-panel,
+.admin-v2 #section-orders .order-detail-panel,
+.admin-v2 #section-wallet .wallet-command-panel,
+.admin-v2 #section-wallet .wallet-detail-panel,
+.admin-v2 #section-products .products-workspace > *,
+.admin-v2 #section-pricing-engine > *,
+.admin-v2 #section-pricing-settings > * {
+    min-width: 0;
+}
+
+/* Storefront: retain five columns at full width and expose Manage on compact panes. */
+@container (max-width: 860px) {
+    .admin-v2 #section-products .catalog-merch-summary {
+        grid-template-columns: minmax(180px, 1.35fr) minmax(96px, .7fr) minmax(145px, 1fr) minmax(96px, .7fr);
+        gap: 10px 12px;
+    }
+
+    .admin-v2 #section-products .catalog-merch-actions,
+    .admin-v2 #section-products .catalog-merch-editor {
+        grid-column: 1 / -1;
+        width: 100%;
+        margin-top: 0;
+        justify-content: flex-end;
+    }
+}
+
+@container (max-width: 620px) {
+    .admin-v2 #section-products .catalog-merch-summary {
+        grid-template-columns: minmax(0, 1fr) auto;
+    }
+
+    .admin-v2 #section-products .catalog-merch-price,
+    .admin-v2 #section-products .catalog-merch-offer-preview,
+    .admin-v2 #section-products .catalog-merch-state {
+        min-width: 0;
+    }
+
+    .admin-v2 #section-products .catalog-merch-price,
+    .admin-v2 #section-products .catalog-merch-offer-preview {
+        grid-column: 1 / -1;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 8px;
+        align-items: center;
+    }
+
+    .admin-v2 #section-products .catalog-merch-actions .catalog-merch-manage-btn,
+    .admin-v2 #section-products .catalog-merch-editor > summary {
+        width: 100%;
+        text-align: center;
+    }
+}
+
+/* Orders: keep identifiers legible and stack details when the pane is compact. */
+.admin-v2 #section-orders .orders-queue-row > *,
+.admin-v2 #section-orders .order-detail-grid > *,
+.admin-v2 #section-orders .order-detail-section p > * {
+    min-width: 0;
+}
+
+.admin-v2 #section-orders .orders-queue-row strong,
+.admin-v2 #section-orders .orders-queue-row small {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.admin-v2 #section-orders .order-detail-section p b {
+    overflow-wrap: anywhere;
+    word-break: normal;
+}
+
+/* The detail pane is substantially narrower than the Orders section. */
+@container (max-width: 760px) {
+    .admin-v2 #section-orders .order-detail-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .admin-v2 #section-orders .order-detail-section p {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        gap: 3px;
+    }
+
+    .admin-v2 #section-orders .order-detail-section p > span,
+    .admin-v2 #section-orders .order-detail-section p > b {
+        grid-column: 1 / -1;
+    }
+
+    .admin-v2 #section-orders .order-detail-section p > b {
+        text-align: left;
+        white-space: normal;
+        overflow: visible;
+        text-overflow: clip;
+        overflow-wrap: anywhere;
+    }
+
+    .admin-v2 #section-orders .order-game-account p {
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: center;
+    }
+
+    .admin-v2 #section-orders .order-game-account p > span {
+        grid-column: 1 / -1;
+    }
+
+    .admin-v2 #section-orders .order-game-account p > b {
+        grid-column: 1;
+    }
+
+    .admin-v2 #section-orders .order-game-account p > .order-copy-icon {
+        grid-column: 2;
+        grid-row: 2;
+    }
+}
+
+@container (max-width: 1050px) {
+    .admin-v2 #section-orders .orders-command-center {
+        grid-template-columns: minmax(0, 1.25fr) minmax(300px, .9fr);
+    }
+
+    .admin-v2 #section-orders .orders-queue-row {
+        grid-template-columns: minmax(140px, .9fr) minmax(150px, 1fr) minmax(88px, .55fr) auto;
+        gap: 10px;
+    }
+}
+
+@container (max-width: 820px) {
+    .admin-v2 #section-orders .orders-command-center {
+        grid-template-columns: minmax(0, 1fr);
+        height: auto;
+        min-height: 0;
+        overflow: visible;
+    }
+
+    .admin-v2 #section-orders .orders-command-panel,
+    .admin-v2 #section-orders .order-detail-panel {
+        max-height: none;
+        overflow: visible;
+    }
+
+    .admin-v2 #section-orders .orders-queue-list {
+        max-height: min(52dvh, 620px);
+    }
+}
+
+@container (max-width: 520px) {
+    .admin-v2 #section-orders .orders-queue-row {
+        grid-template-columns: minmax(0, 1fr) auto;
+    }
+
+    .admin-v2 #section-orders .order-detail-grid {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .admin-v2 #section-orders .order-detail-section p {
+        display: grid;
+        gap: 4px;
+    }
+
+    .admin-v2 #section-orders .order-detail-section p b {
+        text-align: left;
+    }
+}
+
+/* Wallet: reduce fixed tracks, wrap filters, and keep one scroll owner per pane. */
+.admin-v2 #section-wallet .wallet-queue-filters > *,
+.admin-v2 #section-wallet .wallet-review-scroll > * {
+    min-width: 0;
+}
+
+@container (max-width: 1050px) {
+    .admin-v2 #section-wallet .wallet-command-center {
+        grid-template-columns: minmax(0, 1.15fr) minmax(320px, .9fr);
+    }
+
+    .admin-v2 #section-wallet .wallet-queue-filters {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .admin-v2 #section-wallet .wallet-queue-filters > :first-child {
+        grid-column: 1 / -1;
+    }
+}
+
+@container (max-width: 780px) {
+    .admin-v2 #section-wallet .wallet-command-center {
+        grid-template-columns: minmax(0, 1fr);
+        height: auto;
+        min-height: 0;
+        overflow: visible;
+    }
+
+    .admin-v2 #section-wallet .wallet-command-panel,
+    .admin-v2 #section-wallet .wallet-detail-panel {
+        max-height: none;
+    }
+
+    .admin-v2 #section-wallet .wallet-queue-list,
+    .admin-v2 #section-wallet .wallet-ledger-list {
+        max-height: min(52dvh, 620px);
+    }
+}
+
+/* Overview, pricing, and shared data controls compact without changing visuals. */
+@media (max-width: 1399px) {
+    .admin-v2 #section-dashboard .dashboard-command-header {
+        grid-template-columns: minmax(220px, .65fr) minmax(0, 1.35fr);
+        gap: 20px;
+    }
+
+    .admin-v2 #section-dashboard .dashboard-filter-bar {
+        grid-template-columns: repeat(4, minmax(110px, 1fr));
+    }
+
+    .admin-v2 #section-dashboard .dashboard-filter-bar button {
+        min-width: 0;
+    }
+}
+
+@media (max-width: 1023px) {
+    .admin-v2 #section-dashboard .dashboard-command-header {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .admin-v2 #section-dashboard .dashboard-command-title {
+        display: grid;
+    }
+
+    .admin-v2 #section-dashboard .dashboard-filter-bar {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@container (max-width: 720px) {
+    .admin-v2 #section-pricing-engine .pricing-product-browser-toolbar,
+    .admin-v2 #section-pricing-engine .pricing-v3-toolbar,
+    .admin-v2 #section-pricing-settings .pricing-settings-form {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .admin-v2 #section-pricing-settings .pricing-fx-row {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .admin-v2 #section-pricing-settings .pricing-fx-row > :first-child {
+        grid-column: 1 / -1;
+    }
+}
+
+/* Keyboard focus must remain visible inside clipped/scrolling workspaces. */
+.admin-v2 :is(.catalog-merch-manage-btn, .orders-command-tab, .wallet-command-tab, .customer-tabs button, .settings-tab, .admin-tabs button):focus-visible {
+    outline: 2px solid var(--v2-purple);
+    outline-offset: 2px;
 }
 
 @media (max-width: 480px) {

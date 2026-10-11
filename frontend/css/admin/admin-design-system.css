@@ -7161,7 +7161,10 @@ button.media-asset-card {
     font-size: 13px;
   }
 
-  #section-orders .orders-command-panel>.panel-head,
+  #section-orders .orders-command-panel>.panel-head {
+    display: flex;
+  }
+
   #section-wallet .wallet-command-panel>.panel-head,
   #section-catalog .catalog-products-panel>.panel-head>div,
   #section-media .media-library-panel>.panel-head>div {
@@ -9342,6 +9345,193 @@ body.theme-light.admin-body .pricing-cost-input-shell {
 .order-copy-icon.is-copied {
   border-color: var(--admin-primary, var(--primary));
   color: var(--admin-primary, var(--primary));
+}
+
+/* Admin responsive refinement: Customers and catalog use their own pane width. */
+#section-users,
+#section-products {
+  container-type: inline-size;
+}
+
+.customer-crm-list-panel {
+  container-type: inline-size;
+}
+
+.customer-crm-workspace > *,
+.customer-crm-list-panel > *,
+.customer-row > *,
+.customer-profile-header > *,
+.customer-record-row > *,
+.catalog-command-center > *,
+.catalog-detail-panel > * {
+  min-width: 0;
+}
+
+.customer-crm-list {
+  grid-auto-rows: max-content;
+}
+
+.customer-row {
+  min-block-size: max-content;
+  block-size: auto;
+  height: auto;
+  overflow: visible;
+  align-items: start;
+}
+
+.customer-row-main {
+  display: grid;
+  grid-auto-rows: max-content;
+  align-self: stretch;
+  overflow: visible;
+}
+
+.customer-tags {
+  position: static;
+  display: flex;
+  flex-wrap: wrap;
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  align-items: flex-start;
+  align-content: flex-start;
+  overflow: visible;
+  line-height: 1.25;
+}
+
+.customer-tags em {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@container (max-width: 1080px) {
+  .customer-crm-workspace {
+    grid-template-columns: minmax(280px, .82fr) minmax(0, 1.18fr);
+  }
+
+  .customer-crm-filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .customer-crm-filters > :first-child {
+    grid-column: 1 / -1;
+  }
+
+  .customer-row {
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .customer-row-metrics,
+  .customer-row > .admin-status-pill {
+    grid-column: 2;
+    justify-items: start;
+    justify-self: start;
+  }
+
+  .customer-row-metrics {
+    width: 100%;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: baseline;
+    gap: 4px 10px;
+    text-align: left;
+  }
+
+  .customer-row-metrics small {
+    grid-column: 1 / -1;
+  }
+}
+
+@container (max-width: 760px) {
+  .customer-crm-workspace,
+  .catalog-command-center {
+    grid-template-columns: minmax(0, 1fr);
+    height: auto;
+    min-height: 0;
+    max-height: none;
+    overflow: visible;
+  }
+
+  .customer-crm-list-panel,
+  .customer-crm-detail-panel,
+  .catalog-products-panel,
+  .catalog-detail-panel {
+    max-height: none;
+  }
+
+  .customer-crm-list,
+  .catalog-product-list {
+    max-height: min(52dvh, 620px);
+  }
+
+  .customer-profile-header {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+}
+
+@container (max-width: 480px) {
+  .customer-crm-filters,
+  .customer-summary-grid,
+  .customer-wallet-balances,
+  .customer-record-row,
+  .customer-timeline-item {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .customer-crm-filters > :first-child,
+  .customer-row-metrics,
+  .customer-row > .admin-status-pill {
+    grid-column: auto;
+  }
+
+  .customer-row {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .customer-row > .customer-row-metrics,
+  .customer-row > .admin-status-pill {
+    grid-column: 2;
+  }
+
+  .customer-record-row strong,
+  .customer-record-row small,
+  .customer-timeline-item strong,
+  .customer-timeline-item small {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+}
+
+/* Genuine tables retain controlled horizontal scrolling; page shells do not. */
+.admin-table-wrap,
+.table-responsive,
+[class*="table-container"],
+.fulfillment-table-wrap,
+.audit-table-wrap {
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+}
+
+/* Drawers and modals remain usable on short laptop viewports. */
+.admin-modal-box,
+.admin-action-modal > *,
+.catalog-merch-modal-box {
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+@media (max-height: 700px) and (min-width: 768px) {
+  .customer-crm-workspace,
+  .catalog-command-center,
+  .orders-command-center,
+  .wallet-command-center {
+    min-height: 0;
+  }
 }
 /* Catalog product editor — contained scrolling and text-safe actions */
 .catalog-product-drawer .catalog-drawer-box {

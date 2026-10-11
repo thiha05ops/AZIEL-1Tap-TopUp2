@@ -1985,6 +1985,124 @@ textarea {
   border: 1px solid rgba(255, 255, 255, .08);
 }
 
+/* Responsive settings and payments refinement (layout only). */
+.settings-page,
+.settings-content,
+.settings-card,
+.settings-row,
+.payment-operator-workspace,
+.payment-operator-layout,
+.payment-operator-list,
+.payment-operator-row,
+.payment-operator-editor {
+  min-width: 0;
+}
+
+#section-settings,
+#section-payments {
+  container-type: inline-size;
+}
+
+.settings-row > *,
+.payment-operator-row > *,
+.payment-operator-editor-head > *,
+.payment-operator-identities dl div > * {
+  min-width: 0;
+}
+
+.payment-operator-identities dd,
+.payment-mmp-identity dd,
+.payment-myanmyanpay-activation details dd {
+  overflow-wrap: anywhere;
+  word-break: normal;
+  text-align: right;
+}
+
+@container (max-width: 1050px) {
+  .settings-page {
+    grid-template-columns: minmax(230px, 280px) minmax(0, 1fr);
+  }
+
+  .settings-menu,
+  .settings-content,
+  .settings-card {
+    padding: 20px;
+  }
+
+  .settings-row {
+    grid-template-columns: minmax(180px, .8fr) minmax(0, 1.2fr);
+    gap: 18px;
+  }
+
+  .payment-operator-workspace.has-editor .payment-operator-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .payment-operator-editor {
+    position: fixed;
+    z-index: 99990;
+    inset: 0 0 0 auto;
+    width: min(440px, 100%);
+    max-height: none;
+    padding: 22px;
+    border-left: 1px solid var(--admin-border, #e2e8f0);
+    background: var(--admin-surface-raised, #fff);
+    box-shadow: -16px 0 40px rgba(15, 23, 42, .16);
+    overflow-y: auto;
+  }
+}
+
+@container (max-width: 720px) {
+  .settings-page {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .settings-menu {
+    border-right: 0;
+    border-bottom: 1px solid rgba(148, 163, 184, .12);
+  }
+
+  .settings-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 9px;
+  }
+
+  .payment-operator-columns {
+    display: none;
+  }
+
+  .payment-operator-row {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+  }
+}
+
+@media (max-width: 430px) {
+  .settings-menu,
+  .settings-content,
+  .settings-card,
+  .payment-operator-editor {
+    padding: 16px;
+  }
+
+  .settings-tab {
+    gap: 10px;
+    padding: 14px;
+  }
+
+  .payment-operator-editor {
+    width: 100%;
+    border-left: 0;
+  }
+}
+
+.settings-tab:focus-visible,
+.payment-operator-region button:focus-visible,
+.payment-operator-filters button:focus-visible,
+.payment-operator-more:focus-visible {
+  outline: 2px solid var(--admin-accent, #7c3aed);
+  outline-offset: 2px;
+}
+
 .admin-payment-card-preview div {
   display: grid;
   gap: 3px;

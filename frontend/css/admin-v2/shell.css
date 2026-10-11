@@ -33,9 +33,64 @@
 }
 
 .admin-v2 .admin-sidebar-head {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 34px;
+    align-items: center;
+    gap: 8px;
     min-height: var(--v2-topbar);
-    padding: 0 var(--v2-space-3);
+    padding: 6px var(--v2-space-2);
     border-bottom: 1px solid var(--v2-line);
+}
+
+.admin-v2 .admin-logo[data-aziel-os-brand] {
+    width: 100%;
+    min-width: 0;
+    min-height: 0;
+    margin: 0;
+    padding: 0;
+    justify-items: stretch;
+}
+
+.admin-v2 .admin-logo[data-aziel-os-brand] .aziel-os-brand-inner {
+    width: 100%;
+    min-width: 0;
+    display: grid;
+    grid-template-columns: 30px minmax(0, 1fr);
+    grid-template-areas:
+        "mark wordmark"
+        "mark subtitle";
+    align-items: center;
+    justify-items: start;
+    column-gap: 8px;
+    row-gap: 2px;
+}
+
+.admin-v2 .admin-logo[data-aziel-os-brand] .aziel-os-brand-mark {
+    grid-area: mark;
+    width: 30px;
+    height: 30px;
+}
+
+.admin-v2 .admin-logo[data-aziel-os-brand] .aziel-os-wordmark {
+    grid-area: wordmark;
+    min-width: 0;
+    max-width: 100%;
+    justify-content: start;
+    gap: .14em;
+    font-size: .78rem;
+    letter-spacing: .075em;
+}
+
+.admin-v2 .admin-logo[data-aziel-os-brand] .aziel-os-subtitle {
+    grid-area: subtitle;
+    max-width: 100%;
+    overflow: hidden;
+    font-size: .46rem;
+    letter-spacing: .08em;
+    line-height: 1.2;
+    text-align: left;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .admin-v2 .admin-logo img {
@@ -56,7 +111,7 @@
 }
 
 .admin-v2 .admin-sidebar-navigation {
-    padding: var(--v2-space-2) var(--v2-space-2) var(--v2-space-4);
+    padding: var(--v2-space-3) var(--v2-space-2) var(--v2-space-4);
 }
 
 .admin-v2 .admin-nav-search {
@@ -64,7 +119,7 @@
 }
 
 .admin-v2 .admin-nav-group {
-    margin: 0 0 var(--v2-space-3);
+    margin: 0 0 var(--v2-space-4);
 }
 
 .admin-v2 .admin-nav-label {
@@ -79,7 +134,7 @@
 }
 
 .admin-v2 .admin-nav {
-    min-height: 36px;
+    min-height: 38px;
     gap: 10px;
     margin: 0;
     padding: 7px 10px;
@@ -260,6 +315,9 @@
 
 .admin-v2.admin-sidebar-collapsed .admin-nav {
     justify-content: center;
+    width: 44px;
+    min-height: 42px;
+    margin-inline: auto;
     padding-inline: 0;
 }
 
@@ -269,6 +327,45 @@
 
 .admin-v2.admin-sidebar-collapsed .admin-logo-copy {
     display: none;
+}
+
+.admin-v2.admin-sidebar-collapsed .admin-sidebar-head {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    gap: 6px;
+    padding: 7px 4px;
+}
+
+.admin-v2.admin-sidebar-collapsed .admin-logo[data-aziel-os-brand] {
+    width: 38px;
+    min-height: 38px;
+    padding: 0;
+}
+
+.admin-v2.admin-sidebar-collapsed .admin-logo[data-aziel-os-brand] .aziel-os-brand-inner {
+    display: grid;
+    grid-template-columns: 1fr;
+    grid-template-areas: "mark";
+    place-items: center;
+}
+
+.admin-v2.admin-sidebar-collapsed .admin-logo[data-aziel-os-brand] .aziel-os-wordmark,
+.admin-v2.admin-sidebar-collapsed .admin-logo[data-aziel-os-brand] .aziel-os-subtitle {
+    display: none;
+}
+
+.admin-v2.admin-sidebar-collapsed .admin-sidebar-collapse {
+    width: 38px;
+    min-height: 34px;
+}
+
+.admin-v2.admin-sidebar-collapsed .admin-sidebar-navigation {
+    padding-inline: 0;
+}
+
+.admin-v2.admin-sidebar-collapsed .admin-nav-group {
+    margin-bottom: var(--v2-space-3);
 }
 
 /* ---------- Popovers ---------- */
@@ -322,9 +419,10 @@
 /* ---------- Mobile nav ---------- */
 
 .admin-v2 .admin-mobile-bottom-nav {
-    background: rgba(255,255,255,.98);
+    background: color-mix(in srgb, var(--v2-surface) 96%, transparent);
     border-top: 1px solid var(--v2-line);
-    box-shadow: none;
+    box-shadow: 0 -8px 24px color-mix(in srgb, var(--v2-bg) 18%, transparent);
+    backdrop-filter: saturate(140%) blur(18px);
 }
 
 .admin-v2 .admin-mobile-bottom-nav button {
@@ -337,6 +435,21 @@
 .admin-v2 .admin-mobile-bottom-nav button.active {
     color: var(--v2-purple);
     background: var(--v2-purple-soft);
+}
+
+.admin-v2 .admin-mobile-bottom-nav button:hover:not(:disabled) {
+    color: var(--v2-text);
+    background: var(--v2-subtle);
+}
+
+.admin-v2 .admin-mobile-bottom-nav button:disabled {
+    color: var(--v2-faint);
+    opacity: .55;
+}
+
+.admin-v2 .admin-mobile-bottom-nav button:focus-visible {
+    outline: 2px solid var(--v2-purple);
+    outline-offset: -2px;
 }
 
 /* ---------- Responsive shell ---------- */
@@ -395,9 +508,13 @@
     }
 
     .admin-v2 .admin-topbar {
-        min-height: 56px;
-        height: 56px;
-        padding: 0 10px;
+        min-height: calc(var(--admin-mobile-header-height, 60px) + env(safe-area-inset-top));
+        height: calc(var(--admin-mobile-header-height, 60px) + env(safe-area-inset-top));
+        padding: env(safe-area-inset-top) 10px 0;
+    }
+
+    .admin-v2 .admin-main {
+        padding-top: calc(var(--admin-mobile-header-height, 60px) + env(safe-area-inset-top) + 12px);
     }
 
     .admin-v2 #adminGlobalSearch {

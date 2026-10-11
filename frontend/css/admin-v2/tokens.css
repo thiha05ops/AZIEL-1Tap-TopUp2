@@ -157,10 +157,69 @@ body.theme-light.admin-v2 {
 html.theme-dark .admin-v2,
 body.theme-dark.admin-v2 {
     color-scheme: dark;
+
+    --v2-bg: #111317;
+    --v2-surface: #17191e;
+    --v2-surface-raised: #1d2026;
+    --v2-subtle: #202329;
+    --v2-subtle-strong: #272b32;
+    --v2-text: #f2f3f5;
+    --v2-text-soft: #d0d3d8;
+    --v2-muted: #9ca2ac;
+    --v2-faint: #737a85;
+    --v2-line: #2b2f36;
+    --v2-line-strong: #3b4049;
+    --v2-purple: #9b7bea;
+    --v2-purple-hover: #ad91ef;
+    --v2-purple-soft: #292139;
+    --v2-yellow: #d2a64b;
+    --v2-yellow-soft: #302817;
+    --v2-red: #e0747e;
+    --v2-red-soft: #341e22;
+    --v2-green: #62b890;
+    --v2-green-soft: #193027;
+    --v2-blue: #79a9da;
+
+    --admin-bg: var(--v2-bg);
+    --admin-bg-soft: var(--v2-subtle);
+    --admin-surface: var(--v2-surface);
+    --admin-surface-raised: var(--v2-surface-raised);
+    --admin-panel: var(--v2-surface);
+    --admin-input: var(--v2-surface);
+    --admin-border: var(--v2-line);
+    --admin-border-strong: var(--v2-line-strong);
+    --admin-text: var(--v2-text);
+    --admin-text-muted: var(--v2-muted);
+    --admin-primary: var(--v2-purple);
+    --admin-accent: var(--v2-purple);
 }
 
 html.theme-light .admin-v2,
 body.theme-light.admin-v2 {
+    color-scheme: light;
+
+    --v2-bg: #f7f8fa;
+    --v2-surface: #ffffff;
+    --v2-surface-raised: #ffffff;
+    --v2-subtle: #f2f4f6;
+    --v2-subtle-strong: #eceff3;
+    --v2-text: #1b1d21;
+    --v2-text-soft: #3f444c;
+    --v2-muted: #686e77;
+    --v2-faint: #8b919a;
+    --v2-line: #e2e5e9;
+    --v2-line-strong: #d3d7dc;
+    --v2-purple: #6840cf;
+    --v2-purple-hover: #5934bd;
+    --v2-purple-soft: #f0ebfb;
+    --v2-yellow: #a66c00;
+    --v2-yellow-soft: #fff7df;
+    --v2-red: #bd3d49;
+    --v2-red-soft: #fff0f2;
+    --v2-green: #207c59;
+    --v2-green-soft: #edf8f3;
+    --v2-blue: #376ea6;
+
     --admin-bg: var(--v2-bg);
     --admin-bg-soft: var(--v2-subtle);
     --admin-surface: var(--v2-surface);
