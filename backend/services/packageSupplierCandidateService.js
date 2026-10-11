@@ -12,6 +12,8 @@ const SupplierProductMapping = require("../models/SupplierProductMapping");
 const StoreCatalogSelection = require("../models/StoreCatalogSelection");
 const { getSupplierAdapter } = require("./supplierAdapterRegistry");
 const { READINESS_MODES, assessMappingReadiness } = require("./supplierMappingReadinessService");
+const { projectPackagePublication, publicationPackageMap } = require("./packageMarketPublicationService");
+const { publicPaymentMarketReadiness } = require("./publicPaymentMarketReadinessService");
 
 class PackageSupplierCandidateError extends Error {
     constructor(code, message, statusCode = 400) {
@@ -83,7 +85,7 @@ function resolveEffectiveSupplierCandidate(candidates = [], selection = null) {
     return { candidate: null, source: "NONE", blockers: exactBlockers.length ? exactBlockers : ["NO_EXECUTABLE_SUPPLIER_ROUTE"] };
 }
 
-function effectivePackageSalesState({ product = null, storeCatalogMember = false, pkg = null, publication = null, customerMarket = "TH", candidates = [], selection = null } = {}) {
+function effectivePackageSalesState({ product = null, storeCatalogMember = false, pkg = null, publication = null, customerMarket = "TH", candidates = [], selection = null, marketPaymentReady = true } = {}) {
     const market = normalizeCustomerMarket(customerMarket);
     if (publication?.published !== true) return { state: "DISABLED", blockers: [], route: resolveEffectiveSupplierCandidate(candidates, selection) };
     const blockers = [];
@@ -92,12 +94,13 @@ function effectivePackageSalesState({ product = null, storeCatalogMember = false
     if (!pkg || pkg.deletedAt || pkg.enabled === false) blockers.push("PACKAGE_DISABLED");
     const price = pkg?.prices?.[market];
     if (!price || price.enabled === false || !(Number(price.amount) > 0)) blockers.push("NO_VALID_PRICE");
+    if (marketPaymentReady !== true) blockers.push("NO_AVAILABLE_PAYMENT_METHOD");
     const route = resolveEffectiveSupplierCandidate(candidates, selection);
     blockers.push(...route.blockers);
     return { state: blockers.length ? "BLOCKED" : "LIVE", blockers: [...new Set(blockers)], route };
 }
 
-function evaluatePackageSupplierCandidates({ productCode, packageCode, customerMarket, product = null, storeCatalogMember = false, pkg, publication = null, selection = null, mappings = [], suppliers = [], offers = [], availabilityRows = [], iconAsset = null, adapterFor = getSupplierAdapter } = {}) {
+function evaluatePackageSupplierCandidates({ productCode, packageCode, customerMarket, product = null, storeCatalogMember = false, pkg, publication = null, selection = null, mappings = [], suppliers = [], offers = [], availabilityRows = [], iconAsset = null, adapterFor = getSupplierAdapter, marketPaymentReady = true } = {}) {
     const normalizedProduct = lower(productCode);
     const normalizedPackage = upper(packageCode);
     const market = normalizeCustomerMarket(customerMarket);
@@ -143,7 +146,7 @@ function evaluatePackageSupplierCandidates({ productCode, packageCode, customerM
     if (pkg.deletedAt) publicationBlockers.push("PACKAGE_DELETED");
     if (pkg.enabled === false) publicationBlockers.push("PACKAGE_DISABLED");
     if (!price || price.enabled === false || !Number.isFinite(Number(price.amount)) || Number(price.amount) <= 0) publicationBlockers.push("NO_VALID_PRICE");
-    const effectiveState = effectivePackageSalesState({ product, storeCatalogMember, pkg, publication, customerMarket: market, candidates, selection });
+    const effectiveState = effectivePackageSalesState({ product, storeCatalogMember, pkg, publication, customerMarket: market, candidates, selection, marketPaymentReady });
     publicationBlockers.push(...effectiveState.blockers);
     const published = publication?.published === true;
     const operationalBlockers = [...new Set(effectiveState.blockers)];
@@ -178,13 +181,14 @@ async function getProductPackageSupplierOverview({ productCode, customerMarket }
     const normalizedProduct = lower(productCode);
     const market = normalizeCustomerMarket(customerMarket);
     if (!normalizedProduct) throw new PackageSupplierCandidateError("PACKAGE_IDENTITY_REQUIRED", "Product is required.");
-    const [product, packages, publications, selections, mappings, storeCatalogMemberships] = await Promise.all([
+    const [product, packages, publications, selections, mappings, storeCatalogMemberships, paymentReadiness] = await Promise.all([
         CatalogProduct.findOne({ productCode: normalizedProduct }).lean(),
         CatalogPackage.find({ productCode: normalizedProduct, deletedAt: null }).sort({ sortOrder: 1, packageCode: 1 }).lean(),
-        PackageMarketPublication.find({ productCode: normalizedProduct, customerMarket: market }).lean(),
+        PackageMarketPublication.find({ productCode: normalizedProduct }).lean(),
         PackageSupplierSelection.find({ productCode: normalizedProduct, customerMarket: market }).lean(),
         SupplierProductMapping.find({ productCode: normalizedProduct }).sort({ packageCode: 1, supplierCode: 1, region: 1, _id: 1 }).lean(),
-        StoreCatalogSelection.find({ productCode: normalizedProduct, status: "ACTIVE", sellingRegions: market }).lean()
+        StoreCatalogSelection.find({ productCode: normalizedProduct, status: "ACTIVE", sellingRegions: market }).lean(),
+        publicPaymentMarketReadiness(market)
     ]);
     const supplierIds = [...new Set(mappings.map(item => objectId(item.supplierId)).filter(Boolean))];
     const offerIds = [...new Set(mappings.map(item => objectId(item.supplierCatalogOfferId)).filter(Boolean))];
@@ -201,7 +205,7 @@ async function getProductPackageSupplierOverview({ productCode, customerMarket }
         map.get(key).push(item);
         return map;
     }, new Map());
-    const publicationByPackage = new Map(publications.map(item => [upper(item.packageCode), item]));
+    const publicationRecordsByPackage = publicationPackageMap(publications);
     const selectionByPackage = new Map(selections.map(item => [upper(item.packageCode), item]));
     const mappingsByPackage = byPackage(mappings);
     const storeCatalogPackages = new Set(storeCatalogMemberships.flatMap(item => item.packages || []).map(item => upper(item.packageCode)));
@@ -216,12 +220,13 @@ async function getProductPackageSupplierOverview({ productCode, customerMarket }
             product,
             storeCatalogMember: storeCatalogPackages.has(upper(pkg.packageCode)),
             pkg,
-            publication: publicationByPackage.get(upper(pkg.packageCode)) || null,
+            publication: projectPackagePublication(pkg, publicationRecordsByPackage.get(`${normalizedProduct}:${upper(pkg.packageCode)}`) || [], market),
             selection: selectionByPackage.get(upper(pkg.packageCode)) || null,
             mappings: mappingsByPackage.get(upper(pkg.packageCode)) || [],
             suppliers,
             offers,
             availabilityRows,
+            marketPaymentReady: paymentReadiness.ready,
             iconAsset: assetById.get(clean(pkg.iconAssetId)) || null
         }))
     };
@@ -241,6 +246,7 @@ function createPackageSupplierCandidateService(models = {}, dependencies = {}) {
         StoreSelection: models.StoreSelection || StoreCatalogSelection
     };
     const adapterFor = dependencies.getSupplierAdapter || getSupplierAdapter;
+    const paymentReadinessFor = dependencies.publicPaymentMarketReadiness || publicPaymentMarketReadiness;
 
     return async function getPackageSupplierCandidates({ productCode, packageCode, customerMarket } = {}) {
         const normalizedProduct = lower(productCode);
@@ -249,13 +255,14 @@ function createPackageSupplierCandidateService(models = {}, dependencies = {}) {
         if (!normalizedProduct || !normalizedPackage) {
             throw new PackageSupplierCandidateError("PACKAGE_IDENTITY_REQUIRED", "Product and package are required.");
         }
-        const [product, pkg, publication, selection, mappings, storeCatalogMember] = await Promise.all([
+        const [product, pkg, publications, selection, mappings, storeCatalogMember, paymentReadiness] = await Promise.all([
             M.Product.findOne({ productCode: normalizedProduct }).lean(),
             M.Package.findOne({ productCode: normalizedProduct, packageCode: normalizedPackage, deletedAt: null }).lean(),
-            M.Publication.findOne({ productCode: normalizedProduct, packageCode: normalizedPackage, customerMarket: market }).lean(),
+            M.Publication.find({ productCode: normalizedProduct, packageCode: normalizedPackage }).lean(),
             M.Selection.findOne({ productCode: normalizedProduct, packageCode: normalizedPackage, customerMarket: market }).lean(),
             M.Mapping.find({ productCode: normalizedProduct, packageCode: normalizedPackage }).sort({ supplierCode: 1, region: 1, _id: 1 }).lean(),
-            M.StoreSelection.exists({ productCode: normalizedProduct, status: "ACTIVE", sellingRegions: market, "packages.packageCode": normalizedPackage })
+            M.StoreSelection.exists({ productCode: normalizedProduct, status: "ACTIVE", sellingRegions: market, "packages.packageCode": normalizedPackage }),
+            paymentReadinessFor(market)
         ]);
         if (!pkg) throw new PackageSupplierCandidateError("CATALOG_PACKAGE_NOT_FOUND", "Package not found.", 404);
 
@@ -267,7 +274,8 @@ function createPackageSupplierCandidateService(models = {}, dependencies = {}) {
             offerIds.length ? M.Availability.find({ supplierCatalogOfferId: { $in: offerIds } }).lean() : [],
             pkg.iconAssetId ? M.Media.findOne({ assetId: pkg.iconAssetId, status: "active" }).lean() : null
         ]);
-        return evaluatePackageSupplierCandidates({ productCode: normalizedProduct, packageCode: normalizedPackage, customerMarket: market, product, storeCatalogMember: Boolean(storeCatalogMember), pkg, publication, selection, mappings, suppliers, offers, availabilityRows, iconAsset, adapterFor });
+        const publication = projectPackagePublication(pkg, publications, market);
+        return evaluatePackageSupplierCandidates({ productCode: normalizedProduct, packageCode: normalizedPackage, customerMarket: market, product, storeCatalogMember: Boolean(storeCatalogMember), pkg, publication, selection, mappings, suppliers, offers, availabilityRows, iconAsset, adapterFor, marketPaymentReady: paymentReadiness.ready });
     };
 }
 

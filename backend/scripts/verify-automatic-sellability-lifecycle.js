@@ -13,18 +13,20 @@ let checks = 0;
 const ok = (value, message) => { assert(value, message); checks += 1; };
 const now = new Date();
 const future = new Date(Date.now() + 60_000);
-const product = { productCode: "game", enabled: true, deletedAt: null, supportedRegions: ["GLOBAL"] };
+const product = { productCode: "game", enabled: true, deletedAt: null, publicDiscoveryEnabled: true, commerceState: "PURCHASABLE", supportedRegions: ["GLOBAL"] };
 const pkg = { productCode: "game", packageCode: "P1", name: "Package 1", enabled: true, deletedAt: null, prices: { TH: { amount: 10, currency: "THB", enabled: true }, MM: { amount: 1000, currency: "MMK", enabled: true } } };
 const supplier = { _id: "s1", supplierCode: "TEST", name: "Test Supplier", enabled: true, mode: "API" };
 const offer = { _id: "o1", supplierId: "s1", supplierProductCode: "native-product", supplierOfferCode: "native-offer", catalogLifecycleState: "ACTIVE" };
 const availability = { supplierCatalogOfferId: "o1", state: "AVAILABLE", observedAt: now, staleAt: future };
 const mapping = { _id: "m1", supplierId: "s1", supplierCode: "TEST", productCode: "game", packageCode: "P1", supplierCatalogOfferId: "o1", supplierProductCode: "native-product", supplierPackageCode: "native-offer", region: "GLOBAL", enabled: true, archivedAt: null, executionMode: "API", productionRole: "DISABLED", fulfillmentEligibility: { mode: "GLOBAL", allowedCustomerMarkets: [], evidenceCode: "PROVIDER_CONFIRMED", evidenceSource: "fixture", verifiedAt: now, version: 1 }, mappingMetadata: { readiness: { supplierMapped: true, inputReady: true, fulfillmentReady: true } } };
 const adapter = { isConfigured: () => true, isAutoFulfillmentEnabled: () => true };
-const evaluate = (overrides = {}) => evaluatePackageSupplierCandidates({ productCode: "game", packageCode: "P1", customerMarket: "TH", product, pkg, publication: null, selection: { supplierMappingId: "m1", decisionVersion: 1 }, mappings: [mapping], suppliers: [supplier], offers: [offer], availabilityRows: [availability], adapterFor: () => adapter, ...overrides });
+const evaluate = (overrides = {}) => evaluatePackageSupplierCandidates({ productCode: "game", packageCode: "P1", customerMarket: "TH", product, storeCatalogMember: true, pkg, publication: { productCode: "game", packageCode: "P1", customerMarket: "TH", published: true }, selection: { supplierMappingId: "m1", decisionVersion: 1 }, mappings: [mapping], suppliers: [supplier], offers: [offer], availabilityRows: [availability], adapterFor: () => adapter, ...overrides });
 
 const live = evaluate();
-ok(live.operational.state === "LIVE", "valid price plus exact executable selected route is live without publication intent");
-ok(live.publication.published === false && live.publication.historical === true, "publication is historical rather than a sellability gate");
+ok(live.operational.state === "LIVE", "explicit publication plus valid price and exact executable selected route is live");
+ok(live.publication.published === true && live.publication.historical === true, "explicit market publication is required for LIVE state");
+const sellingOff = evaluate({ publication: null });
+ok(sellingOff.operational.state === "DISABLED" && sellingOff.operational.blockerCodes.length === 0, "missing publication keeps Selling OFF distinct from operational readiness failures");
 ok(evaluate({ pkg: { ...pkg, prices: { ...pkg.prices, TH: { ...pkg.prices.TH, amount: 12 } } } }).operational.state === "LIVE", "normal price change preserves live routing");
 ok(evaluate({ pkg: { ...pkg, prices: { MM: pkg.prices.MM } } }).operational.blockerCodes.includes("NO_VALID_PRICE"), "missing price blocks");
 ok(evaluate({ pkg: { ...pkg, enabled: false } }).operational.blockerCodes.includes("PACKAGE_DISABLED"), "disabled package blocks");
@@ -36,14 +38,15 @@ ok(evaluate({ customerMarket: "MM", product: { ...product, supportedRegions: ["T
 const thOnlyMapping = { ...mapping, fulfillmentEligibility: { ...mapping.fulfillmentEligibility, mode: "CUSTOMER_MARKET_ALLOWLIST", allowedCustomerMarkets: ["TH"] } };
 const unsupportedMm = evaluate({ customerMarket: "MM", mappings: [thOnlyMapping] });
 ok(unsupportedMm.operational.state === "BLOCKED" && unsupportedMm.operational.blockerCodes.includes("CUSTOMER_MARKET_NOT_ELIGIBLE"), "actual supplier-route eligibility blocks a truly unsupported customer market");
-ok(evaluate({ selection: null }).operational.blockerCodes.includes("PACKAGE_SUPPLIER_SELECTION_REQUIRED"), "checkout routing authority is still required");
+const uniqueRoute = evaluate({ selection: null });
+ok(uniqueRoute.operational.state === "LIVE" && uniqueRoute.effectiveState.supplierResolution === "UNIQUE_EXECUTABLE_ROUTE", "one uniquely executable route may safely become checkout authority without an owner override");
 ok(evaluate({ mappings: [{ ...mapping, executionMode: "MANUAL" }] }).operational.blockerCodes.includes("MAPPING_EXECUTION_NOT_API"), "non-executable auto fulfillment blocks");
 ok(evaluate({ offers: [{ ...offer, catalogLifecycleState: "INACTIVE" }] }).operational.blockerCodes.includes("SUPPLIER_OFFER_NOT_ACTIVE"), "inactive supplier offer blocks");
 ok(evaluate({ pkg: { ...pkg, enabled: false } }).operational.state === "BLOCKED", "disabled canonical package is not live");
-ok(evaluate({ product: { ...product, enabled: false } }).operational.blockerCodes.includes("PRODUCT_UNAVAILABLE"), "disabled canonical product is blocked without inventing market authority");
+ok(evaluate({ product: { ...product, enabled: false } }).operational.blockerCodes.includes("PRODUCT_NOT_PURCHASABLE"), "disabled canonical product is blocked without inventing market authority");
 
 const projected = explicitPublishedPackages({ packages: [{ ...pkg, publication: { customerMarket: "TH", published: false }, fulfillmentRegions: { TH: true } }] });
-ok(projected.length === 1, "sellable package is included without a publication record");
+ok(projected.length === 0, "Selling OFF package remains excluded even when fulfillment is ready");
 ok(explicitPublishedPackages({ packages: [{ ...pkg, publication: { customerMarket: "TH" }, fulfillmentRegions: { TH: false } }] }).length === 0, "unsafe package remains excluded");
 const commerce = { checks: { fulfillment: true, availability: true }, regions: { TH: { fulfillment: true, availability: true } } };
 ok(resolvePublicProductReadiness({ ...product, publicDiscoveryEnabled: false, commerceState: "HIDDEN" }, [pkg], commerce, { explicitCommercialAuthority: true }).state === "HIDDEN", "Hide suppresses discovery without changing package authorities");
@@ -86,9 +89,9 @@ ok(frontend.includes("publicDiscoveryEnabled: show") && frontend.includes('comme
 ok(frontend.includes("preserveCatalogAnchorPosition(anchor") && frontend.includes("syncCatalogBulkSelectionUi(detail, product, input)"), "Package Offers checkbox scroll preservation remains present");
 
 const addProduct = fs.readFileSync(path.join(root, "services/supplierCatalog/addProductFinalizationService.js"), "utf8");
-ok(addProduct.includes('commerceState:"PURCHASABLE",publicDiscoveryEnabled:true') && addProduct.includes("supportedRegions:plan.customerMarkets"), "new Add Product canonical products enter normal visible lifecycle");
-ok(addProduct.includes('"mappingMetadata.onboardingPlanHash":plan.planHash') && addProduct.includes("{$set:{enabled:true}}"), "only source-locked mappings created by the trusted plan are activated");
-ok(addProduct.includes("applyPackageSupplierSelectionBootstrapPlan") && addProduct.includes("publicationWrites:0"), "Add Product reconciles selection without publication ceremony");
+ok(addProduct.includes('commerceState:"HIDDEN",publicDiscoveryEnabled:false') && addProduct.includes('supportedRegions:["TH","MM"]'), "new Add Product canonical products remain hidden until explicit owner publication");
+ok(addProduct.includes("onboardingPlanHash:plan.planHash") && addProduct.includes("enabled:false,productionRole:\"DISABLED\""), "source-locked mappings remain disabled pending explicit technical activation");
+ok(addProduct.includes("publicationWrites:0") && addProduct.includes("packageSupplierSelectionWrites:0"), "Add Product cannot create publication intent or silently select a supplier route");
 
 const bootstrap = fs.readFileSync(path.join(root, "services/packageSupplierSelectionBootstrapService.js"), "utf8");
 ok(bootstrap.includes("reconcileAutomaticPackageSupplierSelections"), "bounded automatic reconciliation authority exists");
@@ -101,8 +104,8 @@ Promise.all(["TH", "MM"].map(region => validatePaymentCatalogEligibility({ quote
     loadProduct: async () => ({ ...product, publicDiscoveryEnabled: true, commerceState: "PURCHASABLE", lifecycleStatus: "ACTIVE" }),
     loadPackage: async () => ({ ...pkg, _id: "package-1" })
 }))).then(results => {
-    ok(results.every(result => result.allowed === true), "payment catalog revalidation follows visible product plus market price and does not require compatibility-region equality or publication history");
+    ok(results.every(result => result.allowed === true), "payment catalog revalidation preserves the locked quote price after public publication eligibility was established upstream");
     const paymentSource = fs.readFileSync(path.join(root, "services/commerce/paymentCatalogEligibilityService.js"), "utf8");
     ok(!paymentSource.includes("PackageMarketPublication") && !paymentSource.includes("productSupportsRegion"), "payment-time catalog validation has no obsolete publication or product-compatibility market gate");
-    console.log(JSON.stringify({ result: "PASS", checks, productionWrites: 0, providerCalls: 0, publicationRequired: false }, null, 2));
+    console.log(JSON.stringify({ result: "PASS", checks, productionWrites: 0, providerCalls: 0, publicationRequired: true }, null, 2));
 }).catch(error => { console.error(error); process.exitCode = 1; });

@@ -36,9 +36,12 @@ const {
     comparePublicationSets,
     explicitPublishedPackages,
     publicationMode,
+    publicationPackageMap,
+    projectPackagePublication,
     stripPublicationMetadata
 } = require("./packageMarketPublicationService");
 const { finalizePublishedCustomerAmount } = require("./commerce/customerPayableAmountService");
+const { publicPaymentMarketReadiness } = require("./publicPaymentMarketReadinessService");
 
 class CatalogError extends Error {
     constructor(code, message, statusCode = 400) {
@@ -52,13 +55,13 @@ class CatalogError extends Error {
 const productIndex = new Map();
 const aliasIndex = new Map();
 
-function applySelectedPublicPurchasability(projection, product, rawPackages, mappings, suppliers, selections, publications, offers, availabilityRows, customerMarket, storeCatalogMember = true) {
+function applySelectedPublicPurchasability(projection, product, rawPackages, mappings, suppliers, selections, publications, offers, availabilityRows, customerMarket, storeCatalogMember = true, marketPaymentReady = true) {
     const market = String(customerMarket || "TH").trim().toUpperCase();
     const packageByCode = new Map(rawPackages.map(pkg => [String(pkg.packageCode).toUpperCase(), pkg]));
     const mappingById = new Map(mappings.map(mapping => [String(mapping._id), mapping]));
     const supplierById = new Map(suppliers.map(supplier => [String(supplier._id), supplier]));
     const selectionByCode = new Map(selections.filter(row => row.customerMarket === market).map(row => [String(row.packageCode).toUpperCase(), row]));
-    const publicationByCode = new Map(publications.filter(row => row.customerMarket === market).map(row => [String(row.packageCode).toUpperCase(), row]));
+    const publicationRecordsByCode = publicationPackageMap(publications);
     const offerById = new Map(offers.map(offer => [String(offer._id), offer]));
     const availabilityByOffer = new Map(availabilityRows.map(row => [String(row.supplierCatalogOfferId), row]));
     for (const pkg of projection.packages || []) {
@@ -76,9 +79,12 @@ function applySelectedPublicPurchasability(projection, product, rawPackages, map
         if (!product || product.deletedAt || product.enabled === false || product.publicDiscoveryEnabled !== true || String(product.commerceState || "").toUpperCase() !== "PURCHASABLE") blockers.push("PRODUCT_NOT_PURCHASABLE");
         if (!rawPackage || rawPackage.deletedAt || rawPackage.enabled === false) blockers.push("PACKAGE_DISABLED");
         if (!price || price.enabled === false || !(Number(price.amount) > 0)) blockers.push("NO_VALID_PRICE");
-        if (publicationByCode.get(code)?.published !== true) blockers.push("PACKAGE_SELLING_DISABLED");
+        if (marketPaymentReady !== true) blockers.push("NO_AVAILABLE_PAYMENT_METHOD");
+        const publication = projectPackagePublication(pkg, publicationRecordsByCode.get(`${String(product?.productCode || "").toLowerCase()}:${code}`) || [], market);
+        if (publication.published !== true) blockers.push("PACKAGE_SELLING_DISABLED");
         blockers.push(...route.blockers);
-        pkg.salesState = publicationByCode.get(code)?.published !== true ? "DISABLED" : blockers.length ? "BLOCKED" : "LIVE";
+        pkg.publication = publication;
+        pkg.salesState = publication.published !== true ? "DISABLED" : blockers.length ? "BLOCKED" : "LIVE";
         pkg.salesBlockers = [...new Set(blockers)];
         pkg.effectiveSupplierMappingId = route.candidate?.supplierMappingId || "";
         if (pkg.salesState !== "LIVE") {
@@ -1014,6 +1020,9 @@ async function toDatabasePublicCatalog({ includeDisabled = true, includeAssetPro
         SupplierCatalogOffer.find({ _id: { $in: offerIds } }).lean(),
         SupplierOfferAvailability.find({ supplierCatalogOfferId: { $in: offerIds } }).lean()
     ]);
+    const marketPayment = includeAdminPricing
+        ? { ready: true }
+        : await publicPaymentMarketReadiness(customerMarket);
     const mediaMap = await loadMediaAssetMap(products, packages);
 
     const legacyProducts = products
@@ -1034,7 +1043,7 @@ async function toDatabasePublicCatalog({ includeDisabled = true, includeAssetPro
                 enabledSuppliers
             );
             applyPackageFulfillmentReadiness(projection, activeMappings.filter(item => item.productCode === product.productCode), inventoryStates, enabledSuppliers);
-            applySelectedPublicPurchasability(projection, product, productPackages, activeMappings.filter(item => item.productCode === product.productCode), enabledSuppliers, packageSupplierSelections.filter(item => item.productCode === product.productCode), publications.filter(item => item.productCode === product.productCode), selectedOffers, selectedAvailability, customerMarket, storeSelections.some(item => item.productCode === product.productCode));
+            applySelectedPublicPurchasability(projection, product, productPackages, activeMappings.filter(item => item.productCode === product.productCode), enabledSuppliers, packageSupplierSelections.filter(item => item.productCode === product.productCode), publications.filter(item => item.productCode === product.productCode), selectedOffers, selectedAvailability, customerMarket, storeSelections.some(item => item.productCode === product.productCode), marketPayment.ready);
             applyCustomerInputContract(projection, activeMappings.filter(item => item.productCode === product.productCode));
             if (!includeAdminPricing) applyPublicPackageEligibility(projection, customerMarket);
             if (includeAdminPricing) applyPublicationMetadata(projection, publications, customerMarket);
@@ -1062,7 +1071,7 @@ async function toDatabasePublicCatalog({ includeDisabled = true, includeAssetPro
             const productMappings = activeMappings.filter(item => item.productCode === product.productCode);
             const productInventory = inventoryStates.filter(item => sourcePackages.some(pkg => String(pkg._id) === String(item.packageRef) || pkg.packageCode === item.packageCode));
             applyPackageFulfillmentReadiness(projection, productMappings, productInventory, enabledSuppliers);
-            applySelectedPublicPurchasability(projection, product, sourcePackages, productMappings, enabledSuppliers, packageSupplierSelections.filter(item => item.productCode === product.productCode), recordsByProduct.get(product.productCode) || [], selectedOffers, selectedAvailability, customerMarket, true);
+            applySelectedPublicPurchasability(projection, product, sourcePackages, productMappings, enabledSuppliers, packageSupplierSelections.filter(item => item.productCode === product.productCode), recordsByProduct.get(product.productCode) || [], selectedOffers, selectedAvailability, customerMarket, true, marketPayment.ready);
             applyCustomerInputContract(projection, productMappings);
             applyPublicationMetadata(projection, recordsByProduct.get(product.productCode) || [], customerMarket);
             projection.packages = explicitPublishedPackages(projection).filter(pkg => pkg.salesState === "LIVE");
@@ -1402,7 +1411,8 @@ async function getCatalogProductDetail(productCode, options = {}) {
         SupplierCatalogOffer.find({ _id: { $in: offerIds } }).lean(),
         SupplierOfferAvailability.find({ supplierCatalogOfferId: { $in: offerIds } }).lean()
     ]);
-    applySelectedPublicPurchasability(projection, product, packages, activeMappings, enabledSuppliers, packageSupplierSelections, publications, offers, availabilityRows, customerMarket, true);
+    const marketPayment = await publicPaymentMarketReadiness(customerMarket);
+    applySelectedPublicPurchasability(projection, product, packages, activeMappings, enabledSuppliers, packageSupplierSelections, publications, offers, availabilityRows, customerMarket, true, marketPayment.ready);
 
     projection.packages = explicitPublishedPackages(projection).filter(pkg => pkg.salesState === "LIVE");
     projection.packageCount = projection.packages.length;
@@ -1587,7 +1597,8 @@ async function listPublicExclusiveOffers(options = {}) {
         inventoryStates,
         enabledSuppliers,
         publications,
-        storeSelections
+        storeSelections,
+        packageSupplierSelections
     ] = await Promise.all([
         CatalogProduct.find({
             productCode: { $in: candidateProductCodes },
@@ -1626,6 +1637,12 @@ async function listPublicExclusiveOffers(options = {}) {
             sellingRegions: customerMarket,
             visibleRegions: customerMarket,
             productCode: { $in: candidateProductCodes }
+        }).lean(),
+
+        PackageSupplierSelection.find({
+            customerMarket,
+            productCode: { $in: candidateProductCodes },
+            packageCode: { $in: candidatePackageCodes }
         }).lean()
     ]);
 
@@ -1636,6 +1653,17 @@ async function listPublicExclusiveOffers(options = {}) {
     const activeMappings = mappings.filter(mapping =>
         enabledSupplierIds.has(String(mapping.supplierId || ""))
     );
+
+    const offerIds = activeMappings
+        .map(mapping => mapping.supplierCatalogOfferId)
+        .filter(Boolean);
+    const [offers, availabilityRows] = await Promise.all([
+        SupplierCatalogOffer.find({ _id: { $in: offerIds } }).lean(),
+        SupplierOfferAvailability.find({
+            supplierCatalogOfferId: { $in: offerIds }
+        }).lean()
+    ]);
+    const marketPayment = await publicPaymentMarketReadiness(customerMarket);
 
     const mediaMap = await loadMediaAssetMap(products, candidatePackages);
     const winners = [];
@@ -1713,7 +1741,27 @@ async function listPublicExclusiveOffers(options = {}) {
             customerMarket
         );
 
-        projection.packages = explicitPublishedPackages(projection);
+        applySelectedPublicPurchasability(
+            projection,
+            product,
+            sourcePackages,
+            productMappings,
+            enabledSuppliers,
+            packageSupplierSelections.filter(record =>
+                normalizeProductCode(record.productCode) === productCode
+            ),
+            publications.filter(record =>
+                normalizeProductCode(record.productCode) === productCode
+            ),
+            offers,
+            availabilityRows,
+            customerMarket,
+            true,
+            marketPayment.ready
+        );
+
+        projection.packages = explicitPublishedPackages(projection)
+            .filter(pkg => pkg.salesState === "LIVE");
         projection.packageCount = projection.packages.length;
 
         if (!projection.packages.length) continue;

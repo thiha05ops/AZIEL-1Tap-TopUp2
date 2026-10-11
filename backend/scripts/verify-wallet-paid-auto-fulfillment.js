@@ -56,6 +56,19 @@ function supplierOrder(overrides = {}) {
     assert.strictEqual(repeated.reason, "SUPPLIER_FULFILLMENT_ALREADY_BOUND");
     assert.strictEqual(supplierStarts, 1, "Repeated paid handling must not submit a second supplier fulfillment.");
 
+    let missingSnapshotRouteResolutions = 0;
+    const missingSnapshot = await ensurePaidOrderFulfillmentWork(supplierOrder({
+        orderId: "AZL-WALLET-MISSING-ROUTE-1",
+        fulfilment: { status: "not_started" }
+    }), {
+        resolveCurrentRoute: async () => {
+            missingSnapshotRouteResolutions += 1;
+            return { ready: true, routeSnapshot: supplierOrder().fulfilment.routeSnapshot };
+        }
+    });
+    assert.strictEqual(missingSnapshot.reason, "ORDER_ROUTE_SNAPSHOT_MISSING");
+    assert.strictEqual(missingSnapshotRouteResolutions, 0, "A paid CommerceOrder must never resolve a replacement supplier route.");
+
     const manualAttempts = new Map();
     let manualInserts = 0;
     const manualOrder = supplierOrder({

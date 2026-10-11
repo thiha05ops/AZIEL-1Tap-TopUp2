@@ -12,7 +12,7 @@ const PackageMarketPublication = require("../models/PackageMarketPublication");
 const StoreCatalogSelection = require("../models/StoreCatalogSelection");
 const { getSupplierAdapter } = require("./supplierAdapterRegistry");
 const { basicCandidateBlockers } = require("./supplierEligibilityRouteResolver");
-const { publicationPackageKey, publicationPackageMap, setPackageMarketPublication } = require("./packageMarketPublicationService");
+const { publicationPackageKey, publicationPackageMap, projectPackagePublication, setPackageMarketPublication } = require("./packageMarketPublicationService");
 const { assessExistingPreparedRoute } = require("./supplierCatalog/supplierRoutePreparationService");
 const { assessCanonicalEquivalenceProof } = require("./supplierCatalog/canonicalEquivalenceProofService");
 const { contractFromSupplierCatalog } = require("./suppliers/fazercardsFulfillmentContractService");
@@ -383,9 +383,12 @@ function projectActivation(data, { search = "", productCode = "", supplierMarket
         const supplierProduct = offer ? supplierProductById.get(id(offer.supplierCatalogProductId)) : null;
         const availability = offer ? availabilityByOffer.get(id(offer)) : null;
         const publicationRecords = publicationByPackage.get(publicationPackageKey(mapping.productCode, mapping.packageCode)) || [];
-        const marketPublication = publicationRecords.find(item => upper(item.customerMarket) === market);
-        const publication = marketPublication || publicationRecords.find(item => item.published === true) || publicationRecords[0] || null;
-        const packagePublished = publicationRecords.some(item => item.published === true);
+        const publicationProjection = projectPackagePublication(pkg, publicationRecords, market);
+        const publication = publicationRecords.find(item => upper(item.customerMarket) === "GLOBAL")
+            || publicationRecords.find(item => item.published === true)
+            || publicationRecords[0]
+            || null;
+        const packagePublished = publicationProjection.published;
         const readiness = mappingReadiness({ mapping, supplier, pkg, offer, availability, customerMarket: market, now });
         const setup = mappingAvailability({ mapping, supplier, pkg, offer });
         const discovery = discoveryAssessment({ mapping, mappingIsDurable: !synthetic, supplier, supplierProduct, offer, availability, product, pkg, customerMarkets: requestedSellingRegions, dependencies });
@@ -469,7 +472,7 @@ function createAdminProductActivationService(models = {}) {
             const [products, mappings, publications, supplierProducts, offers, suppliers, availability] = await Promise.all([
                 lean(M.CatalogProduct.find({ deletedAt: null }).select("productCode name enabled commerceState publicDiscoveryEnabled catalogCategory metadata"), session),
                 lean(M.Mapping.find({ archivedAt: null }).select("productCode packageCode supplierId supplierCode supplierProductCode supplierCatalogOfferId region fulfillmentEligibility"), session),
-                lean(M.Publication.find({ published: true }).select("productCode packageCode customerMarket published decisionVersion decisionNote"), session),
+                lean(M.Publication.find({}).select("productCode packageCode customerMarket published decisionVersion decisionNote updatedAt"), session),
                 lean(M.SupplierProduct.find({}).select("_id supplierId supplierProductCode supplierMarketCode displayName rawName metadata normalizedInputContract requiredFields"), session),
                 lean(M.Offer.find({}).select("_id supplierId supplierCatalogProductId supplierProductCode supplierOfferCode supplierOfferName rawName reconciliationState reconciliationEvidence catalogLifecycleState metadata"), session),
                 lean(M.Supplier.find({}).select("_id supplierCode name enabled mode"), session),

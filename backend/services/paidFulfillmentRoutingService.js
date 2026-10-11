@@ -78,6 +78,17 @@ async function ensurePaidOrderFulfillmentWork(order = {}, options = {}) {
             }
         }
         if (routeSnapshot.routeType !== FULFILLMENT_ROUTE_TYPES.MANUAL_ADMIN) return { created: false, reason: "SUPPLIER_ROUTE_SNAPSHOT_BOUND", attempt: null, routeSnapshot };
+    } else if (identity.orderModel === "CommerceOrder") {
+        // Quote checkout freezes the supplier route before an order exists.
+        // A paid CommerceOrder without that snapshot is unsafe to fulfill:
+        // resolving today's route here could silently switch suppliers after
+        // settlement.
+        return {
+            created: false,
+            reason: "ORDER_ROUTE_SNAPSHOT_MISSING",
+            errorCode: "ORDER_ROUTE_SNAPSHOT_MISSING",
+            attempt: null
+        };
     } else {
         routing = await (options.resolveCurrentRoute || resolveCheckoutRouteSnapshot)({
             productCode: identity.productCode,

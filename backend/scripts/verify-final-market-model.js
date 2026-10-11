@@ -127,7 +127,7 @@ const adapter = enabled => ({
 });
 
 function assertReadyForCommerceMarket(customerMarket) {
-    const m = mapping({ supplierCode: "GENERICAPI", eligibilityMarkets: ["TH"] });
+    const m = mapping({ supplierCode: "GENERICAPI", eligibilityMarkets: ["TH", "MM"] });
     const blockers = basicCandidateBlockers({
         mapping: m,
         supplier: supplier("GENERICAPI"),
@@ -138,7 +138,7 @@ function assertReadyForCommerceMarket(customerMarket) {
         availability: availability(m.supplierCatalogOfferId),
         requireCatalogEvidence: true
     }).blockers;
-    assert.deepStrictEqual(blockers, [], `${customerMarket} commerce must not invalidate a TH player-region route`);
+    assert.deepStrictEqual(blockers, [], `${customerMarket} commerce may use a route explicitly eligible for both customer markets regardless of currency`);
 }
 
 assertReadyForCommerceMarket("TH");
@@ -310,7 +310,7 @@ assertReadyForCommerceMarket("MM");
         supplierProductCode: "honor_of_kings",
         supplierPackageCode: "16_tokens",
         region: "TH",
-        eligibilityMarkets: ["TH"]
+        eligibilityMarkets: ["TH", "MM"]
     });
     const route = ({ customerMarket, packageOverride = {}, adapterEnabled = true, availabilityOverride = {} }) => basicCandidateBlockers({
         mapping: hokMapping,

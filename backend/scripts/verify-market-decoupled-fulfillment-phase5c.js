@@ -54,7 +54,7 @@ function verifyMappingAndEligibilityRemainAuthoritative() {
     const assessed = value => basicCandidateBlockers({ mapping: value, supplier, pkg, customerMarket: "MM", now, adapter }).blockers;
     assert.deepStrictEqual(assessed(mapping), [], "A valid new mapped product must pass the gate layer without a product env variable.");
     assert(assessed({ ...mapping, enabled: false }).includes("MAPPING_DISABLED"));
-    assert(!assessed({ ...mapping, fulfillmentEligibility: { ...eligibility, mode: "UNKNOWN", allowedCustomerMarkets: [] } }).includes("FULFILLMENT_ELIGIBILITY_UNKNOWN"), "Customer payment market eligibility must not choose or reject an exact supplier route.");
+    assert(assessed({ ...mapping, fulfillmentEligibility: { ...eligibility, mode: "UNKNOWN", allowedCustomerMarkets: [] } }).includes("FULFILLMENT_ELIGIBILITY_UNKNOWN"), "Unknown supplier eligibility must fail closed for new routes without coupling the decision to currency.");
     assert(assessed({ ...mapping, supplierProductCode: "" }).includes("EXACT_MAPPING_INCOMPLETE"));
     assert.strictEqual(summarizeEligibilityResolution({ mappings: [], assessments: new Map(), productCode: "new-product", packageCode: "NEW_1", customerMarket: "MM" }).outcome, OUTCOMES.NO_ELIGIBLE_ROUTE);
     const assessments = new Map([["mapping-1", { blockers: [] }], ["mapping-2", { blockers: [] }]]);

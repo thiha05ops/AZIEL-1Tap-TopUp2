@@ -74,7 +74,7 @@ async function verify() {
     const th = projection.markets.TH, mm = projection.markets.MM;
     ok(th.readyPackages.some(item => item.packageCode === "READY"), "TH ready package planned");
     ok(mm.readyPackages.some(item => item.packageCode === "READY"), "MM ready package planned independently");
-    ok(th.publicPackages.some(item => item.packageCode === "PUBLIC_TH") && !mm.publicPackages.some(item => item.packageCode === "PUBLIC_TH"), "already-public state is market-specific");
+    ok(th.publicPackages.some(item => item.packageCode === "PUBLIC_TH") && mm.publicPackages.some(item => item.packageCode === "PUBLIC_TH"), "legacy publication keeps the package globally available");
     ok(th.blockedPackages.find(item => item.packageCode === "DISABLED").blockers.some(item => item.code === "PACKAGE_DISABLED"), "disabled package blocked");
     ok(mm.blockedPackages.find(item => item.packageCode === "NO_MM_PRICE").blockers.some(item => item.code === "NO_VALID_PRICE"), "missing market price blocked");
     ok(th.blockedPackages.find(item => item.packageCode === "NO_SELECTION").blockers.some(item => item.code === "PACKAGE_SUPPLIER_SELECTION_REQUIRED"), "missing selection blocked");
@@ -95,20 +95,20 @@ async function verify() {
         },
         batchPublish: async input => {
             writes.push(clone(input));
-            input.packages.forEach(item => state.publications.push({ productCode, packageCode: item.packageCode, customerMarket: input.customerMarket, published: true, decisionVersion: item.expectedDecisionVersion + 1 }));
+            input.packages.forEach(item => state.publications.push({ productCode, packageCode: item.packageCode, customerMarket: "GLOBAL", published: true, decisionVersion: item.expectedDecisionVersion + 1 }));
             return { packageCodes: input.packages.map(item => item.packageCode) };
         },
         audit: async input => { audits.push(clone(input)); }
     });
     const plan = await service.plan({ productCode, markets: ["TH", "MM"] });
     const apply = await service.apply({ productCode, markets: ["TH", "MM"], marketPlanTokens: { TH: plan.markets.TH.marketPlanToken, MM: plan.markets.MM.marketPlanToken } }, { actor: { username: "owner" } });
-    ok(apply.markets.TH.status === "APPLIED" && apply.markets.MM.status === "APPLIED", "both markets apply independently");
+    ok(apply.markets.TH.status === "APPLIED" && apply.markets.MM.status === "APPLIED", "one global apply reports both market views");
     const expectedReadyByMarket = { TH: new Set(plan.markets.TH.readyPackages.map(item => item.packageCode)), MM: new Set(plan.markets.MM.readyPackages.map(item => item.packageCode)) };
-    ok(writes.length === 2 && writes.every(write => write.packages.every(item => expectedReadyByMarket[write.customerMarket].has(item.packageCode))), "only ready unpublished packages batch-written");
+    ok(writes.length === 1 && writes[0].packages.every(item => expectedReadyByMarket.TH.has(item.packageCode) || expectedReadyByMarket.MM.has(item.packageCode)), "ready packages are deduplicated into one global batch write");
     const blockedByMarket = { TH: new Set(plan.markets.TH.blockedPackages.map(item => item.packageCode)), MM: new Set(plan.markets.MM.blockedPackages.map(item => item.packageCode)) };
-    ok(!writes.some(write => write.packages.some(item => blockedByMarket[write.customerMarket].has(item.packageCode))), "blocked packages never written");
+    ok(!writes.some(write => write.packages.some(item => blockedByMarket.TH.has(item.packageCode) && blockedByMarket.MM.has(item.packageCode))), "packages blocked in every requested market are never written");
     ok(writes.every(write => write.session?.fixture === true), "batch writes receive transaction session");
-    ok(audits.length === 2 && audits.every(item => item.session?.fixture === true), "batch audit shares transaction session");
+    ok(audits.length === 1 && audits.every(item => item.session?.fixture === true), "global batch audit shares transaction session");
     ok(audits.every(item => !Object.keys(item.metadata).some(key => /packages|supplier|price|mapping/i.test(key))), "audit summary remains bounded");
     assert.deepStrictEqual(state.selections, beforeSelections); checks += 1;
     assert.deepStrictEqual(state.mappings, beforeMappings); checks += 1;
@@ -159,7 +159,7 @@ async function verify() {
     const isolatedWrites = [];
     const isolatedService = createProductReadyPublicationService({}, { loadAuthority: async () => clone(isolatedState), adapterFor: adapter, storeCatalogMode: () => "EXPLICIT", transaction: async callback => callback({}), batchPublish: async input => { if (input.customerMarket === "TH") throw Object.assign(new Error("TH failure"), { code: "TH_FAILURE" }); isolatedWrites.push(input.customerMarket); }, audit: async () => {} });
     const isolatedApply = await isolatedService.apply({ productCode, markets: ["TH", "MM"], marketPlanTokens: { TH: isolatedPlan.markets.TH.marketPlanToken, MM: isolatedPlan.markets.MM.marketPlanToken } });
-    ok(isolatedApply.markets.TH.status === "FAILED" && isolatedApply.markets.MM.status === "APPLIED" && isolatedWrites.join() === "MM", "TH failure does not prevent MM transaction");
+    ok(isolatedApply.markets.TH.status === "FAILED" && isolatedApply.markets.MM.status === "FAILED" && isolatedWrites.length === 0, "global publication batch fails atomically");
 
     const rollbackState = fixture();
     const rollbackPlan = projectProductReadyPublication(rollbackState, { markets: ["TH"], adapterFor: adapter, storeCatalogMode: "EXPLICIT" });

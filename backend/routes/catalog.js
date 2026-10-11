@@ -796,8 +796,8 @@ router.patch("/admin/catalog/products/:productCode/packages/:packageCode/publica
             req,
             action: result.publication.published ? ADMIN_AUDIT_ACTIONS.PACKAGE_MARKET_PUBLISHED : ADMIN_AUDIT_ACTIONS.PACKAGE_MARKET_UNPUBLISHED,
             resourceType: "PackageMarketPublication",
-            resourceId: `${result.publication.productCode}:${result.publication.packageCode}:${customerMarket}`,
-            metadata: { published: result.publication.published, decisionVersion: result.publication.decisionVersion }
+            resourceId: `${result.publication.productCode}:${result.publication.packageCode}:GLOBAL`,
+            metadata: { published: result.publication.published, decisionVersion: result.publication.decisionVersion, authorityMarket: "GLOBAL", requestedFromMarketView: customerMarket }
         }).catch(error => console.log("Admin audit failed:", error.message));
         const product = await getCatalogProductDetail(result.publication.productCode, {
             source: "database",

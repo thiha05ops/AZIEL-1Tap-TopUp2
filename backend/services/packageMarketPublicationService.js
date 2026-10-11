@@ -2,6 +2,7 @@ const CatalogPackage = require("../models/CatalogPackage");
 const PackageMarketPublication = require("../models/PackageMarketPublication");
 
 const PUBLICATION_MODES = Object.freeze(["LEGACY", "SHADOW", "EXPLICIT"]);
+const GLOBAL_PUBLICATION_MARKET = "GLOBAL";
 
 class PackageMarketPublicationError extends Error {
     constructor(code, message, statusCode = 400) {
@@ -47,6 +48,29 @@ function publicationPackageMap(records = []) {
     return grouped;
 }
 
+function publicationDecisionTime(record = {}) {
+    return new Date(record.updatedAt || record.publishedAt || record.unpublishedAt || 0).getTime() || 0;
+}
+
+function resolveGlobalPublicationRecord(records = []) {
+    const rows = (records || []).filter(Boolean);
+    const global = rows.find(item => String(item.customerMarket || "").trim().toUpperCase() === GLOBAL_PUBLICATION_MARKET);
+    if (global) return { record: global, source: "GLOBAL" };
+
+    // Backward compatibility: any historically published market means the
+    // canonical package was already being sold. No record (or only disabled
+    // records) remains disabled. The legacy rows are never mutated here.
+    const legacy = rows
+        .filter(item => ["TH", "MM"].includes(String(item.customerMarket || "").trim().toUpperCase()))
+        .sort((a, b) => Number(b.decisionVersion || 0) - Number(a.decisionVersion || 0)
+            || publicationDecisionTime(b) - publicationDecisionTime(a)
+            || String(a.customerMarket || "").localeCompare(String(b.customerMarket || "")));
+    return {
+        record: legacy.find(item => item.published === true) || legacy[0] || null,
+        source: legacy.some(item => item.published === true) ? "LEGACY_ANY_PUBLISHED" : "LEGACY_DISABLED"
+    };
+}
+
 function suppressionReasons(pkg = {}, customerMarket = "TH") {
     normalizeCustomerMarket(customerMarket);
     return [];
@@ -59,17 +83,15 @@ function projectPackagePublication(pkg, recordOrRecords, customerMarket = "TH") 
 
     const market = normalizeCustomerMarket(customerMarket);
 
-    const record = records.find(
-        item =>
-            String(item?.customerMarket || "")
-                .trim()
-                .toUpperCase() === market
-    ) || null;
+    const resolution = resolveGlobalPublicationRecord(records);
+    const record = resolution.record;
 
     const published = record?.published === true;
     const reasons = published ? suppressionReasons(pkg, market) : [];
     return {
         customerMarket: normalizeCustomerMarket(customerMarket),
+        authorityMarket: GLOBAL_PUBLICATION_MARKET,
+        authoritySource: resolution.source,
         published,
         state: !published ? "PRIVATE" : reasons.length ? "SUPPRESSED" : "PUBLISHED",
         currentlyPurchasable: published && reasons.length === 0,
@@ -120,7 +142,8 @@ function comparePublicationSets(legacyProducts = [], proposedProducts = [], cust
 
 async function setPackageMarketPublication({ productCode, packageCode, customerMarket = "TH", published, actor = "admin", decisionNote = "", session = null }) {
     if (typeof published !== "boolean") throw new PackageMarketPublicationError("PUBLICATION_DECISION_INVALID", "published must be true or false.");
-    const market = normalizeCustomerMarket(customerMarket);
+    normalizeCustomerMarket(customerMarket);
+    const market = GLOBAL_PUBLICATION_MARKET;
     const normalizedProduct = String(productCode || "").trim().toLowerCase();
     const normalizedPackage = String(packageCode || "").trim().toUpperCase();
     const packageQuery = CatalogPackage.findOne({ productCode: normalizedProduct, packageCode: normalizedPackage, deletedAt: null });
@@ -155,7 +178,8 @@ async function setPackageMarketPublication({ productCode, packageCode, customerM
 }
 
 async function publishPackageMarketBatch({ productCode, customerMarket = "TH", packages = [], actor = "admin", decisionNote = "", session = null, model = PackageMarketPublication } = {}) {
-    const market = normalizeCustomerMarket(customerMarket);
+    normalizeCustomerMarket(customerMarket);
+    const market = GLOBAL_PUBLICATION_MARKET;
     const normalizedProduct = String(productCode || "").trim().toLowerCase();
     const normalizedActor = String(actor || "admin").trim().slice(0, 120);
     const normalizedNote = String(decisionNote || "").trim().slice(0, 500);
@@ -209,6 +233,7 @@ async function publishPackageMarketBatch({ productCode, customerMarket = "TH", p
 
 module.exports = {
     PUBLICATION_MODES,
+    GLOBAL_PUBLICATION_MARKET,
     PackageMarketPublicationError,
     applyPublicationMetadata,
     comparePublicationSets,
@@ -219,6 +244,7 @@ module.exports = {
     publicationPackageMap,
     publicationMap,
     publicationMode,
+    resolveGlobalPublicationRecord,
     publishPackageMarketBatch,
     projectPackagePublication,
     setPackageMarketPublication,

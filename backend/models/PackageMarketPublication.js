@@ -4,7 +4,7 @@ const packageMarketPublicationSchema = new mongoose.Schema(
     {
         productCode: { type: String, required: true, trim: true, lowercase: true, maxlength: 80 },
         packageCode: { type: String, required: true, trim: true, uppercase: true, maxlength: 120 },
-        customerMarket: { type: String, required: true, trim: true, uppercase: true, enum: ["MM", "TH"] },
+        customerMarket: { type: String, required: true, trim: true, uppercase: true, enum: ["GLOBAL", "MM", "TH"] },
         published: { type: Boolean, required: true, default: false },
         publishedAt: { type: Date, default: null },
         publishedBy: { type: String, trim: true, maxlength: 120, default: "" },

@@ -43,7 +43,7 @@ function mapping(supplierCode) {
         enabled: true,
         archivedAt: null,
         executionMode: "API",
-        fulfillmentEligibility: { mode: "CUSTOMER_MARKET_ALLOWLIST", allowedCustomerMarkets: ["TH", "MM"] },
+        fulfillmentEligibility: { mode: "CUSTOMER_MARKET_ALLOWLIST", allowedCustomerMarkets: ["TH", "MM"], evidenceCode: "PROVIDER_CONFIRMED", evidenceSource: "verified fixture", verifiedAt: "2026-10-10T00:00:00.000Z", version: 1 },
         mappingMetadata: {
             readiness: { supplierMapped: true, inputReady: true, pricingReady: false, fulfillmentReady: true },
             fulfillmentContract: verifiedContract(supplierCode, supplierCode === "WONDD" ? "WONDD_GAME_ID_TOPUP" : "FAZERCARDS_TOPUPS_ORDER_V2", supplierCode === "WONDD" ? "mlbb" : "")

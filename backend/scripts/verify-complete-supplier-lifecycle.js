@@ -7,6 +7,7 @@ const { buildSupplierLifecycleAudit } = require("../services/supplierLifecycleAu
 const { assessMappingReadiness, READINESS_MODES } = require("../services/supplierMappingReadinessService");
 const { createRoutingAuthority } = require("../services/supplierProductionSelectionService");
 const { applySelectedPublicPurchasability } = require("../services/catalogService");
+const { publicPaymentMarketReadiness } = require("../services/publicPaymentMarketReadinessService");
 const { FULFILLMENT_ROUTING_MODES, resolveFulfillmentRoutingMode } = require("../config/fulfillmentRoutingMode");
 
 const root = path.resolve(__dirname, "../..");
@@ -79,6 +80,19 @@ async function main() {
     const projected = { packages: [{ packageCode: "PACK", fulfillmentRegions: { TH: true } }] };
     const blockedPublic = applySelectedPublicPurchasability(projected, { enabled: true, publicDiscoveryEnabled: true, commerceState: "PURCHASABLE" }, [{ packageCode: "PACK", enabled: true, prices: { TH: { enabled: true, amount: 10 } } }], [], [], [], [{ packageCode: "PACK", customerMarket: "TH", published: true }], [], [], "TH", true);
     check("public catalog fails closed without executable route", blockedPublic.packages[0].fulfillmentRegions.TH === false);
+    const noPaymentProjection = { packages: [{ packageCode: "PACK", fulfillmentRegions: { TH: true } }] };
+    const noPayment = applySelectedPublicPurchasability(noPaymentProjection, { enabled: true, publicDiscoveryEnabled: true, commerceState: "PURCHASABLE" }, [{ packageCode: "PACK", enabled: true, prices: { TH: { enabled: true, amount: 10 } } }], [], [], [], [{ packageCode: "PACK", customerMarket: "TH", published: true }], [], [], "TH", true, false);
+    check("public catalog fails closed without a market payment method", noPayment.packages[0].salesBlockers.includes("NO_AVAILABLE_PAYMENT_METHOD"));
+    const thPayment = await publicPaymentMarketReadiness("TH", { findMethods: async () => [{ key: "promptpay", provider: "promptpay", method: "PromptPay", region: "TH", paymentType: "manual", enabled: true, accountName: "AZIEL", accountNumber: "fixture", uploadedQrImage: "/assets/payment/fixture.png", qrMode: "uploaded_static", confirmationMode: "manual_admin", receiptUploadEnabled: true, slipRequired: true }] });
+    check("configured regional payment method satisfies public checkout readiness", thPayment.ready === true);
+    const retiredMmPayment = await publicPaymentMarketReadiness("MM", { findMethods: async () => [{ key: "wavepay", provider: "wavepay", method: "WavePay", region: "MM", paymentType: "manual", enabled: true }] });
+    check("retired Myanmar manual method cannot make packages LIVE", retiredMmPayment.ready === false);
+    const catalogSource = source("backend/services/catalogService.js");
+    const exclusiveStart = catalogSource.indexOf("async function listPublicExclusiveOffers");
+    const exclusiveEnd = catalogSource.indexOf("module.exports", exclusiveStart);
+    const exclusiveSource = catalogSource.slice(exclusiveStart, exclusiveEnd);
+    check("exclusive offers apply effective market purchasability", exclusiveSource.includes("applySelectedPublicPurchasability("));
+    check("exclusive offers expose only LIVE packages", exclusiveSource.includes('filter(pkg => pkg.salesState === "LIVE")'));
     check("selected uses exact mapping", (await route({})).routeSnapshot === selected.routeSnapshot);
     check("no BACKUP iteration in selected resolver", !source("backend/services/supplierProductionSelectionService.js").includes("productionRole: ROLES.BACKUP"));
     check("no pricing provenance routing", !source("backend/services/supplierProductionSelectionService.js").includes("supplierCostSource"));

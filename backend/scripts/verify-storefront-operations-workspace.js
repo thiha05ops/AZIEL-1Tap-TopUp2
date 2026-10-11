@@ -21,23 +21,24 @@ const supplier = { _id: id(2), supplierCode: "ONE", name: "Supplier One", enable
 const offer = { _id: id(3), supplierId: id(2), supplierProductCode: "P", supplierOfferCode: "O", catalogLifecycleState: "ACTIVE", supplierCost: { amount: 70, currency: "THB", observedAt: now } };
 const availability = { supplierCatalogOfferId: id(3), state: "AVAILABLE", observedAt: now, staleAt: new Date(Date.now() + 60000).toISOString() };
 const adapterFor = () => ({ isConfigured: () => true, isAutoFulfillmentEnabled: () => true });
-const evaluate = ({ published = true, selected = true, packagePatch = {} } = {}) => evaluatePackageSupplierCandidates({ productCode: "fixture", packageCode: "PACK", customerMarket: "TH", pkg: { ...pkg, ...packagePatch }, publication: { published }, selection: selected ? { supplierMappingId: id(1), decisionVersion: 1 } : null, mappings: [mapping], suppliers: [supplier], offers: [offer], availabilityRows: [availability], adapterFor });
+const evaluate = ({ published = true, selected = true, packagePatch = {} } = {}) => evaluatePackageSupplierCandidates({ productCode: "fixture", packageCode: "PACK", customerMarket: "TH", product: { productCode: "fixture", enabled: true, deletedAt: null, publicDiscoveryEnabled: true, commerceState: "PURCHASABLE" }, storeCatalogMember: true, pkg: { ...pkg, ...packagePatch }, publication: { published }, selection: selected ? { supplierMappingId: id(1), decisionVersion: 1 } : null, mappings: [mapping], suppliers: [supplier], offers: [offer], availabilityRows: [availability], adapterFor });
 
 const live = evaluate();
 assert.strictEqual(live.operational.state, "LIVE");
 assert.strictEqual(live.candidates.length, 1);
 assert.strictEqual(live.candidates[0].selected, true);
 const secondMapping = { ...mapping, _id: id(4), supplierId: id(5), supplierCode: "TWO", supplierCatalogOfferId: id(6), supplierPackageCode: "O2" };
-const twoSupplierCanonicalRow = evaluatePackageSupplierCandidates({ productCode: "fixture", packageCode: "PACK", customerMarket: "TH", pkg, publication: { published: true }, selection: { supplierMappingId: id(1), decisionVersion: 1 }, mappings: [mapping, secondMapping], suppliers: [supplier, { ...supplier, _id: id(5), supplierCode: "TWO", name: "Supplier Two" }], offers: [offer, { ...offer, _id: id(6), supplierId: id(5), supplierOfferCode: "O2" }], availabilityRows: [availability, { ...availability, supplierCatalogOfferId: id(6) }], adapterFor });
+const twoSupplierCanonicalRow = evaluatePackageSupplierCandidates({ productCode: "fixture", packageCode: "PACK", customerMarket: "TH", product: { productCode: "fixture", enabled: true, deletedAt: null, publicDiscoveryEnabled: true, commerceState: "PURCHASABLE" }, storeCatalogMember: true, pkg, publication: { published: true }, selection: { supplierMappingId: id(1), decisionVersion: 1 }, mappings: [mapping, secondMapping], suppliers: [supplier, { ...supplier, _id: id(5), supplierCode: "TWO", name: "Supplier Two" }], offers: [offer, { ...offer, _id: id(6), supplierId: id(5), supplierOfferCode: "O2" }], availabilityRows: [availability, { ...availability, supplierCatalogOfferId: id(6) }], adapterFor });
 assert.strictEqual(twoSupplierCanonicalRow.package.packageCode, "PACK", "one canonical package must remain the row identity");
 assert.strictEqual(twoSupplierCanonicalRow.candidates.length, 2, "all exact supplier choices must remain in the drawer projection");
 const unpublished = evaluate({ published: false });
-assert.strictEqual(unpublished.operational.state, "UNPUBLISHED", "publication must take deterministic precedence");
+assert.strictEqual(unpublished.operational.state, "DISABLED", "Selling OFF must deterministically disable the package without inventing a readiness blocker");
+assert.deepStrictEqual(unpublished.operational.blockerCodes, [], "Selling OFF is publication intent, not a supplier-readiness failure");
 const missingSelection = evaluate({ selected: false });
-assert.strictEqual(missingSelection.operational.state, "SETUP_REQUIRED");
-assert(missingSelection.operational.blockerCodes.includes("PACKAGE_SUPPLIER_SELECTION_REQUIRED"));
+assert.strictEqual(missingSelection.operational.state, "LIVE", "one uniquely executable route may safely resolve without an owner override");
+assert.strictEqual(missingSelection.effectiveState.supplierResolution, "UNIQUE_EXECUTABLE_ROUTE");
 const noPrice = evaluate({ packagePatch: { prices: {} } });
-assert.strictEqual(noPrice.operational.state, "SETUP_REQUIRED");
+assert.strictEqual(noPrice.operational.state, "BLOCKED");
 assert(noPrice.operational.blockerCodes.includes("NO_VALID_PRICE"));
 
 assert(html.includes('data-catalog-panel="storefront" hidden'));
@@ -54,7 +55,7 @@ assert(ui.includes("sortStorefrontPackages") && ui.includes("pkg?.sortOrder"), "
 assert(!ui.slice(ui.indexOf("async function mutateCatalog"), ui.indexOf("async function confirmCatalogAction")).includes("loadAdminCatalog(true)"), "catalog mutation must not trigger a broad catalog reload");
 assert(ui.includes("updateManagePackagePublication") && ui.includes("updateManagePackageImage") && ui.includes("saveManagePackageSupplier"));
 assert(ui.includes("renderManagePackageCandidates(modal, current)"), "failed publication mutation must restore the prior authoritative drawer state");
-assert(ui.includes("No supplier") && ui.includes("Setup required") && ui.includes("Unpublished"));
+assert(ui.includes("No supplier") && ui.includes("Supplier decision required") && ui.includes("Selling OFF"));
 assert(!ui.includes("force-enable"), "Storefront must not expose an unsafe generic force-enable path");
 
 console.log("PASS storefront workspace isolation/bulk canonical projection/classification/sorting/local mutation/static interaction verification");

@@ -71,6 +71,10 @@ function basicCandidateBlockers({ mapping = {}, supplier = {}, pkg = {}, custome
     if (readiness.pricingReady !== true) blockers.push("PRICING_NOT_READY");
     if (readiness.inputReady !== true) blockers.push("INPUT_NOT_READY");
     if (readiness.fulfillmentReady !== true) blockers.push("FULFILLMENT_NOT_READY");
+    const eligibility = validateFulfillmentEligibility(mapping.fulfillmentEligibility);
+    if (!eligibility.valid) blockers.push(...eligibility.errors);
+    else if (eligibility.value.mode === "UNKNOWN") blockers.push("FULFILLMENT_ELIGIBILITY_UNKNOWN");
+    else if (eligibility.value.mode === "CUSTOMER_MARKET_ALLOWLIST" && !eligibility.value.allowedCustomerMarkets.includes(market)) blockers.push("CUSTOMER_MARKET_NOT_ELIGIBLE");
     if (requireCatalogEvidence) {
         const offerMatches = offer && String(offer._id) === String(mapping.supplierCatalogOfferId) &&
             String(offer.supplierId) === String(mapping.supplierId) &&

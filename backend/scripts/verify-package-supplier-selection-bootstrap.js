@@ -129,7 +129,7 @@ async function verify() {
     ok(normalMerchandising.includes("Live ${counts.LIVE} · Blocked ${counts.BLOCKED} · Total ${joined.length}"), "operator counts use one non-overlapping sellability denominator");
     const checkboxHandler = ui.slice(ui.indexOf('detail.querySelectorAll("[data-bulk-package-select]")'), ui.indexOf('bindCatalogBulkActionBar(detail, product);', ui.indexOf('detail.querySelectorAll("[data-bulk-package-select]")')));
     ok(checkboxHandler.includes("syncCatalogBulkSelectionUi") && !checkboxHandler.includes("renderCatalogDetail(product)"), "package checkbox scroll-preservation remains intact");
-    ok(addProduct.includes("getPackageSupplierSelectionBootstrapPlan") && addProduct.includes("applyPackageSupplierSelectionBootstrapPlan") && addProduct.includes("packageSupplierSelectionWrites"), "Add Product reuses bootstrap authority without duplicate validation");
+    ok(!addProduct.includes("applyPackageSupplierSelectionBootstrapPlan") && addProduct.includes("packageSupplierSelectionWrites:0"), "Add Product cannot silently create supplier selections; bootstrap remains an explicit owner action");
     ok(calls.count === 0, "zero provider/network requests");
 
     console.log(JSON.stringify({ result: "PASS", checks, writes: state.selections.length, providerRequests: calls.count, publicationWrites: 0, priceWrites: 0 }, null, 2));

@@ -17,7 +17,7 @@ const { getSupplierAdapter } = require("./supplierAdapterRegistry");
 const { supplierCapabilityProductCode } = require("./fulfillmentCapabilityService");
 const { READINESS_MODES, assessMappingReadiness } = require("./supplierMappingReadinessService");
 const { isProductPubliclyEligible } = require("../catalog/productRegionAuthority");
-const { publishPackageMarketBatch } = require("./packageMarketPublicationService");
+const { projectPackagePublication, publicationPackageMap, publishPackageMarketBatch } = require("./packageMarketPublicationService");
 
 const MARKETS = Object.freeze(["TH", "MM"]);
 const clean = value => String(value == null ? "" : value).trim();
@@ -85,7 +85,7 @@ function projectProductReadyPublication(data = {}, { markets = MARKETS, adapterF
     const mappings = new Map((data.mappings || []).map(item => [objectId(item), item]));
     const offers = new Map((data.offers || []).map(item => [objectId(item), item]));
     const availability = new Map((data.availability || []).map(item => [objectId(item.supplierCatalogOfferId), item]));
-    const publications = new Map((data.publications || []).map(item => [`${upper(item.customerMarket)}:${upper(item.packageCode)}`, item]));
+    const publicationRecordsByPackage = publicationPackageMap(data.publications || []);
     const selections = new Map((data.selections || []).map(item => [`${upper(item.customerMarket)}:${upper(item.packageCode)}`, item]));
     const mappedPackageCodes = new Set((data.mappings || []).filter(item => lower(item.productCode) === productCode).map(item => upper(item.packageCode)));
     const storeAuthorities = new Map();
@@ -106,7 +106,10 @@ function projectProductReadyPublication(data = {}, { markets = MARKETS, adapterF
     for (const market of requestedMarkets) {
         const rows = (data.packages || []).map(pkg => {
             const packageCode = upper(pkg.packageCode);
-            const publication = publications.get(`${market}:${packageCode}`) || null;
+            const publicationProjection = projectPackagePublication(pkg, publicationRecordsByPackage.get(`${productCode}:${packageCode}`) || [], market);
+            const publication = publicationRecordsByPackage.get(`${productCode}:${packageCode}`)?.find(item => upper(item.customerMarket) === "GLOBAL")
+                || publicationRecordsByPackage.get(`${productCode}:${packageCode}`)?.find(item => item.published === true)
+                || null;
             const selection = selections.get(`${market}:${packageCode}`) || null;
             const selectedMapping = selection ? mappings.get(objectId(selection.supplierMappingId)) || null : null;
             let readinessSupplier = null;
@@ -143,7 +146,7 @@ function projectProductReadyPublication(data = {}, { markets = MARKETS, adapterF
                 if (!assessment.ready) blockers.push("FULFILLMENT_NOT_READY", ...assessment.blockers);
             }
             const uniqueBlockers = [...new Set(blockers)];
-            const published = publication?.published === true;
+            const published = publicationProjection.published === true;
             const sourceVersion = stableHash({
                 packageUpdatedAt: pkg.updatedAt || null,
                 packageEnabled: pkg.enabled === true,
@@ -188,7 +191,7 @@ function projectProductReadyPublication(data = {}, { markets = MARKETS, adapterF
                 state: published ? "PUBLIC" : uniqueBlockers.length ? "BLOCKED" : "READY_TO_PUBLISH",
                 blockers: uniqueBlockers.map(blocker),
                 liveBlockers: published ? uniqueBlockers.map(blocker) : [],
-                expectedDecisionVersion: Number(publication?.decisionVersion || 0),
+                expectedDecisionVersion: publicationProjection.authoritySource === "GLOBAL" ? Number(publication?.decisionVersion || 0) : 0,
                 sourceVersion
             };
         }).sort((a, b) => a.packageCode.localeCompare(b.packageCode));
@@ -226,7 +229,7 @@ function createProductReadyPublicationService(models = {}, dependencies = {}) {
         const product = await lean(M.Product.findOne({ productCode: lower(productCode) }), session);
         if (!product) return { product: null, packages: [], publications: [], selections: [], storeSelections: [], mappings: [], suppliers: [], offers: [], availability: [] };
         const packages = await lean(M.Package.find({ productCode: lower(productCode) }).sort({ sortOrder: 1, packageCode: 1 }), session);
-        const publications = await lean(M.Publication.find({ productCode: lower(productCode), customerMarket: { $in: marketList } }), session);
+        const publications = await lean(M.Publication.find({ productCode: lower(productCode) }), session);
         const selections = await lean(M.Selection.find({ productCode: lower(productCode), customerMarket: { $in: marketList } }), session);
         const storeSelections = await lean(M.StoreSelection.find({ productCode: lower(productCode), status: "ACTIVE" }), session);
         const mappings = await lean(M.Mapping.find({ productCode: lower(productCode) }), session);
@@ -262,31 +265,39 @@ function createProductReadyPublicationService(models = {}, dependencies = {}) {
         const requestedMarkets = normalizeMarkets(markets);
         const initial = await plan({ productCode: normalizedProduct, markets: requestedMarkets });
         const result = { productCode: normalizedProduct, generatedAt: initial.generatedAt, markets: {} };
-        for (const market of requestedMarkets) {
-            try {
-                result.markets[market] = await transaction(async session => {
-                    const current = await plan({ productCode: normalizedProduct, markets: [market] }, session);
-                    const marketPlan = current.markets[market];
-                    const expectedToken = clean(marketPlanTokens?.[market]);
-                    if (!expectedToken || expectedToken !== marketPlan.marketPlanToken) {
-                        return { status: "CONFLICT", published: 0, alreadyPublic: marketPlan.public, blocked: marketPlan.blocked, conflicted: marketPlan.ready, marketPlanToken: marketPlan.marketPlanToken, blockedPackages: marketPlan.blockedPackages, conflictCode: "PUBLICATION_READY_PLAN_STALE" };
+        try {
+            const applied = await transaction(async session => {
+                const current = await plan({ productCode: normalizedProduct, markets: requestedMarkets }, session);
+                const stale = requestedMarkets.filter(market => clean(marketPlanTokens?.[market]) !== current.markets[market].marketPlanToken);
+                if (stale.length) return { current, stale };
+                const readyByCode = new Map();
+                for (const market of requestedMarkets) {
+                    for (const row of current.markets[market].readyPackages) {
+                        if (!readyByCode.has(row.packageCode)) readyByCode.set(row.packageCode, row);
                     }
-                    const ready = marketPlan.readyPackages;
-                    if (ready.length) {
-                        await batchPublish({ productCode: normalizedProduct, customerMarket: market, packages: ready, actor: context.actor?.username || "admin", decisionNote, session });
-                    }
-                    await audit({
-                        actor: context.actor || null,
-                        req: context.req || null,
-                        action: ADMIN_AUDIT_ACTIONS.PRODUCT_READY_PACKAGES_PUBLISHED,
-                        resourceType: "CatalogProduct",
-                        resourceId: `${normalizedProduct}:${market}`,
-                        session,
-                        metadata: { productCode: normalizedProduct, customerMarket: market, publishedCount: ready.length, alreadyPublicCount: marketPlan.public, blockedCount: marketPlan.blocked, conflictCount: 0, marketPlanToken: marketPlan.marketPlanToken }
-                    });
-                    return { status: "APPLIED", published: ready.length, alreadyPublic: marketPlan.public, blocked: marketPlan.blocked, conflicted: 0, marketPlanToken: marketPlan.marketPlanToken, publishedPackages: ready.map(item => ({ packageCode: item.packageCode, packageName: item.packageName })), blockedPackages: marketPlan.blockedPackages };
+                }
+                const ready = [...readyByCode.values()];
+                if (ready.length) await batchPublish({ productCode: normalizedProduct, customerMarket: requestedMarkets[0], packages: ready, actor: context.actor?.username || "admin", decisionNote, session });
+                await audit({
+                    actor: context.actor || null,
+                    req: context.req || null,
+                    action: ADMIN_AUDIT_ACTIONS.PRODUCT_READY_PACKAGES_PUBLISHED,
+                    resourceType: "CatalogProduct",
+                    resourceId: `${normalizedProduct}:GLOBAL`,
+                    session,
+                    metadata: { productCode: normalizedProduct, authorityMarket: "GLOBAL", requestedMarkets, publishedCount: ready.length }
                 });
-            } catch (error) {
+                return { current, stale: [], ready };
+            });
+            for (const market of requestedMarkets) {
+                const marketPlan = applied.current.markets[market];
+                const conflict = applied.stale.includes(market);
+                result.markets[market] = conflict
+                    ? { status: "CONFLICT", published: 0, alreadyPublic: marketPlan.public, blocked: marketPlan.blocked, conflicted: marketPlan.ready, marketPlanToken: marketPlan.marketPlanToken, blockedPackages: marketPlan.blockedPackages, conflictCode: "PUBLICATION_READY_PLAN_STALE" }
+                    : { status: "APPLIED", published: marketPlan.ready, globallyPublished: applied.ready.length, alreadyPublic: marketPlan.public, blocked: marketPlan.blocked, conflicted: 0, marketPlanToken: marketPlan.marketPlanToken, publishedPackages: marketPlan.readyPackages.map(item => ({ packageCode: item.packageCode, packageName: item.packageName })), blockedPackages: marketPlan.blockedPackages };
+            }
+        } catch (error) {
+            for (const market of requestedMarkets) {
                 result.markets[market] = { status: "FAILED", published: 0, alreadyPublic: initial.markets[market]?.public || 0, blocked: initial.markets[market]?.blocked || 0, conflicted: initial.markets[market]?.ready || 0, blockedPackages: initial.markets[market]?.blockedPackages || [], conflictCode: error.code || "PUBLICATION_READY_APPLY_FAILED" };
             }
         }

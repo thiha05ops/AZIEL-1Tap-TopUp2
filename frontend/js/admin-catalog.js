@@ -851,6 +851,7 @@ function catalogPackageBlockerLabel(code = "") {
         PACKAGE_DISABLED: "Canonical package is disabled",
         PACKAGE_DELETED: "Canonical package is deleted",
         NO_VALID_PRICE: `Price missing for ${catalogCustomerMarket}`,
+        NO_AVAILABLE_PAYMENT_METHOD: `No public payment method is currently available for ${catalogCustomerMarket}`,
         PRODUCT_UNAVAILABLE: "Product is disabled or unavailable",
         PACKAGE_SUPPLIER_SELECTION_REQUIRED: `No fulfillment supplier is selected for ${catalogCustomerMarket === "MM" ? "Myanmar" : "Thailand"}`,
         FULFILLMENT_NOT_READY: "Selected supplier mapping is not ready for new orders",
@@ -867,7 +868,8 @@ function catalogPackageBlockerLabel(code = "") {
 }
 
 function storefrontOperationalState(item = {}) {
-    return item.operational?.state === "LIVE" ? "LIVE" : "BLOCKED";
+    const state = String(item.operational?.state || item.state || "DISABLED").toUpperCase();
+    return ["LIVE", "BLOCKED", "DISABLED"].includes(state) ? state : "BLOCKED";
 }
 
 function sortStorefrontPackages(packages = []) {
@@ -2183,7 +2185,7 @@ function renderManagePackageCandidates(modal, data = {}) {
     const operationalBlockers = data.operational?.blockerCodes || data.publication?.blockers || [];
     modal.querySelector("[data-manage-package-public-detail]").textContent = operationalBlockers.length
         ? operationalBlockers.map(catalogPackageBlockerLabel).join(" · ")
-        : data.publication?.published ? "Selling is enabled and the effective route is ready for this customer market." : "Selling is disabled for this customer market.";
+        : data.publication?.published ? "Selling is ON globally and the effective route is ready for this customer market." : "Selling is OFF globally.";
     const price = data.customerPrice;
     modal.querySelector("[data-manage-package-customer-price]").textContent = price && Number.isFinite(Number(price.amount))
         ? `${Number(price.amount).toLocaleString()} ${price.currency}` : "Price unavailable";
@@ -2270,11 +2272,10 @@ async function updateManagePackagePublication(product, pkg, modal) {
     const current = modal._supplierCandidateData || {};
     const published = current.publication?.published !== true;
     const market = current.customerMarket === "MM" ? "MM" : "TH";
-    const marketName = market === "MM" ? "Myanmar" : "Thailand";
     const confirmed = await confirmCatalogAction({
-        title: published ? `Make this package public in ${marketName}?` : `Make this package private in ${marketName}?`,
-        message: `${pkg.name || pkg.packageCode}\n\n${published ? "Publication will be enabled, but the package will only become live when price and fulfillment requirements are satisfied." : "New customer purchases will no longer see this package."}\n\nPricing, supplier mappings, selections and historical orders will not change.`,
-        confirmText: published ? "Make Public" : "Make Private"
+        title: published ? "Turn Selling ON globally?" : "Turn Selling OFF globally?",
+        message: `${pkg.name || pkg.packageCode}\n\n${published ? "The package will be offered in both Thailand and Myanmar when each storefront's price, payment, and fulfillment requirements are satisfied." : "New purchases will no longer see this package in either storefront."}\n\nRegional prices, payment methods, supplier mappings, selections and historical orders will not change.`,
+        confirmText: published ? "Selling ON" : "Selling OFF"
     });
     if (!confirmed) return;
     const button = modal.querySelector("[data-manage-package-publication]");
@@ -2284,7 +2285,7 @@ async function updateManagePackagePublication(product, pkg, modal) {
         const result = await adminFetch(`/api/admin/catalog/products/${encodeURIComponent(product.productCode)}/packages/${encodeURIComponent(pkg.packageCode)}/publication`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ customerMarket: market, published, decisionNote: "Storefront package drawer visibility" })
+            body: JSON.stringify({ customerMarket: market, published, decisionNote: "Global package selling decision" })
         });
         if (!result?.success) throw new Error(result?.message || "Package visibility could not be changed.");
         if (result.product) selectedCatalogProduct = result.product;
@@ -2293,7 +2294,7 @@ async function updateManagePackagePublication(product, pkg, modal) {
         const latest = await loadPackageSupplierCandidateData(result.product || product, pkg, { refresh: true });
         renderManagePackageCandidates(modal, latest);
         reconcileCatalogPackageOverview(result.product || product, pkg, latest);
-        showAdminToast?.(published ? `Publication enabled for ${pkg.name || pkg.packageCode} in ${marketName}` : `${pkg.name || pkg.packageCode} is private in ${marketName}`, "success");
+        showAdminToast?.(published ? `Selling is ON globally for ${pkg.name || pkg.packageCode}` : `Selling is OFF globally for ${pkg.name || pkg.packageCode}`, "success");
     } catch (error) {
         renderManagePackageCandidates(modal, current);
         throw error;
@@ -4338,7 +4339,7 @@ function openPackageEditPanel(product, pkg) {
     publicationToggle.checked = publication.published === true;
     modal.querySelector("#catalogEditTHPublicationState").textContent = publication.state === "SUPPRESSED"
         ? `Published but Suppressed · ${(publication.suppressionReasons || []).join(", ") || "Operational safety gate"}`
-        : publication.published ? "Published" : "Private";
+        : publication.published ? "Selling ON" : "Selling OFF";
     modal.querySelector("#catalogEditTHPublicationNote").value = publication.decisionNote || "";
     publicationToggle.onchange = () => updatePackagePublication(product, pkg, publicationToggle.checked);
     mmEnabled.checked = draft?.regionEnabled?.MM ?? Boolean(pkg.prices?.MM);
@@ -4387,9 +4388,9 @@ async function updatePackagePublication(product, pkg, published) {
     const toggle = modal?.querySelector("#catalogEditTHPublication");
     const previous = pkg.publication?.published === true;
     const confirmed = await confirmCatalogAction({
-        title: published ? "Publish package for Thailand?" : "Unpublish package for Thailand?",
-        message: `${pkg.packageCode} · ${pkg.name}\nThis changes publication intent only. Pricing, supplier mappings, eligibility and fulfillment roles will not change.`,
-        confirmText: published ? "Publish" : "Unpublish"
+        title: published ? "Turn Selling ON globally?" : "Turn Selling OFF globally?",
+        message: `${pkg.packageCode} · ${pkg.name}\nThis changes storefront visibility for both Thailand and Myanmar. Regional pricing, payments, supplier mappings, eligibility and fulfillment roles will not change.`,
+        confirmText: published ? "Selling ON" : "Selling OFF"
     });
     if (!confirmed) {
         if (toggle) toggle.checked = previous;
@@ -4901,11 +4902,11 @@ function ensurePackageEditModal() {
                         <div>
                             <span>Publication</span>
                             <h4>Public Storefront</h4>
-                            <p>Explicit package publication for the Thailand customer market. Operational failures suppress purchasing without changing this decision.</p>
+                            <p>One global Selling decision controls both storefronts. Regional price, payment, and fulfillment readiness can still block checkout without changing this decision.</p>
                         </div>
                     </div>
                     <label class="catalog-toggle-row">
-                        <span><b>Thailand · Public Storefront</b><small id="catalogEditTHPublicationState">Private</small></span>
+                        <span><b>Global Selling ON/OFF</b><small id="catalogEditTHPublicationState">Selling OFF</small></span>
                         <input id="catalogEditTHPublication" type="checkbox" role="switch">
                     </label>
                     <label>Decision note <input id="catalogEditTHPublicationNote" type="text" maxlength="500" placeholder="Optional Admin note"></label>
