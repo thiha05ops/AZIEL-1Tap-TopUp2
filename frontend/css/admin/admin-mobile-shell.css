@@ -54,11 +54,11 @@
 @media (min-width: 1024px) {
   .admin-body .admin-app {
     display: grid;
-    grid-template-columns: var(--admin-sidebar-width, 272px) minmax(0, 1fr);
+    grid-template-columns: var(--v2-sidebar-wide, var(--admin-sidebar-width, 272px)) minmax(0, 1fr);
   }
 
   .admin-body.admin-sidebar-collapsed .admin-app {
-    grid-template-columns: var(--admin-sidebar-collapsed-width, 76px) minmax(0, 1fr);
+    grid-template-columns: var(--v2-sidebar-compact, var(--admin-sidebar-collapsed-width, 76px)) minmax(0, 1fr);
   }
 
   .admin-body .admin-sidebar {
