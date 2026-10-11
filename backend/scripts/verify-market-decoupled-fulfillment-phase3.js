@@ -10,10 +10,8 @@ const {
     OUTCOMES
 } = require("../services/supplierEligibilityRouteResolver");
 const {
-    createRoutingAuthority,
-    compareRoutingDecisions
+    createRoutingAuthority
 } = require("../services/supplierProductionSelectionService");
-const { FULFILLMENT_ROUTING_MODES } = require("../config/fulfillmentRoutingMode");
 
 const ROOT = path.resolve(__dirname, "../..");
 const read = relative => fs.readFileSync(path.join(ROOT, relative), "utf8");
@@ -51,38 +49,23 @@ function resolve(rows, customerMarket, catalogPackage) {
     return summarizeEligibilityResolution({ mappings: rows, assessments: assess(rows, customerMarket, catalogPackage), productCode: "mlbb", packageCode: "MLBB_55_DIA_FIRST_TOPUP", customerMarket });
 }
 
-async function verifyDualReadAuthority() {
-    const supplierRoute = { ready: true, blockers: [], routeSnapshot: { routeType: "SUPPLIER_API", supplierCode: "WONDD", region: "TH" } };
-    const manualRoute = { ready: true, blockers: [], routeSnapshot: { routeType: "MANUAL_ADMIN", supplierCode: "AZIEL_ADMIN", region: "MM" } };
-    const unknownShadow = { outcome: OUTCOMES.NO_ELIGIBLE_ROUTE, routeSnapshot: null, blockerCodes: ["FULFILLMENT_ELIGIBILITY_UNKNOWN"] };
-    let shadowCalls = 0;
-    const legacyMode = createRoutingAuthority({ legacyResolver: async () => supplierRoute, eligibilityResolver: async () => { shadowCalls += 1; return unknownShadow; }, modeResolver: () => FULFILLMENT_ROUTING_MODES.LEGACY_REGION });
-    assert.strictEqual(await legacyMode({ productCode: "mlbb", packageCode: "X", region: "TH" }), supplierRoute);
-    assert.strictEqual(shadowCalls, 0, "LEGACY_REGION must remain the exact pre-Phase-3 path.");
-
-    const observed = [];
-    const dual = createRoutingAuthority({ legacyResolver: async () => supplierRoute, eligibilityResolver: async () => { shadowCalls += 1; return unknownShadow; }, modeResolver: () => FULFILLMENT_ROUTING_MODES.DUAL_READ, diagnosticsObserver: diagnostic => observed.push(diagnostic) });
-    assert.strictEqual(await dual({ productCode: "mlbb", packageCode: "X", region: "TH" }), supplierRoute, "DUAL_READ production return must be the legacy object unchanged.");
-    assert.strictEqual(observed[0].comparisonClassification, "SHADOW_UNKNOWN", "Internal diagnostics must be observable without changing the public return.");
-    const diagnosed = await dual({ productCode: "mlbb", packageCode: "X", region: "TH", includeDiagnostics: true });
-    assert.strictEqual(diagnosed.routeSnapshot, supplierRoute.routeSnapshot);
-    assert.strictEqual(diagnosed.diagnostics.comparisonClassification, "SHADOW_UNKNOWN");
-    assert.strictEqual(diagnosed.diagnostics.legacySupplierCode, "WONDD");
-    assert.strictEqual(diagnosed.diagnostics.shadowSupplierCode, "");
-
-    const dualManual = createRoutingAuthority({ legacyResolver: async () => manualRoute, eligibilityResolver: async () => unknownShadow, modeResolver: () => FULFILLMENT_ROUTING_MODES.DUAL_READ });
-    const mm = await dualManual({ productCode: "mlbb", packageCode: "X", region: "MM", includeDiagnostics: true });
-    assert.strictEqual(mm.ready, false, "An unresolved supplier eligibility state must not be hidden by a manual fallback.");
-    assert.strictEqual(mm.routeSnapshot, null);
-    assert(mm.blockers.includes("FULFILLMENT_ELIGIBILITY_UNKNOWN"));
-    assert.strictEqual(mm.diagnostics.comparisonClassification, "SHADOW_UNKNOWN");
-    assert.strictEqual(mm.diagnostics.manualFallbackSuppressed, true);
-
-    const ambiguous = { outcome: OUTCOMES.AMBIGUOUS_PRIMARY_ROUTE, routeSnapshot: null, blockerCodes: ["AMBIGUOUS_PRIMARY_ROUTE"] };
-    const dualAmbiguous = createRoutingAuthority({ legacyResolver: async () => supplierRoute, eligibilityResolver: async () => ambiguous, modeResolver: () => FULFILLMENT_ROUTING_MODES.DUAL_READ });
-    const ambiguity = await dualAmbiguous({ productCode: "mlbb", packageCode: "X", region: "TH", includeDiagnostics: true });
-    assert.strictEqual(ambiguity.routeSnapshot, supplierRoute.routeSnapshot);
-    assert.strictEqual(ambiguity.diagnostics.comparisonClassification, "SHADOW_AMBIGUOUS");
+async function verifyGlobalSelectedAuthority() {
+    const calls = [];
+    const authority = createRoutingAuthority({ selectedResolver: async input => {
+        calls.push(input);
+        return { ready: true, blockers: [], routeSnapshot: { routeType: "SUPPLIER_API", snapshotVersion: 2, supplierMappingId: "mapping-global", supplierCode: "WONDD", supplierMarket: "GLOBAL", customerMarket: input.region, supplierPackageCode: "MLFT055" } };
+    } });
+    const th = await authority({ productCode: "mlbb", packageCode: "X", region: "TH" });
+    const mm = await authority({ productCode: "mlbb", packageCode: "X", region: "MM" });
+    assert.strictEqual(th.routeSnapshot.supplierMappingId, mm.routeSnapshot.supplierMappingId);
+    assert.strictEqual(th.routeSnapshot.supplierPackageCode, mm.routeSnapshot.supplierPackageCode);
+    assert.notStrictEqual(th.routeSnapshot.customerMarket, mm.routeSnapshot.customerMarket);
+    assert.deepStrictEqual(calls.map(item => item.region), ["TH", "MM"]);
+    const blocked = createRoutingAuthority({ selectedResolver: async () => ({ ready: false, blockers: ["GLOBAL_SUPPLIER_SELECTION_REQUIRED"], routeSnapshot: null }) });
+    const missing = await blocked({ productCode: "mlbb", packageCode: "X", region: "TH" });
+    assert.strictEqual(missing.ready, false);
+    assert.strictEqual(missing.routeSnapshot, null);
+    assert.deepStrictEqual(missing.blockers, ["GLOBAL_SUPPLIER_SELECTION_REQUIRED"]);
 }
 
 function verifyEligibilitySemantics() {
@@ -136,17 +119,20 @@ function verifyStaticBoundaries() {
     const paid = read("backend/services/paidFulfillmentRoutingService.js");
     assert(paid.includes("SUPPLIER_ROUTE_SNAPSHOT_BOUND"), "Paid fulfillment must remain bound to the immutable snapshot.");
     assert(paid.indexOf("if (routeSnapshot)") < paid.indexOf("options.resolveCurrentRoute || resolveCheckoutRouteSnapshot"), "A frozen route must be consumed before the historical no-snapshot compatibility resolver.");
-    assert.strictEqual(compareRoutingDecisions({ legacy: { routeSnapshot: { routeType: "SUPPLIER_API", supplierCode: "A" } }, shadow: { outcome: OUTCOMES.ELIGIBLE, routeSnapshot: { supplierCode: "B" }, blockerCodes: [] } }).classification, "DIFFERENT_SUPPLIER");
+    const productionSelection = read("backend/services/supplierProductionSelectionService.js");
+    assert(productionSelection.includes('customerMarket: "GLOBAL"'));
+    assert(productionSelection.includes("GLOBAL_SUPPLIER_SELECTION_REQUIRED"));
+    assert(!productionSelection.includes('selectedRouteSnapshot(ready[0].mapping'));
 }
 
 (async () => {
-    await verifyDualReadAuthority();
+    await verifyGlobalSelectedAuthority();
     verifyEligibilitySemantics();
     verifyStaticBoundaries();
     console.log(JSON.stringify({
         result: "PASS",
-        legacyAuthorityUnchanged: true,
-        dualReadProductionParity: true,
+        globalSelectedAuthority: true,
+        implicitCandidateSelection: false,
         wonddMlbbUnknown: true,
         providerConfirmedMarketRules: true,
         ambiguityFailsClosed: true,

@@ -79,10 +79,11 @@ function resolveEffectiveSupplierCandidate(candidates = [], selection = null) {
             ? { candidate: selected, source: "OWNER_SELECTION", blockers: [] }
             : { candidate: selected, source: "OWNER_SELECTION", blockers: selected?.readiness?.blockerCodes?.length ? selected.readiness.blockerCodes : ["SELECTED_MAPPING_INVALID"] };
     }
-    if (selectable.length === 1) return { candidate: selectable[0], source: "UNIQUE_EXECUTABLE_ROUTE", blockers: [] };
-    if (selectable.length > 1) return { candidate: null, source: "AMBIGUOUS", blockers: ["AMBIGUOUS_EXECUTABLE_SUPPLIER_ROUTES"] };
-    const exactBlockers = [...new Set(candidates.flatMap(candidate => candidate.readiness?.blockerCodes || []))];
-    return { candidate: null, source: "NONE", blockers: exactBlockers.length ? exactBlockers : ["NO_EXECUTABLE_SUPPLIER_ROUTE"] };
+    return {
+        candidate: null,
+        source: selectable.length > 1 ? "GLOBAL_SELECTION_MISSING_AMBIGUOUS" : "GLOBAL_SELECTION_MISSING",
+        blockers: [selectable.length > 1 ? "LEGACY_SUPPLIER_SELECTION_CONFLICT" : "GLOBAL_SUPPLIER_SELECTION_REQUIRED"]
+    };
 }
 
 function effectivePackageSalesState({ product = null, storeCatalogMember = false, pkg = null, publication = null, customerMarket = "TH", candidates = [], selection = null, marketPaymentReady = true } = {}) {
@@ -185,7 +186,7 @@ async function getProductPackageSupplierOverview({ productCode, customerMarket }
         CatalogProduct.findOne({ productCode: normalizedProduct }).lean(),
         CatalogPackage.find({ productCode: normalizedProduct, deletedAt: null }).sort({ sortOrder: 1, packageCode: 1 }).lean(),
         PackageMarketPublication.find({ productCode: normalizedProduct }).lean(),
-        PackageSupplierSelection.find({ productCode: normalizedProduct, customerMarket: market }).lean(),
+        PackageSupplierSelection.find({ productCode: normalizedProduct, customerMarket: "GLOBAL" }).lean(),
         SupplierProductMapping.find({ productCode: normalizedProduct }).sort({ packageCode: 1, supplierCode: 1, region: 1, _id: 1 }).lean(),
         StoreCatalogSelection.find({ productCode: normalizedProduct, status: "ACTIVE", sellingRegions: market }).lean(),
         publicPaymentMarketReadiness(market)
@@ -259,7 +260,7 @@ function createPackageSupplierCandidateService(models = {}, dependencies = {}) {
             M.Product.findOne({ productCode: normalizedProduct }).lean(),
             M.Package.findOne({ productCode: normalizedProduct, packageCode: normalizedPackage, deletedAt: null }).lean(),
             M.Publication.find({ productCode: normalizedProduct, packageCode: normalizedPackage }).lean(),
-            M.Selection.findOne({ productCode: normalizedProduct, packageCode: normalizedPackage, customerMarket: market }).lean(),
+            M.Selection.findOne({ productCode: normalizedProduct, packageCode: normalizedPackage, customerMarket: "GLOBAL" }).lean(),
             M.Mapping.find({ productCode: normalizedProduct, packageCode: normalizedPackage }).sort({ supplierCode: 1, region: 1, _id: 1 }).lean(),
             M.StoreSelection.exists({ productCode: normalizedProduct, status: "ACTIVE", sellingRegions: market, "packages.packageCode": normalizedPackage }),
             paymentReadinessFor(market)

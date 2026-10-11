@@ -581,7 +581,7 @@ router.put("/admin/catalog/products/:productCode/packages/:packageCode/supplier-
         const result = await setPackageSupplierSelection({
             productCode: req.params.productCode,
             packageCode: req.params.packageCode,
-            customerMarket: req.body?.customerMarket,
+            customerMarket: "GLOBAL",
             supplierMappingId: req.body?.supplierMappingId,
             expectedDecisionVersion: req.body?.expectedDecisionVersion,
             reason: req.body?.reason

@@ -60,7 +60,7 @@ function applySelectedPublicPurchasability(projection, product, rawPackages, map
     const packageByCode = new Map(rawPackages.map(pkg => [String(pkg.packageCode).toUpperCase(), pkg]));
     const mappingById = new Map(mappings.map(mapping => [String(mapping._id), mapping]));
     const supplierById = new Map(suppliers.map(supplier => [String(supplier._id), supplier]));
-    const selectionByCode = new Map(selections.filter(row => row.customerMarket === market).map(row => [String(row.packageCode).toUpperCase(), row]));
+    const selectionByCode = new Map(selections.filter(row => String(row.customerMarket).toUpperCase() === "GLOBAL").map(row => [String(row.packageCode).toUpperCase(), row]));
     const publicationRecordsByCode = publicationPackageMap(publications);
     const offerById = new Map(offers.map(offer => [String(offer._id), offer]));
     const availabilityByOffer = new Map(availabilityRows.map(row => [String(row.supplierCatalogOfferId), row]));
@@ -1014,7 +1014,7 @@ async function toDatabasePublicCatalog({ includeDisabled = true, includeAssetPro
     ]);
     const enabledSupplierIds = new Set(enabledSuppliers.map(item => String(item._id)));
     const activeMappings = mappings.filter(item => enabledSupplierIds.has(String(item.supplierId)));
-    const packageSupplierSelections = await PackageSupplierSelection.find({ customerMarket: String(customerMarket).toUpperCase() }).lean();
+    const packageSupplierSelections = await PackageSupplierSelection.find({ customerMarket: "GLOBAL" }).lean();
     const offerIds = activeMappings.map(row => row.supplierCatalogOfferId).filter(Boolean);
     const [selectedOffers, selectedAvailability] = await Promise.all([
         SupplierCatalogOffer.find({ _id: { $in: offerIds } }).lean(),
@@ -1369,7 +1369,7 @@ async function getCatalogProductDetail(productCode, options = {}) {
             productCode: normalizedCode
         }).lean(),
 
-        PackageSupplierSelection.find({ productCode: normalizedCode, customerMarket }).lean()
+        PackageSupplierSelection.find({ productCode: normalizedCode, customerMarket: "GLOBAL" }).lean()
     ]);
 
     const enabledSupplierIds = new Set(
@@ -1640,7 +1640,7 @@ async function listPublicExclusiveOffers(options = {}) {
         }).lean(),
 
         PackageSupplierSelection.find({
-            customerMarket,
+            customerMarket: "GLOBAL",
             productCode: { $in: candidateProductCodes },
             packageCode: { $in: candidatePackageCodes }
         }).lean()

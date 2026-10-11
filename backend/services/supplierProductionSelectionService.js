@@ -159,36 +159,16 @@ async function resolveSelectedCheckoutRouteSnapshot({ productCode, packageCode, 
     const normalizedProduct = clean(productCode).toLowerCase();
     const normalizedPackage = upper(packageCode);
     const customerMarket = upper(region);
-    const selection = await PackageSupplierSelection.findOne({ productCode: normalizedProduct, packageCode: normalizedPackage, customerMarket }).lean();
+    const selection = await PackageSupplierSelection.findOne({ productCode: normalizedProduct, packageCode: normalizedPackage, customerMarket: "GLOBAL" }).lean();
     if (!selection) {
-        const mappings = await Mapping.find({ productCode: normalizedProduct, packageCode: normalizedPackage, archivedAt: null }).lean();
-        if (!mappings.length) return { ready: false, blockers: ["NO_EXECUTABLE_SUPPLIER_ROUTE"], routeSnapshot: null, resolution: "NONE" };
-        const supplierIds = [...new Set(mappings.map(item => String(item.supplierId)))];
-        const offerIds = [...new Set(mappings.map(item => item.supplierCatalogOfferId).filter(Boolean).map(String))];
-        const [suppliers, offers, availabilityRows] = await Promise.all([
-            Supplier.find({ _id: { $in: supplierIds } }).lean(),
-            SupplierCatalogOffer.find({ _id: { $in: offerIds } }).lean(),
-            SupplierOfferAvailability.find({ supplierCatalogOfferId: { $in: offerIds } }).lean()
-        ]);
-        const supplierById = new Map(suppliers.map(item => [String(item._id), item]));
-        const offerById = new Map(offers.map(item => [String(item._id), item]));
-        const availabilityByOffer = new Map(availabilityRows.map(item => [String(item.supplierCatalogOfferId), item]));
-        const assessed = mappings.map(mapping => {
-            const supplier = supplierById.get(String(mapping.supplierId)) || null;
-            return { mapping, assessment: assessMappingReadiness({
-                mode: READINESS_MODES.NEW_ORDER_SELECTABLE,
-                mapping,
-                supplier,
-                offer: offerById.get(String(mapping.supplierCatalogOfferId)) || null,
-                availability: availabilityByOffer.get(String(mapping.supplierCatalogOfferId)) || null,
-                customerMarket,
-                adapter: supplier ? getSupplierAdapter(supplier) : null
-            }) };
-        });
-        const ready = assessed.filter(item => item.assessment.ready);
-        if (ready.length === 1) return { ready: true, blockers: [], routeSnapshot: selectedRouteSnapshot(ready[0].mapping, null, customerMarket, "UNIQUE_EXECUTABLE_ROUTE"), resolution: "UNIQUE_EXECUTABLE_ROUTE" };
-        if (ready.length > 1) return { ready: false, blockers: ["AMBIGUOUS_EXECUTABLE_SUPPLIER_ROUTES"], routeSnapshot: null, resolution: "AMBIGUOUS" };
-        return { ready: false, blockers: [...new Set(assessed.flatMap(item => item.assessment.blockers))], routeSnapshot: null, resolution: "BLOCKED" };
+        const legacy = await PackageSupplierSelection.find({ productCode: normalizedProduct, packageCode: normalizedPackage, customerMarket: { $in: ["TH", "MM"] } }).lean();
+        const legacyMappingIds = [...new Set(legacy.map(item => String(item.supplierMappingId || "")).filter(Boolean))];
+        return {
+            ready: false,
+            blockers: [legacyMappingIds.length > 1 ? "LEGACY_SUPPLIER_SELECTION_CONFLICT" : "GLOBAL_SUPPLIER_SELECTION_REQUIRED"],
+            routeSnapshot: null,
+            resolution: legacyMappingIds.length > 1 ? "LEGACY_CONFLICT" : legacyMappingIds.length === 1 ? "LEGACY_UNMIGRATED" : "NONE"
+        };
     }
     const mapping = await Mapping.findById(selection.supplierMappingId).lean();
     if (!mapping || mapping.productCode !== normalizedProduct || mapping.packageCode !== normalizedPackage) return { ready: false, blockers: ["SELECTED_MAPPING_INVALID"], routeSnapshot: null };
@@ -198,7 +178,7 @@ async function resolveSelectedCheckoutRouteSnapshot({ productCode, packageCode, 
     const adapter = supplier ? getSupplierAdapter(supplier) : null;
     const assessment = assessMappingReadiness({ mode: READINESS_MODES.NEW_ORDER_SELECTABLE, mapping, supplier, offer, availability, customerMarket, adapter });
     if (!assessment.ready) return { ready: false, blockers: assessment.blockers, routeSnapshot: null, resolution: "OWNER_SELECTION" };
-    return { ready: true, blockers: [], routeSnapshot: selectedRouteSnapshot(mapping, selection, customerMarket), resolution: "OWNER_SELECTION" };
+    return { ready: true, blockers: [], routeSnapshot: selectedRouteSnapshot(mapping, selection, customerMarket), resolution: "GLOBAL_OWNER_SELECTION" };
 }
 
 function createRoutingAuthority({ selectedResolver = resolveSelectedCheckoutRouteSnapshot } = {}) {

@@ -168,30 +168,31 @@ async function verifyPaidV2Compatibility() {
 }
 
 function verifyDormantModeAndBoundaries() {
-    assert.strictEqual(resolveFulfillmentRoutingMode({}), FULFILLMENT_ROUTING_MODES.LEGACY_REGION);
+    assert.strictEqual(resolveFulfillmentRoutingMode({}), FULFILLMENT_ROUTING_MODES.SELECTED);
     assert.strictEqual(resolveFulfillmentRoutingMode({ AZIEL_FULFILLMENT_ROUTING_MODE: "LEGACY_REGION" }), FULFILLMENT_ROUTING_MODES.LEGACY_REGION);
     assert.throws(() => resolveFulfillmentRoutingMode({ AZIEL_FULFILLMENT_ROUTING_MODE: "INVALID" }), /Unsupported fulfillment routing mode/);
 
     const selection = read("backend/services/supplierProductionSelectionService.js");
-    assert(!selection.includes("supplierFulfillmentEligibilityService"), "Phase 1 must not wire eligibility into production selection.");
-    assert(selection.includes("region: clean(region).toUpperCase()"), "Legacy PRIMARY lookup must remain region-bound.");
-    assert(selection.includes("region: mapping.region"), "Legacy route snapshots must remain v1.");
-    assert(selection.includes("pilotSelected") && selection.includes("snapshotVersion: 2"), "Any later-phase v2 emission must remain behind the exact scoped pilot boundary.");
+    assert(selection.includes('customerMarket: "GLOBAL"'), "New checkout routing must require the GLOBAL owner selection.");
+    assert(selection.includes("GLOBAL_SUPPLIER_SELECTION_REQUIRED"), "Missing GLOBAL selection must fail closed.");
+    assert(!selection.includes('selectedRouteSnapshot(ready[0].mapping'), "A sole executable route must never replace explicit owner selection.");
+    assert(selection.includes("snapshotVersion: 2") && selection.includes("supplierMarket: upper(mapping.region)"), "Selected snapshots must preserve customer and supplier market separation.");
     const pilot = read("backend/config/mmWonddMlbbPilot.js");
     assert(pilot.includes('AZIEL_MM_WONDD_MLBB_PILOT_ENABLED') && pilot.includes('=== "true"'), "The Phase 4 pilot must remain false by default and explicitly enabled.");
 
-    const capability = read("backend/services/fulfillmentCapabilityService.js");
-    assert(capability.includes("normalizeRegion(mapping.region) !== normalizedRegion"), "MM routing must remain inactive in Phase 1.");
-    const wondd = read("backend/services/fulfillmentCapabilityService.js");
-    assert(wondd.includes('String(mapping.region || "").trim().toUpperCase() === "TH"'), "WonDD TH guard must remain.");
+    const readiness = read("backend/services/supplierMappingReadinessService.js");
+    assert(readiness.includes("validateFulfillmentEligibility"), "Selected mappings must preserve explicit destination eligibility checks.");
+    const wondd = read("backend/services/suppliers/wonddFulfillmentProcessor.js");
     const fazer = read("backend/services/suppliers/fazercardsFulfillmentProcessor.js");
-    assert(fazer.includes('mapping.region !== "TH"'), "FazerCards TH guard must remain.");
+    assert(wondd.includes("mapping.supplierPackageCode"), "WonDD must use the frozen mapping native package identity.");
+    assert(fazer.includes("mapping.supplierPackageCode"), "FazerCards must use the frozen mapping native package identity.");
 
     const wallet = read("backend/services/commerce/customerWalletCheckoutService.js");
     const promptPay = read("backend/services/commerce/customerManualPromptPayCheckoutService.js");
     assert(wallet.includes('return region === "TH" ? "THB" : "MMK"'));
     assert(promptPay.includes('return region === "TH" ? "THB" : "MMK"'));
-    assert(promptPay.includes('if (region !== "TH" || requestedKey !== "promptpay")'));
+    assert(promptPay.includes('const isManualPromptPay = !(region !== "TH" || requestedKey !== "promptpay")'));
+    assert(promptPay.includes('const isThunderPromptPay = region === "TH" && requestedKey === "thunder_promptpay"'));
 }
 
 (async () => {
@@ -206,7 +207,7 @@ function verifyDormantModeAndBoundaries() {
         legacyMappingsCompatible: true,
         v1SnapshotsCompatible: true,
         v2SnapshotsSupported: true,
-        mmAutomaticRoutingActivated: false,
+        globalOwnerSelectionRequired: true,
         databaseMutations: 0,
         providerCalls: 0
     }, null, 2));

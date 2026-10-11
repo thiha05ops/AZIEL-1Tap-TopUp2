@@ -37,7 +37,7 @@ function assessRouteFromContext({ productCode, packageCode, region }, context) {
     const customerMarket = upper(region);
     const normalizedProduct = clean(productCode).toLowerCase();
     const normalizedPackage = upper(packageCode);
-    const selection = context.selectionByRoute.get(routeKey(normalizedProduct, normalizedPackage, customerMarket)) || null;
+    const selection = context.selectionByRoute.get(routeKey(normalizedProduct, normalizedPackage, "GLOBAL")) || null;
     let candidates;
     let resolution;
     if (selection) {
@@ -45,18 +45,14 @@ function assessRouteFromContext({ productCode, packageCode, region }, context) {
         if (!mapping || clean(mapping.productCode).toLowerCase() !== normalizedProduct || upper(mapping.packageCode) !== normalizedPackage) return { ready: false, blockers: ["SELECTED_MAPPING_INVALID"], routeSnapshot: null, resolution: "OWNER_SELECTION" };
         candidates = [mapping];
         resolution = "OWNER_SELECTION";
-    } else {
-        candidates = (context.mappingsByPackage.get(packageKey(normalizedProduct, normalizedPackage)) || []).filter(row => !row.archivedAt);
-        resolution = "UNIQUE_EXECUTABLE_ROUTE";
-    }
-    if (!candidates.length) return { ready: false, blockers: ["NO_EXECUTABLE_SUPPLIER_ROUTE"], routeSnapshot: null, resolution: "NONE" };
+    } else return { ready: false, blockers: ["GLOBAL_SUPPLIER_SELECTION_REQUIRED"], routeSnapshot: null, resolution: "NONE" };
+    if (!candidates.length) return { ready: false, blockers: ["GLOBAL_SUPPLIER_SELECTION_REQUIRED"], routeSnapshot: null, resolution: "NONE" };
     const assessed = candidates.map(mapping => {
         const supplier = context.supplierById.get(id(mapping.supplierId)) || null;
         return { mapping, assessment: assessMappingReadiness({ mode: READINESS_MODES.NEW_ORDER_SELECTABLE, mapping, supplier, offer: context.offerById.get(id(mapping.supplierCatalogOfferId)) || null, availability: context.availabilityByOffer.get(id(mapping.supplierCatalogOfferId)) || null, customerMarket, adapter: supplier ? getSupplierAdapter(supplier) : null }) };
     });
     const ready = assessed.filter(row => row.assessment.ready);
     if (selection && ready.length !== 1) return { ready: false, blockers: assessed[0].assessment.blockers, routeSnapshot: null, resolution };
-    if (!selection && ready.length > 1) return { ready: false, blockers: ["AMBIGUOUS_EXECUTABLE_SUPPLIER_ROUTES"], routeSnapshot: null, resolution: "AMBIGUOUS" };
     if (ready.length !== 1) return { ready: false, blockers: [...new Set(assessed.flatMap(row => row.assessment.blockers))], routeSnapshot: null, resolution: "BLOCKED" };
     return { ready: true, blockers: [], routeSnapshot: selectedRouteSnapshot(ready[0].mapping, selection, customerMarket, resolution), resolution };
 }

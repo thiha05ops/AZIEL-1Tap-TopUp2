@@ -794,7 +794,7 @@ function renderCatalogBulkSupplierModal() {
     if (!modal || !assignment) return;
     const body = modal.querySelector("[data-bulk-supplier-body]");
     const marketName = assignment.customerMarket === "MM" ? "Myanmar" : "Thailand";
-    modal.querySelector("[data-bulk-supplier-subtitle]").textContent = `${assignment.selectedCodes.length} canonical packages · Customer market: ${marketName}`;
+    modal.querySelector("[data-bulk-supplier-subtitle]").textContent = `${assignment.selectedCodes.length} canonical packages · Global supplier choices · ${marketName} readiness view`;
     if (assignment.result) {
         const summary = assignment.result.summary || {};
         body.innerHTML = `<section class="catalog-bulk-review-summary"><div><span>Assigned</span><strong>${Number(summary.assigned || 0)}</strong></div><div><span>Unchanged</span><strong>${Number(summary.unchanged || 0)}</strong></div><div><span>Conflicted</span><strong>${Number(summary.conflicted || 0)}</strong></div><div><span>Blocked</span><strong>${Number(summary.blocked || 0)}</strong></div></section><div class="catalog-bulk-result-list">${(assignment.result.results || []).map(item => `<div><strong>${escapeHtml(item.packageCode)}</strong><span class="catalog-supplier-status">${escapeHtml(item.status)}</span>${item.code ? `<small>${escapeHtml(catalogPackageBlockerLabel(item.code))}</small>` : ""}</div>`).join("")}</div><footer class="catalog-bulk-footer"><button type="button" class="admin-primary-btn" data-close-bulk-supplier>Done</button></footer>`;
@@ -809,7 +809,7 @@ function renderCatalogBulkSupplierModal() {
     const plan = bulkCandidatePlan(assignment.overview, assignment.selectedCodes, assignment.supplierId);
     const eligible = plan.filter(item => item.candidate);
     const blocked = plan.filter(item => !item.candidate);
-    body.innerHTML = `<section class="catalog-bulk-review-summary"><div><span>Customer market</span><strong>${marketName}</strong></div><div><span>Supplier</span><strong>${escapeHtml(option?.name || "Supplier")}</strong></div><div><span>Selected</span><strong>${plan.length}</strong></div><div><span>Ready to assign</span><strong>${eligible.length}</strong></div><div><span>Blocked</span><strong>${blocked.length}</strong></div></section>${blocked.length ? `<section class="catalog-bulk-blocked"><h4>Blocked packages</h4>${blocked.map(item => `<div><strong>${escapeHtml(item.item.package?.name || item.item.package?.packageCode)}</strong><small>${escapeHtml(item.blockerCodes.map(catalogPackageBlockerLabel).join(" · "))}</small></div>`).join("")}</section>` : ""}<label class="catalog-supplier-reason"><span>Reason <small>Optional</small></span><input type="text" maxlength="500" data-bulk-supplier-reason placeholder="Why is this supplier being assigned?"></label><footer class="catalog-bulk-footer"><button type="button" class="admin-secondary-btn" data-bulk-supplier-back>Back</button><button type="button" class="admin-primary-btn" data-confirm-bulk-supplier ${eligible.length && !assignment.saving ? "" : "disabled"}>${assignment.saving ? "Assigning…" : `Confirm ${eligible.length} package${eligible.length === 1 ? "" : "s"}`}</button></footer>`;
+    body.innerHTML = `<section class="catalog-bulk-review-summary"><div><span>Scope</span><strong>Global supplier · ${marketName} readiness</strong></div><div><span>Supplier</span><strong>${escapeHtml(option?.name || "Supplier")}</strong></div><div><span>Selected</span><strong>${plan.length}</strong></div><div><span>Ready to assign</span><strong>${eligible.length}</strong></div><div><span>Blocked</span><strong>${blocked.length}</strong></div></section>${blocked.length ? `<section class="catalog-bulk-blocked"><h4>Blocked packages</h4>${blocked.map(item => `<div><strong>${escapeHtml(item.item.package?.name || item.item.package?.packageCode)}</strong><small>${escapeHtml(item.blockerCodes.map(catalogPackageBlockerLabel).join(" · "))}</small></div>`).join("")}</section>` : ""}<label class="catalog-supplier-reason"><span>Reason <small>Optional</small></span><input type="text" maxlength="500" data-bulk-supplier-reason placeholder="Why is this supplier being assigned globally?"></label><footer class="catalog-bulk-footer"><button type="button" class="admin-secondary-btn" data-bulk-supplier-back>Back</button><button type="button" class="admin-primary-btn" data-confirm-bulk-supplier ${eligible.length && !assignment.saving ? "" : "disabled"}>${assignment.saving ? "Assigning…" : `Confirm ${eligible.length} package${eligible.length === 1 ? "" : "s"}`}</button></footer>`;
 }
 
 async function submitCatalogBulkSupplierAssignment() {
@@ -853,7 +853,9 @@ function catalogPackageBlockerLabel(code = "") {
         NO_VALID_PRICE: `Price missing for ${catalogCustomerMarket}`,
         NO_AVAILABLE_PAYMENT_METHOD: `No public payment method is currently available for ${catalogCustomerMarket}`,
         PRODUCT_UNAVAILABLE: "Product is disabled or unavailable",
-        PACKAGE_SUPPLIER_SELECTION_REQUIRED: `No fulfillment supplier is selected for ${catalogCustomerMarket === "MM" ? "Myanmar" : "Thailand"}`,
+        PACKAGE_SUPPLIER_SELECTION_REQUIRED: "No global fulfillment supplier is selected",
+        GLOBAL_SUPPLIER_SELECTION_REQUIRED: "No global fulfillment supplier is selected",
+        LEGACY_SUPPLIER_SELECTION_CONFLICT: "Legacy Thailand/Myanmar supplier selections conflict; choose one global supplier",
         FULFILLMENT_NOT_READY: "Selected supplier mapping is not ready for new orders",
         NO_EXACT_SUPPLIER_MAPPING: "No exact supplier mapping",
         AMBIGUOUS_SUPPLIER_MAPPING_IDENTITY: "Multiple exact mapping identities require individual review",
@@ -1832,7 +1834,7 @@ function ensureCatalogMerchandisingModal() {
                     <div class="catalog-merch-modal-section-head">
                         <span>Fulfillment supplier</span>
                         <h4 data-manage-package-selection-state>Loading supplier candidates…</h4>
-                        <p data-manage-package-supplier-helper>Choose who fulfills this package.</p>
+                        <p data-manage-package-supplier-helper>Choose the one global supplier route used for new TH and MM orders.</p>
                     </div>
                     <div class="catalog-supplier-candidate-list" data-manage-package-candidates><div class="catalog-empty-state"><strong>Loading supplier routes…</strong><span>Checking current mapping readiness.</span></div></div>
                     <label class="catalog-supplier-reason">
@@ -2082,7 +2084,7 @@ function renderSupplierMappingRow(candidate, repeatedSupplier = false) {
     return `<label class="catalog-supplier-candidate ${candidate.readiness.selectable ? "" : "is-disabled"}">
         <input type="radio" name="manage-package-supplier" value="${escapeHtml(candidate.supplierMappingId)}" ${candidate.readiness.selectable ? "" : "disabled"} ${candidate.selected ? "checked" : ""}>
         <span class="catalog-supplier-candidate-body">
-            <span class="catalog-supplier-candidate-head"><strong>${escapeHtml(candidate.supplier.name)}</strong><span class="catalog-supplier-badges">${candidate.selected ? `<span class="catalog-supplier-status is-selected">Selected for ${catalogCustomerMarket === "MM" ? "MM" : "TH"}</span>` : ""}<span class="catalog-supplier-status">${escapeHtml(status)}</span></span></span>
+            <span class="catalog-supplier-candidate-head"><strong>${escapeHtml(candidate.supplier.name)}</strong><span class="catalog-supplier-badges">${candidate.selected ? `<span class="catalog-supplier-status is-selected">Selected globally</span>` : ""}<span class="catalog-supplier-status">${escapeHtml(status)}</span></span></span>
             <small>${escapeHtml(account)}${repeatedSupplier && providerIdentity ? ` · ${escapeHtml(providerIdentity)}` : ""}</small>
             ${!repeatedSupplier && providerIdentity ? `<small class="catalog-supplier-provider">${escapeHtml(providerIdentity)}</small>` : ""}
             <small class="catalog-supplier-cost"><span>${escapeHtml(costLabel)}</span><span>${escapeHtml(candidateCostState(candidate.cost))}</span></small>
@@ -2186,7 +2188,7 @@ function renderManagePackageCandidates(modal, data = {}) {
     const state = storefrontPackageState(data);
     modal.querySelector("#catalogMerchModalSubtitle").textContent = `${marketName} · ${data.customerPrice?.currency || (data.customerMarket === "MM" ? "MMK" : "THB")} · ${state}`;
     const helper = modal.querySelector("[data-manage-package-supplier-helper]");
-    if (helper) helper.textContent = `Choose who fulfills this package for ${marketName}.`;
+    if (helper) helper.textContent = `Choose the one global supplier route for all new orders. ${marketName} is shown only for price and checkout readiness.`;
     modal.querySelector("[data-manage-package-public-state]").textContent = `${state} · Customer market: ${marketName}`;
     const operationalBlockers = data.operational?.blockerCodes || data.publication?.blockers || [];
     modal.querySelector("[data-manage-package-public-detail]").textContent = operationalBlockers.length
@@ -2206,7 +2208,7 @@ function renderManagePackageCandidates(modal, data = {}) {
     modal.dataset.currentSupplierMappingId = data.selection?.supplierMappingId || "";
     modal.dataset.draftSupplierMappingId = data.selection?.supplierMappingId || "";
     modal.dataset.supplierDecisionVersion = data.selection?.decisionVersion == null ? "" : String(data.selection.decisionVersion);
-    modal.dataset.supplierCustomerMarket = data.customerMarket || "";
+    modal.dataset.supplierCustomerMarket = "GLOBAL";
     modal._supplierCandidateData = data;
     const save = modal.querySelector("[data-save-package-supplier]");
     const dirty = modal.querySelector("[data-manage-package-supplier-dirty]");
@@ -2231,10 +2233,9 @@ async function saveManagePackageSupplier(product, pkg, modal) {
     const previous = (data.candidates || []).find(item => item.supplierMappingId === previousId);
     if (!next?.readiness?.selectable) return;
     const price = data.customerPrice;
-    const marketName = data.customerMarket === "MM" ? "Myanmar" : "Thailand";
     const confirmed = await confirmCatalogAction({
-        title: "Change fulfillment supplier?",
-        message: `Package\n${pkg.name || pkg.packageCode}\n\nCustomer market\n${marketName}\n\nPrevious supplier route\n${previous ? `${candidateRouteLabel(previous)}\n${formatCandidateCost(previous.cost)}` : "No explicit supplier selected"}\n\nNew supplier route\n${candidateRouteLabel(next)}\n${formatCandidateCost(next.cost)}\n\nCustomer price\n${price ? `${Number(price.amount).toLocaleString()} ${price.currency}` : "Price unavailable"}\n\nCustomer price will not change.\nSelling state will not change.\nNew checkouts will use this exact supplier; existing frozen orders will not change.`,
+        title: "Change global fulfillment supplier?",
+        message: `Package\n${pkg.name || pkg.packageCode}\n\nScope\nAll new Thailand and Myanmar orders\n\nPrevious supplier route\n${previous ? `${candidateRouteLabel(previous)}\n${formatCandidateCost(previous.cost)}` : "No global supplier selected"}\n\nNew supplier route\n${candidateRouteLabel(next)}\n${formatCandidateCost(next.cost)}\n\nDisplayed ${data.customerMarket || "TH"} customer price\n${price ? `${Number(price.amount).toLocaleString()} ${price.currency}` : "Price unavailable"}\n\nRegional prices and payment methods will not change.\nSelling state will not change.\nExisting frozen orders will not change.`,
         confirmText: "Change Supplier"
     });
     if (!confirmed) return;
@@ -2248,7 +2249,7 @@ async function saveManagePackageSupplier(product, pkg, modal) {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-                customerMarket: data.customerMarket,
+                customerMarket: "GLOBAL",
                 supplierMappingId: mappingId,
                 expectedDecisionVersion: data.selection?.decisionVersion ?? null,
                 reason: modal.querySelector("[data-manage-package-supplier-reason]")?.value || ""

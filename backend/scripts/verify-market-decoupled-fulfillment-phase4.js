@@ -11,7 +11,7 @@ const {
     pilotEligibility,
     EVIDENCE_SOURCE
 } = require("./migrate-mm-wondd-mlbb-pilot-eligibility");
-const { createRoutingAuthority, compareRoutingDecisions } = require("../services/supplierProductionSelectionService");
+const { createRoutingAuthority } = require("../services/supplierProductionSelectionService");
 const { OUTCOMES } = require("../services/supplierEligibilityRouteResolver");
 const { FULFILLMENT_ROUTING_MODES } = require("../config/fulfillmentRoutingMode");
 const { ensurePaidOrderFulfillmentWork } = require("../services/paidFulfillmentRoutingService");
@@ -59,27 +59,17 @@ function eligibleShadow(packageCode = "MLBB_55_DIA_FIRST_TOPUP") {
 }
 
 async function verifyRouting() {
-    const thLegacy = { ready: true, blockers: [], routeSnapshot: { routeType: "SUPPLIER_API", supplierCode: "WONDD", region: "TH" } };
-    const mmLegacy = { ready: true, blockers: [], routeSnapshot: { routeType: "MANUAL_ADMIN", supplierCode: "AZIEL_ADMIN", region: "MM" } };
-    assert.strictEqual(compareRoutingDecisions({ legacy: thLegacy, shadow: eligibleShadow() }).classification, "MATCH");
-    assert.strictEqual(compareRoutingDecisions({ legacy: mmLegacy, shadow: eligibleShadow() }).classification, "ELIGIBILITY_ONLY");
-
-    const common = { eligibilityResolver: async () => eligibleShadow(), modeResolver: () => FULFILLMENT_ROUTING_MODES.DUAL_READ };
-    const off = createRoutingAuthority({ ...common, legacyResolver: async () => mmLegacy, pilotEnabledResolver: () => false });
-    assert.strictEqual((await off({ productCode: "mlbb", packageCode: "MLBB_55_DIA_FIRST_TOPUP", region: "MM" })).routeSnapshot.routeType, "MANUAL_ADMIN");
-    const on = createRoutingAuthority({ ...common, legacyResolver: async () => mmLegacy, pilotEnabledResolver: () => true });
-    const pilot = await on({ productCode: "mlbb", packageCode: "MLBB_55_DIA_FIRST_TOPUP", region: "MM" });
-    assert.strictEqual(pilot.routeSnapshot.snapshotVersion, 2);
-    assert.strictEqual(pilot.routeSnapshot.customerMarket, "MM");
-    assert.strictEqual(pilot.routeSnapshot.supplierMappingId, "pilot-mapping-id");
-    assert.strictEqual(pilot.routeSnapshot.supplierPackageCode, "MLFT055");
-    assert.deepStrictEqual(pilot.routeSnapshot.eligibility.allowedCustomerMarkets, ["MM", "TH"]);
-    assert.strictEqual(pilot.routeSnapshot.region, undefined);
-
-    const thOn = createRoutingAuthority({ ...common, legacyResolver: async () => thLegacy, pilotEnabledResolver: () => true });
-    assert.strictEqual((await thOn({ productCode: "mlbb", packageCode: "MLBB_55_DIA_FIRST_TOPUP", region: "TH" })).routeSnapshot, thLegacy.routeSnapshot);
-    const nonPilot = createRoutingAuthority({ eligibilityResolver: async () => eligibleShadow("MLBB_86"), legacyResolver: async () => mmLegacy, modeResolver: () => FULFILLMENT_ROUTING_MODES.DUAL_READ, pilotEnabledResolver: () => true });
-    assert.strictEqual((await nonPilot({ productCode: "mlbb", packageCode: "MLBB_86", region: "MM" })).routeSnapshot.routeType, "MANUAL_ADMIN");
+    const selectedResolver = async input => ({ ready: true, blockers: [], routeSnapshot: { ...eligibleShadow().routeSnapshot, snapshotVersion: 2, region: input.region, customerMarket: input.region, supplierMarket: "TH", eligibility: pilotEligibility(VERIFIED_AT) } });
+    const authority = createRoutingAuthority({ selectedResolver });
+    const th = await authority({ productCode: "mlbb", packageCode: "MLBB_55_DIA_FIRST_TOPUP", region: "TH" });
+    const mm = await authority({ productCode: "mlbb", packageCode: "MLBB_55_DIA_FIRST_TOPUP", region: "MM" });
+    assert.strictEqual(th.routeSnapshot.supplierMappingId, "pilot-mapping-id");
+    assert.strictEqual(mm.routeSnapshot.supplierMappingId, "pilot-mapping-id");
+    assert.strictEqual(th.routeSnapshot.supplierPackageCode, mm.routeSnapshot.supplierPackageCode);
+    assert.strictEqual(th.routeSnapshot.customerMarket, "TH");
+    assert.strictEqual(mm.routeSnapshot.customerMarket, "MM");
+    const blocked = createRoutingAuthority({ selectedResolver: async () => ({ ready: false, blockers: ["SELECTED_MAPPING_INVALID"], routeSnapshot: null }) });
+    assert.strictEqual((await blocked({ productCode: "mlbb", packageCode: "MLBB_55_DIA_FIRST_TOPUP", region: "MM" })).routeSnapshot, null);
 }
 
 async function verifyPaidSnapshotBinding() {
@@ -95,8 +85,9 @@ async function verifyPaidSnapshotBinding() {
 
 function verifyBoundaries() {
     const fulfillment = read("backend/services/fulfillmentService.js");
-    assert(fulfillment.includes("scopedPilotV2"));
-    assert(fulfillment.includes("basicCandidateBlockers"));
+    assert(fulfillment.includes("isMarketDecoupledV2RouteSnapshot"));
+    assert(fulfillment.includes('String(routeSnapshot.supplierMappingId || "") !== String(mapping._id)'));
+    assert(fulfillment.includes("READINESS_MODES.FROZEN_ORDER_EXECUTABLE"));
     const processor = read("backend/services/suppliers/wonddFulfillmentProcessor.js");
     assert(processor.includes("packCode: mapping.supplierPackageCode"));
     assert(processor.includes("reference: attempt.fulfillmentId"));
@@ -110,5 +101,5 @@ function verifyBoundaries() {
     await verifyRouting();
     await verifyPaidSnapshotBinding();
     verifyBoundaries();
-    console.log(JSON.stringify({ result: "PASS", pilotMappingsChangedByDryRun: 1, unrelatedMappingsChanged: 0, rollbackVerified: true, dualReadTh: "MATCH", dualReadMm: "ELIGIBILITY_ONLY", pilotOffMm: "MANUAL_ADMIN", pilotOnMm: "WONDD_V2", mmCurrency: "MMK", supplierCostCurrency: "THB", providerCalls: 0, productionMutations: 0 }, null, 2));
+    console.log(JSON.stringify({ result: "PASS", pilotMappingsChangedByDryRun: 1, unrelatedMappingsChanged: 0, rollbackVerified: true, globalSelectedThMmIdentity: "MATCH", missingOrInvalidSelectionFailsClosed: true, mmCurrency: "MMK", supplierCostCurrency: "THB", providerCalls: 0, productionMutations: 0 }, null, 2));
 })().catch(error => { console.error(`VERIFY_MARKET_DECOUPLED_FULFILLMENT_PHASE4_FAILED: ${error.stack || error.message}`); process.exitCode = 1; });

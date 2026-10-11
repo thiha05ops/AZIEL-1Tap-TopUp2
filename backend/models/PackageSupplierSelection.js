@@ -6,7 +6,11 @@ const packageSupplierSelectionSchema = new mongoose.Schema(
     {
         productCode: { type: String, required: true, trim: true, lowercase: true, immutable: true },
         packageCode: { type: String, required: true, trim: true, uppercase: true, immutable: true },
-        customerMarket: { type: String, enum: ["TH", "MM"], required: true, immutable: true },
+        // GLOBAL is the only authority used for new checkout routing. TH/MM
+        // remain valid so existing production decisions can be retained as
+        // read-only migration evidence until an Owner explicitly replaces
+        // them with a GLOBAL decision.
+        customerMarket: { type: String, enum: ["GLOBAL", "TH", "MM"], required: true, immutable: true },
         supplierMappingId: { type: mongoose.Schema.Types.ObjectId, ref: "SupplierProductMapping", required: true },
         selectedByAdminId: { type: mongoose.Schema.Types.ObjectId, ref: "AdminAccount", default: null },
         selectedByUsernameSnapshot: { type: String, required: true, trim: true, maxlength: 120 },

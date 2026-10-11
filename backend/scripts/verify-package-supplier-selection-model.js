@@ -9,7 +9,7 @@ async function main() {
     assert.strictEqual(paths.productCode.options.required, true);
     assert.strictEqual(paths.productCode.options.immutable, true);
     assert.strictEqual(paths.packageCode.options.immutable, true);
-    assert.deepStrictEqual(paths.customerMarket.options.enum, ["TH", "MM"]);
+    assert.deepStrictEqual(paths.customerMarket.options.enum, ["GLOBAL", "TH", "MM"]);
     assert.strictEqual(paths.supplierMappingId.options.ref, "SupplierProductMapping");
     assert.strictEqual(paths.selectedByUsernameSnapshot.options.maxlength, 120);
     assert.strictEqual(paths.reason.options.maxlength, 500);
@@ -22,12 +22,12 @@ async function main() {
     assert(indexes.some(([fields]) => fields.updatedAt === -1));
 
     const mappingId = new mongoose.Types.ObjectId();
-    const th = new PackageSupplierSelection({ productCode: "game", packageCode: "PACK", customerMarket: "TH", supplierMappingId: mappingId, selectedByUsernameSnapshot: "owner" });
-    const mm = new PackageSupplierSelection({ productCode: "game", packageCode: "PACK", customerMarket: "MM", supplierMappingId: mappingId, selectedByUsernameSnapshot: "owner" });
-    await th.validate();
-    await mm.validate();
-    assert.notStrictEqual(th.customerMarket, mm.customerMarket, "TH and MM must support separate records");
-    console.log("PASS PackageSupplierSelection schema and market-scoped indexes");
+    const global = new PackageSupplierSelection({ productCode: "game", packageCode: "PACK", customerMarket: "GLOBAL", supplierMappingId: mappingId, selectedByUsernameSnapshot: "owner" });
+    const legacy = new PackageSupplierSelection({ productCode: "game", packageCode: "PACK", customerMarket: "TH", supplierMappingId: mappingId, selectedByUsernameSnapshot: "owner" });
+    await global.validate();
+    await legacy.validate();
+    assert.strictEqual(global.customerMarket, "GLOBAL");
+    console.log("PASS PackageSupplierSelection schema, GLOBAL authority, legacy compatibility, and indexes");
 }
 
 main().catch(error => { console.error(error); process.exitCode = 1; });

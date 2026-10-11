@@ -114,7 +114,7 @@ function createPackageSupplierSelectionService(models = {}, dependencies = {}) {
     return async function setPackageSupplierSelection(input = {}, context = {}) {
         const productCode = lower(input.productCode);
         const packageCode = upper(input.packageCode);
-        const customerMarket = normalizeCustomerMarket(input.customerMarket);
+        const customerMarket = "GLOBAL";
         const supplierMappingId = clean(input.supplierMappingId);
         const reason = clean(input.reason).slice(0, 500);
         if (!productCode || !packageCode) throw new PackageSupplierSelectionError("PACKAGE_IDENTITY_REQUIRED", "Product and package are required.");
@@ -142,10 +142,11 @@ function createPackageSupplierSelectionService(models = {}, dependencies = {}) {
             if (supplier.enabled !== true) throw new PackageSupplierSelectionError("SUPPLIER_DISABLED", "Supplier is disabled.", 409);
             const offer = mapping.supplierCatalogOfferId ? await lean(M.Offer.findById(mapping.supplierCatalogOfferId), session) : null;
             const availability = mapping.supplierCatalogOfferId ? await lean(M.Availability.findOne({ supplierCatalogOfferId: mapping.supplierCatalogOfferId }), session) : null;
-            const blockers = candidateBlockers({ mapping, supplier, offer, availability, customerMarket, adapter: adapterFor(supplier) });
-            if (blockers.length) throw stableSelectionError(blockers);
+            const marketAssessments = ["TH", "MM"].map(market => ({ market, blockers: candidateBlockers({ mapping, supplier, offer, availability, customerMarket: market, adapter: adapterFor(supplier) }) }));
+            const selectableMarkets = marketAssessments.filter(item => item.blockers.length === 0).map(item => item.market);
+            if (!selectableMarkets.length) throw stableSelectionError([...new Set(marketAssessments.flatMap(item => item.blockers))]);
             const proposedCost = costProjection(mapping, offer);
-            const assessment = marginAssessment(pkg, customerMarket, proposedCost);
+            const assessment = Object.fromEntries(["TH", "MM"].map(market => [market, marginAssessment(pkg, market, proposedCost)]));
             const previousSelection = projectSelection(current);
             // The routing decision is the mapping identity. A reason-only edit is
             // intentionally idempotent: it neither rewrites history nor bumps version.
@@ -191,7 +192,7 @@ function createPackageSupplierSelectionService(models = {}, dependencies = {}) {
                 resourceId: `${productCode}/${packageCode}/${customerMarket}`,
                 session,
                 metadata: {
-                    productCode, packageCode, customerMarket,
+                    productCode, packageCode, customerMarket, selectableMarkets,
                     oldSupplierMappingId: objectId(current?.supplierMappingId),
                     newSupplierMappingId: objectId(mapping),
                     oldSupplierId: objectId(oldMapping?.supplierId),

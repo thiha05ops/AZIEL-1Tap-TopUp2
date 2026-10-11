@@ -29,7 +29,7 @@ const service = createPackageSupplierCandidateService({
     Product: { findOne: () => query({ productCode: "game", enabled: true, publicDiscoveryEnabled: true, commerceState: "PURCHASABLE" }) },
     StoreSelection: { exists: async () => ({ _id: id() }) },
     Package: { findOne: () => query({ productCode: "game", packageCode: "PACK", name: "Pack", enabled: true, prices: { TH: { amount: 100, currency: "THB", enabled: true } }, updatedAt: new Date() }) },
-    Publication: { findOne: () => query({ published: true, customerMarket: "TH" }) },
+    Publication: { find: () => query([{ published: true, customerMarket: "GLOBAL" }]) },
     Selection: { findOne: () => query(null) },
     Mapping: { find: () => query(mappings) },
     Supplier: { find: () => query(suppliers) },
@@ -37,7 +37,8 @@ const service = createPackageSupplierCandidateService({
     Availability: { find: () => query(availability) },
     Media: { findOne: () => query(null) }
 }, {
-    getSupplierAdapter: () => ({ isConfigured: () => true, isAutoFulfillmentEnabled: () => true })
+    getSupplierAdapter: () => ({ isConfigured: () => true, isAutoFulfillmentEnabled: () => true }),
+    publicPaymentMarketReadiness: async () => ({ ready: true, providers: [] })
 });
 
 service({ productCode: "game", packageCode: "PACK", customerMarket: "TH" }).then(result => {
@@ -57,11 +58,14 @@ service({ productCode: "game", packageCode: "PACK", customerMarket: "TH" }).then
     assert(disabled.readiness.blockerCodes.includes("SUPPLIER_AVAILABILITY_NOT_CONFIRMED"));
     assert.strictEqual(result.publication.state, "RECORDED", "publication record remains the package Selling authority");
     assert.strictEqual(result.effectiveState.state, "BLOCKED", "multiple executable routes require an explicit Owner choice");
-    assert(result.effectiveState.blockers.includes("AMBIGUOUS_EXECUTABLE_SUPPLIER_ROUTES"));
+    assert(result.effectiveState.blockers.includes("LEGACY_SUPPLIER_SELECTION_CONFLICT"));
     const common = { productCode: "game", packageCode: "PACK", customerMarket: "TH", product: { enabled: true, publicDiscoveryEnabled: true, commerceState: "PURCHASABLE" }, storeCatalogMember: true, pkg: { productCode: "game", packageCode: "PACK", name: "Pack", enabled: true, prices: { TH: { amount: 100, enabled: true } } }, suppliers, offers, availabilityRows: availability, adapterFor: () => ({ isConfigured: () => true, isAutoFulfillmentEnabled: () => true }) };
     const unique = evaluatePackageSupplierCandidates({ ...common, publication: { published: true }, mappings: [mappings[0]] });
-    assert.strictEqual(unique.effectiveState.state, "LIVE");
-    assert.strictEqual(unique.effectiveState.supplierResolution, "UNIQUE_EXECUTABLE_ROUTE");
+    assert.strictEqual(unique.effectiveState.state, "BLOCKED");
+    assert(unique.effectiveState.blockers.includes("GLOBAL_SUPPLIER_SELECTION_REQUIRED"));
+    const globallySelected = evaluatePackageSupplierCandidates({ ...common, publication: { published: true }, selection: { customerMarket: "GLOBAL", supplierMappingId: mappingA, decisionVersion: 1 }, mappings: [mappings[0]] });
+    assert.strictEqual(globallySelected.effectiveState.state, "LIVE");
+    assert.strictEqual(globallySelected.effectiveState.supplierResolution, "OWNER_SELECTION");
     const disabledByOwner = evaluatePackageSupplierCandidates({ ...common, publication: { published: false }, mappings: [mappings[0]] });
     assert.strictEqual(disabledByOwner.effectiveState.state, "DISABLED");
     const unavailableSelection = evaluatePackageSupplierCandidates({ ...common, publication: { published: true }, selection: { supplierMappingId: mappingC, decisionVersion: 1 }, mappings });

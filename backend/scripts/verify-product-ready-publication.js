@@ -56,7 +56,7 @@ function fixture() {
         suppliers: [{ _id: "supplier-1", supplierCode: "FIXTURE", enabled: true, mode: "API" }],
         offers: mappingRows.map(item => ({ _id: item.supplierCatalogOfferId, supplierId: item.supplierId, supplierProductCode: item.supplierProductCode, supplierOfferCode: item.supplierPackageCode, catalogLifecycleState: "ACTIVE" })),
         availability: mappingRows.map(item => ({ supplierCatalogOfferId: item.supplierCatalogOfferId, state: "AVAILABLE", staleAt: future })),
-        selections: ["TH", "MM"].flatMap(market => selectedCodes.map(code => ({ productCode, packageCode: code, customerMarket: market, supplierMappingId: `mapping-${code}`, decisionVersion: 1 }))),
+        selections: selectedCodes.map(code => ({ productCode, packageCode: code, customerMarket: "GLOBAL", supplierMappingId: `mapping-${code}`, decisionVersion: 1 })),
         publications: [{ productCode, packageCode: "PUBLIC_TH", customerMarket: "TH", published: true, decisionVersion: 2 }],
         storeSelections: [{ productCode, status: "ACTIVE", sellingRegions: ["TH", "MM"], visibleRegions: ["TH", "MM"], packages: packages.filter(item => item.packageCode !== "NO_STORE").map(item => ({ packageCode: item.packageCode, supplierProductMappingId: `mapping-${item.packageCode}` })) }]
     };
@@ -141,18 +141,12 @@ async function verify() {
     ok(featureApply.markets.TH.status === "CONFLICT" && featureWrites === 0, "local feature-gate change conflicts with zero writes");
 
     const marketScopedState = fixture();
-    const thReady = marketScopedState.mappings.find(item => item.packageCode === "READY");
-    const mmReady = { ...clone(thReady), _id: "mapping-READY-MM", supplierCatalogOfferId: "offer-READY-MM", supplierPackageCode: "native-READY-MM" };
-    marketScopedState.mappings.push(mmReady);
-    marketScopedState.offers.push({ _id: "offer-READY-MM", supplierId: "supplier-1", supplierProductCode: "native-product", supplierOfferCode: "native-READY-MM", catalogLifecycleState: "ACTIVE" });
-    marketScopedState.availability.push({ supplierCatalogOfferId: "offer-READY-MM", state: "AVAILABLE", staleAt: future });
-    marketScopedState.selections.find(item => item.customerMarket === "MM" && item.packageCode === "READY").supplierMappingId = "mapping-READY-MM";
     const marketScopedService = createProductReadyPublicationService({}, { loadAuthority: async () => clone(marketScopedState), adapterFor: adapter, storeCatalogMode: () => "EXPLICIT", transaction: async callback => callback({}), batchPublish: async () => {}, audit: async () => {} });
     const beforeMarketChange = await marketScopedService.plan({ productCode, markets: ["TH", "MM"] });
     marketScopedState.offers.find(item => item._id === "offer-READY").catalogLifecycleState = "INACTIVE";
     const afterMarketChange = await marketScopedService.plan({ productCode, markets: ["TH", "MM"] });
-    ok(beforeMarketChange.markets.TH.marketPlanToken !== afterMarketChange.markets.TH.marketPlanToken, "TH-selected offer change stales TH");
-    ok(beforeMarketChange.markets.MM.marketPlanToken === afterMarketChange.markets.MM.marketPlanToken, "TH-only selected-offer change does not stale MM");
+    ok(beforeMarketChange.markets.TH.marketPlanToken !== afterMarketChange.markets.TH.marketPlanToken, "global selected-offer change stales TH");
+    ok(beforeMarketChange.markets.MM.marketPlanToken !== afterMarketChange.markets.MM.marketPlanToken, "global selected-offer change also stales MM");
 
     const isolatedState = fixture();
     const isolatedPlan = projectProductReadyPublication(isolatedState, { markets: ["TH", "MM"], adapterFor: adapter, storeCatalogMode: "EXPLICIT" });

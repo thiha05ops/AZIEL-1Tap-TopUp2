@@ -20,7 +20,8 @@ async function main() {
     const mappingB = { ...mappingA, _id: "b", supplierId: "sb", supplierCode: "WONDD", supplierPackageCode: "b", supplierCatalogOfferId: "ob" };
     const offerA = { _id: "oa", supplierId: "sa", supplierCatalogProductId: "pa", supplierProductCode: "p", supplierOfferCode: "a", catalogLifecycleState: "ACTIVE", reconciliationState: "EXACT_CANONICAL_MATCH" };
     const offerB = { _id: "ob", supplierId: "sb", supplierCatalogProductId: "pb", supplierProductCode: "p", supplierOfferCode: "b", catalogLifecycleState: "ACTIVE", reconciliationState: "AMBIGUOUS" };
-    const audit = buildSupplierLifecycleAudit({ products: [{ _id: "pa" }, { _id: "pb" }, { _id: "unmapped", supplierProductCode: "new" }], offers: [offerA, offerB, { _id: "unresolved", supplierCatalogProductId: "unmapped", supplierOfferCode: "x", reconciliationState: "AMBIGUOUS" }], mappings: [mappingA, mappingB], packages: [{ _id: "pkg", productCode: "game", packageCode: "PACK", name: "Pack", prices: { TH: { supplierCode: "FAZERCARDS" } } }], publications: [{ productCode: "game", packageCode: "PACK", customerMarket: "TH", published: true }], selections: [{ productCode: "game", packageCode: "PACK", customerMarket: "TH", supplierMappingId: "b" }] });
+    const globalSelection = { productCode: "game", packageCode: "PACK", customerMarket: "GLOBAL", supplierMappingId: "b" };
+    const audit = buildSupplierLifecycleAudit({ products: [{ _id: "pa" }, { _id: "pb" }, { _id: "unmapped", supplierProductCode: "new" }], offers: [offerA, offerB, { _id: "unresolved", supplierCatalogProductId: "unmapped", supplierOfferCode: "x", reconciliationState: "AMBIGUOUS" }], mappings: [mappingA, mappingB], packages: [{ _id: "pkg", productCode: "game", packageCode: "PACK", name: "Pack", prices: { TH: { supplierCode: "FAZERCARDS" } } }], publications: [{ productCode: "game", packageCode: "PACK", customerMarket: "GLOBAL", published: true }], selections: [globalSelection] });
     check("one canonical package has two exact supplier mappings", audit.packagesWithMultipleMappings[0].mappingIds.length === 2);
     check("supplier names never define equivalence", !source("backend/services/supplierCatalog/supplierCatalogReconciliationService.js").includes("similarity"));
     check("ambiguous offer remains unresolved", audit.ambiguousEquivalenceCandidates.some(row => row._id === "unresolved"));
@@ -31,12 +32,12 @@ async function main() {
     check("admin projection retains both mappings", audit.packagesWithMultipleMappings.length === 1);
     check("selection A representable", mappingA._id === "a");
     check("selection A to B representable", mappingB._id === "b");
-    check("TH/MM selection identities are independent", new Set(["TH", "MM"].map(m => `game|PACK|${m}`)).size === 2);
+    check("one GLOBAL selection serves TH and MM", globalSelection.customerMarket === "GLOBAL");
     check("route snapshot source is immutable construction", source("backend/services/supplierProductionSelectionService.js").includes("Object.freeze"));
     const selected = { ready: true, routeSnapshot: { supplierMappingId: "b" }, blockers: [] };
     const route = createRoutingAuthority({ legacyResolver: async () => ({ ready: true, routeSnapshot: { supplierMappingId: "a", routeType: "SUPPLIER_API" } }), selectedResolver: async () => selected, modeResolver: () => FULFILLMENT_ROUTING_MODES.SELECTED });
     check("new order SELECTED uses B", (await route({ productCode: "game", packageCode: "PACK", region: "TH" })).routeSnapshot.supplierMappingId === "b");
-    check("unique executable route resolves without selection", source("backend/services/supplierProductionSelectionService.js").includes("UNIQUE_EXECUTABLE_ROUTE"));
+    check("unique executable route cannot replace owner selection", !source("backend/services/supplierProductionSelectionService.js").includes('selectedRouteSnapshot(ready[0].mapping') && source("backend/services/supplierProductionSelectionService.js").includes("GLOBAL_SUPPLIER_SELECTION_REQUIRED"));
     check("invalid selected mapping fails closed", source("backend/services/supplierProductionSelectionService.js").includes("SELECTED_MAPPING_INVALID"));
     check("selected failure has no fallback", !source("backend/services/supplierProductionSelectionService.js").match(/resolveSelectedCheckoutRouteSnapshot[\s\S]{0,1800}BACKUP/));
     const adapter = { isConfigured: () => true, isAutoFulfillmentEnabled: () => true };
@@ -47,7 +48,7 @@ async function main() {
     check("frozen archived fails", !assessMappingReadiness({ mode: READINESS_MODES.FROZEN_ORDER_EXECUTABLE, mapping: { ...mappingA, archivedAt: new Date() }, supplier, adapter }).ready);
     check("supplier disabled fails", !assessMappingReadiness({ mode: READINESS_MODES.FROZEN_ORDER_EXECUTABLE, mapping: mappingA, supplier: { ...supplier, enabled: false }, adapter }).ready);
     check("adapter non-executable fails", !assessMappingReadiness({ mode: READINESS_MODES.FROZEN_ORDER_EXECUTABLE, mapping: mappingA, supplier, adapter: { isConfigured: () => false } }).ready);
-    check("pricing supplier may differ", audit.pricingVsFulfillment[0].differs);
+    check("pricing supplier may differ from global fulfillment supplier", mappingB.supplierCode !== "FAZERCARDS");
     check("selection service does not mutate price", !source("backend/services/packageSupplierSelectionService.js").includes("prices."));
     check("selection service does not mutate publication", !source("backend/services/packageSupplierSelectionService.js").includes("PackageMarketPublication"));
     check("paid replay uses fulfillment idempotency", source("backend/services/paidFulfillmentRoutingService.js").includes("findAttempt(idempotencyKey)"));

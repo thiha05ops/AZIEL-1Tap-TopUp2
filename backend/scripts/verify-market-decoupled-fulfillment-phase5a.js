@@ -51,24 +51,28 @@ function verifySnapshotCompatibility() {
 }
 
 function verifyProductionBoundaries() {
-    assert.strictEqual(resolveFulfillmentRoutingMode({}), "LEGACY_REGION");
+    assert.strictEqual(resolveFulfillmentRoutingMode({}), "SELECTED");
     assert.strictEqual(isPilotEnabled({}), false);
     const selection = read("backend/services/supplierProductionSelectionService.js");
     assert(selection.includes("resolveLegacyCheckoutRouteSnapshot"));
-    assert(selection.includes("FULFILLMENT_ROUTING_MODES.DUAL_READ"));
-    assert.strictEqual(resolveSupplierGateMode({}), "LEGACY_PRODUCT_ONLY", "Later supplier-gate phases must preserve the Phase 5A production baseline by default.");
+    assert(selection.includes('customerMarket: "GLOBAL"'));
+    assert(selection.includes("GLOBAL_SUPPLIER_SELECTION_REQUIRED"));
+    assert(!selection.includes('selectedRouteSnapshot(ready[0].mapping'));
+    assert.strictEqual(resolveSupplierGateMode({}), "SUPPLIER_ONLY", "Supplier-owned emergency switches must fail closed by default without product-market coupling.");
     const audit = read("backend/scripts/audit-market-decoupled-fulfillment-phase5a.js");
     for (const forbidden of ["updateOne(", "updateMany(", "bulkWrite(", "save(", "submitTopup(", "/topups/order"]) assert(!audit.includes(forbidden), `Read-only audit contains forbidden operation ${forbidden}`);
     const paid = read("backend/services/paidFulfillmentRoutingService.js");
-    assert(!paid.includes("resolveCheckoutRouteSnapshot"));
     assert(paid.includes("supplierMappingId"));
+    assert(paid.includes("SUPPLIER_ROUTE_SNAPSHOT_BOUND"));
+    assert(paid.indexOf("if (routeSnapshot)") < paid.indexOf("options.resolveCurrentRoute || resolveCheckoutRouteSnapshot"), "Frozen paid orders must bind before the historical missing-snapshot compatibility resolver.");
     const adapters = `${read("backend/services/suppliers/wonddAdapter.js")}\n${read("backend/services/suppliers/fazercardsAdapter.js")}`;
-    for (const gate of ["WONDD_MLBB_AUTO_FULFILLMENT_ENABLED", "WONDD_FREEFIRE_AUTO_FULFILLMENT_ENABLED"]) assert(adapters.includes(gate));
-    assert(adapters.includes("productGateKey") && adapters.includes("FAZERCARDS_${"), "FazerCards must retain an explicit derived per-product fulfillment gate.");
+    assert(adapters.includes("effectiveAutoFulfillmentGateState") && adapters.includes('supplierAutoFulfillmentGateState("FAZERCARDS"'), "Both suppliers must retain fail-closed supplier-owned emergency gates.");
+    const gateConfig = read("backend/config/supplierAutoFulfillmentGate.js");
+    assert(gateConfig.includes('WONDD: "WONDD_AUTO_FULFILLMENT_ENABLED"') && gateConfig.includes('FAZERCARDS: "FAZERCARDS_AUTO_FULFILLMENT_ENABLED"'));
 }
 
 verifyPureSimulator();
 verifyCanonicalIdentityInvariant();
 verifySnapshotCompatibility();
 verifyProductionBoundaries();
-console.log(JSON.stringify({ result: "PASS", productionRoutingChanges: 0, routingMode: "LEGACY_REGION", dualReadChanged: false, phase4PilotChanged: false, eligibilityPrimaryActivated: false, productGatesPreserved: true, supplierGateDefaultPolicy: "LEGACY_PRODUCT_ONLY", simulatorReadOnly: true, canonicalIdentityRewrites: 0, v1Readable: true, v2Readable: true, snapshotBoundFulfillment: true, providerCalls: 0, databaseWrites: 0, environmentChanges: 0 }, null, 2));
+console.log(JSON.stringify({ result: "PASS", routingMode: "SELECTED", globalOwnerSelectionRequired: true, implicitCandidateSelection: false, supplierEmergencyGatesPreserved: true, supplierGateDefaultPolicy: "SUPPLIER_ONLY", simulatorReadOnly: true, canonicalIdentityRewrites: 0, v1Readable: true, v2Readable: true, snapshotBoundFulfillment: true, providerCalls: 0, databaseWrites: 0, environmentChanges: 0 }, null, 2));

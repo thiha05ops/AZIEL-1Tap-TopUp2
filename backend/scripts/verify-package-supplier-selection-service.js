@@ -117,11 +117,12 @@ async function rejectsCode(promise, code) {
     assert.strictEqual(created.changed, true);
     assert.strictEqual(created.previousSelection, null);
     assert.strictEqual(created.selection.decisionVersion, 1);
+    assert.strictEqual(created.selection.customerMarket, "GLOBAL");
     assert.strictEqual(audits[0].action, "PACKAGE_SUPPLIER_SELECTION_CREATED");
     assert.strictEqual(audits[0].metadata.customerPriceChanged, false);
     assert.strictEqual(audits[0].metadata.publicationChanged, false);
 
-    const idempotent = await call("TH", ids.mappingA, 1);
+    const idempotent = await call("MM", ids.mappingA, 1);
     assert.strictEqual(idempotent.changed, false);
     assert.strictEqual(idempotent.selection.decisionVersion, 1);
     assert.strictEqual(audits.length, 1, "idempotent save must not audit");
@@ -135,31 +136,30 @@ async function rejectsCode(promise, code) {
     assert.strictEqual(audits[1].metadata.newSupplierCode, "B");
     assert.strictEqual(mappings[1].productionRole, "BACKUP", "non-primary role remains unchanged and selectable");
 
-    const mm = await call("MM", ids.mappingA, null);
-    assert.strictEqual(mm.selection.decisionVersion, 1);
-    assert.strictEqual(selections.find(item => item.customerMarket === "TH").supplierMappingId, ids.mappingB);
-    assert.strictEqual(selections.find(item => item.customerMarket === "MM").supplierMappingId, ids.mappingA);
+    assert.strictEqual(selections.length, 1, "TH/MM requests must write one GLOBAL decision");
+    assert.strictEqual(selections[0].customerMarket, "GLOBAL");
+    assert.strictEqual(selections[0].supplierMappingId, ids.mappingB);
 
     await rejectsCode(call("TH", ids.mappingWrong, 2), "SUPPLIER_MAPPING_SCOPE_MISMATCH");
     await rejectsCode(call("TH", ids.mappingDisabled, 2), "SUPPLIER_MAPPING_NOT_READY");
     await rejectsCode(call("TH", ids.mappingArchived, 2), "SUPPLIER_MAPPING_NOT_READY");
-    const marketDecoupled = await call("MM", ids.mappingIneligible, 1);
-    assert.strictEqual(marketDecoupled.selection.decisionVersion, 2, "customer payment market must not reject an otherwise exact executable supplier route");
+    const marketDecoupled = await call("MM", ids.mappingIneligible, 2);
+    assert.strictEqual(marketDecoupled.selection.decisionVersion, 3, "customer payment market must not choose the supplier; a route eligible for at least one storefront remains an explicit global choice");
     assert.strictEqual(marketDecoupled.selection.supplierMappingId, String(ids.mappingIneligible));
 
     suppliers[0].enabled = false;
-    await rejectsCode(call("MM", ids.mappingA, 2), "SUPPLIER_DISABLED");
+    await rejectsCode(call("MM", ids.mappingA, 3), "SUPPLIER_DISABLED");
     suppliers[0].enabled = true;
     const savedAvailability = availability.splice(availability.findIndex(item => same(item.supplierCatalogOfferId, ids.offerA)), 1)[0];
-    await rejectsCode(call("MM", ids.mappingA, 2), "SUPPLIER_NOT_AVAILABLE");
+    await rejectsCode(call("MM", ids.mappingA, 3), "SUPPLIER_NOT_AVAILABLE");
     availability.push(savedAvailability);
 
-    const beforeAuditFailure = { ...selections.find(item => item.customerMarket === "MM") };
+    const beforeAuditFailure = { ...selections.find(item => item.customerMarket === "GLOBAL") };
     const auditCountBeforeFailure = audits.length;
     auditFailure = new Error("simulated audit failure");
-    await assert.rejects(call("MM", ids.mappingB, 2), error => error === auditFailure);
+    await assert.rejects(call("MM", ids.mappingB, 3), error => error === auditFailure);
     auditFailure = null;
-    const afterAuditFailure = selections.find(item => item.customerMarket === "MM");
+    const afterAuditFailure = selections.find(item => item.customerMarket === "GLOBAL");
     assert.strictEqual(afterAuditFailure.supplierMappingId, beforeAuditFailure.supplierMappingId, "simulated transaction must roll back selection when audit fails");
     assert.strictEqual(afterAuditFailure.decisionVersion, beforeAuditFailure.decisionVersion, "simulated transaction must roll back decisionVersion when audit fails");
     assert.strictEqual(audits.length, auditCountBeforeFailure, "failed audit must not leave an audit event");

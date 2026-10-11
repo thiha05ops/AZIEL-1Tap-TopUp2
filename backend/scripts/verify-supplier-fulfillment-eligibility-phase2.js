@@ -199,7 +199,9 @@ function verifyRuntimeUsesExplicitSelection() {
     assert(selection.includes("region: mapping.region"));
     assert(selection.includes("snapshotVersion: 2") && selection.includes("supplierMappingId: String(mapping._id)"), "v2 routes must freeze one exact mapping identity.");
     assert(selection.includes("customerMarket: upper(customerMarket)") && selection.includes("supplierMarket: upper(mapping.region)"), "customer and supplier markets must remain distinct.");
-    assert(selection.includes("UNIQUE_EXECUTABLE_ROUTE") && selection.includes("SELECTED_MAPPING_INVALID"), "routing must allow one exact eligible route while invalid explicit selections fail closed.");
+    assert(selection.includes('customerMarket: "GLOBAL"') && selection.includes("SELECTED_MAPPING_INVALID"), "routing must require one exact GLOBAL owner selection and reject invalid references.");
+    assert(selection.includes("GLOBAL_SUPPLIER_SELECTION_REQUIRED") && selection.includes("LEGACY_SUPPLIER_SELECTION_CONFLICT"), "unmigrated or conflicting legacy selections must fail closed.");
+    assert(!selection.includes('selectedRouteSnapshot(ready[0].mapping'), "routing must not silently choose a sole executable candidate.");
     assert(!selection.match(/resolveSelectedCheckoutRouteSnapshot[\s\S]{0,1800}productionRole:\s*ROLES\.BACKUP/), "selected routing must not scan BACKUP mappings.");
     const capability = read("backend/services/fulfillmentCapabilityService.js");
     assert(capability.includes("normalizeRegion(context.region || mapping.region)"), "capability evaluation must normalize the explicit customer region.");

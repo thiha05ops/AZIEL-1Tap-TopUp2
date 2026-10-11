@@ -110,7 +110,7 @@ function projectProductReadyPublication(data = {}, { markets = MARKETS, adapterF
             const publication = publicationRecordsByPackage.get(`${productCode}:${packageCode}`)?.find(item => upper(item.customerMarket) === "GLOBAL")
                 || publicationRecordsByPackage.get(`${productCode}:${packageCode}`)?.find(item => item.published === true)
                 || null;
-            const selection = selections.get(`${market}:${packageCode}`) || null;
+            const selection = selections.get(`GLOBAL:${packageCode}`) || null;
             const selectedMapping = selection ? mappings.get(objectId(selection.supplierMappingId)) || null : null;
             let readinessSupplier = null;
             let readinessOffer = null;
@@ -230,7 +230,7 @@ function createProductReadyPublicationService(models = {}, dependencies = {}) {
         if (!product) return { product: null, packages: [], publications: [], selections: [], storeSelections: [], mappings: [], suppliers: [], offers: [], availability: [] };
         const packages = await lean(M.Package.find({ productCode: lower(productCode) }).sort({ sortOrder: 1, packageCode: 1 }), session);
         const publications = await lean(M.Publication.find({ productCode: lower(productCode) }), session);
-        const selections = await lean(M.Selection.find({ productCode: lower(productCode), customerMarket: { $in: marketList } }), session);
+        const selections = await lean(M.Selection.find({ productCode: lower(productCode), customerMarket: "GLOBAL" }), session);
         const storeSelections = await lean(M.StoreSelection.find({ productCode: lower(productCode), status: "ACTIVE" }), session);
         const mappings = await lean(M.Mapping.find({ productCode: lower(productCode) }), session);
         const supplierIds = [...new Set(mappings.map(item => objectId(item.supplierId)).filter(Boolean))];

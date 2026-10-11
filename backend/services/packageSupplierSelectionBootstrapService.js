@@ -156,38 +156,16 @@ function createPackageSupplierSelectionBootstrapService(models = {}, dependencie
     }
 
     async function apply(input = {}, context = {}, externalSession = null) {
-        const productCode = lower(input.productCode);
-        const markets = normalizeMarkets(input.markets);
-        const decisionNote = clean(input.decisionNote).slice(0, 500);
-        const actor = context.actor || {};
-        const results = { productCode, markets: {} };
-        const applyMarket = async (market, session) => {
-            const current = await plan({ productCode, markets: [market] }, session);
-            const marketPlan = current.markets[market];
-            if (clean(input.marketPlanTokens?.[market]) !== marketPlan.marketPlanToken) throw new PackageSupplierSelectionBootstrapError("SUPPLIER_SELECTION_BOOTSTRAP_PLAN_STALE", "Supplier selection bootstrap authorities changed. Refresh and review again.", 409, { customerMarket: market });
-            const safe = marketPlan.packages.filter(row => row.state === "SAFE_TO_CREATE");
-            const created = [];
-            for (const row of safe) {
-                try {
-                    const saved = await createSelection({ productCode, packageCode: row.packageCode, customerMarket: market, supplierMappingId: row.intendedSupplierMappingId, selectedByAdminId: actor.id || actor.adminId || actor._id || null, selectedByUsernameSnapshot: clean(actor.username || "admin"), selectedAt: new Date(), decisionVersion: 1, reason: decisionNote || "Bootstrapped from exact Store Catalog supplier provenance" }, session);
-                    created.push({ packageCode: row.packageCode, supplierMappingId: id(saved.supplierMappingId || row.intendedSupplierMappingId) });
-                } catch (error) {
-                    if (error?.code === 11000) throw new PackageSupplierSelectionBootstrapError("SUPPLIER_SELECTION_BOOTSTRAP_CONFLICT", "A supplier selection was created concurrently. Refresh and review again.", 409, { customerMarket: market, packageCode: row.packageCode });
-                    throw error;
-                }
-            }
-            await audit({ actor, req: context.req || null, action: ADMIN_AUDIT_ACTIONS.PACKAGE_SUPPLIER_SELECTIONS_BOOTSTRAPPED, resourceType: "CatalogProduct", resourceId: `${productCode}:${market}`, session, metadata: { productCode, customerMarket: market, sourceStoreCatalogSelectionIds: [...new Set(marketPlan.packages.flatMap(row => row.sourceStoreCatalogSelectionIds))].sort(), createdSelectionCount: created.length, alreadySelectedCount: marketPlan.counts.ALREADY_SELECTED, blockedCount: marketPlan.counts.BLOCKED, ambiguousCount: marketPlan.counts.AMBIGUOUS, ineligibleCount: marketPlan.counts.INELIGIBLE, protectedCount: marketPlan.counts.PROTECTED_EXISTING_SELECTION, mappingIdsCreated: created.map(item => item.supplierMappingId), planVersion: marketPlan.marketPlanToken, decisionNote } });
-            return { status: "APPLIED", created: created.length, createdSelections: created, counts: marketPlan.counts, marketPlanToken: marketPlan.marketPlanToken };
-        };
-        for (const market of markets) {
-            if (externalSession) {
-                results.markets[market] = await applyMarket(market, externalSession);
-            } else {
-                try { results.markets[market] = await transaction(session => applyMarket(market, session)); }
-                catch (error) { results.markets[market] = { status: error instanceof PackageSupplierSelectionBootstrapError && /STALE|CONFLICT/.test(error.code) ? "CONFLICT" : "FAILED", created: 0, code: error.code || "SUPPLIER_SELECTION_BOOTSTRAP_FAILED", message: error.message }; }
-            }
-        }
-        return results;
+        // The legacy bootstrap inferred independent TH/MM routing decisions
+        // from Store Catalog provenance. That is not a valid source of the
+        // single global supplier authority and could silently migrate a
+        // conflict. Global decisions must be made explicitly through Manage
+        // Package, where the exact candidate and decisionVersion are reviewed.
+        throw new PackageSupplierSelectionBootstrapError(
+            "GLOBAL_SUPPLIER_SELECTION_REQUIRED",
+            "Automatic market supplier-selection bootstrap is retired. Select one global supplier mapping in Manage Package.",
+            409
+        );
     }
 
     return { plan, apply };
@@ -196,17 +174,14 @@ function createPackageSupplierSelectionBootstrapService(models = {}, dependencie
 const service = createPackageSupplierSelectionBootstrapService();
 async function reconcileAutomaticPackageSupplierSelections(input = {}, context = {}, session = null) {
     const markets = normalizeMarkets(input.markets || MARKETS);
-    const plan = await service.plan({ productCode: input.productCode, markets }, session);
-    const actionable = markets.filter(market => Number(plan.markets?.[market]?.counts?.SAFE_TO_CREATE || 0) > 0);
-    if (!actionable.length) {
-        return { productCode: plan.productCode, markets: Object.fromEntries(markets.map(market => [market, { status: "UNCHANGED", created: 0 }])) };
-    }
-    return service.apply({
-        productCode: plan.productCode,
-        markets: actionable,
-        marketPlanTokens: Object.fromEntries(actionable.map(market => [market, plan.markets[market].marketPlanToken])),
-        decisionNote: clean(input.decisionNote || "Automatic sellability lifecycle reconciliation")
-    }, context, session);
+    return {
+        productCode: lower(input.productCode),
+        markets: Object.fromEntries(markets.map(market => [market, {
+            status: "UNCHANGED",
+            created: 0,
+            code: "GLOBAL_SUPPLIER_SELECTION_REQUIRES_OWNER_DECISION"
+        }]))
+    };
 }
 
 module.exports = { MARKETS, STATES, PackageSupplierSelectionBootstrapError, adapterFingerprint, authorityFingerprint, normalizeMarkets, projectBootstrapPlan, createPackageSupplierSelectionBootstrapService, getPackageSupplierSelectionBootstrapPlan: service.plan, applyPackageSupplierSelectionBootstrapPlan: service.apply, reconcileAutomaticPackageSupplierSelections };

@@ -39,7 +39,7 @@ const thOnlyMapping = { ...mapping, fulfillmentEligibility: { ...mapping.fulfill
 const unsupportedMm = evaluate({ customerMarket: "MM", mappings: [thOnlyMapping] });
 ok(unsupportedMm.operational.state === "BLOCKED" && unsupportedMm.operational.blockerCodes.includes("CUSTOMER_MARKET_NOT_ELIGIBLE"), "actual supplier-route eligibility blocks a truly unsupported customer market");
 const uniqueRoute = evaluate({ selection: null });
-ok(uniqueRoute.operational.state === "LIVE" && uniqueRoute.effectiveState.supplierResolution === "UNIQUE_EXECUTABLE_ROUTE", "one uniquely executable route may safely become checkout authority without an owner override");
+ok(uniqueRoute.operational.state === "BLOCKED" && uniqueRoute.operational.blockerCodes.includes("GLOBAL_SUPPLIER_SELECTION_REQUIRED"), "a sole candidate cannot become checkout authority without an explicit global selection");
 ok(evaluate({ mappings: [{ ...mapping, executionMode: "MANUAL" }] }).operational.blockerCodes.includes("MAPPING_EXECUTION_NOT_API"), "non-executable auto fulfillment blocks");
 ok(evaluate({ offers: [{ ...offer, catalogLifecycleState: "INACTIVE" }] }).operational.blockerCodes.includes("SUPPLIER_OFFER_NOT_ACTIVE"), "inactive supplier offer blocks");
 ok(evaluate({ pkg: { ...pkg, enabled: false } }).operational.state === "BLOCKED", "disabled canonical package is not live");
@@ -84,7 +84,7 @@ const root = path.resolve(__dirname, "..");
 const frontend = fs.readFileSync(path.join(root, "../frontend/js/admin-catalog.js"), "utf8");
 const merchandising = frontend.slice(frontend.indexOf("function renderOperationalPackageRows"), frontend.indexOf("function renderCatalogMerchandisingPanel"));
 ok(!merchandising.includes("renderCatalogSupplierSetup") && !merchandising.includes("renderCatalogMarketAvailability"), "normal merchandising UI has no Supplier Setup or Publish Ready workflow");
-ok(merchandising.includes("Live ${counts.LIVE} · Blocked ${counts.BLOCKED} · Total ${joined.length}"), "market counts are mutually exclusive and share one denominator");
+ok(merchandising.includes("LIVE ${counts.LIVE} · BLOCKED ${counts.BLOCKED} · DISABLED ${counts.DISABLED} · Total ${joined.length}"), "market counts are mutually exclusive and share one denominator");
 ok(frontend.includes("publicDiscoveryEnabled: show") && frontend.includes('commerceState: show ? "PURCHASABLE" : "HIDDEN"'), "Show/Hide changes visibility without disabling technical authorities");
 ok(frontend.includes("preserveCatalogAnchorPosition(anchor") && frontend.includes("syncCatalogBulkSelectionUi(detail, product, input)"), "Package Offers checkbox scroll preservation remains present");
 
