@@ -3210,14 +3210,14 @@
     container-type: inline-size;
 }
 
-.admin-v2 #section-products .catalog-detail-panel {
+.admin-v2 #section-catalog .catalog-detail-panel {
     container-type: inline-size;
 }
 
-.admin-v2 #section-products .catalog-detail-panel,
-.admin-v2 #section-products .catalog-workspace-tab-panel,
-.admin-v2 #section-products .catalog-merch-package-groups,
-.admin-v2 #section-products .catalog-merch-row,
+.admin-v2 #section-catalog .catalog-detail-panel,
+.admin-v2 #section-catalog .catalog-workspace-tab-panel,
+.admin-v2 #section-catalog .catalog-merch-package-groups,
+.admin-v2 #section-catalog .catalog-merch-row,
 .admin-v2 #section-orders .orders-command-panel,
 .admin-v2 #section-orders .order-detail-panel,
 .admin-v2 #section-wallet .wallet-command-panel,
@@ -3230,13 +3230,13 @@
 
 /* Storefront: retain five columns at full width and expose Manage on compact panes. */
 @container (max-width: 860px) {
-    .admin-v2 #section-products .catalog-merch-summary {
+    .admin-v2 #section-catalog .catalog-merch-summary {
         grid-template-columns: minmax(180px, 1.35fr) minmax(96px, .7fr) minmax(145px, 1fr) minmax(96px, .7fr);
         gap: 10px 12px;
     }
 
-    .admin-v2 #section-products .catalog-merch-actions,
-    .admin-v2 #section-products .catalog-merch-editor {
+    .admin-v2 #section-catalog .catalog-merch-actions,
+    .admin-v2 #section-catalog .catalog-merch-editor {
         grid-column: 1 / -1;
         width: 100%;
         margin-top: 0;
@@ -3245,18 +3245,18 @@
 }
 
 @container (max-width: 620px) {
-    .admin-v2 #section-products .catalog-merch-summary {
+    .admin-v2 #section-catalog .catalog-merch-summary {
         grid-template-columns: minmax(0, 1fr) auto;
     }
 
-    .admin-v2 #section-products .catalog-merch-price,
-    .admin-v2 #section-products .catalog-merch-offer-preview,
-    .admin-v2 #section-products .catalog-merch-state {
+    .admin-v2 #section-catalog .catalog-merch-price,
+    .admin-v2 #section-catalog .catalog-merch-offer-preview,
+    .admin-v2 #section-catalog .catalog-merch-state {
         min-width: 0;
     }
 
-    .admin-v2 #section-products .catalog-merch-price,
-    .admin-v2 #section-products .catalog-merch-offer-preview {
+    .admin-v2 #section-catalog .catalog-merch-price,
+    .admin-v2 #section-catalog .catalog-merch-offer-preview {
         grid-column: 1 / -1;
         display: grid;
         grid-template-columns: minmax(0, 1fr) auto;
@@ -3264,8 +3264,8 @@
         align-items: center;
     }
 
-    .admin-v2 #section-products .catalog-merch-actions .catalog-merch-manage-btn,
-    .admin-v2 #section-products .catalog-merch-editor > summary {
+    .admin-v2 #section-catalog .catalog-merch-actions .catalog-merch-manage-btn,
+    .admin-v2 #section-catalog .catalog-merch-editor > summary {
         width: 100%;
         text-align: center;
     }
