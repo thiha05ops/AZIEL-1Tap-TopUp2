@@ -102,6 +102,7 @@
     "verify:refresh-supplier-cost-authority": "node backend/scripts/verify-refresh-existing-supplier-cost-authority.js",
     "verify:wallet-paid-auto-fulfillment": "node backend/scripts/verify-wallet-paid-auto-fulfillment.js",
     "verify:mm-controlled-package-publication": "node backend/scripts/verify-mm-controlled-package-publication.js",
+    "verify:admin-global-package-selling": "node backend/scripts/verify-admin-global-package-selling-control.js",
     "verify:paid-auto-fulfillment-end-to-end": "node backend/scripts/verify-paid-auto-fulfillment-end-to-end.js",
     "verify:paid-fulfillment-handoff": "node backend/scripts/verify-paid-fulfillment-handoff.js",
     "verify:market-decoupled-fulfillment-phase1": "node backend/scripts/verify-market-decoupled-fulfillment-phase1.js",

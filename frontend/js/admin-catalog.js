@@ -287,7 +287,7 @@ function renderCatalogProductRow(product) {
         const state = storefrontOperationalState(item);
         counts[state] = (counts[state] || 0) + 1;
         return counts;
-    }, { LIVE: 0, BLOCKED: 0 });
+    }, { LIVE: 0, BLOCKED: 0, DISABLED: 0 });
 
     return `
         <button class="catalog-product-row ${active} ${deleted ? "is-deleted" : ""}" type="button"
@@ -942,9 +942,9 @@ function renderOperationalPackageRows(product, packages, overview) {
         const state = storefrontOperationalState(item.state);
         result[state] = (result[state] || 0) + 1;
         return result;
-    }, { LIVE: 0, BLOCKED: 0 });
+    }, { LIVE: 0, BLOCKED: 0, DISABLED: 0 });
     const effectiveFilter = catalogPackageOperationalFilter === "AUTO"
-        ? (counts.LIVE ? "LIVE" : counts.BLOCKED ? "BLOCKED" : "ALL")
+        ? (counts.LIVE ? "LIVE" : counts.BLOCKED ? "BLOCKED" : counts.DISABLED ? "DISABLED" : "ALL")
         : catalogPackageOperationalFilter;
     const query = catalogPackageSearch.trim().toLowerCase();
     const visible = sortStorefrontPackages(joined.filter(item => {
@@ -958,20 +958,21 @@ function renderOperationalPackageRows(product, packages, overview) {
         const price = state?.customerPrice;
         const selected = (state?.candidates || []).find(candidate => candidate.selected);
         const blockers = operational === "BLOCKED" ? (state?.operational?.blockerCodes || []) : [];
-        const statusLabel = operational === "LIVE" ? "Live" : "Blocked";
+        const statusLabel = operational === "LIVE" ? "LIVE" : operational === "DISABLED" ? "DISABLED · Selling OFF" : "BLOCKED · Selling ON";
+        const statusIcon = operational === "LIVE" ? "fa-circle-check" : operational === "DISABLED" ? "fa-circle-minus" : "fa-triangle-exclamation";
         return `<article class="catalog-merch-row operational-${operational.toLowerCase()}" data-merch-package="${escapeHtml(pkg.packageCode)}">
             <div class="catalog-merch-summary">
                 <div class="catalog-merch-package"><label class="catalog-bulk-package-check"><input type="checkbox" data-bulk-package-select="${escapeHtml(pkg.packageCode)}" aria-label="Select ${escapeHtml(pkg.name || pkg.packageCode)} for bulk supplier assignment" ${catalogBulkSelectedPackages.has(String(pkg.packageCode).toUpperCase()) ? "checked" : ""}></label><div class="catalog-merch-package-icon">${pkg.iconUrl ? `<img src="${escapeHtml(pkg.iconUrl)}" alt="">` : `<span>${escapeHtml((pkg.name || "?").slice(0,1).toUpperCase())}</span>`}</div><div><strong>${escapeHtml(pkg.name || pkg.packageCode)}</strong><small>${escapeHtml(marketName)}</small></div></div>
                 <div class="catalog-merch-price"><span>Customer price</span><strong>${price && Number(price.amount) > 0 ? escapeHtml(`${Number(price.amount).toLocaleString()} ${price.currency || (region === "MM" ? "MMK" : "THB")}`) : "—"}</strong></div>
                 <div class="catalog-merch-offer-preview" data-package-supplier-summary="${escapeHtml(pkg.packageCode)}"><span>Fulfillment supplier</span><strong>${escapeHtml(selected?.supplier?.name || "No supplier")}</strong><small>${selected ? escapeHtml(selected.readiness?.summary || "") : "Supplier decision required"}</small></div>
-                <div class="catalog-merch-state"><span class="catalog-operational-status is-${operational.toLowerCase()}"><i class="fa-solid ${operational === "LIVE" ? "fa-circle-check" : "fa-triangle-exclamation"}" aria-hidden="true"></i>${statusLabel}</span>${blockers.length ? `<small title="${escapeHtml(blockers.map(catalogPackageBlockerLabel).join(" · "))}">${escapeHtml(catalogPackageBlockerLabel(blockers[0]))}</small>` : ""}</div>
+                <div class="catalog-merch-state"><span class="catalog-operational-status is-${operational.toLowerCase()}"><i class="fa-solid ${statusIcon}" aria-hidden="true"></i>${statusLabel}</span>${blockers.length ? `<small title="${escapeHtml(blockers.map(catalogPackageBlockerLabel).join(" · "))}">${escapeHtml(catalogPackageBlockerLabel(blockers[0]))}</small>` : ""}</div>
                 <div class="catalog-merch-actions"><button type="button" class="admin-secondary-btn catalog-merch-manage-btn" data-manage-merchandising="${escapeHtml(pkg.packageCode)}">Manage</button></div>
             </div></article>`;
     }).join("");
     return `<section class="catalog-merchandising-panel">
         <div class="catalog-merchandising-head"><div><span>Storefront Merchandising</span><h3>Package Offers</h3><p>One canonical package per row. Pricing and fulfillment authorities remain separate.</p></div><label class="catalog-merch-market"><span>Customer market</span><select data-merch-market><option value="TH" ${region === "TH" ? "selected" : ""}>Thailand · THB</option><option value="MM" ${region === "MM" ? "selected" : ""}>Myanmar · MMK</option></select></label></div>
-        <section class="catalog-market-availability"><header><div><span>Store Status</span><h4>${escapeHtml(marketName)}</h4><p>Live ${counts.LIVE} · Blocked ${counts.BLOCKED} · Total ${joined.length}</p></div></header></section>
-        <div class="catalog-package-operations"><div class="catalog-package-state-filters" role="group" aria-label="Package state">${filter("LIVE", "Live", counts.LIVE)}${filter("BLOCKED", "Blocked", counts.BLOCKED)}${filter("ALL", "All", joined.length)}</div><label><span class="sr-only">Search packages</span><input type="search" data-merch-package-search value="${escapeHtml(catalogPackageSearch)}" placeholder="Search packages"></label></div>
+        <section class="catalog-market-availability"><header><div><span>Store Status</span><h4>${escapeHtml(marketName)}</h4><p>LIVE ${counts.LIVE} · BLOCKED ${counts.BLOCKED} · DISABLED ${counts.DISABLED} · Total ${joined.length}</p></div></header></section>
+        <div class="catalog-package-operations"><div class="catalog-package-state-filters" role="group" aria-label="Package state">${filter("LIVE", "Live", counts.LIVE)}${filter("BLOCKED", "Blocked", counts.BLOCKED)}${filter("DISABLED", "Disabled", counts.DISABLED)}${filter("ALL", "All", joined.length)}</div><label><span class="sr-only">Search packages</span><input type="search" data-merch-package-search value="${escapeHtml(catalogPackageSearch)}" placeholder="Search packages"></label></div>
         <div data-catalog-bulk-action-host>${renderCatalogBulkActionBar()}</div>
         <p class="catalog-package-result-count">${visible.length} package${visible.length === 1 ? "" : "s"} shown · ordered by canonical package order</p>
         <div class="catalog-merch-list">${rows || `<div class="catalog-empty-state"><strong>No ${effectiveFilter === "ALL" ? "matching" : effectiveFilter.toLowerCase().replace("_", " ")} packages</strong><span>Choose another operational state or adjust the package search.</span></div>`}</div>
@@ -1816,10 +1817,15 @@ function ensureCatalogMerchandisingModal() {
 
                 <section class="catalog-merch-modal-section" data-manage-package-section="public">
                     <div class="catalog-merch-modal-section-head">
-                        <span>Store status</span>
+                        <span>Global Selling</span>
                         <h4 data-manage-package-public-state>Loading…</h4>
                         <p data-manage-package-public-detail>Checking current price and fulfillment readiness.</p>
                     </div>
+                    <label class="catalog-merch-public-toggle" title="Controls package visibility in both Thailand and Myanmar">
+                        <input type="checkbox" role="switch" data-manage-package-publication aria-label="Global Selling ON/OFF">
+                        <span class="catalog-merch-public-toggle__track" aria-hidden="true"><span></span></span>
+                        <strong data-manage-package-publication-label>Selling OFF</strong>
+                    </label>
                 </section>
 
                 <section class="catalog-merch-modal-section" data-manage-package-section="supplier">
@@ -2186,6 +2192,10 @@ function renderManagePackageCandidates(modal, data = {}) {
     modal.querySelector("[data-manage-package-public-detail]").textContent = operationalBlockers.length
         ? operationalBlockers.map(catalogPackageBlockerLabel).join(" · ")
         : data.publication?.published ? "Selling is ON globally and the effective route is ready for this customer market." : "Selling is OFF globally.";
+    const publicationToggle = modal.querySelector("[data-manage-package-publication]");
+    const publicationLabel = modal.querySelector("[data-manage-package-publication-label]");
+    if (publicationToggle) publicationToggle.checked = data.publication?.published === true;
+    if (publicationLabel) publicationLabel.textContent = data.publication?.published === true ? "Selling ON" : "Selling OFF";
     const price = data.customerPrice;
     modal.querySelector("[data-manage-package-customer-price]").textContent = price && Number.isFinite(Number(price.amount))
         ? `${Number(price.amount).toLocaleString()} ${price.currency}` : "Price unavailable";
@@ -2278,9 +2288,10 @@ async function updateManagePackagePublication(product, pkg, modal) {
         confirmText: published ? "Selling ON" : "Selling OFF"
     });
     if (!confirmed) return;
-    const button = modal.querySelector("[data-manage-package-publication]");
-    button.disabled = true;
-    button.textContent = "Saving…";
+    const toggle = modal.querySelector("[data-manage-package-publication]");
+    const label = modal.querySelector("[data-manage-package-publication-label]");
+    toggle.disabled = true;
+    if (label) label.textContent = "Saving…";
     try {
         const result = await adminFetch(`/api/admin/catalog/products/${encodeURIComponent(product.productCode)}/packages/${encodeURIComponent(pkg.packageCode)}/publication`, {
             method: "PATCH",
@@ -2294,10 +2305,13 @@ async function updateManagePackagePublication(product, pkg, modal) {
         const latest = await loadPackageSupplierCandidateData(result.product || product, pkg, { refresh: true });
         renderManagePackageCandidates(modal, latest);
         reconcileCatalogPackageOverview(result.product || product, pkg, latest);
+        await loadCatalogPackageOverview(result.product || product, { force: true });
         showAdminToast?.(published ? `Selling is ON globally for ${pkg.name || pkg.packageCode}` : `Selling is OFF globally for ${pkg.name || pkg.packageCode}`, "success");
     } catch (error) {
         renderManagePackageCandidates(modal, current);
         throw error;
+    } finally {
+        toggle.disabled = false;
     }
 }
 
@@ -2354,6 +2368,10 @@ function openCatalogMerchandisingModal(product, pkg) {
         .then(data => {
             renderManagePackageCandidates(modal, data);
             modal.querySelector("[data-save-package-supplier]").onclick = () => saveManagePackageSupplier(product, pkg, modal).catch(error => showAdminToast?.(error.message, "error"));
+            modal.querySelector("[data-manage-package-publication]").onchange = event => {
+                event.currentTarget.checked = modal._supplierCandidateData?.publication?.published === true;
+                updateManagePackagePublication(product, pkg, modal).catch(error => showAdminToast?.(error.message, "error"));
+            };
         })
         .catch(error => {
             modal.querySelector("[data-manage-package-selection-state]").textContent = "Supplier data unavailable";
