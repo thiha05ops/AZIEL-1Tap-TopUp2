@@ -7,6 +7,8 @@ const DEFAULT_BASE_URL = "https://api.fzr.cards/api/v2";
 const MAX_CATEGORY_PAGES = 10;
 const MAX_AVAILABILITY_CATEGORIES = 40;
 const AVAILABILITY_CONCURRENCY = 4;
+const MAX_VALIDATION_CATEGORIES = 50;
+const MAX_VALIDATION_FIELDS = 12;
 const clean = value => String(value == null ? "" : value).trim();
 
 class FazerCardsAdapterError extends Error {
@@ -78,6 +80,37 @@ function createFazerCardsAdapter(options = {}) {
     }
     const getTopupCategories = (cursor = "", options = {}) => request(`/topups${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`, { signal: options.signal });
     const getTopupOffers = (categoryId, options = {}) => request(`/topups/offers?category_id=${encodeURIComponent(clean(categoryId))}`, { signal: options.signal });
+
+    function normalizePlayerValidationCapabilities(payload = {}) {
+        const rows = Array.isArray(payload?.items) ? payload.items : [];
+        if (payload?.ok !== true || rows.length > MAX_VALIDATION_CATEGORIES) {
+            throw new FazerCardsAdapterError("FAZERCARDS_VALIDATION_CAPABILITY_RESPONSE_INVALID", "FazerCards returned an invalid player-validation capability response.", { retryable: true });
+        }
+        const seenCategories = new Set();
+        return rows.map(row => {
+            const categoryId = clean(row?.category_id);
+            const name = clean(row?.name);
+            const fields = Array.isArray(row?.fields) ? row.fields : [];
+            if (!/^[a-z0-9][a-z0-9_-]{0,79}$/i.test(categoryId) || !name || seenCategories.has(categoryId) || !fields.length || fields.length > MAX_VALIDATION_FIELDS) {
+                throw new FazerCardsAdapterError("FAZERCARDS_VALIDATION_CAPABILITY_RESPONSE_INVALID", "FazerCards returned an invalid player-validation capability response.", { retryable: true });
+            }
+            seenCategories.add(categoryId);
+            const seenFields = new Set();
+            const normalizedFields = fields.map(field => {
+                const key = clean(field?.key);
+                if (!/^[a-z][a-z0-9_]{0,63}$/.test(key) || seenFields.has(key)) {
+                    throw new FazerCardsAdapterError("FAZERCARDS_VALIDATION_CAPABILITY_RESPONSE_INVALID", "FazerCards returned an invalid player-validation field contract.", { retryable: true });
+                }
+                seenFields.add(key);
+                return Object.freeze({ key, label: clean(field?.label), type: clean(field?.type) });
+            });
+            return Object.freeze({ categoryId, name, fields: Object.freeze(normalizedFields) });
+        });
+    }
+
+    async function getPlayerValidationCapabilities(options = {}) {
+        return normalizePlayerValidationCapabilities(await request("/topups/validate-id", { signal: options.signal }));
+    }
 
     const categoryRows = payload => Array.isArray(payload?.items) ? payload.items : Array.isArray(payload?.categories) ? payload.categories : Array.isArray(payload?.data?.categories) ? payload.data.categories : Array.isArray(payload?.data) ? payload.data : [];
     const offerRows = payload => Array.isArray(payload?.offers) ? payload.offers : Array.isArray(payload?.data?.offers) ? payload.data.offers : Array.isArray(payload?.data) ? payload.data : [];
@@ -194,8 +227,8 @@ function createFazerCardsAdapter(options = {}) {
         const expected = crypto.createHmac("sha256", secret).update(rawBody).digest("hex");
         return crypto.timingSafeEqual(Buffer.from(expected, "hex"), Buffer.from(supplied, "hex"));
     }
-    return { isConfigured, productGateKey, isProductAutoFulfillmentEnabled, isAnyAutoFulfillmentEnabled, autoFulfillmentGateState, isAutoFulfillmentEnabled, getAccount, getBalance, getTopupCategories, getTopupOffers, getPackageAvailability, getOrder, buildValidationPayload, normalizeValidation, validatePlayerId, buildTopupPayload, dryRunTopup, submitTopup, checkStatus, verifyWebhookSignature };
+    return { isConfigured, productGateKey, isProductAutoFulfillmentEnabled, isAnyAutoFulfillmentEnabled, autoFulfillmentGateState, isAutoFulfillmentEnabled, getAccount, getBalance, getTopupCategories, getTopupOffers, getPlayerValidationCapabilities, normalizePlayerValidationCapabilities, getPackageAvailability, getOrder, buildValidationPayload, normalizeValidation, validatePlayerId, buildTopupPayload, dryRunTopup, submitTopup, checkStatus, verifyWebhookSignature };
 }
 
 const adapter = createFazerCardsAdapter();
-module.exports = { ...adapter, createFazerCardsAdapter, normalizeProviderOrder, normalizeStatus, FazerCardsAdapterError, DEFAULT_BASE_URL, MAX_CATEGORY_PAGES, MAX_AVAILABILITY_CATEGORIES, AVAILABILITY_CONCURRENCY };
+module.exports = { ...adapter, createFazerCardsAdapter, normalizeProviderOrder, normalizeStatus, FazerCardsAdapterError, DEFAULT_BASE_URL, MAX_CATEGORY_PAGES, MAX_AVAILABILITY_CATEGORIES, AVAILABILITY_CONCURRENCY, MAX_VALIDATION_CATEGORIES, MAX_VALIDATION_FIELDS };

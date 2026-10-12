@@ -102,6 +102,15 @@
         return response?.ok === true && data?.success === true && validation?.available === true;
     }
 
+    function formatPlayerValidationMessage(validation = {}) {
+        const playerName = String(validation.playerName || "").trim();
+        const region = String(validation.region || "").trim();
+        if (playerName && region) return `✓ ${playerName} · Region: ${region}`;
+        if (playerName) return `✓ ${playerName}`;
+        if (region) return `✓ Account Verified · Region: ${region}`;
+        return "✓ Account Verified";
+    }
+
     function getPlayerValidationFields(flow) {
         const fields = getAccountFieldDefinitions(flow).map(field => ({
             field,
@@ -270,20 +279,10 @@
                 }
 
                 if (validation.valid === true) {
-                    const playerName = String(validation.playerName || "").trim();
-                    const region = String(validation.region || "").trim();
-                    const verifiedMessage = playerName && region
-                        ? `✓ ${playerName} · Region: ${region}`
-                        : playerName
-                            ? `✓ ${playerName}`
-                            : region
-                                ? `✓ Player verified · Region: ${region}`
-                                : "✓ Player verified";
-
                     renderPlayerValidationStatus(
                         flow,
                         "valid",
-                        verifiedMessage
+                        formatPlayerValidationMessage(validation)
                     );
                     return;
                 }
@@ -325,7 +324,10 @@
                 cache: "no-store"
             });
             const data = await response.json().catch(() => ({}));
-            flow.playerValidation.capabilitySupported = response.ok && data?.success === true && data?.capability?.supported === true;
+            flow.playerValidation.capabilitySupported = response.ok &&
+                data?.success === true &&
+                data?.capability?.supported === true &&
+                data?.capability?.available === true;
         } catch (_) {
             flow.playerValidation.capabilitySupported = false;
         }

@@ -8,6 +8,7 @@ const PackageMarketPublication = require("../models/PackageMarketPublication");
 const StoreCatalogSelection = require("../models/StoreCatalogSelection");
 const { publicCategoryFor } = require("../catalog/catalogTaxonomy");
 const { resolveProductRoute } = require("../catalog/productRoute");
+const { toPublicCatalog } = require("./catalogService");
 
 const PRESENTATION_SECTIONS = Object.freeze([
     "POPULAR_MOBILE_GAMES",
@@ -142,18 +143,25 @@ function buildPresentationPayload({ region, products = [], selections = [], publ
     };
 }
 
-async function getHomePresentation({ region = "TH", models = {} } = {}) {
+async function getHomePresentation({ region = "TH", models = {}, loadPublicCatalog = toPublicCatalog } = {}) {
     const customerMarket = normalizeRegion(region);
     const ProductModel = models.CatalogProduct || CatalogProduct;
     const SelectionModel = models.StoreCatalogSelection || StoreCatalogSelection;
     const PublicationModel = models.PackageMarketPublication || PackageMarketPublication;
     const MediaModel = models.MediaAsset || MediaAsset;
 
-    const selections = await SelectionModel.find({
-        status: "ACTIVE",
-        sellingRegions: customerMarket,
-        visibleRegions: customerMarket
-    }).select("productCode updatedAt").lean();
+    const [publicProducts, marketSelections] = await Promise.all([
+        loadPublicCatalog({ includeDisabled: false, customerMarket }),
+        SelectionModel.find({
+            status: "ACTIVE",
+            sellingRegions: customerMarket
+        }).select("productCode updatedAt").lean()
+    ]);
+    const liveProductCodes = new Set((publicProducts || [])
+        .filter(product => (product.packages || []).some(pkg => pkg.salesState === "LIVE"))
+        .map(product => normalizeCode(product.productCode))
+        .filter(Boolean));
+    const selections = marketSelections.filter(item => liveProductCodes.has(normalizeCode(item.productCode)));
     const productCodes = [...new Set(selections.map(item => normalizeCode(item.productCode)).filter(Boolean))];
 
     if (!productCodes.length) {

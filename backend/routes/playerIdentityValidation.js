@@ -43,9 +43,16 @@ function safeAccountFields(value) {
 router.get(
     "/player-identity/capability",
     playerValidationLimiter,
-    (req, res) => {
-        const capability = playerIdentityValidationCapability(clean(req.query?.productCode));
-        return res.status(200).json({ success: true, capability });
+    async (req, res) => {
+        const capability = await playerIdentityValidationCapability(clean(req.query?.productCode));
+        return res.status(200).json({
+            success: true,
+            capability: {
+                supported: capability.supported === true,
+                available: capability.available === true,
+                accountFieldKeys: capability.accountFieldKeys
+            }
+        });
     }
 );
 

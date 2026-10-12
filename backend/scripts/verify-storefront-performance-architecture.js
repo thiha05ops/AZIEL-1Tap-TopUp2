@@ -255,8 +255,9 @@ async function main() {
         presentation: { imageAssetId: "fixture-art" },
         updatedAt: "2026-09-20T00:00:00.000Z"
     };
+    let selectionFilter = null;
     const models = {
-        StoreCatalogSelection: { find: () => query([{ productCode: "fixture-game", updatedAt: fixture.updatedAt }], calls, "selection") },
+        StoreCatalogSelection: { find: filter => { selectionFilter = filter; return query([{ productCode: "fixture-game", updatedAt: fixture.updatedAt }], calls, "selection"); } },
         CatalogProduct: {
             find: () => query([fixture], calls, "product"),
             findOne: () => query({ _id: "product" }, calls, "product-visible")
@@ -265,8 +266,17 @@ async function main() {
         MediaAsset: { find: () => query([{ assetId: "fixture-art", secureUrl: "https://res.cloudinary.com/demo/image/upload/sample.webp", altText: "Fixture", status: "active", metadata: { width: 600, height: 600 }, updatedAt: fixture.updatedAt }], calls, "media") }
     };
 
-    const payload = await getHomePresentation({ region: "TH", models });
-    assert.deepStrictEqual(calls, ["selection", "product", "publication", "media"], "home presentation must use four bounded query families");
+    const payload = await getHomePresentation({
+        region: "TH",
+        models,
+        loadPublicCatalog: async options => {
+            calls.push("public-catalog");
+            assert.deepStrictEqual(options, { includeDisabled: false, customerMarket: "TH" });
+            return [{ productCode: "fixture-game", packages: [{ packageCode: "P1", salesState: "LIVE" }] }];
+        }
+    });
+    assert.deepStrictEqual(calls, ["public-catalog", "selection", "product", "publication", "media"], "home presentation must use one canonical eligibility lookup and four bounded presentation query families");
+    assert.deepStrictEqual(selectionFilter, { status: "ACTIVE", sellingRegions: "TH" }, "Home selection must use active selling-market authority without legacy visibleRegions");
     assert.strictEqual(payload.sections[0].products[0].productCode, "fixture-game");
     assert.ok(payload.sections[0].products[0].artwork.src.includes("f_auto,q_auto,c_limit,w_480"));
     assert.ok(!/(price|package|supplier|quote|fulfillment)/i.test(JSON.stringify(payload)), "presentation payload must not expose commerce authority");
