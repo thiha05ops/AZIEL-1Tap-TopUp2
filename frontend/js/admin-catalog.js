@@ -1948,7 +1948,7 @@ function ensureCatalogMerchandisingModal() {
                             <span>
                                 <b>Feature in Exclusive Offers</b>
                                 <small>
-                                    Allows this package to compete for this product's Exclusive Offer slot.
+                                    Includes this package in this product's rotating Exclusive Offers.
                                 </small>
                             </span>
                             <input type="checkbox" role="switch" data-merch-modal-exclusive>
@@ -1965,7 +1965,7 @@ function ensureCatalogMerchandisingModal() {
                             data-merch-modal-priority
                         >
                         <small>
-                            Higher priority wins when multiple packages are eligible for the same product.
+                            Priority controls the deterministic order when multiple packages rotate for this product.
                         </small>
                     </label>
                     <div class="catalog-merch-secondary-save">
@@ -5028,9 +5028,9 @@ function ensurePackageEditModal() {
                             <span>Merchandising</span>
                             <h4>Exclusive Offers</h4>
                             <p>
-                                Controls whether this package may compete for this
-                                product's Exclusive Offer slot. Only one package
-                                per product is displayed on the storefront.
+                                Controls whether this package joins this product's
+                                Exclusive Offer rotation. One package per product
+                                is displayed on each Home visit.
                             </p>
                         </div>
                     </div>
@@ -5060,9 +5060,9 @@ function ensurePackageEditModal() {
                             value="0"
                         >
                         <small>
-                            Higher priority wins when multiple eligible packages
-                            belong to the same product. This is not a discount
-                            percentage.
+                            Priority controls the deterministic order when multiple
+                            eligible packages rotate for the same product. This is
+                            not a discount percentage.
                         </small>
                     </label>
                 </section>

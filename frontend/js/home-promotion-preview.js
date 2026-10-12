@@ -82,6 +82,39 @@
         return payload.offers.slice(0, LIMIT);
     }
 
+    function offerVariantForVisit(offer = {}, visitCursor = 0) {
+        const variants = Array.isArray(offer.variants) && offer.variants.length
+            ? offer.variants
+            : [offer];
+        const cursor = Math.max(0, Math.floor(Number(visitCursor) || 0));
+        const variantIndex = Math.max(0, cursor - 1) % variants.length;
+
+        return {
+            ...offer,
+            ...variants[variantIndex],
+            variants
+        };
+    }
+
+    function selectOfferVariants(offers = [], visitCursor = 0) {
+        const selectedByProduct = new Map();
+
+        for (const offer of Array.isArray(offers) ? offers : []) {
+            const productCode = String(offer?.productCode || "")
+                .trim()
+                .toLowerCase();
+
+            if (!productCode || selectedByProduct.has(productCode)) continue;
+
+            selectedByProduct.set(
+                productCode,
+                offerVariantForVisit(offer, visitCursor)
+            );
+        }
+
+        return [...selectedByProduct.values()];
+    }
+
     function personalizeOffers(offers = []) {
         const list = Array.isArray(offers) ? [...offers] : [];
         const discovery = window.AZIEL_CUSTOMER_DISCOVERY;
@@ -302,9 +335,12 @@
         list.innerHTML = "";
 
         try {
-            const offers = personalizeOffers(
-                await fetchExclusiveOffers()
-            );
+            const discovery = window.AZIEL_CUSTOMER_DISCOVERY;
+            const visitCursor = discovery?.homeRotationCursor?.() || 0;
+            const offers = personalizeOffers(selectOfferVariants(
+                await fetchExclusiveOffers(),
+                visitCursor
+            ));
 
             if (!offers.length) {
                 panel.dataset.promotionPreviewState = "empty";

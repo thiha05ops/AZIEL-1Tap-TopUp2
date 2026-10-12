@@ -1547,6 +1547,7 @@ async function resolveAdminCatalogProduct(productCode, options = {}) {
 async function listPublicExclusiveOffers(options = {}) {
     const customerMarket = normalizeRegion(options.customerMarket || "TH");
     const limit = Math.max(1, Math.min(24, Number(options.limit || 8)));
+    const variantsPerProductLimit = 12;
 
     /*
      * Candidate-first merchandising projection.
@@ -1635,7 +1636,6 @@ async function listPublicExclusiveOffers(options = {}) {
         StoreCatalogSelection.find({
             status: "ACTIVE",
             sellingRegions: customerMarket,
-            visibleRegions: customerMarket,
             productCode: { $in: candidateProductCodes }
         }).lean(),
 
@@ -1878,7 +1878,14 @@ async function listPublicExclusiveOffers(options = {}) {
                 String(a.packageCode).localeCompare(String(b.packageCode))
         );
 
-        winners.push(candidates[0]);
+        const variants = candidates.slice(0, variantsPerProductLimit);
+
+        // Preserve the legacy top-level offer contract while exposing the
+        // bounded package pool needed for deterministic per-visit rotation.
+        winners.push({
+            ...variants[0],
+            variants
+        });
     }
 
     winners.sort(
