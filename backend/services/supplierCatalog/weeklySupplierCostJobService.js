@@ -13,8 +13,14 @@ const RETRY_DELAYS_MS = Object.freeze([15, 30, 60].map(minutes => minutes * 60 *
 const ACTIVE = Object.freeze(["QUEUED", "RUNNING"]);
 class WeeklySupplierCostJobError extends Error { constructor(code, message, statusCode = 400) { super(message); this.code = code; this.statusCode = statusCode; } }
 const transientFailure = error => error?.retryable === true || /TIMEOUT|TRANSPORT|NETWORK|ECONN|HTTP_5|UNAVAILABLE|ABORT/i.test(String(error?.code || error?.message || ""));
+const leaseFenceFailure = error => ["WEEKLY_SUPPLIER_COST_SYNC_LEASE_LOST", "WEEKLY_SUPPLIER_COST_SYNC_JOB_FENCE_LOST"].includes(error?.code);
 const safeError = error => ({ code: String(error?.code || error?.name || "SYNC_FAILED").slice(0, 100), message: String(error?.message || "Supplier cost synchronization failed.").slice(0, 500) });
 const actorSnapshot = actor => ({ adminId: actor?.id || actor?._id || actor?.adminId || null, username: String(actor?.username || ""), role: String(actor?.role || "") });
+function assertJobMutation(result) {
+    const matched = Number(result?.matchedCount ?? result?.n ?? result?.modifiedCount ?? 0);
+    if (matched < 1) throw new WeeklySupplierCostJobError("WEEKLY_SUPPLIER_COST_SYNC_JOB_FENCE_LOST", "Supplier cost job ownership changed before the state update.", 409);
+    return result;
+}
 
 function createWeeklySupplierCostJobService(options = {}) {
     const JobModel = options.JobModel || Job, ApprovalModel = options.ApprovalModel || Approval;
@@ -44,9 +50,21 @@ function createWeeklySupplierCostJobService(options = {}) {
         let currentLease = lease, leaseFailure = null;
         const heartbeat = setInterval(() => leases.renew(currentLease, policy.jobLeaseTtlMs).then(value => { currentLease = value; }).catch(error => { leaseFailure = error; }), heartbeatMs); heartbeat.unref?.();
         const assertLease = async () => { if (leaseFailure) throw leaseFailure; currentLease = await leases.assertOwned(currentLease); return true; };
+        const mutateJob = async (filter, update) => {
+            if (leaseFailure) throw leaseFailure;
+            const guarded = await leases.withOwnedLeaseTransaction(currentLease, policy.jobLeaseTtlMs, async ({ session }) => {
+                const result = await JobModel.updateOne(filter, update, { session });
+                return assertJobMutation(result);
+            });
+            currentLease = guarded.lease;
+            return guarded.result;
+        };
         const supplierResults = [], failures = [];
         try {
-            await JobModel.updateOne({ _id: job._id }, { $set: { status: "RUNNING", startedAt: clock(), leaseOwnerId: currentLease.ownerId, nextRetryAt: null } });
+            await mutateJob(
+                { _id: job._id, status: "QUEUED", leaseOwnerId: currentLease.ownerId },
+                { $set: { status: "RUNNING", startedAt: clock(), nextRetryAt: null } }
+            );
             for (const supplierCode of SUPPLIERS) {
                 try {
                     await assertLease();
@@ -60,18 +78,30 @@ function createWeeklySupplierCostJobService(options = {}) {
                     }
                     supplierResults.push({ supplierCode, status: "SUCCEEDED", updated: costSync.updated, unchanged: costSync.unchanged, reviewRequired: costSync.reviewRequired, failed: costSync.rejected, pendingInitialApproval });
                 } catch (error) {
+                    if (leaseFenceFailure(error)) throw error;
                     const failure = { supplierCode, ...safeError(error), transient: transientFailure(error) }; failures.push(failure);
                     supplierResults.push({ supplierCode, status: "FAILED", updated: 0, unchanged: 0, reviewRequired: 0, failed: 1, pendingInitialApproval: 0, errorCode: failure.code, errorMessage: failure.message });
                 }
             }
-            await assertLease();
             const retryAttempt = Number(job.retryAttempt || 0), retryable = failures.length > 0 && failures.every(row => row.transient) && retryAttempt < RETRY_DELAYS_MS.length;
             const nextRetryAt = retryable ? new Date(clock().getTime() + RETRY_DELAYS_MS[retryAttempt]) : null;
             const finalStatus = retryable ? "RETRY_SCHEDULED" : failures.length === 0 ? "SUCCEEDED" : failures.length < SUPPLIERS.length ? "PARTIAL" : "FAILED";
-            await JobModel.updateOne({ _id: job._id }, { $set: { status: finalStatus, supplierResults, retryAttempt: retryable ? retryAttempt + 1 : retryAttempt, nextRetryAt, completedAt: retryable ? null : clock(), lastFailureCode: failures[0]?.code || "", lastFailureReason: failures[0]?.message || "", leaseOwnerId: "" } });
+            await mutateJob(
+                { _id: job._id, status: "RUNNING", leaseOwnerId: currentLease.ownerId },
+                { $set: { status: finalStatus, supplierResults, retryAttempt: retryable ? retryAttempt + 1 : retryAttempt, nextRetryAt, completedAt: retryable ? null : clock(), lastFailureCode: failures[0]?.code || "", lastFailureReason: failures[0]?.message || "", leaseOwnerId: "" } }
+            );
         } catch (error) {
             const failure = safeError(error);
-            await JobModel.updateOne({ _id: job._id }, { $set: { status: "FAILED", completedAt: clock(), lastFailureCode: failure.code, lastFailureReason: failure.message, leaseOwnerId: "" } }).catch(() => null);
+            if (!leaseFenceFailure(error)) {
+                try {
+                    await mutateJob(
+                        { _id: job._id, status: { $in: ACTIVE }, leaseOwnerId: currentLease.ownerId },
+                        { $set: { status: "FAILED", completedAt: clock(), lastFailureCode: failure.code, lastFailureReason: failure.message, leaseOwnerId: "" } }
+                    );
+                } catch (fenceError) {
+                    if (!leaseFenceFailure(fenceError)) throw fenceError;
+                }
+            }
         } finally {
             clearInterval(heartbeat); await leases.release(currentLease).catch(() => null);
         }
@@ -82,11 +112,18 @@ function createWeeklySupplierCostJobService(options = {}) {
         const policy = policyReader();
         if (!policy.enabled) throw new WeeklySupplierCostJobError("SUPPLIER_WEEKLY_COST_SYNC_DISABLED", "Supplier cost synchronization is disabled.", 409);
         const jobId = existingJob?.jobId || `supplier-cost-${clock().getTime()}-${crypto.randomUUID()}`;
-        const lease = await leases.acquire({ runKey: `${trigger}:${jobId}`, ttlMs: policy.jobLeaseTtlMs });
+        let lease = await leases.acquire({ runKey: `${trigger}:${jobId}`, ttlMs: policy.jobLeaseTtlMs });
         let job = existingJob;
         try {
-            if (!job) job = await JobModel.create({ jobId, trigger, status: "QUEUED", requestedBy: actorSnapshot(actor) });
-            else await JobModel.updateOne({ _id: job._id }, { $set: { trigger: "RETRY", status: "QUEUED", nextRetryAt: null } });
+            if (!job) job = await JobModel.create({ jobId, trigger, status: "QUEUED", leaseOwnerId: lease.ownerId, requestedBy: actorSnapshot(actor) });
+            else {
+                const guarded = await leases.withOwnedLeaseTransaction(lease, policy.jobLeaseTtlMs, async ({ session }) => assertJobMutation(await JobModel.updateOne(
+                    { _id: job._id, status: "RETRY_SCHEDULED", leaseOwnerId: { $in: ["", null] } },
+                    { $set: { trigger: "RETRY", status: "QUEUED", nextRetryAt: null, leaseOwnerId: lease.ownerId } },
+                    { session }
+                )));
+                lease = guarded.lease;
+            }
         } catch (error) { await leases.release(lease).catch(() => null); throw error; }
         defer(() => execute(job, lease, actor).catch(() => null));
         return { jobId, status: "QUEUED" };
@@ -107,7 +144,7 @@ function createWeeklySupplierCostJobService(options = {}) {
         const jobId = `supplier-cost-${clock().getTime()}-${crypto.randomUUID()}`;
         const lease = await leases.acquire({ runKey: `${trigger}:${jobId}`, ttlMs: policy.jobLeaseTtlMs });
         let job;
-        try { job = await JobModel.create({ jobId, trigger, status: "QUEUED", requestedBy: actorSnapshot(actor) }); }
+        try { job = await JobModel.create({ jobId, trigger, status: "QUEUED", leaseOwnerId: lease.ownerId, requestedBy: actorSnapshot(actor) }); }
         catch (error) { await leases.release(lease).catch(() => null); throw error; }
         return execute(job, lease, actor);
     }
@@ -120,14 +157,24 @@ function createWeeklySupplierCostJobService(options = {}) {
         let lease;
         try {
             lease = await leases.acquire({ runKey: `RETRY:${candidate.jobId}`, ttlMs: policy.jobLeaseTtlMs });
-            const job = await JobModel.findOneAndUpdate({ _id: candidate._id, status: candidate.status }, { $set: { status: "QUEUED", trigger: "RETRY", nextRetryAt: null } }, { returnDocument: "after" });
+            const guarded = await leases.withOwnedLeaseTransaction(lease, policy.jobLeaseTtlMs, async ({ session }) => JobModel.findOneAndUpdate(
+                { _id: candidate._id, status: candidate.status, leaseOwnerId: candidate.leaseOwnerId || "" },
+                { $set: { status: "QUEUED", trigger: "RETRY", nextRetryAt: null, leaseOwnerId: lease.ownerId } },
+                { new: true, runValidators: true, session }
+            ));
+            lease = guarded.lease;
+            const job = guarded.result;
             if (!job) { await leases.release(lease).catch(() => null); return { recovered: false }; }
             return { recovered: true, job: await execute(job, lease, actor) };
         }
-        catch (error) { if (lease) await leases.release(lease).catch(() => null); throw error; }
+        catch (error) {
+            if (lease) await leases.release(lease).catch(() => null);
+            if (error?.code === "WEEKLY_SUPPLIER_COST_SYNC_ALREADY_RUNNING") return { recovered: false, reason: "ACTIVE_JOB_LEASE_HELD", jobId: candidate.jobId };
+            throw error;
+        }
     }
 
     return Object.freeze({ summary, status, execute, enqueueManual, enqueueWeekly, runNow, recoverDue });
 }
 
-module.exports = Object.freeze({ RETRY_DELAYS_MS, WeeklySupplierCostJobError, transientFailure, createWeeklySupplierCostJobService });
+module.exports = Object.freeze({ RETRY_DELAYS_MS, WeeklySupplierCostJobError, transientFailure, leaseFenceFailure, createWeeklySupplierCostJobService });

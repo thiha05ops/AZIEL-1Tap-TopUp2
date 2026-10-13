@@ -24,6 +24,7 @@ async function main() {
     const leases = {
         acquire: async ({ runKey }) => { if (leaseHeld) throw Object.assign(new Error("running"), { code: "WEEKLY_SUPPLIER_COST_SYNC_ALREADY_RUNNING" }); leaseHeld = true; return { _id: "lease", ownerId: runKey, expiresAt: new Date(now.getTime() + 60000) }; },
         renew: async lease => lease, assertOwned: async lease => lease,
+        withOwnedLeaseTransaction: async (lease, ttlMs, operation) => ({ lease, result: await operation({ session: null, lease }) }),
         release: async () => { leaseHeld = false; }
     };
     const ownerAuthorization = { requireAuthenticatedOwner: async actor => { if (actor.persistedOwner !== true) throw Object.assign(new Error("denied"), { code: "OWNER_AUTHENTICATION_REQUIRED", statusCode: 403 }); return { id: "1".repeat(24), username: "owner-db", role: "OWNER", sessionId: "session-db" }; } };
