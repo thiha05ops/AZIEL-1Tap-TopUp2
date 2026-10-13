@@ -21,7 +21,7 @@ function initAdminSecurityController() {
     });
 
     document.getElementById("refreshAdminSecurityBtn")?.addEventListener("click", refreshActiveAdminSecurityView);
-    document.getElementById("addAdminAccountBtn")?.addEventListener("click", openAdminAccountModal);
+    document.getElementById("addAdminAccountBtn")?.addEventListener("click", () => openAdminAccountModal());
     document.getElementById("revokeOtherAdminSessionsBtn")?.addEventListener("click", confirmRevokeOtherAdminSessions);
     document.getElementById("startAdmin2FABtn")?.addEventListener("click", startAdmin2FASetup);
     document.getElementById("disableAdmin2FABtn")?.addEventListener("click", openDisableAdmin2FAModal);
@@ -144,7 +144,7 @@ function renderAdmin2FAState() {
 }
 
 function openAdminAccountModal(account = null) {
-    const isEdit = Boolean(account);
+    const isEdit = Boolean(account?.id);
     const modal = ensureAdminSecurityModal("adminAccountModal");
     modal.querySelector(".admin-security-modal-title").textContent = isEdit ? adminT("edit_admin", "Edit Admin") : adminT("add_admin", "Add Admin");
     modal.querySelector(".admin-security-modal-body").innerHTML = `
@@ -158,7 +158,7 @@ function openAdminAccountModal(account = null) {
         </select></label>
         ${isEdit ? "" : `<label>${adminT("initial_password", "Initial Password")}<input id="adminAccountPassword" type="password"></label>`}
     `;
-    modal.querySelector(".admin-security-modal-save").onclick = () => saveAdminAccount(account);
+    modal.querySelector(".admin-security-modal-save").onclick = () => saveAdminAccount(isEdit ? account : null);
     modal.__azielAdminModal?.open?.() || modal.classList.add("show");
 }
 

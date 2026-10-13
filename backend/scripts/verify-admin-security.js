@@ -155,6 +155,15 @@ function verifyFrontend() {
     assert(!adminSecurity.includes("${escapeAdminSecurity(event.resourceId || \"\")}") && !adminSecurity.includes("event.resourceId || \"\"}</small>"), "Audit UI must not render raw resourceId in default cards.");
     includes("backend/models/AdminAuditLog.js", "resourceId", "Canonical audit database truth must retain resourceId.");
     includes("frontend/js/admin-security.js", "renderAdmin2FAState", "2FA actions must be state-aware.");
+    includes("frontend/js/admin-security.js", 'addEventListener("click", () => openAdminAccountModal())', "Add Admin must not pass the DOM click event as an AdminAccount.");
+    includes("frontend/js/admin-security.js", "const isEdit = Boolean(account?.id)", "Edit mode must require a canonical AdminAccount id.");
+    includes("frontend/js/admin-security.js", "saveAdminAccount(isEdit ? account : null)", "Create mode must submit with a null account and Edit mode with the selected account.");
+    includes("frontend/js/admin-security.js", 'id="adminAccountUsername"', "Create Admin must render Username.");
+    includes("frontend/js/admin-security.js", 'id="adminAccountPassword"', "Create Admin must render Initial Password.");
+    includes("frontend/js/admin-security.js", 'url = "/api/admin/accounts"', "Create Admin must use the canonical accounts endpoint.");
+    includes("frontend/js/admin-security.js", 'method = "POST"', "Create Admin must submit with POST.");
+    includes("frontend/js/admin-security.js", 'let url = `/api/admin/accounts/${encodeURIComponent(account?.id || "")}`', "Edit Admin must target the selected account id.");
+    includes("frontend/js/admin-security.js", 'let method = "PATCH"', "Edit Admin must preserve PATCH semantics.");
     includes("frontend/js/admin-security.js", "twoFactorEnabled", "2FA state must derive from backend admin truth.");
     includes("frontend/js/admin-security.js", "startBtn.hidden = enabled", "2FA enabled must hide Enable 2FA.");
     includes("frontend/js/admin-security.js", "disableBtn.hidden = !enabled", "2FA disabled must hide Disable 2FA.");
@@ -206,6 +215,14 @@ function verifyRegressionBoundaries() {
     forbidden.forEach(([file, term]) => {
         assert(!read(file).includes(term), `${file}: Phase 12 must not change ownership with ${term}.`);
     });
+
+    const authService = read("backend/services/adminAuthService.js");
+    const createStart = authService.indexOf("async function createAdminAccount");
+    const updateStart = authService.indexOf("async function updateAdminAccount");
+    const createAccount = authService.slice(createStart, updateStart);
+    assert(createStart >= 0 && updateStart > createStart, "Admin create/update service boundaries must remain explicit.");
+    assert(createAccount.includes("AdminAccount.create"), "Create Admin must create a separate AdminAccount.");
+    assert(!createAccount.includes("findById") && !createAccount.includes("findByIdAndUpdate"), "Create Admin must not target or modify an existing OWNER account.");
 }
 
 function main() {
