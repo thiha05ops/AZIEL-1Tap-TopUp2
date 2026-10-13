@@ -25,6 +25,7 @@ const {
     publishDailyPricing
     ,savePackageProfitOverride
 } = require("../services/commerce/adminPricingControlCenterService");
+const { WeeklySupplierCostJobError, createWeeklySupplierCostJobService } = require("../services/supplierCatalog/weeklySupplierCostJobService");
 
 const PRICING_ENGINE_REQUEST_TIMEOUT_MS = 8000;
 
@@ -398,6 +399,27 @@ router.post("/admin/pricing-engine/workspace/publish", adminMiddleware, requireA
         return res.json(result);
     } catch (error) {
         return sendPricingError(req, res, error);
+    }
+});
+
+router.get("/admin/pricing-engine/supplier-cost-sync", adminMiddleware, requireAdminPermission(PERMISSIONS.OWNER_ROUTING_MANAGE), async (req, res) => {
+    try { return res.json({ success: true, ...(await createWeeklySupplierCostJobService().summary()) }); }
+    catch (error) { return res.status(error.statusCode || 500).json({ success: false, code: error.code || "SUPPLIER_COST_SYNC_STATUS_FAILED", message: error.message || "Supplier cost sync status is unavailable." }); }
+});
+
+router.get("/admin/pricing-engine/supplier-cost-sync/:jobId", adminMiddleware, requireAdminPermission(PERMISSIONS.OWNER_ROUTING_MANAGE), async (req, res) => {
+    try { return res.json({ success: true, job: await createWeeklySupplierCostJobService().status(req.params.jobId) }); }
+    catch (error) { const status = error instanceof WeeklySupplierCostJobError ? error.statusCode : 500; return res.status(status).json({ success: false, code: error.code || "SUPPLIER_COST_SYNC_STATUS_FAILED", message: error.message || "Supplier cost sync status is unavailable." }); }
+});
+
+router.post("/admin/pricing-engine/supplier-cost-sync", adminMiddleware, requireAdminPermission(PERMISSIONS.OWNER_ROUTING_MANAGE), async (req, res) => {
+    try {
+        if (req.body?.confirmed !== true) throw new WeeklySupplierCostJobError("EXPLICIT_OWNER_CONFIRMATION_REQUIRED", "Explicit Owner confirmation is required.", 400);
+        const queued = await createWeeklySupplierCostJobService().enqueueManual({ actor: { ...req.admin, sessionId: req.adminSession?.sessionId } });
+        return res.status(202).json({ success: true, ...queued });
+    } catch (error) {
+        const status = error.code === "WEEKLY_SUPPLIER_COST_SYNC_ALREADY_RUNNING" ? 409 : error.statusCode || 500;
+        return res.status(status).json({ success: false, code: error.code || "SUPPLIER_COST_SYNC_START_FAILED", message: error.message || "Supplier cost sync could not start." });
     }
 });
 

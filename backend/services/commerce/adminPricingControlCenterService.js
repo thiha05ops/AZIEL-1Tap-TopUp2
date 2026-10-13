@@ -19,6 +19,7 @@ const { clearPublishedSupplierCostDraftRows } = require("./pricingWorkspaceDraft
 const { resolvePricingSupplier } = require("./pricingSupplierService");
 const { SUPPLIER_CURRENCY } = require("../../constants/commerce");
 const { finalizeCustomerPayableAmount, finalizePublishedCustomerAmount } = require("./customerPayableAmountService");
+const { compareSupplierCost } = require("../supplierCatalog/supplierCostComparisonService");
 
 const PROFITABILITY_STATUS = Object.freeze({
     HEALTHY: "HEALTHY",
@@ -184,7 +185,10 @@ async function loadDailyPricingWorkspace({ supplierId = "", supplierMarket = "",
             previewSupplierCost: Number.isFinite(costState.previewSupplierCost) ? costState.previewSupplierCost : null,
             supplierCurrency: supplierCostEvidence.supplierCurrency || observedSupplierCost?.currency || selected.supplierCurrency,
             observedSupplierCost: observedSupplierCost?.amount ?? null, observedSupplierCurrency: observedSupplierCost?.currency || "", observedSupplierCostAt: observedSupplierCost?.observedAt || null,
-            supplierCostStatus: costState.status,
+            supplierCostStatus: costState.status === "REVIEW_REQUIRED" ? "COST_REVIEW_REQUIRED" : costState.status,
+            supplierCostAuthorityState: costState.status,
+            supplierCostDifference: costState.comparison?.absoluteDelta ?? null,
+            supplierCostDifferencePercent: costState.comparison?.percentageDelta ?? null,
             supplierCostTimestamp: supplierCostEvidence.capturedAt || null,
             supplierCostSource: supplierCostEvidence.source || "supplier_mapping",
             providerProductCode: mapping.supplierProductCode,
@@ -328,7 +332,9 @@ async function loadDailyPricingProductDetail({ supplierId = "", productCode = ""
             previewSupplierCost: Number.isFinite(costState.previewSupplierCost) ? costState.previewSupplierCost : null,
             supplierCurrency: evidence.supplierCurrency || observedSupplierCost?.currency || selected.supplierCurrency,
             observedSupplierCost: observedSupplierCost?.amount ?? null, observedSupplierCurrency: observedSupplierCost?.currency || "", observedSupplierCostAt: observedSupplierCost?.observedAt || null,
-            supplierCostStatus: costState.status, supplierCostTimestamp: evidence.capturedAt || null, supplierCostSource: evidence.source || "supplier_mapping",
+            supplierCostStatus: costState.status === "REVIEW_REQUIRED" ? "COST_REVIEW_REQUIRED" : costState.status,
+            supplierCostAuthorityState: costState.status,
+            supplierCostTimestamp: evidence.capturedAt || null, supplierCostSource: evidence.source || "supplier_mapping",
             providerProductCode: mapping.supplierProductCode, providerOfferCode: mapping.supplierPackageCode,
             fundingCost: Number(evidence.fundingCost || 0), otherAcquisitionCost: Number(evidence.otherAcquisitionCost || 0),
             mappingReadiness: mapping.mappingMetadata?.readiness || {}, packageEnabled: pkg.enabled !== false,
@@ -600,10 +606,12 @@ function workspaceSupplierCostState(mapping = {}, observedSupplierCost = null) {
     const authoritativeEvidence = mapping.supplierCostAuthority?.rawSupplierCost != null
         ? mapping.supplierCostAuthority
         : mapping.mappingMetadata?.supplierCost || {};
-    const approved = Number(authoritativeEvidence.rawSupplierCost ?? authoritativeEvidence.priceUsd ?? authoritativeEvidence.netDealerPrice);
+    const approvedRaw = authoritativeEvidence.rawSupplierCost ?? authoritativeEvidence.priceUsd ?? authoritativeEvidence.netDealerPrice;
+    const approved = Number(approvedRaw);
     const observed = Number(observedSupplierCost?.amount);
-    const authoritative = Number.isFinite(approved);
+    const authoritative = approvedRaw != null && approvedRaw !== "" && Number.isFinite(approved);
     const observedFact = Number.isFinite(observed);
+    const comparison = compareSupplierCost(observedSupplierCost, authoritativeEvidence);
     const provisional = false;
     const stale = authoritative && mapping.supplierCostAuthority?.capturedAt &&
         Date.now() - new Date(mapping.supplierCostAuthority.capturedAt).getTime() > Number(mapping.mappingMetadata?.costAuthorityMaximumAgeSeconds || 86400) * 1000;
@@ -613,7 +621,12 @@ function workspaceSupplierCostState(mapping = {}, observedSupplierCost = null) {
         provisional,
         approvedSupplierCost: authoritative ? approved : null,
         previewSupplierCost: observedFact ? observed : authoritative ? approved : null,
-        status: observedFact ? "COST_READY" : authoritative ? (stale ? "COST_STALE" : "COST_READY") : "COST_MISSING"
+        comparison,
+        status: stale ? "STALE" : comparison.state === "CURRENCY_MISMATCH" || (comparison.comparable && comparison.state !== "MATCH")
+            ? "REVIEW_REQUIRED"
+            : authoritative ? "AUTHORITATIVE"
+                : observedFact ? "OBSERVED"
+                    : "MISSING"
     };
 }
 

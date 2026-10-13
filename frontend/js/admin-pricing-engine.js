@@ -19,6 +19,7 @@
 
     const $ = (id) => document.getElementById(id);
     const text = (value) => String(value || "").trim();
+    const html = value => text(value).replace(/[&<>"']/g, character => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[character]));
     const upper = (value) => text(value).toUpperCase();
     const number = (value, fallback = 0) => Number.isFinite(Number(value)) ? Number(value) : fallback;
     const rowKey = (row) => `${upper(row.productCode)}:${upper(row.packageCode)}`;
@@ -39,6 +40,46 @@
         const body = await response.json().catch(() => ({}));
         if (!response.ok || body.success === false) { const error = new Error(body.message || body.code || "Pricing request failed."); error.code = body.code || ""; error.stage = body.stage || ""; error.requestId = body.requestId || ""; error.status = response.status; throw error; }
         return body;
+    }
+
+    let supplierCostSyncPoll = null;
+    const syncDate = value => value ? new Date(value).toLocaleString() : "Never";
+    function supplierCostSyncTotals(job) {
+        return (job?.supplierResults || []).reduce((total, row) => ({ updated: total.updated + number(row.updated), unchanged: total.unchanged + number(row.unchanged), reviewRequired: total.reviewRequired + number(row.reviewRequired), failed: total.failed + number(row.failed) }), { updated: 0, unchanged: 0, reviewRequired: 0, failed: 0 });
+    }
+    function ensureSupplierCostSyncPanel() {
+        const shell = document.querySelector("#section-pricing-engine .pricing-v3-shell"), header = shell?.querySelector(".pricing-v3-header");
+        if (!shell || !header) return;
+        if ($("supplierCostSyncPanel")) { $("supplierCostSyncPanel").hidden = window.AZIEL_ADMIN_AUTH?.hasPermission?.("OWNER_ROUTING_MANAGE") !== true; return; }
+        header.insertAdjacentHTML("afterend", `<section id="supplierCostSyncPanel" class="pricing-cost-sync-panel" data-admin-permission="OWNER_ROUTING_MANAGE" hidden><div class="pricing-cost-sync-head"><div><strong>Supplier Cost Sync</strong><small>Internal cost observations only. Customer prices are never published automatically.</small></div><button id="supplierCostSyncButton" class="admin-secondary-btn" type="button">Sync Supplier Costs</button></div><div id="supplierCostSyncSummary" class="pricing-cost-sync-summary" aria-live="polite">Loading sync status…</div><div id="supplierCostSyncSuppliers" class="pricing-cost-sync-suppliers"></div></section>`);
+        $("supplierCostSyncPanel").hidden = window.AZIEL_ADMIN_AUTH?.hasPermission?.("OWNER_ROUTING_MANAGE") !== true;
+        $("supplierCostSyncButton")?.addEventListener("click", startSupplierCostSync);
+    }
+    function renderSupplierCostSync(data) {
+        ensureSupplierCostSyncPanel();
+        const panel = $("supplierCostSyncPanel"), summary = $("supplierCostSyncSummary"), suppliers = $("supplierCostSyncSuppliers"), button = $("supplierCostSyncButton");
+        if (!panel || !summary || !suppliers || !button) return;
+        const job = data.active || data.latest, running = ["QUEUED", "RUNNING"].includes(job?.status), totals = supplierCostSyncTotals(job);
+        button.disabled = running; button.textContent = running ? "Syncing…" : "Sync Supplier Costs";
+        summary.innerHTML = `<span><b>Last successful</b>${html(syncDate(data.lastSuccessful?.completedAt))}</span><span><b>Next scheduled</b>${html(data.schedule?.label)} ${html(data.schedule?.timeZone)}</span><span><b>Updated</b>${totals.updated}</span><span><b>Unchanged</b>${totals.unchanged}</span><span><b>Review Required</b>${totals.reviewRequired}</span><span><b>Failed</b>${totals.failed}</span><span><b>Pending approval</b>${number(data.pendingInitialApproval)}</span><span><b>Next retry</b>${html(syncDate(data.latest?.nextRetryAt))}</span>`;
+        suppliers.innerHTML = (job?.supplierResults || []).map(row => `<span><b>${html(row.supplierCode)}</b>${html(row.status)} · ${number(row.updated)} updated · ${number(row.reviewRequired)} review${row.errorMessage ? ` · ${html(row.errorMessage)}` : ""}</span>`).join("") || `<span>${html(running ? "Supplier refresh is starting…" : data.latest?.lastFailureReason || "No supplier sync has run yet.")}</span>`;
+        if (running) scheduleSupplierCostSyncPoll(job.jobId); else if (supplierCostSyncPoll) { clearTimeout(supplierCostSyncPoll); supplierCostSyncPoll = null; }
+    }
+    async function loadSupplierCostSync() {
+        if (window.AZIEL_ADMIN_AUTH?.hasPermission?.("OWNER_ROUTING_MANAGE") !== true) return;
+        try { renderSupplierCostSync(await pricingFetch("/api/admin/pricing-engine/supplier-cost-sync")); }
+        catch (error) { const el = $("supplierCostSyncSummary"); if (el) el.textContent = error.message; }
+    }
+    function scheduleSupplierCostSyncPoll() {
+        if (supplierCostSyncPoll) clearTimeout(supplierCostSyncPoll);
+        supplierCostSyncPoll = setTimeout(loadSupplierCostSync, 2000);
+    }
+    async function startSupplierCostSync() {
+        const button = $("supplierCostSyncButton"); if (!button || button.disabled) return;
+        if (!window.confirm("Refresh supplier catalogs and reconcile internal supplier costs now? This will not publish customer prices.")) return;
+        button.disabled = true; button.textContent = "Syncing…";
+        try { await pricingFetch("/api/admin/pricing-engine/supplier-cost-sync", { method: "POST", body: JSON.stringify({ confirmed: true }) }); scheduleSupplierCostSyncPoll(); }
+        catch (error) { button.disabled = false; button.textContent = "Sync Supplier Costs"; const el = $("supplierCostSyncSummary"); if (el) el.textContent = error.message; }
     }
 
     function policyConfig(region, source = "draft") {
@@ -273,7 +314,7 @@
 
     function statusView(row, preview, regionFilter = ["TH", "MM"]) {
         if (row.previewEligible === false) return { status: "BLOCKED", reason: row.previewabilityReason || "Supplier cost is unavailable for preview", regions: [] };
-        if (!daily.edits.has(rowKey(row)) && row.previewSupplierCost == null && row.supplierCost == null && row.savedDraftSupplierCost == null && row.publishedSupplierPrice == null) return { status: "MISSING", reason: "Supplier cost required", regions: [] };
+        if (!daily.edits.has(rowKey(row)) && row.previewSupplierCost == null && row.supplierCost == null && row.savedDraftSupplierCost == null) return { status: "MISSING", reason: "Supplier cost required", regions: [] };
         if (preview == null) {
             if (daily.previewError) return { status: "BLOCKED", reason: `Pricing preview unavailable: ${daily.previewError}`, regions: [], code: "PREVIEW_FAILED" };
             if (daily.previewCompleted) return { status: "BLOCKED", reason: `Preview identity mismatch for ${rowKey(row)}`, regions: [], code: "PREVIEW_IDENTITY_MISMATCH" };
@@ -387,7 +428,7 @@
         const supplier = activeSupplier();
         body.innerHTML = rows.map(row => {
             const key = rowKey(row);
-            const value = daily.edits.has(key) ? daily.edits.get(key).value : (row.supplierCost ?? row.savedDraftSupplierCost ?? row.publishedSupplierPrice ?? "");
+            const value = daily.edits.has(key) ? daily.edits.get(key).value : (row.supplierCost ?? row.savedDraftSupplierCost ?? row.previewSupplierCost ?? "");
             const preview = previewFor(row);
             const view = statusView(row, preview);
             const priceModes = (preview?.regions || []).map(item => item.priceMode);
@@ -402,7 +443,7 @@
                             : "UNCHANGED";
             const blocked = dailyBlockingReason();
             const selectionEligible = rowSelectionEligible(row);
-            const canReviewCost = row.supplierCostStatus === "COST_REVIEW_REQUIRED" && window.AZIEL_ADMIN_AUTH?.hasPermission?.("SUPPLIER_COST_MANAGE") === true;
+            const canReviewCost = (row.supplierCostStatus === "COST_REVIEW_REQUIRED" || row.supplierCostAuthorityState === "REVIEW_REQUIRED") && window.AZIEL_ADMIN_AUTH?.hasPermission?.("SUPPLIER_COST_MANAGE") === true;
             const reviewCostAction = canReviewCost
                 ? `<button class="admin-secondary-btn" type="button" data-pricing-review-cost data-mapping-id="${text(row.mappingId)}" data-offer-id="${text(row.supplierCatalogOfferId)}" data-supplier-code="${text(row.supplierCode || supplier?.supplierCode)}" data-product-code="${text(row.productCode)}" data-package-code="${text(row.packageCode)}" data-supplier-market="${text(row.supplierMarket || daily.supplierMarket)}">Review cost</button>`
                 : "";
@@ -415,7 +456,7 @@
             return `<tr data-pricing-row="${key}">
                 <td><input type="checkbox" data-row-selection="${key}" aria-label="Select ${text(row.packageName)}" ${daily.selected.has(key) ? "checked" : ""} ${selectionEligible ? "" : "disabled"}></td>
                 <td><strong>${text(row.packageName)}</strong><small>${text(row.productName)} · ${upper(row.packageCode)}</small><details class="pricing-mobile-regions"><summary>Regional prices</summary><div><b>Thailand</b>${regionalResult(row, preview, "TH")}</div><div><b>Myanmar</b>${regionalResult(row, preview, "MM")}</div></details></td>
-                <td><label class="pricing-cost-input"><input type="number" min="0.000001" step="0.000001" value="${value}" placeholder="${row.observedSupplierCost ?? ""}" data-supplier-cost="${key}" ${blocked ? `disabled title="${blocked}"` : ""}><span>${row.supplierCurrency || supplier?.supplierCurrency || "-"}</span></label><small>${row.observedSupplierCost != null ? `Supplier catalog: ${row.observedSupplierCost} ${row.observedSupplierCurrency}` : "Supplier catalog cost unavailable"}</small></td>
+                <td><label class="pricing-cost-input"><input type="number" min="0.000001" step="0.000001" value="${value}" placeholder="${row.observedSupplierCost ?? ""}" data-supplier-cost="${key}" ${blocked ? `disabled title="${blocked}"` : ""}><span>${row.supplierCurrency || supplier?.supplierCurrency || "-"}</span></label><small>${row.observedSupplierCost != null ? `Observed ${row.observedSupplierCost} ${row.observedSupplierCurrency} · ${text(row.supplierCostAuthorityState || row.supplierCostStatus)}` : "Supplier catalog cost unavailable"}</small><small>${row.supplierCostDifferencePercent == null ? "" : `Cost change ${Number(row.supplierCostDifferencePercent).toFixed(2)}%`}</small><small>Draft recommendation · UNPUBLISHED</small></td>
                 <td>${profitControls}</td>
                 <td class="pricing-desktop-region">${regionalResult(row, preview, "TH")}</td><td class="pricing-desktop-region">${regionalResult(row, preview, "MM")}</td>
                 <td><span class="pricing-status is-${displayStatus.toLowerCase()}">${displayStatus}</span><small>${view.reason}</small><small>${row.storeCatalogStatus === "SELECTED" ? "In Store Catalog" : "Not in Store Catalog"}</small></td>
@@ -472,7 +513,7 @@
         return rows.map(row => ({
             rowId: rowKey(row), productCode: row.productCode, packageCode: row.packageCode,
             mappingId: row.mappingId,
-            newSupplierCost: daily.edits.has(rowKey(row)) ? daily.edits.get(rowKey(row)).value : (row.supplierCost ?? row.savedDraftSupplierCost ?? row.publishedSupplierPrice),
+            newSupplierCost: daily.edits.has(rowKey(row)) ? daily.edits.get(rowKey(row)).value : (row.supplierCost ?? row.savedDraftSupplierCost ?? row.previewSupplierCost),
             supplierCostEdited: daily.edits.has(rowKey(row)),
             supplierCurrency: supplier.supplierCurrency, supplierName: supplier.name,
             expectedUpdatedAt: row.updatedAt, priceInstructions: priceInstructions(row), selected: true
@@ -481,10 +522,10 @@
 
     function buildPreviewRows() {
         const supplier = activeSupplier();
-        return daily.detailRows.filter(row => row.previewEligible !== false && (daily.edits.has(rowKey(row)) || row.previewSupplierCost != null || row.supplierCost != null || row.savedDraftSupplierCost != null || row.publishedSupplierPrice != null)).map(row => ({
+        return daily.detailRows.filter(row => row.previewEligible !== false && (daily.edits.has(rowKey(row)) || row.previewSupplierCost != null || row.supplierCost != null || row.savedDraftSupplierCost != null)).map(row => ({
             rowId: rowKey(row), productCode: row.productCode, packageCode: row.packageCode,
             mappingId: row.mappingId,
-            newSupplierCost: daily.edits.has(rowKey(row)) ? daily.edits.get(rowKey(row)).value : (row.previewSupplierCost ?? row.supplierCost ?? row.savedDraftSupplierCost ?? row.publishedSupplierPrice),
+            newSupplierCost: daily.edits.has(rowKey(row)) ? daily.edits.get(rowKey(row)).value : (row.previewSupplierCost ?? row.supplierCost ?? row.savedDraftSupplierCost),
             supplierCurrency: supplier.supplierCurrency, supplierName: supplier.name,
             expectedUpdatedAt: row.updatedAt, priceInstructions: priceInstructions(row),
             supplierCostEdited: daily.edits.has(rowKey(row)), selected: daily.selected.has(rowKey(row))
@@ -881,6 +922,7 @@
     function bind() {
         if (document.documentElement.dataset.pricingV3Bound === "true") return;
         document.documentElement.dataset.pricingV3Bound = "true";
+        ensureSupplierCostSyncPanel();
         $("pricingSupplierSelect")?.closest("label")?.setAttribute("hidden","");
         $("pricingSupplierMarketSelect")?.closest("label")?.setAttribute("hidden","");
         $("pricingProductSelect")?.closest("label")?.setAttribute("hidden","");
@@ -973,9 +1015,9 @@
         $("pricingSettingsRegion")?.addEventListener("change", event => { settings.region = event.target.value; fillSettings(); });
         $("pricingSettingsForm")?.addEventListener("input", updateSettingUnits);
         $("pricingSettingsSave")?.addEventListener("click", saveSettings);
-        window.addEventListener("aziel:admin-section-opened", event => { if (event.detail?.section === "pricing-engine") loadInventory(); if (event.detail?.section === "pricing-settings") { cancelDetailWork(); loadSettings(); } });
-        window.addEventListener("aziel:admin-auth-ready", () => { if (document.body.dataset.adminSection === "pricing-engine") loadInventory(); if (document.body.dataset.adminSection === "pricing-settings") loadSettings(); });
-        if (document.body.dataset.adminSection === "pricing-engine") loadInventory();
+        window.addEventListener("aziel:admin-section-opened", event => { if (event.detail?.section === "pricing-engine") { loadInventory(); loadSupplierCostSync(); } if (event.detail?.section === "pricing-settings") { cancelDetailWork(); loadSettings(); } });
+        window.addEventListener("aziel:admin-auth-ready", () => { if (document.body.dataset.adminSection === "pricing-engine") { loadInventory(); loadSupplierCostSync(); } if (document.body.dataset.adminSection === "pricing-settings") loadSettings(); });
+        if (document.body.dataset.adminSection === "pricing-engine") { loadInventory(); loadSupplierCostSync(); }
         if (document.body.dataset.adminSection === "pricing-settings") loadSettings();
     }
 

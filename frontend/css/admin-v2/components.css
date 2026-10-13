@@ -2626,6 +2626,17 @@
     font-size: 13px;
 }
 
+.admin-v2 #section-pricing-engine .pricing-cost-sync-panel { display: grid; gap: 12px; padding: 14px 16px; border: 1px solid var(--v2-line, #e6e8ec); border-radius: 12px; background: var(--v2-surface, #fff); }
+.admin-v2 #section-pricing-engine .pricing-cost-sync-panel[hidden] { display: none !important; }
+.admin-v2 #section-pricing-engine .pricing-cost-sync-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.admin-v2 #section-pricing-engine .pricing-cost-sync-head > div { display: grid; gap: 3px; min-width: 0; }
+.admin-v2 #section-pricing-engine .pricing-cost-sync-head small { color: var(--v2-text-muted, #697386); }
+.admin-v2 #section-pricing-engine .pricing-cost-sync-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; }
+.admin-v2 #section-pricing-engine .pricing-cost-sync-summary span, .admin-v2 #section-pricing-engine .pricing-cost-sync-suppliers span { min-width: 0; padding: 8px 10px; border-radius: 8px; background: var(--v2-surface-muted, rgba(127,127,127,.08)); overflow-wrap: anywhere; }
+.admin-v2 #section-pricing-engine .pricing-cost-sync-summary b { display: block; margin-bottom: 2px; font-size: 11px; color: var(--v2-text-muted, #697386); }
+.admin-v2 #section-pricing-engine .pricing-cost-sync-suppliers { display: grid; gap: 6px; font-size: 12px; }
+@media (max-width: 620px) { .admin-v2 #section-pricing-engine .pricing-cost-sync-head { align-items: stretch; flex-direction: column; } .admin-v2 #section-pricing-engine .pricing-cost-sync-head button { width: 100%; } }
+
 /* Product browser */
 
 .admin-v2 #section-pricing-engine .pricing-product-browser {

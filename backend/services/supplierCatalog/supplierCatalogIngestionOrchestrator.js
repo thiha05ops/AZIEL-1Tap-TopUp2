@@ -7,7 +7,7 @@ const Offer = require("../../models/SupplierCatalogOffer");
 const Run = require("../../models/SupplierCatalogIngestionRun");
 const { createSupplierCatalogMongoRepositories } = require("./supplierCatalogMongoRepositories");
 const { createSupplierCatalogIngestionLockService } = require("./supplierCatalogIngestionLockService");
-const { readSupplierCatalogIngestionPolicy } = require("../../config/supplierCatalogIngestionPolicy");
+const { readSupplierCatalogIngestionPolicy, readWeeklySupplierCostSyncPolicy } = require("../../config/supplierCatalogIngestionPolicy");
 class SupplierCatalogIngestionError extends Error { constructor(code, message, statusCode = 400, details = {}) { super(message); this.code = code; this.statusCode = statusCode; this.details = details; } }
 const wait = ms => new Promise(resolve => { const timer = setTimeout(resolve, ms); timer.unref?.(); });
 const retryable = error => error?.retryable === true || /TRANSPORT|TIMEOUT|HTTP_5|ECONN|NETWORK/i.test(String(error?.code || error?.message || ""));
@@ -36,7 +36,8 @@ function createSupplierCatalogIngestionOrchestrator(options = {}) {
         const supplierCode = String(input.supplierCode || "").trim().toUpperCase(), trigger = input.trigger || "SYSTEM", policy = policyReader(), supplierPolicy = policy.suppliers[supplierCode];
         if (!supplierPolicy) throw new SupplierCatalogIngestionError("UNSUPPORTED_SUPPLIER", "Unsupported supplier catalog.", 404);
         if (!policy.executionEnabled) throw new SupplierCatalogIngestionError("SUPPLIER_CATALOG_INGESTION_EXECUTION_DISABLED", "Supplier catalog ingestion execution is disabled.", 409);
-        if (trigger === "SCHEDULED" && (!policy.automatedEnabled || !supplierPolicy.enabled)) throw new SupplierCatalogIngestionError("SUPPLIER_CATALOG_AUTOMATION_DISABLED", "Automated supplier catalog ingestion is disabled.", 409);
+        if (trigger === "SCHEDULED" && (!policy.automatedEnabled || !supplierPolicy.enabled)) throw new SupplierCatalogIngestionError("SUPPLIER_CATALOG_AUTOMATION_DISABLED", "In-process supplier catalog automation is disabled.", 409);
+        if (trigger === "EXTERNAL_SCHEDULED" && (!readWeeklySupplierCostSyncPolicy().enabled || !supplierPolicy.enabled)) throw new SupplierCatalogIngestionError("SUPPLIER_WEEKLY_COST_SYNC_DISABLED", "External weekly supplier cost sync is disabled.", 409);
         const supplier = await models.Supplier.findOne({ supplierCode }).select("_id supplierCode").lean();
         if (!supplier) throw new SupplierCatalogIngestionError("SUPPLIER_NOT_FOUND", "Supplier record not found.", 404);
         const requestedAt = clock(), runKey = `${supplierCode}:AUTO:${requestedAt.toISOString()}:${crypto.randomUUID()}`, owner = `${process.pid}:${crypto.randomUUID()}`;
@@ -70,10 +71,12 @@ function createSupplierCatalogIngestionOrchestrator(options = {}) {
             logger.info?.("Supplier catalog ingestion progress", { supplierCode, attempt: attempts, phase: "APPLY_START", products: plan.products.length, offers: plan.offers.length });
             const result = await service.applyCatalogOnlyPlan(plan, leaseGuardedRepositories(repositories(), assertLease), { runKey, onProgress: progress => logger.info?.("Supplier catalog ingestion progress", { supplierCode, attempt: attempts, ...progress }) });
             await models.Run.updateOne({ _id: result._id }, { $set: { trigger, requestedAt, attemptCount: attempts, lockOwnerId: owner, requestedBy: input.actor || {}, reason: String(input.reason || "") } });
-            const affectedProducts = [...new Set(mappings.map(mapping => String(mapping.productCode || "").trim().toLowerCase()).filter(Boolean))];
-            for (const productCode of affectedProducts) {
-                try { await reconcileSellability(productCode); }
-                catch (error) { logger.warn?.("Automatic sellability reconciliation deferred", { productCode, code: error?.code || error?.name || "RECONCILIATION_FAILED" }); }
+            if (input.reconcileSellability !== false) {
+                const affectedProducts = [...new Set(mappings.map(mapping => String(mapping.productCode || "").trim().toLowerCase()).filter(Boolean))];
+                for (const productCode of affectedProducts) {
+                    try { await reconcileSellability(productCode); }
+                    catch (error) { logger.warn?.("Automatic sellability reconciliation deferred", { productCode, code: error?.code || error?.name || "RECONCILIATION_FAILED" }); }
+                }
             }
             return { runKey, supplierCode, status: result.status, coverageState: result.coverageState, attempts, runId: String(result._id) };
         } catch (error) {

@@ -64,7 +64,7 @@ assert.strictEqual(resolveProductRoute(productCode), `/products/${productCode}`)
     const observed = workspaceSupplierCostState(mapping, { amount: 4.25, currency: "USD" });
     assert.strictEqual(observed.previewSupplierCost, 4.25);
     assert.strictEqual(observed.provisional, false);
-    assert.strictEqual(observed.status, "COST_READY");
+    assert.strictEqual(observed.status, "OBSERVED");
     assert.strictEqual(mapping.supplierCostAuthority.rawSupplierCost, null, "Pricing preparation must not approve cost.");
 
     const adminProduct = await resolveAdminCatalogProduct(productCode, {

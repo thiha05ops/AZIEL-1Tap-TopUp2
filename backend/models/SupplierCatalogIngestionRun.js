@@ -4,7 +4,7 @@ const mongoose = require("mongoose");
 
 const RUN_STATUSES = Object.freeze(["RUNNING", "SUCCEEDED_COMPLETE", "SUCCEEDED_PARTIAL", "FAILED"]);
 const COVERAGE_STATES = Object.freeze(["UNKNOWN", "PARTIAL", "COMPLETE"]);
-const TRIGGERS = Object.freeze(["LEGACY", "SCHEDULED", "ADMIN_MANUAL", "SYSTEM"]);
+const TRIGGERS = Object.freeze(["LEGACY", "SCHEDULED", "EXTERNAL_SCHEDULED", "ADMIN_MANUAL", "SYSTEM"]);
 
 const supplierCatalogIngestionRunSchema = new mongoose.Schema({
     supplierId: { type: mongoose.Schema.Types.ObjectId, ref: "Supplier", required: true, immutable: true },
