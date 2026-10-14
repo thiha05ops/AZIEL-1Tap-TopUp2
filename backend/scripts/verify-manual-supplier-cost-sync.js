@@ -4,6 +4,7 @@ const assert = require("assert");
 const fs = require("fs");
 const path = require("path");
 const { createWeeklySupplierCostJobService, RETRY_DELAYS_MS } = require("../services/supplierCatalog/weeklySupplierCostJobService");
+const { readWeeklySupplierCostSyncPolicy } = require("../config/supplierCatalogIngestionPolicy");
 
 let checks = 0;
 const equal = (actual, expected, message) => { assert.strictEqual(actual, expected, message); checks += 1; };
@@ -12,6 +13,9 @@ const ok = (value, message) => { assert(value, message); checks += 1; };
 function query(value) { return { sort() { return this; }, lean: async () => value }; }
 
 async function main() {
+    equal(readWeeklySupplierCostSyncPolicy({}).manualEnabled, false, "manual sync defaults disabled");
+    equal(readWeeklySupplierCostSyncPolicy({ SUPPLIER_MANUAL_COST_SYNC_ENABLED: "true" }).manualEnabled, true, "manual sync requires exact explicit enablement");
+    equal(readWeeklySupplierCostSyncPolicy({ SUPPLIER_MANUAL_COST_SYNC_ENABLED: "TRUE" }).manualEnabled, false, "manual sync rejects non-canonical truthy values");
     let now = new Date("2026-10-11T20:00:00.000Z"), deferred = [], leaseHeld = false, ingestions = 0, reconciliations = 0;
     const ingestionTriggers = [];
     const jobs = [];
@@ -32,7 +36,7 @@ async function main() {
         JobModel, ApprovalModel: { countDocuments: async () => 2 }, leases, ownerAuthorization,
         ingest: async input => { ingestions += 1; ingestionTriggers.push(input.trigger); equal(input.reconcileSellability, false, "manual ingestion cannot alter sellability"); return { runId: `run-${ingestions}` }; },
         sync: { reconcile: async input => { reconciliations += 1; return input.prepare ? { initialCandidateCount: 1 } : { updated: 1, unchanged: 2, reviewRequired: 1, rejected: 0, initialCandidateCount: 1 }; } },
-        policyReader: () => ({ enabled: true, jobLeaseTtlMs: 60000, maximumObservationAgeMs: 1000, maximumAutomaticChangePercent: 20 }),
+        policyReader: () => ({ enabled: false, manualEnabled: true, jobLeaseTtlMs: 60000, maximumObservationAgeMs: 1000, maximumAutomaticChangePercent: 20 }),
         clock: () => now, defer: fn => deferred.push(fn)
     });
     await assert.rejects(() => service.enqueueManual({ actor: { role: "OWNER" } }), error => error.code === "OWNER_AUTHENTICATION_REQUIRED"); checks += 1;
@@ -44,15 +48,23 @@ async function main() {
     equal(jobs[0].status, "SUCCEEDED"); equal(jobs[0].supplierResults.length, 2); equal(ingestions, 2); equal(reconciliations, 4, "initial candidates are prepared separately without replacing routine reconciliation");
     equal(ingestionTriggers.join(","), "ADMIN_MANUAL,ADMIN_MANUAL", "manual supplier ingestion uses the canonical persisted trigger");
     const status = await service.status(queued.jobId); equal(status.jobId, queued.jobId);
+    const modeSummary = await service.summary(); equal(modeSummary.modes.manualEnabled, true, "status reports manual sync enabled"); equal(modeSummary.modes.weeklyEnabled, false, "status reports weekly sync disabled");
 
     let failedCalls = 0;
     const retryJobs = [];
     const RetryModel = { ...JobModel, create: async value => { const job = { _id: `retry-${retryJobs.length}`, createdAt: now, updatedAt: now, retryAttempt: 0, supplierResults: [], ...value }; retryJobs.push(job); jobs.push(job); return job; } };
     const retryService = createWeeklySupplierCostJobService({ JobModel: RetryModel, ApprovalModel: { countDocuments: async () => 0 }, leases, ownerAuthorization,
         ingest: async input => { failedCalls += 1; equal(input.trigger, "ADMIN_MANUAL", "retry ingestion retains the canonical manual trigger"); throw Object.assign(new Error("network unavailable"), { code: "NETWORK_UNAVAILABLE", retryable: true }); },
-        sync: { reconcile: async () => { throw new Error("unreachable"); } }, policyReader: () => ({ enabled: true, jobLeaseTtlMs: 60000 }), clock: () => now, defer: fn => deferred.push(fn) });
+        sync: { reconcile: async () => { throw new Error("unreachable"); } }, policyReader: () => ({ enabled: false, manualEnabled: true, jobLeaseTtlMs: 60000 }), clock: () => now, defer: fn => deferred.push(fn) });
     const retryQueued = await retryService.enqueueManual({ actor: { persistedOwner: true } }); await deferred.shift()();
     const retryJob = jobs.find(row => row.jobId === retryQueued.jobId); equal(retryJob.status, "RETRY_SCHEDULED"); equal(retryJob.retryAttempt, 1); equal(retryJob.nextRetryAt.getTime() - now.getTime(), RETRY_DELAYS_MS[0]); equal(failedCalls, 2);
+
+    const disabledService = createWeeklySupplierCostJobService({ JobModel, ApprovalModel: { countDocuments: async () => 0 }, leases, ownerAuthorization,
+        policyReader: () => ({ enabled: false, manualEnabled: false, jobLeaseTtlMs: 60000 }), clock: () => now, defer: fn => deferred.push(fn) });
+    await assert.rejects(() => disabledService.enqueueManual({ actor: { persistedOwner: true } }), error => error.code === "SUPPLIER_MANUAL_COST_SYNC_DISABLED"); checks += 1;
+    await assert.rejects(() => disabledService.enqueueWeekly({ actor: { id: "automation" } }), error => error.code === "SUPPLIER_WEEKLY_COST_SYNC_DISABLED"); checks += 1;
+    await assert.rejects(() => disabledService.recoverDue({ actor: { id: "automation" } }), error => error.code === "SUPPLIER_WEEKLY_COST_SYNC_DISABLED"); checks += 1;
+    await assert.rejects(() => service.enqueueWeekly({ actor: { id: "automation" } }), error => error.code === "SUPPLIER_WEEKLY_COST_SYNC_DISABLED"); checks += 1;
 
     const root = path.resolve(__dirname, "..");
     const jobSource = fs.readFileSync(path.join(root, "services/supplierCatalog/weeklySupplierCostJobService.js"), "utf8");
@@ -61,6 +73,7 @@ async function main() {
     for (const forbidden of ["publishDailyPricing", "PackageMarketPublication", "PackageSupplierSelection", "CommerceOrder", "PaymentAttempt", "FulfillmentAttempt", "ExclusiveOffer"]) ok(!jobSource.includes(forbidden), `job pipeline excludes ${forbidden}`);
     ok(routeSource.includes("OWNER_ROUTING_MANAGE") && routeSource.includes("enqueueManual"), "manual API is authenticated and Owner-gated");
     ok(uiSource.includes("Sync Supplier Costs") && uiSource.includes("confirmed: true") && !uiSource.includes("fazercards") && !uiSource.includes("wondd"), "browser uses only server-side sync API");
+    ok(uiSource.includes("data.modes?.manualEnabled") && uiSource.includes("Manual Sync Disabled") && uiSource.includes("data.modes?.weeklyEnabled"), "Admin panel distinguishes manual and weekly gate states");
     equal(RETRY_DELAYS_MS.join(","), [900000, 1800000, 3600000].join(","), "retry schedule is 15/30/60 minutes");
     console.log(JSON.stringify({ result: "PASS", checks, productionConnections: 0, supplierNetworkCalls: 0, publicationWrites: 0, mappingWrites: 0, fulfillmentWrites: 0 }, null, 2));
 }

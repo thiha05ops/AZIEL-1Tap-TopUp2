@@ -30,13 +30,14 @@ function createWeeklySupplierCostJobService(options = {}) {
     const defer = options.defer || (fn => setImmediate(fn));
 
     async function summary() {
+        const policy = policyReader();
         const [latest, lastSuccessful, active, pendingInitialApproval] = await Promise.all([
             JobModel.findOne({ status: { $in: ["SUCCEEDED", "PARTIAL", "FAILED", "RETRY_SCHEDULED"] } }).sort({ updatedAt: -1 }).lean(),
             JobModel.findOne({ status: "SUCCEEDED" }).sort({ completedAt: -1 }).lean(),
             JobModel.findOne({ status: { $in: ACTIVE } }).sort({ createdAt: -1 }).lean(),
             ApprovalModel.countDocuments({ status: "PENDING" })
         ]);
-        return { latest, lastSuccessful, active, pendingInitialApproval, schedule: { label: "Sunday 03:00", timeZone: "Asia/Bangkok", cronUtc: "0 20 * * 6" } };
+        return { latest, lastSuccessful, active, pendingInitialApproval, modes: { manualEnabled: policy.manualEnabled === true, weeklyEnabled: policy.enabled === true }, schedule: { label: "Sunday 03:00", timeZone: "Asia/Bangkok", cronUtc: "0 20 * * 6" } };
     }
 
     async function status(jobId) {
@@ -110,7 +111,8 @@ function createWeeklySupplierCostJobService(options = {}) {
 
     async function enqueue({ trigger, actor, existingJob = null }) {
         const policy = policyReader();
-        if (!policy.enabled) throw new WeeklySupplierCostJobError("SUPPLIER_WEEKLY_COST_SYNC_DISABLED", "Supplier cost synchronization is disabled.", 409);
+        if (trigger === "MANUAL" && !policy.manualEnabled) throw new WeeklySupplierCostJobError("SUPPLIER_MANUAL_COST_SYNC_DISABLED", "Manual supplier cost synchronization is disabled.", 409);
+        if (trigger !== "MANUAL" && !policy.enabled) throw new WeeklySupplierCostJobError("SUPPLIER_WEEKLY_COST_SYNC_DISABLED", "Weekly supplier cost synchronization is disabled.", 409);
         const jobId = existingJob?.jobId || `supplier-cost-${clock().getTime()}-${crypto.randomUUID()}`;
         let lease = await leases.acquire({ runKey: `${trigger}:${jobId}`, ttlMs: policy.jobLeaseTtlMs });
         let job = existingJob;
@@ -150,10 +152,11 @@ function createWeeklySupplierCostJobService(options = {}) {
     }
 
     async function recoverDue({ actor }) {
+        const policy = policyReader();
+        if (!policy.enabled) throw new WeeklySupplierCostJobError("SUPPLIER_WEEKLY_COST_SYNC_DISABLED", "Weekly supplier cost synchronization recovery is disabled.", 409);
         const now = clock();
         const candidate = await JobModel.findOne({ $or: [{ status: "RETRY_SCHEDULED", nextRetryAt: { $lte: now } }, { status: { $in: ACTIVE } }] }).sort({ createdAt: 1 });
         if (!candidate) return { recovered: false };
-        const policy = policyReader();
         let lease;
         try {
             lease = await leases.acquire({ runKey: `RETRY:${candidate.jobId}`, ttlMs: policy.jobLeaseTtlMs });

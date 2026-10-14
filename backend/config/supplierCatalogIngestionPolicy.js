@@ -23,6 +23,7 @@ function readSupplierCatalogIngestionPolicy(env = process.env) {
 function readWeeklySupplierCostSyncPolicy(env = process.env) {
     return Object.freeze({
         enabled: exactTrue(env.SUPPLIER_WEEKLY_COST_SYNC_ENABLED),
+        manualEnabled: exactTrue(env.SUPPLIER_MANUAL_COST_SYNC_ENABLED),
         scheduleTimeZone: "Asia/Bangkok",
         scheduleLocal: "Sunday 03:00",
         cronUtc: "0 20 * * 6",
