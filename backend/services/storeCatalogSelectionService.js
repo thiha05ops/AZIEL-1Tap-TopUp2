@@ -31,9 +31,9 @@ function createStoreCatalogSelectionService(models = {}, dependencies = {}) {
         if (query.supplierMarket) filter.supplierMarket = upper(query.supplierMarket);
         if (query.sellingRegion) filter.sellingRegions = upper(query.sellingRegion);
         const selections=await lean(M.Selection.find(filter).sort({ productCode: 1, supplierMarket: 1 }), session),productCodes=[...new Set(selections.map(item=>item.productCode))],packageCodes=[...new Set(selections.flatMap(item=>item.packages||[]).map(item=>item.packageCode))];
-        const[products,packages]=await Promise.all([productCodes.length?lean(M.Product.find({productCode:{$in:productCodes}}).select("productCode name"),session):[],packageCodes.length?lean(M.Package.find({productCode:{$in:productCodes},packageCode:{$in:packageCodes},deletedAt:null}).select("productCode packageCode name"),session):[]]);
-        const productNames=new Map(products.map(item=>[item.productCode,item.name])),packageNames=new Map(packages.map(item=>[`${item.productCode}/${item.packageCode}`,item.name]));
-        return selections.map(item=>({...item,productName:productNames.get(item.productCode)||item.productCode,packages:(item.packages||[]).map(pkg=>({...pkg,packageName:packageNames.get(`${item.productCode}/${pkg.packageCode}`)||pkg.packageCode}))}));
+        const[products,packages]=await Promise.all([productCodes.length?lean(M.Product.find({productCode:{$in:productCodes}}).select("productCode name"),session):[],packageCodes.length?lean(M.Package.find({productCode:{$in:productCodes},packageCode:{$in:packageCodes},deletedAt:null}).select("productCode packageCode name enabled updatedAt"),session):[]]);
+        const productNames=new Map(products.map(item=>[item.productCode,item.name])),packageByKey=new Map(packages.map(item=>[`${item.productCode}/${item.packageCode}`,item]));
+        return selections.map(item=>({...item,productName:productNames.get(item.productCode)||item.productCode,packages:(item.packages||[]).map(pkg=>{const canonical=packageByKey.get(`${item.productCode}/${pkg.packageCode}`);return{...pkg,packageName:canonical?.name||pkg.packageCode,enabled:canonical?.enabled===true,updatedAt:canonical?.updatedAt||null}})}));
     }
     async function save(input = {}, context = {}) {
         const productCode = lower(input.productCode), supplierMarket = upper(input.supplierMarket), supplierId = clean(input.supplierId);

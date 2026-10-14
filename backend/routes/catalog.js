@@ -12,6 +12,7 @@ const {
     reorderPackages,
     restorePackage,
     restoreProduct,
+    setPackageEnabledForSelling,
     softDeletePackage,
     softDeleteProduct,
     updatePackage,
@@ -746,12 +747,22 @@ router.patch("/admin/catalog/products/:productCode/packages/:packageCode/restore
 
 router.patch("/admin/catalog/products/:productCode/packages/:packageCode", adminMiddleware, requireAdminPermission(PERMISSIONS.CATALOG_MANAGE), async (req, res) => {
     try {
-        const result = await updatePackage({
-            productCode: req.params.productCode,
-            packageCode: req.params.packageCode,
-            patch: req.body || {},
-            actor: req.admin?.username || "admin"
-        });
+        const packageAvailabilityDecision = Object.prototype.hasOwnProperty.call(req.body || {}, "enabled");
+        const result = packageAvailabilityDecision
+            ? await setPackageEnabledForSelling({
+                productCode: req.params.productCode,
+                packageCode: req.params.packageCode,
+                enabled: req.body?.enabled,
+                expectedUpdatedAt: req.body?.expectedUpdatedAt,
+                patch: req.body || {},
+                actor: req.admin
+            })
+            : await updatePackage({
+                productCode: req.params.productCode,
+                packageCode: req.params.packageCode,
+                patch: req.body || {},
+                actor: req.admin?.username || "admin"
+            });
         const product = await getCatalogProductDetail(result.package.productCode, {
             source: "database",
             includeDisabled: true,
@@ -764,7 +775,7 @@ router.patch("/admin/catalog/products/:productCode/packages/:packageCode", admin
             action: ADMIN_AUDIT_ACTIONS.CATALOG_PACKAGE_UPDATED,
             resourceType: "CatalogPackage",
             resourceId: `${result.package.productCode}:${result.package.packageCode}`,
-            metadata: { changedFields: result.changedFields || [] }
+            metadata: { changedFields: result.changedFields || [], ownerPackageAvailabilityDecision: packageAvailabilityDecision }
         }).catch(error => console.log("Admin audit failed:", error.message));
 
         return res.json({

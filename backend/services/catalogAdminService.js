@@ -1,5 +1,7 @@
 const CatalogProduct = require("../models/CatalogProduct");
 const CatalogPackage = require("../models/CatalogPackage");
+const PackageSupplierSelection = require("../models/PackageSupplierSelection");
+const SupplierProductMapping = require("../models/SupplierProductMapping");
 const {
     REGION_CURRENCIES,
     normalizePackageCode,
@@ -1242,6 +1244,45 @@ async function reorderPackages({ productCode, orderedPackageCodes = [], actor = 
     };
 }
 
+async function setPackageEnabledForSelling({ productCode, packageCode, enabled, expectedUpdatedAt, patch = null, actor = {} } = {}) {
+    if (String(actor?.role || "").toUpperCase() !== "OWNER") {
+        throw new CatalogAdminError("OWNER_REQUIRED", "Only the OWNER can change canonical package availability.", 403);
+    }
+    if (typeof enabled !== "boolean") throw new CatalogAdminError("PACKAGE_ENABLED_REQUIRED", "Package enabled state is required.");
+    const normalizedProductCode = normalizeAdminProductCode(productCode);
+    const normalizedPackageCode = normalizePackageCode(packageCode);
+    if (enabled) {
+        const selection = await PackageSupplierSelection.findOne({ productCode: normalizedProductCode, packageCode: normalizedPackageCode, customerMarket: "GLOBAL" }).lean();
+        if (!selection) throw new CatalogAdminError("GLOBAL_SUPPLIER_SELECTION_REQUIRED", "A GLOBAL supplier selection is required before enabling this package.", 409);
+        const mapping = await SupplierProductMapping.findOne({
+            _id: selection.supplierMappingId,
+            productCode: normalizedProductCode,
+            packageCode: normalizedPackageCode,
+            enabled: true,
+            productionRole: "PRIMARY",
+            executionMode: "API",
+            archivedAt: null
+        }).lean();
+        if (!mapping) throw new CatalogAdminError("GLOBAL_SUPPLIER_ROUTE_INVALID", "The selected GLOBAL supplier route is not active for this package.", 409);
+        const cost = mapping.supplierCostAuthority || {};
+        if (!(Number(cost.rawSupplierCost) > 0) || !cost.supplierCurrency || !cost.capturedAt || cost.providerProductCode !== mapping.supplierProductCode || cost.providerOfferCode !== mapping.supplierPackageCode) {
+            throw new CatalogAdminError("APPROVED_SUPPLIER_COST_REQUIRED", "Exact approved supplier cost authority is required before enabling this package.", 409);
+        }
+        if (mapping.mappingMetadata?.readiness?.pricingReady !== true) {
+            throw new CatalogAdminError("PRICING_READINESS_REQUIRED", "Owner-reviewed Daily Pricing publication is required before enabling this package.", 409);
+        }
+        if (mapping.mappingMetadata?.readiness?.inputReady !== true || mapping.mappingMetadata?.readiness?.fulfillmentReady !== true) {
+            throw new CatalogAdminError("FULFILLMENT_READINESS_REQUIRED", "The selected supplier route is not ready for fulfillment.", 409);
+        }
+    }
+    return updatePackage({
+        productCode: normalizedProductCode,
+        packageCode: normalizedPackageCode,
+        patch: { ...(patch && typeof patch === "object" ? patch : {}), enabled, expectedUpdatedAt },
+        actor: actor.username || actor.id || "owner"
+    });
+}
+
 module.exports = {
     CatalogAdminError,
     classifyProductEnabledTransition,
@@ -1249,6 +1290,7 @@ module.exports = {
     reorderPackages,
     restorePackage,
     restoreProduct,
+    setPackageEnabledForSelling,
     softDeletePackage,
     softDeleteProduct,
     updatePackage,

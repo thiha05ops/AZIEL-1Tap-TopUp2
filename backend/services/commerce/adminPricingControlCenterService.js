@@ -731,6 +731,7 @@ function normalizeWorkspaceRow(row = {}, index = 0) {
         ])),
         supplierCostEdited: row.supplierCostEdited === true,
         mappingId: text(row.mappingId),
+        supplierCatalogOfferId: text(row.supplierCatalogOfferId),
         supplierProductCode: text(row.supplierProductCode),
         supplierPackageCode: text(row.supplierPackageCode),
         mappingRegion: upper(row.mappingRegion),
@@ -738,8 +739,9 @@ function normalizeWorkspaceRow(row = {}, index = 0) {
         approvedSupplierCost: amount(row.approvedSupplierCost),
         observedSupplierCost: amount(row.observedSupplierCost),
         observedSupplierCurrency: upper(row.observedSupplierCurrency),
+        observedSupplierCostAt: row.observedSupplierCostAt || null,
         provisionalPricing: row.provisionalPricing === true,
-        costAuthorityState: upper(row.costAuthorityState),
+        supplierCostAuthorityState: upper(row.supplierCostAuthorityState || row.costAuthorityState),
         preparationSelected: row.preparationSelected === true
     };
 }
@@ -1149,10 +1151,61 @@ function selectedPublicationDecision(row = {}) {
     return { action: "PUBLISH", reason: "" };
 }
 
+function shouldMarkMappingPricingReady(row = {}, admin = null) {
+    const readiness = row.mappingReadiness || {};
+    return String(admin?.role || "").toUpperCase() === "OWNER" &&
+        readiness.supplierMapped === true &&
+        readiness.inputReady === true &&
+        readiness.fulfillmentReady === true;
+}
+
 async function markMappingPricingReady(row = {}, actor = "admin") {
     if (!row.mappingId || row.mappingReadiness?.pricingReady === true) return { changed: false };
+    const approvedCost = Number(row.approvedSupplierCost ?? row.supplierCost);
+    const observedCost = Number(row.observedSupplierCost);
+    const capturedAt = row.supplierCostTimestamp ? new Date(row.supplierCostTimestamp) : null;
+    const observedAt = row.observedSupplierCostAt ? new Date(row.observedSupplierCostAt) : null;
+    if (
+        row.supplierCostAuthorityState !== "AUTHORITATIVE" ||
+        !Number.isFinite(approvedCost) || approvedCost <= 0 ||
+        !Number.isFinite(observedCost) || observedCost !== approvedCost ||
+        upper(row.observedSupplierCurrency) !== upper(row.supplierCurrency) ||
+        !row.supplierCurrency || !capturedAt || Number.isNaN(capturedAt.getTime()) ||
+        !observedAt || Number.isNaN(observedAt.getTime())
+    ) {
+        throw new AdminPricingControlCenterError("PRICING_AUTHORITY_REQUIRED", "Approved supplier cost authority is required before pricing can be marked ready.", 409);
+    }
+    const currentOffer = await SupplierCatalogOffer.exists({
+        _id: row.supplierCatalogOfferId,
+        supplierId: row.supplierId,
+        supplierProductCode: text(row.supplierProductCode),
+        supplierOfferCode: text(row.supplierPackageCode),
+        catalogLifecycleState: "ACTIVE",
+        "supplierCost.amount": approvedCost,
+        "supplierCost.currency": upper(row.supplierCurrency),
+        "supplierCost.observedAt": observedAt
+    });
+    if (!currentOffer) {
+        throw new AdminPricingControlCenterError("PRICING_SOURCE_EVIDENCE_DRIFT", "Current supplier catalog evidence changed during publication. Pricing readiness was not updated.", 409);
+    }
     const result = await SupplierProductMapping.updateOne(
-        { _id: row.mappingId, archivedAt: null, "mappingMetadata.readiness.pricingReady": { $ne: true } },
+        {
+            _id: row.mappingId,
+            supplierId: row.supplierId,
+            supplierCode: upper(row.supplierCode),
+            supplierCatalogOfferId: row.supplierCatalogOfferId,
+            productCode: text(row.productCode).toLowerCase(),
+            packageCode: normalizePackageCode(row.packageCode),
+            supplierProductCode: text(row.supplierProductCode),
+            supplierPackageCode: text(row.supplierPackageCode),
+            archivedAt: null,
+            "supplierCostAuthority.rawSupplierCost": approvedCost,
+            "supplierCostAuthority.supplierCurrency": upper(row.supplierCurrency),
+            "supplierCostAuthority.capturedAt": capturedAt,
+            "supplierCostAuthority.providerProductCode": text(row.providerProductCode || row.supplierProductCode),
+            "supplierCostAuthority.providerOfferCode": text(row.providerOfferCode || row.supplierPackageCode),
+            "mappingMetadata.readiness.pricingReady": { $ne: true }
+        },
         {
             $set: {
                 "mappingMetadata.readiness.pricingReady": true,
@@ -1169,7 +1222,10 @@ async function markMappingPricingReady(row = {}, actor = "admin") {
         },
         { runValidators: true }
     );
-    return { changed: result.modifiedCount === 1 };
+    if (result.modifiedCount !== 1) {
+        throw new AdminPricingControlCenterError("PRICING_AUTHORITY_DRIFT", "Supplier mapping or approved cost authority changed during publication. Pricing readiness was not updated.", 409);
+    }
+    return { changed: true };
 }
 
 function operatorRegionStatus(item = {}) {
@@ -1266,6 +1322,7 @@ async function batchPreviewDailyPricing({ rows = [], couponCode = "", actor = nu
             productCode: mapping.productCode,
             packageCode: mapping.packageCode,
             mappingId: String(mapping._id),
+            supplierCatalogOfferId: mapping.supplierCatalogOfferId ? String(mapping.supplierCatalogOfferId) : "",
             supplierProductCode: mapping.supplierProductCode,
             supplierPackageCode: mapping.supplierPackageCode,
             mappingRegion: mapping.region,
@@ -1274,6 +1331,7 @@ async function batchPreviewDailyPricing({ rows = [], couponCode = "", actor = nu
             approvedSupplierCost: costState.approvedSupplierCost,
             observedSupplierCost: observedSupplierCost?.amount ?? null,
             observedSupplierCurrency: observedSupplierCost?.currency || "",
+            observedSupplierCostAt: observedSupplierCost?.observedAt || null,
             provisionalPricing: costState.provisional,
             costAuthorityState: costState.status,
             preparationSelected: false,
@@ -1389,6 +1447,7 @@ async function batchPreviewDailyPricing({ rows = [], couponCode = "", actor = nu
             supplierId: supplier.supplierId,
             supplierCode: supplier.supplierCode,
             mappingId: row.mappingId || "",
+            supplierCatalogOfferId: row.supplierCatalogOfferId || "",
             supplierProductCode: row.supplierProductCode || "",
             supplierPackageCode: row.supplierPackageCode || pkg.supplierPackageCode || pkg.metadata?.supplierPackageCode || pkg.packageCode,
             mappingRegion: row.mappingRegion || "",
@@ -1396,6 +1455,8 @@ async function batchPreviewDailyPricing({ rows = [], couponCode = "", actor = nu
             approvedSupplierCost: row.approvedSupplierCost,
             observedSupplierCost: row.observedSupplierCost,
             observedSupplierCurrency: row.observedSupplierCurrency,
+            observedSupplierCostAt: row.observedSupplierCostAt,
+            supplierCostAuthorityState: row.supplierCostAuthorityState,
             provisionalPricing: row.provisionalPricing === true,
             preparationSelected: row.preparationSelected === true,
             costAuthorityState: row.costAuthorityState,
@@ -1686,6 +1747,14 @@ async function publishDailyPricing({
                 actor
             });
 
+            if (
+                update.changed === true &&
+                publishableRegions.length === selectedRegions.length &&
+                shouldMarkMappingPricingReady(row, admin)
+            ) {
+                await markMappingPricingReady(row, actor);
+            }
+
             publishableRegions.forEach(selectedRegion => {
                 results.push({
                     region: selectedRegion,
@@ -1924,7 +1993,9 @@ module.exports = Object.freeze({
     loadDailyPricingInventory,
     loadDailyPricingProductDetail,
     bulkBackfillSupplierCosts,
+    markMappingPricingReady,
     publishDailyPricing,
+    shouldMarkMappingPricingReady,
     previewPackagePricing
     ,savePackageProfitOverride
 });

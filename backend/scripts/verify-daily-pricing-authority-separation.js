@@ -40,7 +40,8 @@ assert(preview.includes('pricingTargetRegions("ALL")'));
 assert(!preview.includes("preparationSelections"));
 assert(!publish.includes("pricingPersistenceReadinessReasons"));
 assert(!publish.includes("StoreCatalogSelection.find"));
-assert(!publish.includes("markMappingPricingReady"));
+assert(publish.includes("shouldMarkMappingPricingReady(row, admin)"));
+assert(publish.includes("publishableRegions.length === selectedRegions.length"));
 assert(!publish.includes("enabled: true"));
 assert(publish.includes("expectedUpdatedAt"));
 assert(!drafts.includes("without active regional pricing"));
@@ -63,6 +64,7 @@ console.log(JSON.stringify({
     pricingMarkets: pricingTargetRegions("ALL"),
     missingPricesVisible: true,
     pricePublishOnly: true,
+    ownerReviewedReadyRouteAttestation: true,
     automaticStorefrontPublication: false,
     publishModes: ["PACKAGE", "SELECTION", "PRODUCT_CHANGED", "WORKSPACE_CHANGED"],
     deterministicChunkSize: 200,
