@@ -333,26 +333,38 @@ function projectActivation(data, { search = "", productCode = "", supplierMarket
             const logicalKey = canonicalCode ? `canonical:${canonicalCode}` : `supplier:${id(item)}`;
             const offers = offersBySupplierProduct.get(id(item)) || [];
             const supplier = supplierById.get(id(item.supplierId));
-            const hasSelectableOffer = offers.some(offer => {
+            const assessedOffers = offers.map(offer => {
                 const mapping = data.mappings.find(candidate => id(candidate.supplierCatalogOfferId) === id(offer));
                 const canonicalPackage = mapping ? packageByKey.get(key(lower(mapping.productCode), upper(mapping.packageCode))) : null;
-                return evaluateAddProductOffer({ supplier, product: item, offer, availability: availabilityByOffer.get(id(offer)), mapping, canonicalPackage, customerMarkets: requestedSellingRegions, newCanonicalProduct: !canonicalPackage }).selectable;
+                return { offer, mapping, assessment: evaluateAddProductOffer({ supplier, product: item, offer, availability: availabilityByOffer.get(id(offer)), mapping, canonicalPackage, customerMarkets: requestedSellingRegions, newCanonicalProduct: !canonicalPackage }) };
             });
-            if (!hasSelectableOffer) continue;
+            if (!offers.length) continue;
             if (!logicalByKey.has(logicalKey)) logicalByKey.set(logicalKey, {
                 logicalProductId: logicalKey, canonicalProductCode: "", name: item.displayName || item.rawName || item.supplierProductCode,
                 existingCanonical: false, packageCount: offers.length, publishedPackageCount: 0, sources: []
             });
             const logical = logicalByKey.get(logicalKey);
             const suggestion = canonicalProductSuggestion({ supplierProduct: item, sourceMappings, offers, canonicalProducts: data.products });
+            const exclusionReasonCounts = {};
+            for (const row of assessedOffers.filter(row => !row.assessment.selectable)) {
+                const reasons = [...new Set([...(row.assessment.blockers || []), ...(row.assessment.sellingBlockers || [])])];
+                for (const reason of reasons.length ? reasons : ["REVIEW_REQUIRED"]) exclusionReasonCounts[reason] = Number(exclusionReasonCounts[reason] || 0) + 1;
+            }
             logical.sources.push({ supplierCatalogProductId: id(item), supplierId: id(item.supplierId),
                 supplierProductCode: clean(item.supplierProductCode), supplierCode: upper(supplierById.get(id(item.supplierId))?.supplierCode),
                 supplierName: supplierById.get(id(item.supplierId))?.name || "", supplierMarket: upper(item.supplierMarketCode),
-                displayName: item.displayName || item.rawName || item.supplierProductCode, packageCount: offers.length,
+                displayName: item.displayName || item.rawName || item.supplierProductCode, packageCount: offers.length, totalOfferCount: offers.length,
+                importableOfferCount: assessedOffers.filter(row => row.assessment.selectable).length,
+                reviewRequiredOfferCount: assessedOffers.filter(row => row.assessment.state === "NEEDS_ATTENTION").length,
+                unavailableOfferCount: assessedOffers.filter(row => row.assessment.state === "UNAVAILABLE").length,
+                excludedOfferCount: assessedOffers.filter(row => !row.assessment.selectable).length,
+                exclusionReasonCounts,
+                canonicalMappedPackageCount: new Set(sourceMappings.map(mapping => upper(mapping.packageCode)).filter(Boolean)).size,
+                canonicalProductCode: canonicalCode,
                 mapped: sourceMappings.length > 0, sourceAuthority: canonicalCode ? (mappedCodes.length === 1 ? "EXACT_MAPPING" : "ONBOARDING_AUTHORITY") : "SUPPLIER_NATIVE",
                 suggestedCanonicalProduct: suggestion });
         }
-        const logicalProducts = [...logicalByKey.values()].filter(item => item.sources.length > 0).filter(item => !normalizedSearch || [item.name, item.canonicalProductCode, ...item.sources.flatMap(source => [source.displayName, source.supplierName, source.supplierCode])].some(value => lower(value).includes(normalizedSearch))).sort((a,b)=>a.name.localeCompare(b.name));
+        const logicalProducts = [...logicalByKey.values()].filter(item => item.sources.length > 0).map(item => ({ ...item, presentationGroupId: `name:${normalizedSuggestionIdentity(item.name) || lower(item.name)}` })).filter(item => !normalizedSearch || [item.name, item.canonicalProductCode, ...item.sources.flatMap(source => [source.displayName, source.supplierName, source.supplierCode])].some(value => lower(value).includes(normalizedSearch))).sort((a,b)=>a.name.localeCompare(b.name));
         return {
             authority: { catalog: "CatalogProduct/CatalogPackage", route: "SupplierProductMapping.productionRole", cost: "SupplierProductMapping.supplierCostAuthority", pricing: "Daily Pricing/Pricing Engine", input: "SupplierCatalogProduct + mapping readiness", fulfillment: "supplier eligibility route resolver", publication: "PackageMarketPublication" },
             projectionMode: "NAVIGATION", customerMarket: market, commerceMarketSupported: COMMERCE_MARKETS.includes(market), products, logicalProducts,

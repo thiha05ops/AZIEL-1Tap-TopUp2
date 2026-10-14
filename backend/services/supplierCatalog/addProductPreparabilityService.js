@@ -34,7 +34,11 @@ function evaluateAddProductOffer({ supplier = {}, product = {}, offer = {}, avai
     const disposition = packageDisposition({ offer, mapping, canonicalPackage, newCanonicalProduct });
     if (sourceStale) blockers.push("STALE_SOURCE");
     if (upper(offer.catalogLifecycleState) !== "ACTIVE") blockers.push("SUPPLIER_UNAVAILABLE");
-    if (upper(availability?.state) !== "AVAILABLE") sellingBlockers.push("SUPPLIER_UNAVAILABLE");
+    const availabilityState = upper(availability?.state);
+    if (availabilityState !== "AVAILABLE") {
+        sellingBlockers.push("SUPPLIER_UNAVAILABLE");
+        blockers.push(availabilityState === "UNAVAILABLE" ? "SUPPLIER_UNAVAILABLE" : "SUPPLIER_AVAILABILITY_NOT_CONFIRMED");
+    }
     if (!PROTOCOLS[supplierCode]) sellingBlockers.push("UNSUPPORTED_PROTOCOL");
     const authorities = resolvedAuthorities(product, offer);
     const inputProduct = offer?.metadata?.normalizedInputContract ? { ...product, normalizedInputContract: offer.metadata.normalizedInputContract } : product;
@@ -49,7 +53,7 @@ function evaluateAddProductOffer({ supplier = {}, product = {}, offer = {}, avai
     const unique = [...new Set(blockers)];
     const unavailable = unique.includes("SUPPLIER_UNAVAILABLE");
     const state = unavailable ? "UNAVAILABLE" : unique.length ? "NEEDS_ATTENTION" : mapping ? "READY" : "PREPARABLE";
-    const actionByBlocker = { PACKAGE_IDENTITY_REVIEW: "PACKAGE_REVIEW", INPUT_CONTRACT_REQUIRED: "INPUT_CONTRACT", EXECUTION_IDENTITY_REQUIRED: "EXECUTION_CONFIGURATION", SUPPLIER_MARKET_AUTHORITY_REQUIRED: "MARKET_AUTHORITY", CUSTOMER_MARKET_INELIGIBLE: "MARKET_AUTHORITY", SUPPLIER_UNAVAILABLE: "NONE", UNSUPPORTED_PROTOCOL: "NONE", STALE_SOURCE: "REFRESH" };
+    const actionByBlocker = { PACKAGE_IDENTITY_REVIEW: "PACKAGE_REVIEW", INPUT_CONTRACT_REQUIRED: "INPUT_CONTRACT", EXECUTION_IDENTITY_REQUIRED: "EXECUTION_CONFIGURATION", SUPPLIER_MARKET_AUTHORITY_REQUIRED: "MARKET_AUTHORITY", CUSTOMER_MARKET_INELIGIBLE: "MARKET_AUTHORITY", SUPPLIER_UNAVAILABLE: "NONE", SUPPLIER_AVAILABILITY_NOT_CONFIRMED: "REFRESH", UNSUPPORTED_PROTOCOL: "NONE", STALE_SOURCE: "REFRESH" };
     return { state, selectable: ["READY", "PREPARABLE"].includes(state), primaryBlocker: unique[0] || "", blockers: unique, sellingBlockers: [...new Set(sellingBlockers)], correctiveAction: actionByBlocker[unique[0]] || "NONE", packageDisposition: disposition, inputAuthority: input.classification };
 }
 
