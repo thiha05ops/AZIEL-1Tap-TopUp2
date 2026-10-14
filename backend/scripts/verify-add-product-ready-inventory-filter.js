@@ -4,6 +4,7 @@
 const assert = require("assert");
 const fs = require("fs");
 const path = require("path");
+const vm = require("vm");
 const { projectActivation } = require("../services/adminProductActivationService");
 
 let sequence = 0;
@@ -42,17 +43,29 @@ assert.strictEqual(unavailableSource.importableOfferCount, 0, "Explicitly unavai
 assert.strictEqual(unavailableSource.unavailableOfferCount, 1);
 assert.strictEqual(unavailableSource.exclusionReasonCounts.SUPPLIER_UNAVAILABLE, 1);
 
-const mlbbMapped = source("Mobile Legends (Global)");
-const mlbbUnresolved = source("Mobile Legends (Global)");
-mlbbUnresolved.product.supplierProductCode = "mobile_legends_global_unresolved";
-mlbbUnresolved.offer.supplierProductCode = mlbbUnresolved.product.supplierProductCode;
-const mlbbMapping = { _id: oid(), supplierId: supplier._id, supplierCode: "WONDD", supplierProductCode: mlbbMapped.product.supplierProductCode, supplierPackageCode: mlbbMapped.offer.supplierOfferCode, supplierCatalogOfferId: mlbbMapped.offer._id, productCode: "mlbb", packageCode: "MLBB_10", region: "GLOBAL", fulfillmentEligibility: contract.fulfillmentEligibility };
-const duplicateProjection = projectActivation({ products: [{ productCode: "mlbb", name: "Mobile Legends (Global)" }], packages: [{ productCode: "mlbb", packageCode: "MLBB_10", enabled: true, deletedAt: null }], mappings: [mlbbMapping], publications: [], selections: [], suppliers: [supplier], supplierProducts: [mlbbMapped.product, mlbbUnresolved.product], offers: [mlbbMapped.offer, mlbbUnresolved.offer], availability: [mlbbMapped.availability, mlbbUnresolved.availability] }, { customerMarket: "TH" });
-assert.strictEqual(duplicateProjection.logicalProducts.length, 2, "Backend identities remain separate.");
-assert.strictEqual(new Set(duplicateProjection.logicalProducts.map(item => item.presentationGroupId)).size, 1, "Duplicate-looking identities receive one presentation group only.");
-assert(duplicateProjection.logicalProducts.every(item => item.sources[0].totalOfferCount === 1));
+const variantNames = ["Mobile Legends (Global)", "Mobile Legends (Malaysia)", "Mobile Legends (Exclusive)", "Mobile Legends (Special)"];
+const variantCodes = ["mlbb-global", "mlbb-malaysia", "mlbb-exclusive", "mlbb-special"];
+const variantSources = variantNames.map(name => source(name));
+const variantMappings = variantSources.map((row, index) => ({ _id: oid(), supplierId: supplier._id, supplierCode: "WONDD", supplierProductCode: row.product.supplierProductCode, supplierPackageCode: row.offer.supplierOfferCode, supplierCatalogOfferId: row.offer._id, productCode: variantCodes[index], packageCode: `MLBB_${index + 1}`, region: "GLOBAL", fulfillmentEligibility: contract.fulfillmentEligibility }));
+const unresolvedGlobal = source("Mobile Legends (Global)");
+unresolvedGlobal.product.supplierProductCode = "mobile_legends_global_unresolved";
+unresolvedGlobal.offer.supplierProductCode = unresolvedGlobal.product.supplierProductCode;
+const variantProjection = projectActivation({ products: variantNames.map((name, index) => ({ productCode: variantCodes[index], name })), packages: variantCodes.map((productCode, index) => ({ productCode, packageCode: `MLBB_${index + 1}`, enabled: true, deletedAt: null })), mappings: variantMappings, publications: [], selections: [], suppliers: [supplier], supplierProducts: [...variantSources.map(row => row.product), unresolvedGlobal.product], offers: [...variantSources.map(row => row.offer), unresolvedGlobal.offer], availability: [...variantSources.map(row => row.availability), unresolvedGlobal.availability] }, { customerMarket: "TH" });
+assert.strictEqual(variantProjection.logicalProducts.length, 5, "Canonical variants and unresolved native identities must remain separate.");
+assert.strictEqual(new Set(variantProjection.logicalProducts.map(item => item.presentationGroupId)).size, 5, "Lossy normalized names must never merge regional or category variants.");
+for (const name of variantNames) assert(variantProjection.logicalProducts.some(item => item.name === name), `${name} must remain discoverable.`);
+const malaysia = variantProjection.logicalProducts.find(item => item.canonicalProductCode === "mlbb-malaysia");
+assert.strictEqual(malaysia.name, "Mobile Legends (Malaysia)");
+assert.strictEqual(malaysia.packageCount, 1, "Global package counts must never be attributed to Malaysia.");
+assert(variantProjection.logicalProducts.every(item => item.sources[0].totalOfferCount === 1));
 const serviceSource = fs.readFileSync(path.resolve(__dirname, "../services/adminProductActivationService.js"), "utf8");
 const wizardSource = fs.readFileSync(path.resolve(__dirname, "../../frontend/js/admin-add-product-wizard.js"), "utf8");
+const presentationFunction = wizardSource.match(/function apwPresentationProducts\(\)\{.*?\n(?=function apwRenderProducts)/s)?.[0];
+assert(presentationFunction, "Wizard presentation projection must remain directly verifiable.");
+const browserProjection = vm.runInNewContext(`const addProductWizard = { logicalProducts: input }; ${presentationFunction}; apwPresentationProducts()`, { input: variantProjection.logicalProducts });
+assert.strictEqual(browserProjection.length, 5, "Browser projection must not collapse canonical variants or unresolved native identities.");
+assert.deepStrictEqual(Array.from(browserProjection.filter(item => item.existingCanonical), item => item.name).sort(), [...variantNames].sort());
+assert.strictEqual(browserProjection.find(item => item.canonicalProductCode === "mlbb-malaysia").packageCount, 1, "Browser projection must not relabel another variant's package count as Malaysia.");
 assert(serviceSource.includes("region fulfillmentEligibility"), "Navigation must load mapping eligibility used by preparability.");
 assert(serviceSource.includes("metadata normalizedInputContract requiredFields"), "Navigation must load the normalized customer input contract.");
 assert(serviceSource.includes("catalogLifecycleState metadata"), "Navigation must load offer-scoped business authority.");
@@ -60,4 +73,4 @@ assert(serviceSource.includes("M.CatalogPackage.find({ deletedAt: null, $or: pac
 assert(!serviceSource.includes("for (const offer) await M.CatalogPackage"), "Navigation must not add a per-offer package query.");
 assert(wizardSource.includes("function apwPresentationProducts()") && wizardSource.includes("AZIEL package") && wizardSource.includes("supplier offer"), "Wizard must distinguish canonical packages from supplier offers.");
 assert(wizardSource.includes("review required") && wizardSource.includes("unavailable") && wizardSource.includes("exclusionReasonCounts"), "Wizard must display server-projected coverage and exclusion reasons.");
-console.log(JSON.stringify({ result: "PASS", visible: [...visible].sort(), duplicateNamePresentationGroups: 1, backendIdentitiesPreserved: 2, unavailableSelectable: false, importReadinessSeparatedFromSellingReadiness: true, authoritativeInputs: ["normalizedInputContract", "requiredFields", "fulfillmentEligibility", "canonicalPackage", "offerBusinessAuthority"], packageQueries: "ONE_BATCH", writes: 0, providerCalls: 0 }, null, 2));
+console.log(JSON.stringify({ result: "PASS", visible: [...visible].sort(), distinctMlbbVariants: variantNames, backendIdentitiesPreserved: 5, unavailableSelectable: false, importReadinessSeparatedFromSellingReadiness: true, authoritativeInputs: ["normalizedInputContract", "requiredFields", "fulfillmentEligibility", "canonicalPackage", "offerBusinessAuthority"], packageQueries: "ONE_BATCH", writes: 0, providerCalls: 0 }, null, 2));
