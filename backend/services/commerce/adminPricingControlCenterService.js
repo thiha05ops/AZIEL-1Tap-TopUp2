@@ -1610,6 +1610,15 @@ async function publishDailyPricing({
 
         const publicationDecision = selectedPublicationDecision(row);
         if (publicationDecision.action === "NO_OP") {
+            let readinessConfirmed = false;
+            if (
+                row.mappingReadiness?.pricingReady !== true &&
+                selectedRegions.length === WORKSPACE_REGIONS.length &&
+                shouldMarkMappingPricingReady(row, admin)
+            ) {
+                await markMappingPricingReady(row, actor);
+                readinessConfirmed = true;
+            }
             selectedRegions.forEach(selectedRegion => {
                 results.push({
                     region: selectedRegion,
@@ -1617,7 +1626,7 @@ async function publishDailyPricing({
                     packageCode: row.packageCode,
                     published: false,
                     skipped: true,
-                    reason: publicationDecision.reason
+                    reason: readinessConfirmed ? "Published prices unchanged; pricing readiness confirmed" : publicationDecision.reason
                 });
             });
             continue;

@@ -163,6 +163,7 @@ async function main() {
         const pricingSource = fs.readFileSync(path.join(root, "backend/services/commerce/adminPricingControlCenterService.js"), "utf8");
         const publishBody = pricingSource.slice(pricingSource.indexOf("async function publishDailyPricing"), pricingSource.indexOf("async function loadPackage"));
         ok(publishBody.includes("publishableRegions.length === selectedRegions.length") && publishBody.includes("shouldMarkMappingPricingReady(row, admin)"), "partial or non-OWNER publication cannot mark readiness");
+        ok(publishBody.includes("selectedRegions.length === WORKSPACE_REGIONS.length") && publishBody.includes("Published prices unchanged; pricing readiness confirmed"), "OWNER can reaffirm unchanged TH and MM prices without altering them");
         const ui = fs.readFileSync(path.join(root, "frontend/js/admin-guided-selling.js"), "utf8");
         ok(ui.includes("data-store-package-enabled") && ui.includes("/api/admin/catalog/products/"), "current Products workspace exposes the guarded package availability control through the existing catalog PATCH endpoint");
         const route = fs.readFileSync(path.join(root, "backend/routes/catalog.js"), "utf8");

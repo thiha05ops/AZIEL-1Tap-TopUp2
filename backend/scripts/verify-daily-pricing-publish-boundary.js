@@ -122,7 +122,7 @@ console.log(JSON.stringify({
     deterministicRejectionUncertain: false,
     transportFailureUncertain: true,
     successfulCommitRefreshesWorkspace: true,
-    unchangedPreparedRowsCanConvergePricingReadiness: false,
+    unchangedPreparedRowsCanConvergePricingReadiness: true,
     successfulOwnerReviewedReadyRoutesCanConvergePricingReadiness: true,
     unrelatedPackagesChanged: 0,
     mappingActivationWrites: 0,
