@@ -1144,11 +1144,22 @@ function rowStatusFromRegional(regional = []) {
 }
 
 function selectedPublicationDecision(row = {}) {
-    if (row.changed !== true) return { action: "NO_OP", reason: "No changes" };
     if (row.publishEligible !== true || (row.blockingErrors || []).length) {
         return { action: "BLOCKED", reason: "Blocked by pricing preview" };
     }
+    if (row.changed !== true) return { action: "NO_OP", reason: "No changes" };
     return { action: "PUBLISH", reason: "" };
+}
+
+function selectedRegionsHaveValidPublicationPreview(row = {}, selectedRegions = []) {
+    return selectedRegions.every(selectedRegion => {
+        const regionalPreview = (row.regions || []).find(item => item.region === selectedRegion);
+        const calculatedPrice = Number(regionalPreview?.finalPreviewPrice ?? regionalPreview?.recommendedSellingPrice);
+        return Boolean(regionalPreview) &&
+            !(regionalPreview.blockingErrors || []).length &&
+            Number.isFinite(calculatedPrice) &&
+            calculatedPrice >= 0;
+    });
 }
 
 function shouldMarkMappingPricingReady(row = {}, admin = null) {
@@ -1614,6 +1625,7 @@ async function publishDailyPricing({
             if (
                 row.mappingReadiness?.pricingReady !== true &&
                 selectedRegions.length === WORKSPACE_REGIONS.length &&
+                selectedRegionsHaveValidPublicationPreview(row, selectedRegions) &&
                 shouldMarkMappingPricingReady(row, admin)
             ) {
                 await markMappingPricingReady(row, actor);
@@ -1634,23 +1646,12 @@ async function publishDailyPricing({
 
         const pricePatches = {};
         const publishableRegions = [];
+        const unchangedValidRegions = [];
 
         for (const selectedRegion of selectedRegions) {
             const regionalPreview = (row.regions || []).find(item => item.region === selectedRegion);
             const calculatedPrice = Number(regionalPreview?.finalPreviewPrice ?? regionalPreview?.recommendedSellingPrice);
             const regionalBlockingErrors = regionalPreview?.blockingErrors || [];
-
-            if (regionalPreview && regionalPreview.changed !== true) {
-                results.push({
-                    region: selectedRegion,
-                    productCode: row.productCode,
-                    packageCode: row.packageCode,
-                    published: false,
-                    skipped: true,
-                    reason: "No changes"
-                });
-                continue;
-            }
 
             if (
                 !regionalPreview ||
@@ -1670,6 +1671,19 @@ async function publishDailyPricing({
                     blockingErrors: regionalBlockingErrors.length
                         ? regionalBlockingErrors
                         : row.blockingErrors || []
+                });
+                continue;
+            }
+
+            if (regionalPreview.changed !== true) {
+                unchangedValidRegions.push(selectedRegion);
+                results.push({
+                    region: selectedRegion,
+                    productCode: row.productCode,
+                    packageCode: row.packageCode,
+                    published: false,
+                    skipped: true,
+                    reason: "No changes"
                 });
                 continue;
             }
@@ -1758,7 +1772,7 @@ async function publishDailyPricing({
 
             if (
                 update.changed === true &&
-                publishableRegions.length === selectedRegions.length &&
+                new Set([...publishableRegions, ...unchangedValidRegions]).size === selectedRegions.length &&
                 shouldMarkMappingPricingReady(row, admin)
             ) {
                 await markMappingPricingReady(row, actor);
@@ -2004,6 +2018,7 @@ module.exports = Object.freeze({
     bulkBackfillSupplierCosts,
     markMappingPricingReady,
     publishDailyPricing,
+    selectedRegionsHaveValidPublicationPreview,
     shouldMarkMappingPricingReady,
     previewPackagePricing
     ,savePackageProfitOverride

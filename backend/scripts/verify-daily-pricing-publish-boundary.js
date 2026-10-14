@@ -106,7 +106,7 @@ assert(!publishBody.includes("StoreCatalogSelection.find"));
 assert(!publishBody.includes("storePublicationReadinessReasons"), "Full sellability must remain outside price persistence.");
 assert(!publishBody.includes("withTransaction") && !publishBody.includes("session:"), "Publish path has no Mongo transaction-session concurrency defect.");
 assert(publishBody.includes("shouldMarkMappingPricingReady(row, admin)"), "Only authenticated OWNER publication may attest pricing readiness.");
-assert(publishBody.includes("publishableRegions.length === selectedRegions.length"), "Partial regional publication must not attest pricing readiness.");
+assert(publishBody.includes("new Set([...publishableRegions, ...unchangedValidRegions]).size === selectedRegions.length"), "Only complete changed-or-unchanged-valid regional coverage may attest pricing readiness.");
 assert(frontend.includes('publishOutcome.classify(error) === "UNCERTAIN"'));
 assert(frontend.includes("await loadDaily(true, { preserveOnError: true, postPublish: true"), "Success and uncertainty paths must reload authoritative workspace.");
 assert(!frontend.includes("/api/admin/product-activation"), "Pricing must not trigger Store Catalog publication.");

@@ -41,7 +41,7 @@ assert(!preview.includes("preparationSelections"));
 assert(!publish.includes("pricingPersistenceReadinessReasons"));
 assert(!publish.includes("StoreCatalogSelection.find"));
 assert(publish.includes("shouldMarkMappingPricingReady(row, admin)"));
-assert(publish.includes("publishableRegions.length === selectedRegions.length"));
+assert(publish.includes("new Set([...publishableRegions, ...unchangedValidRegions]).size === selectedRegions.length"));
 assert(!publish.includes("enabled: true"));
 assert(publish.includes("expectedUpdatedAt"));
 assert(!drafts.includes("without active regional pricing"));

@@ -13,6 +13,7 @@ const SupplierCatalogOffer = require("../models/SupplierCatalogOffer");
 const SupplierProductMapping = require("../models/SupplierProductMapping");
 const {
     markMappingPricingReady,
+    selectedRegionsHaveValidPublicationPreview,
     shouldMarkMappingPricingReady
 } = require("../services/commerce/adminPricingControlCenterService");
 const { setPackageEnabledForSelling } = require("../services/catalogAdminService");
@@ -127,6 +128,12 @@ async function main() {
         ok(!shouldMarkMappingPricingReady({ mappingReadiness: { supplierMapped: true, inputReady: true, fulfillmentReady: true } }, { role: "CATALOG" }), "non-OWNER publication cannot mark pricing ready");
         ok(!shouldMarkMappingPricingReady({ mappingReadiness: { supplierMapped: true, inputReady: true, fulfillmentReady: false } }, OWNER), "unready fulfillment route cannot be marked pricing ready");
         ok(shouldMarkMappingPricingReady({ mappingReadiness: { supplierMapped: true, inputReady: true, fulfillmentReady: true } }, OWNER), "ready route and OWNER publication qualify");
+        const mixedRegionalPreview = { regions: [
+            { region: "TH", changed: false, finalPreviewPrice: 54, blockingErrors: [] },
+            { region: "MM", changed: true, finalPreviewPrice: 6889, blockingErrors: [] }
+        ] };
+        ok(selectedRegionsHaveValidPublicationPreview(mixedRegionalPreview, ["TH", "MM"]), "one unchanged and one changed valid region form complete publication coverage");
+        ok(!selectedRegionsHaveValidPublicationPreview({ regions: [mixedRegionalPreview.regions[0], { ...mixedRegionalPreview.regions[1], blockingErrors: [{ code: "BLOCKED" }] }] }, ["TH", "MM"]), "a blocked regional preview cannot satisfy publication coverage");
 
         let fixture = await seed();
         await markMappingPricingReady(readinessRow(fixture.mapping), OWNER.username);
@@ -162,7 +169,7 @@ async function main() {
         const root = path.join(__dirname, "..", "..");
         const pricingSource = fs.readFileSync(path.join(root, "backend/services/commerce/adminPricingControlCenterService.js"), "utf8");
         const publishBody = pricingSource.slice(pricingSource.indexOf("async function publishDailyPricing"), pricingSource.indexOf("async function loadPackage"));
-        ok(publishBody.includes("publishableRegions.length === selectedRegions.length") && publishBody.includes("shouldMarkMappingPricingReady(row, admin)"), "partial or non-OWNER publication cannot mark readiness");
+        ok(publishBody.includes("new Set([...publishableRegions, ...unchangedValidRegions]).size === selectedRegions.length") && publishBody.includes("shouldMarkMappingPricingReady(row, admin)"), "changed plus unchanged-valid coverage may attest readiness but partial or non-OWNER publication cannot");
         ok(publishBody.includes("selectedRegions.length === WORKSPACE_REGIONS.length") && publishBody.includes("Published prices unchanged; pricing readiness confirmed"), "OWNER can reaffirm unchanged TH and MM prices without altering them");
         const ui = fs.readFileSync(path.join(root, "frontend/js/admin-guided-selling.js"), "utf8");
         ok(ui.includes("data-store-package-enabled") && ui.includes("/api/admin/catalog/products/"), "current Products workspace exposes the guarded package availability control through the existing catalog PATCH endpoint");
