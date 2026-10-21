@@ -103,10 +103,11 @@ function planMutations(stage, existing = {}) {
 
 async function applyCatalogOnlyPlan(plan, repositories, { runKey } = {}) {
     const run = await repositories.runs.start({ supplierId: plan.supplierId, catalogNamespace: NAMESPACE, runKey, status: "RUNNING", coverageState: "UNKNOWN", startedAt: plan.observedAt, sourceRevision: plan.contentRevision });
-    const ids = new Map();
+    const ids = new Map(), savedOffers = [];
     for (const product of plan.products) { const saved = await repositories.products.upsert(product); ids.set(product.supplierProductCode, saved._id); }
-    for (const offer of plan.offers) { const saved = await repositories.offers.upsert({ ...offer, supplierCatalogProductId: ids.get(offer.supplierProductCode) }); await repositories.availability.upsert({ ...offer.availability, supplierCatalogOfferId: saved._id, observationRunId: run._id }); if (repositories.observations?.append) await repositories.observations.append({ offer: saved, ingestionRunId: run._id }); }
-    return repositories.runs.finalize(run._id, plan);
+    for (const offer of plan.offers) { const saved = await repositories.offers.upsert({ ...offer, supplierCatalogProductId: ids.get(offer.supplierProductCode) }); savedOffers.push(saved); await repositories.availability.upsert({ ...offer.availability, supplierCatalogOfferId: saved._id, observationRunId: run._id }); if (repositories.observations?.append) await repositories.observations.append({ offer: saved, ingestionRunId: run._id }); }
+    if (repositories.observations?.appendRun) await repositories.observations.appendRun({ ingestionRunId: run._id, supplierId: plan.supplierId, catalogNamespace: NAMESPACE, runKey, observedAt: plan.observedAt, coverageState: plan.coverageState, offers: savedOffers });
+    return repositories.runs.finalizeWithLatest ? repositories.runs.finalizeWithLatest(run._id, plan, savedOffers) : repositories.runs.finalize(run._id, plan);
 }
 
 module.exports = Object.freeze({ NAMESPACE, COMPLETENESS_EVIDENCE, WonddCatalogIngestionError, createCatalogReader, supplierInputContract, semantics, classify, meaningfulRevision, stageCatalog, planMutations, applyCatalogOnlyPlan });

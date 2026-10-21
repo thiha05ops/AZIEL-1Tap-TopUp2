@@ -8,6 +8,9 @@ const SupplierCatalogCostObservation = require("../../models/SupplierCatalogCost
 const SupplierCatalogIngestionRun = require("../../models/SupplierCatalogIngestionRun");
 const Supplier = require("../../models/Supplier");
 const Approval = require("../../models/WeeklySupplierCostApproval");
+const { readSupplierCostEvidencePolicy } = require("../../config/supplierCostEvidencePolicy");
+const { createSupplierCostEvidenceRepositories, validateTerminalLegacyFallbackRun } = require("./supplierCostEvidenceService");
+const { createSupplierLatestCostService } = require("./supplierLatestCostService");
 const { canonicalJson } = require("./supplierCatalogNormalization");
 const { compareSupplierCost, observedCostHash } = require("./supplierCostComparisonService");
 const { promoteObservedCost, sourceLock } = require("./supplierCostAuthorityService");
@@ -45,15 +48,45 @@ function exactCandidate(left, right) {
     return canonicalJson(candidateSnapshot(left)) === canonicalJson(candidateSnapshot(right));
 }
 
-function createRepositories(models = {}) {
+function validateLegacyRunEvidence(run, observations, expectedRunId) {
+    validateTerminalLegacyFallbackRun(run);
+    if (id(run._id) !== id(expectedRunId)) throw Object.assign(new Error("Legacy evidence ingestion-run identity does not match."), { code: "SUPPLIER_COST_EVIDENCE_RUN_IDENTITY_MISMATCH" });
+    const runSupplierId = id(run.supplierId), runNamespace = upper(run.catalogNamespace);
+    for (const observation of observations) {
+        if (id(observation.ingestionRunId) !== id(expectedRunId)
+            || id(observation.supplierId) !== runSupplierId
+            || upper(observation.catalogNamespace) !== runNamespace) {
+            throw Object.assign(new Error("Legacy observation identity does not match its ingestion run."), { code: "SUPPLIER_COST_EVIDENCE_RUN_IDENTITY_MISMATCH" });
+        }
+    }
+    return true;
+}
+
+function createRepositories(models = {}, options = {}) {
     const Selection = models.Selection || PackageSupplierSelection, Mapping = models.Mapping || SupplierProductMapping;
     const Offer = models.Offer || SupplierCatalogOffer, Observation = models.Observation || SupplierCatalogCostObservation;
     const Run = models.Run || SupplierCatalogIngestionRun, SupplierModel = models.Supplier || Supplier, ApprovalModel = models.Approval || Approval;
+    const evidencePolicy = options.evidencePolicy || readSupplierCostEvidencePolicy(), evidence = options.evidenceRepositories || createSupplierCostEvidenceRepositories(models.evidenceModels || {}), latestCosts = options.latestCostService || createSupplierLatestCostService(models.latestCostModels || {});
     return {
         selections: () => Selection.find({ customerMarket: "GLOBAL" }).lean(),
         mappings: ids => Mapping.find({ _id: { $in: ids }, archivedAt: null }).lean(),
         offers: ids => Offer.find({ _id: { $in: ids } }).lean(),
-        observations: (ids, runId) => Observation.find({ supplierCatalogOfferId: { $in: ids }, ...(runId ? { ingestionRunId: runId } : {}) }).sort({ observedAt: -1 }).lean(),
+        observations: async (ids, runId) => {
+            if (evidencePolicy.latestOnlyEnabled) {
+                if (!runId) return latestCosts.forOffers(ids);
+                return latestCosts.forOffers(ids, { ingestionRunId: runId });
+            }
+            if (evidencePolicy.v2ReadEnabled && runId) {
+                const rows = await evidence.observationsForRun(ids, runId);
+                if (rows !== null) return rows;
+            }
+            if (!runId) return Observation.find({ supplierCatalogOfferId: { $in: ids } }).sort({ observedAt: -1 }).lean();
+            const run = await Run.findById(runId).lean();
+            validateTerminalLegacyFallbackRun(run);
+            const rows = await Observation.find({ supplierCatalogOfferId: { $in: ids }, ingestionRunId: runId }).sort({ observedAt: -1 }).lean();
+            validateLegacyRunEvidence(run, rows, runId);
+            return rows;
+        },
         supplier: code => SupplierModel.findOne({ supplierCode: upper(code) }).lean(),
         approval: hash => ApprovalModel.findById(hash).lean(),
         createManifest: async data => {
@@ -100,7 +133,7 @@ function createWeeklySupplierCostSyncService(options = {}) {
         const offerMap = new Map(offers.map(row => [id(row._id), row]));
         const observations = await repos.observations(offers.map(row => row._id), ingestionRunId || null), observationMap = new Map();
         observations.forEach(row => { if (!observationMap.has(id(row.supplierCatalogOfferId))) observationMap.set(id(row.supplierCatalogOfferId), row); });
-        const decisions = scopedSelections.map(selection => { const mapping = allMappingMap.get(id(selection.supplierMappingId)), offer = mapping ? offerMap.get(id(mapping.supplierCatalogOfferId)) : null; return validateCandidate({ selection, mapping, offer, observation: offer ? observationMap.get(id(offer._id)) : null, expectedSupplier, now: clock().getTime(), maximumObservationAgeMs: policy.maximumObservationAgeMs, maximumAutomaticChangePercent: policy.maximumAutomaticChangePercent }); });
+        const decisions = scopedSelections.map(selection => { const mapping = allMappingMap.get(id(selection.supplierMappingId)), catalogOffer = mapping ? offerMap.get(id(mapping.supplierCatalogOfferId)) : null, observation = catalogOffer ? observationMap.get(id(catalogOffer._id)) : null, offer = observation?.evidenceMode === "LATEST_ONLY" ? { ...catalogOffer, supplierCost: { amount: observation.amount, currency: observation.currency, observedAt: observation.observedAt }, sourceRevision: observation.sourceRevision, rawSnapshotHash: observation.rawSnapshotHash } : catalogOffer; return validateCandidate({ selection, mapping, offer, observation, expectedSupplier, now: clock().getTime(), maximumObservationAgeMs: policy.maximumObservationAgeMs, maximumAutomaticChangePercent: policy.maximumAutomaticChangePercent }); });
         const initialCandidates = decisions.filter(row => row.status === "ACCEPTABLE" && row.initialAuthority).map(immutableCandidate), initialManifestHash = initialCandidates.length ? manifestHash(initialCandidates) : "";
         let approval = approvalHash ? await repos.approval(approvalHash) : null;
         if (initialCandidates.length && prepare) approval = await repos.createManifest({ manifestHash: initialManifestHash, candidates: initialCandidates, status: "PENDING" });
@@ -137,4 +170,4 @@ function createWeeklySupplierCostSyncService(options = {}) {
     return Object.freeze({ reconcile });
 }
 
-module.exports = Object.freeze({ createRepositories, validateCandidate, immutableCandidate, candidateSnapshot, manifestHash, exactCandidate, createWeeklySupplierCostSyncService });
+module.exports = Object.freeze({ createRepositories, validateLegacyRunEvidence, validateCandidate, immutableCandidate, candidateSnapshot, manifestHash, exactCandidate, createWeeklySupplierCostSyncService });

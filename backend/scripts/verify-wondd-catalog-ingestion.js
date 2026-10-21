@@ -23,8 +23,8 @@ function memoryRepositories() {
     const stage=await svc.stageCatalog({reader:fixture.reader(),supplierId:"supplier-wondd",mappings:fixture.mappings,observedAt});
     ok(stage.products.some(x=>x.supplierProductCode==="9622"),"serviceid product identity");
     ok(stage.offers.some(x=>x.supplierProductCode==="9622"&&x.supplierOfferCode==="ML00086"),"packcode offer identity");
-    const mlbb=stage.products.find(x=>x.supplierProductCode==="9622"); ok(mlbb.metadata.transactionalServiceCode==="mlbb"&&mlbb.supplierProductCode!==mlbb.metadata.transactionalServiceCode,"serviceid distinct from serviceCode");
-    ok(mlbb.metadata.serviceCodeAuthority==="WONDD_CATALOG_CONFIG_LEGACY","confirmed legacy serviceCode authority");
+    const mlbb=stage.products.find(x=>x.supplierProductCode==="9622"); ok(mlbb.metadata.transactionalServiceCode===""&&mlbb.metadata.serviceCodeAuthority==="UNRESOLVED","serviceCode is not inferred when supplier catalog omits it");
+    ok(mlbb.supplierProductCode==="9622","supplier serviceid remains the catalog product identity");
     ok(!mlbb.normalizedInputContract.fields,"legacy config customer fields are not promoted to supplier authority");
     const bcm=stage.products.find(x=>x.supplierProductCode==="9604"); ok(bcm.metadata.transactionalServiceCode===""&&bcm.metadata.serviceCodeAuthority==="UNRESOLVED","unknown serviceCode not inferred");
     ok(stage.products.every(x=>x.supplierMarketCode==="UNSPECIFIED"),"markets default unspecified");
@@ -40,9 +40,12 @@ function memoryRepositories() {
     ok(multiField.products[0].normalizedInputContract.fields.map(x=>x.providerField).join(",")==="gameid,gameid2,gameid3","supplier-provided WonDD gameid fields normalize generically");
     const malformed=await svc.stageCatalog({reader:fixture.reader({rows:[...fixture.rows,{serviceid:"",packcode:"X",name:"Bad",netpricedealer:1}]}),supplierId:"s",observedAt}); ok(malformed.errors.some(x=>x.code==="MALFORMED_OFFER")&&malformed.offers.length===fixture.rows.length,"malformed row isolated");
     const partialPlan=svc.planMutations(malformed,{offers:[{supplierProductCode:"9999",supplierOfferCode:"OLD",availability:{state:"AVAILABLE"}}]}); ok(partialPlan.missing.length===0&&partialPlan.coverageState==="PARTIAL","partial blocks missing transitions");
-    ok(stage.offers.filter(x=>x.reconciliationState==="EXACT_CANONICAL_MATCH").length===3,"exact mapping by confirmed identity");
+    ok(stage.offers.every(x=>x.reconciliationState!=="EXACT_CANONICAL_MATCH"),"legacy serviceCode aliases are not treated as exact supplier serviceid mappings");
+    const nativeMappings=fixture.mappings.map((mapping,index)=>({...mapping,supplierProductCode:["9622","9602","9624"][index]}));
+    const nativeMappedStage=await svc.stageCatalog({reader:fixture.reader(),supplierId:"supplier-wondd",mappings:nativeMappings,observedAt});
+    ok(nativeMappedStage.offers.filter(x=>x.reconciliationState==="EXACT_CANONICAL_MATCH").length===3,"exact mapping requires confirmed supplier serviceid and packcode identity");
     ok(stage.offers.find(x=>x.supplierOfferCode==="BCM001").reconciliationState!=="EXACT_CANONICAL_MATCH","numeric names never auto-map");
-    ok(stage.offers.find(x=>x.supplierOfferCode==="BCM001").reconciliationState==="NO_CANONICAL_PACKAGE","Black Clover review state");
+    ok(stage.offers.find(x=>x.supplierOfferCode==="BCM001").reconciliationState==="SEMANTIC_REVIEW_REQUIRED","unmapped Black Clover offer remains in generic semantic review");
     ok(stage.offers.find(x=>x.supplierOfferCode==="ASSOC01").reconciliationState==="SPECIAL_VARIANT","Heartopia special retained");
     ok(stage.offers.find(x=>x.supplierOfferCode==="ML00086").supplierCost.amount===58,"supplier cost retained");
     const store=memoryRepositories(), applied=await svc.applyCatalogOnlyPlan(plan,store.repos,{runKey:`WONDD:${stage.contentRevision}`}); ok(store.state.products.size===4&&store.state.offers.size===5&&store.state.availability.size===5&&applied.status==="SUCCEEDED_PARTIAL","isolated apply persists catalog only");

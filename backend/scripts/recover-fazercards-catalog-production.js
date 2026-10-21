@@ -19,6 +19,7 @@ const Availability = require("../models/SupplierOfferAvailability");
 const Observation = require("../models/SupplierCatalogCostObservation");
 const Run = require("../models/SupplierCatalogIngestionRun");
 const Lock = require("../models/SupplierCatalogIngestionLock");
+const { readSupplierCostEvidencePolicy } = require("../config/supplierCostEvidencePolicy");
 
 const TARGET = Object.freeze({
     runId: "6a97936bde1e5d04d8ae88a3",
@@ -51,6 +52,16 @@ function assertRecoveryPreconditions({ requested, run, activeLease, stage, targe
     assert(!activeLease, "Recovery refuses while a durable FazerCards ingestion lease is active.");
     assertGenericStage(stage);
     assert.strictEqual(expectedRunKey(stage), run.runKey, "Fresh live offer identity hash does not match the abandoned run key.");
+    return true;
+}
+
+function assertRecoveryModeSupported(env = process.env) {
+    const policy = readSupplierCostEvidencePolicy(env);
+    if (policy.latestOnlyEnabled) {
+        const error = new Error("Same-run FazerCards recovery is unavailable in latest-only mode. Run a fresh normal manual synchronization so cost freshness is bound to a new ingestion run.");
+        error.code = "LATEST_ONLY_REQUIRES_FRESH_INGESTION_RUN";
+        throw error;
+    }
     return true;
 }
 
@@ -91,6 +102,10 @@ async function resumeSameRun({ run, stage, existing, repositories, existingObser
 async function main() {
     const requested = { confirmed: process.argv.includes(CONFIRM_FLAG), runId: arg("run-id"), runKey: arg("run-key"), updatedAt: arg("updated-at") };
     assert(requested.confirmed, `Refusing recovery without explicit ${CONFIRM_FLAG}.`);
+    // This check intentionally precedes MongoDB connection and supplier access. An
+    // abandoned legacy run can be repaired from legacy observation semantics, but
+    // latest-only evidence must be produced by a newly timed ingestion run.
+    assertRecoveryModeSupported();
     assert(process.env.MONGO_URI, "MONGO_URI is required.");
     await mongoose.connect(process.env.MONGO_URI, { serverSelectionTimeoutMS: Number(process.env.MONGO_SERVER_SELECTION_TIMEOUT_MS || 10000) });
     const supplier = await Supplier.findOne({ supplierCode: "FAZERCARDS" }).select("_id").lean();
@@ -132,4 +147,4 @@ async function main() {
 
 if (require.main === module) main().catch(error => { console.error(JSON.stringify({ result: "ABORTED", code: error.code || error.name, message: error.message }, null, 2)); process.exitCode = 1; }).finally(() => mongoose.disconnect().catch(() => {}));
 
-module.exports = Object.freeze({ TARGET, CONFIRM_FLAG, expectedRunKey, assertRecoveryPreconditions, resumeSameRun });
+module.exports = Object.freeze({ TARGET, CONFIRM_FLAG, expectedRunKey, assertRecoveryPreconditions, assertRecoveryModeSupported, resumeSameRun });

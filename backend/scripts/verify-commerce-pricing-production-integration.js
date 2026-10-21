@@ -73,6 +73,29 @@ function stubModels({ packageAmount = 1490 } = {}) {
     };
 }
 
+function catalogPackageFixture(packageAmount) {
+    const pkg = {
+        _id: "64f000000000000000000000123",
+        productCode: "mlbb",
+        packageCode: "WEEKLY",
+        name: "Weekly Pass",
+        enabled: true,
+        deletedAt: null,
+        prices: { TH: { amount: packageAmount, currency: "THB", enabled: true } }
+    };
+    return async () => ({
+        pkg,
+        price: pkg.prices.TH,
+        region: "TH",
+        currency: "THB",
+        productCode: "mlbb",
+        productName: "Mobile Legends",
+        packageCode: "WEEKLY",
+        packageName: "Weekly Pass",
+        amount: packageAmount
+    });
+}
+
 function pricingContext({ finalAmount = 1500 } = {}) {
     return async ({ pkg, price, catalog, region, currency, now }) => ({
         packageContext: {
@@ -205,6 +228,7 @@ async function verifyManualPromptPayAuthoritativeAmount() {
             sessionId: "session-1"
         }, {
             ...deps,
+            loadCatalogPackage: catalogPackageFixture(1490),
             buildPricingContext: pricingContext({ finalAmount: 1500 }),
             manualPaymentService: {
                 async initiateManualPayment({ orderId }) {
@@ -315,6 +339,7 @@ async function verifyPriceChangeDoesNotMutateExistingOrder() {
             sessionId: "session-1"
         }, {
             ...commerceDeps({ records, createdOrders, orderIds: ["AZL-OLD1"], quoteIds: ["AZQ-OLD1"] }),
+            loadCatalogPackage: catalogPackageFixture(1000),
             buildPricingContext: pricingContext({ finalAmount: 1100 }),
             manualPaymentService: { initiateManualPayment: async () => ({ attemptId: "PAY-OLD", amount: 1100, currency: "THB", qr: {} }) }
         });
@@ -334,6 +359,7 @@ async function verifyPriceChangeDoesNotMutateExistingOrder() {
             sessionId: "session-1"
         }, {
             ...commerceDeps({ records, createdOrders, orderIds: ["AZL-NEW1"], quoteIds: ["AZQ-NEW1"] }),
+            loadCatalogPackage: catalogPackageFixture(1000),
             buildPricingContext: pricingContext({ finalAmount: 1400 }),
             manualPaymentService: { initiateManualPayment: async () => ({ attemptId: "PAY-NEW", amount: 1400, currency: "THB", qr: {} }) }
         });

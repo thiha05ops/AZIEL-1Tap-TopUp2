@@ -77,15 +77,7 @@ function verifyNoActiveLegacyManualMarkup() {
 
 function verifyPageIncludes() {
     [
-        "frontend/mlbb.html",
-        "frontend/pubg.html",
-        "frontend/freefire.html",
-        "frontend/hok.html",
-        "frontend/aov-id.html",
-        "frontend/pubg-rp.html",
-        "frontend/telegram.html",
-        "frontend/genshin.html",
-        "frontend/roblox.html",
+        "frontend/product.html",
         "frontend/wallet.html"
     ].forEach(file => {
         includes(file, "/css/payment/payment-checkout-sheet.css", "page must load shared checkout CSS.");
