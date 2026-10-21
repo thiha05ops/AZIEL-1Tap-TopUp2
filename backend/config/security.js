@@ -96,6 +96,8 @@ function getCspConnectSources(env = process.env) {
 
     return Array.from(new Set([
         "'self'",
+        "https://www.google-analytics.com",
+        "https://region1.google-analytics.com",
         ...origins,
         ...websocketOrigins
     ]));

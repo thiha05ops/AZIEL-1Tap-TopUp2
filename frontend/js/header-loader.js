@@ -1,6 +1,17 @@
 // frontend/js/header-loader.js
 // AZIEL V2.5 Header Loader + i18n
 
+(function loadAzielAnalyticsOnce() {
+    if (window.__AZIEL_ANALYTICS_LOADER__) return;
+    window.__AZIEL_ANALYTICS_LOADER__ = true;
+    if (document.querySelector('script[data-aziel-analytics="true"]')) return;
+    const script = document.createElement("script");
+    script.src = "/js/analytics.js?v=20261021-ga4-consent-v1";
+    script.defer = true;
+    script.dataset.azielAnalytics = "true";
+    document.head.appendChild(script);
+})();
+
 const AZIEL_NAV_ITEMS = {
     home: [
         ["/explore", "nav_explore"],
