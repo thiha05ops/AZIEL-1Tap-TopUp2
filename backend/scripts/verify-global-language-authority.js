@@ -21,7 +21,10 @@ assertIncludes(i18n, 'const LANG_KEY = "azielLanguage"', "Canonical language key
 assertIncludes(i18n, 'const LEGACY_LANG_KEYS = ["language", "azielLang", "selectedLanguage"]', "One-time legacy migration list");
 assertIncludes(i18n, "function readStoredLang()", "One-time language bootstrap");
 assertIncludes(i18n, "localStorage.setItem(LANG_KEY, migrated)", "Legacy language migration");
-assertIncludes(i18n, "localStorage.setItem(LANG_KEY, \"en\")", "First-time English default persistence");
+assertIncludes(i18n, 'return "my"', "First-time Myanmar default");
+if (/localStorage\.setItem\(LANG_KEY,\s*["'](?:en|my|th)["']\)/.test(i18n)) {
+    fail("Initialization must not persist or overwrite a default language before the visitor chooses one");
+}
 assertIncludes(i18n, "document.documentElement.lang = activeLang", "Initial html lang ownership");
 assertIncludes(i18n, "ready()", "AZIEL_I18N.ready API");
 assertIncludes(i18n, "missingKeys()", "Missing key reporting API");

@@ -28,6 +28,10 @@
         if (e.detail?.lang) pending = null;
         syncPreferenceControls();
     });
+    window.addEventListener("aziel:i18nReady", () => {
+        if (panel) window.AZIEL_I18N?.translatePage?.(panel);
+        syncPreferenceControls();
+    });
 
     function initStorefrontPreferences() {
         const desktopBtn = document.getElementById("storefrontPreferenceBtn");
@@ -77,6 +81,7 @@
         panel.setAttribute("aria-labelledby", "azPreferenceTitle");
         panel.innerHTML = panelMarkup();
         document.body.appendChild(panel);
+        window.AZIEL_I18N?.translatePage?.(panel);
 
         panel.addEventListener("click", event => {
             event.stopPropagation();
@@ -293,11 +298,10 @@
         const language = normalizeLang(
             window.AZIEL_I18N?.getLang?.() ||
             localStorage.getItem("azielLanguage") ||
-            "en"
+            "my"
         );
         const currency = currencyByRegion(region);
         persistRegion(region, currency);
-        persistLanguage(language);
         return { region, language, currency };
     }
 
@@ -330,8 +334,8 @@
     }
 
     function normalizeLang(lang) {
-        const value = String(lang || "en").toLowerCase();
-        return Object.prototype.hasOwnProperty.call(LANGUAGES, value) ? value : "en";
+        const value = String(lang || "my").toLowerCase();
+        return Object.prototype.hasOwnProperty.call(LANGUAGES, value) ? value : "my";
     }
 
     function currencyByRegion(region) {

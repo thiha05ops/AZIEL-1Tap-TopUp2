@@ -4,7 +4,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const currencySelect = document.getElementById("currencySelect");
 
     const savedRegion = localStorage.getItem("region") || "TH";
-    const savedLang = window.AZIEL_I18N?.getLang?.() || localStorage.getItem("azielLanguage") || "en";
+    const savedLang = window.AZIEL_I18N?.getLang?.() || localStorage.getItem("azielLanguage") || "my";
     const savedCurrency =
         localStorage.getItem("currency") ||
         (savedRegion === "TH" ? "THB" : "MMK");

@@ -184,7 +184,7 @@ function renderHeader() {
     const wallet = window.AZIEL?.wallet || null;
 
     const isThailand = region === "TH";
-    const language = window.AZIEL_I18N?.getLang?.() || "en";
+    const language = window.AZIEL_I18N?.getLang?.() || "my";
     const languageLabel = { en: "EN", my: "MY", th: "TH" }[language] || String(language).toUpperCase();
 
     preferenceFlags.forEach(node => {

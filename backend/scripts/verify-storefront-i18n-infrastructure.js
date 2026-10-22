@@ -10,15 +10,101 @@ const generator = require("./generate-storefront-runtime-locales");
 const ROOT = path.resolve(__dirname, "../..");
 const read = relative => fs.readFileSync(path.join(ROOT, relative), "utf8");
 
+function createStorage(entries = []) {
+    const values = new Map(entries);
+    const writes = [];
+    return {
+        values,
+        writes,
+        api: {
+            getItem(key) { return values.get(key) ?? null; },
+            setItem(key, value) { writes.push([key, String(value)]); values.set(key, String(value)); },
+            removeItem(key) { values.delete(key); }
+        }
+    };
+}
+
+function evaluateI18n(entries = []) {
+    const storage = createStorage(entries);
+    const document = {
+        documentElement: { lang: "", dataset: {}, removeAttribute() {} },
+        readyState: "complete",
+        addEventListener() {},
+        getElementById() { return null; },
+        querySelectorAll() { return []; }
+    };
+    const window = {
+        AZIEL_LANG: { en: {}, my: {}, th: {} },
+        AZIEL_LOCALE_LOADER: { async load(lang) { return lang; } },
+        addEventListener() {},
+        dispatchEvent() {}
+    };
+    class CustomEvent {
+        constructor(type, options = {}) { this.type = type; this.detail = options.detail; }
+    }
+    vm.runInNewContext(read("frontend/js/i18n.js"), {
+        window,
+        document,
+        localStorage: storage.api,
+        CustomEvent,
+        location: { hostname: "example.com" },
+        console
+    });
+    return { storage, document, i18n: window.AZIEL_I18N };
+}
+
+function evaluateLoader(entries = []) {
+    const storage = createStorage(entries);
+    const document = {
+        documentElement: { lang: "", dataset: {} },
+        readyState: "complete",
+        head: { appendChild() {} },
+        createElement() {
+            return { dataset: {}, addEventListener() {}, textContent: "", id: "" };
+        }
+    };
+    const window = { AZIEL_LANG: { en: {}, my: {}, th: {} } };
+    vm.runInNewContext(read("frontend/js/locale-loader.js"), {
+        window,
+        document,
+        localStorage: storage.api,
+        console
+    });
+    return { storage, document, loader: window.AZIEL_LOCALE_LOADER };
+}
+
+function verifyDefaultLanguageResolution() {
+    for (const [stored, expected] of [[null, "my"], ["en", "en"], ["th", "th"], ["my", "my"], ["obsolete", "my"]]) {
+        const entries = stored === null ? [] : [["azielLanguage", stored]];
+        const runtime = evaluateI18n(entries);
+        const loader = evaluateLoader(entries);
+        assert.strictEqual(runtime.i18n.getLang(), expected, `runtime language for ${stored ?? "fresh profile"}`);
+        assert.strictEqual(loader.loader.initialLocale, expected, `loader language for ${stored ?? "fresh profile"}`);
+        assert.strictEqual(runtime.document.documentElement.lang, expected, "runtime must synchronize the document language");
+        assert.strictEqual(loader.document.documentElement.lang, expected, "loader must synchronize the initial document language");
+        assert.strictEqual(runtime.storage.writes.length, 0, "initial resolution must not overwrite a canonical preference");
+        assert.strictEqual(loader.storage.writes.length, 0, "locale loading must never write language preferences");
+    }
+
+    const legacy = evaluateI18n([["azielLang", "TH"]]);
+    assert.strictEqual(legacy.i18n.getLang(), "th", "a valid explicit legacy preference must be preserved");
+    assert.strictEqual(legacy.storage.values.get("azielLanguage"), "th", "a valid legacy preference must migrate to the canonical key");
+
+    const invalidCanonicalWithLegacy = [["azielLanguage", "obsolete"], ["azielLang", "en"]];
+    assert.strictEqual(evaluateLoader(invalidCanonicalWithLegacy).loader.initialLocale, "en", "loader must recover a valid explicit legacy preference after an invalid canonical value");
+    assert.strictEqual(evaluateI18n(invalidCanonicalWithLegacy).i18n.getLang(), "en", "runtime must match loader legacy recovery");
+}
+
 async function verifyRuntimeAuthority() {
     const source = read("frontend/js/i18n.js");
     const writes = [];
     const events = [];
     const storage = new Map([["azielLanguage", "en"], ["shopRegion", "MM"], ["shopCurrency", "MMK"]]);
     const document = {
-        documentElement: { lang: "" },
+        documentElement: { lang: "", removeAttribute() {} },
         readyState: "complete",
         addEventListener() {},
+        getElementById() { return null; },
         querySelectorAll() { return []; }
     };
     const window = {
@@ -99,6 +185,7 @@ function verifyPaymentContractsUntouched() {
 }
 
 async function main() {
+    verifyDefaultLanguageResolution();
     await verifyRuntimeAuthority();
     verifyActiveListenersAndLegacyReachability();
     verifyGenerator();

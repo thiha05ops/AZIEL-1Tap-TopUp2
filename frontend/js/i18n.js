@@ -31,29 +31,28 @@
 
     function normalizeLang(lang) {
         const value = String(lang || "").toLowerCase();
-        return SUPPORTED_LANGS.has(value) ? value : "en";
+        return SUPPORTED_LANGS.has(value) ? value : "my";
     }
 
     function readStoredLang() {
         try {
             const canonical = localStorage.getItem(LANG_KEY);
-            if (canonical) return normalizeLang(canonical);
+            if (canonical && SUPPORTED_LANGS.has(String(canonical).toLowerCase())) {
+                return String(canonical).toLowerCase();
+            }
 
             for (const key of LEGACY_LANG_KEYS) {
                 const legacy = localStorage.getItem(key);
-                if (!legacy) continue;
-                const migrated = normalizeLang(legacy);
+                const migrated = String(legacy || "").toLowerCase();
+                if (!SUPPORTED_LANGS.has(migrated)) continue;
                 localStorage.setItem(LANG_KEY, migrated);
                 return migrated;
             }
 
-            localStorage.setItem(LANG_KEY, "en");
-            return "en";
+            return "my";
         } catch (error) {
-            return "en";
+            return "my";
         }
-
-        return "en";
     }
 
     function getLang() {
@@ -253,9 +252,19 @@
     };
     window.AZIEL_LOCALE = window.AZIEL_I18N;
 
-    document.addEventListener("DOMContentLoaded", () => {
+    async function initializePage() {
+        await window.AZIEL_I18N.ready();
         translatePage(document);
-    });
+        document.documentElement.removeAttribute("data-aziel-i18n-loading");
+        document.getElementById("azielI18nPendingStyle")?.remove();
+        window.dispatchEvent(new CustomEvent("aziel:i18nReady", { detail: { lang: getLang() } }));
+    }
+
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", initializePage, { once: true });
+    } else {
+        initializePage();
+    }
 
     window.addEventListener("aziel:headerLoaded", () => {
         translatePage(document);
