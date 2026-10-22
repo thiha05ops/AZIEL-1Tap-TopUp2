@@ -53,14 +53,23 @@ body.az-home-page {
     --az-header-mobile-height: 66px;
 }
 
+/* Public information pages use the storefront header geometry while keeping
+   their page-specific content layouts independent. */
+body.az-public-info-page {
+    --az-header-height: 72px;
+    --az-header-mobile-height: 66px;
+}
+
 @media (max-width: 768px) {
-    body.az-home-page {
+    body.az-home-page,
+    body.az-public-info-page {
         --az-header-mobile-height: 60px;
     }
 }
 
 @media (min-width: 901px) and (max-width: 1100px) {
-    body.az-home-page {
+    body.az-home-page,
+    body.az-public-info-page {
         --az-header-height: 66px;
     }
 }
@@ -686,47 +695,47 @@ body.theme-dark .dropdown-btn:hover {
 
 /* Home desktop scale: balances navigation against the wide Hero and merchandise. */
 @media (min-width: 901px) {
-    body:has(.az-home) .az-header {
+    :is(body:has(.az-home), body.az-public-info-page) .az-header {
         min-height: calc(70px + env(safe-area-inset-top));
         gap: 30px;
     }
 
-    body:has(.az-home) .az-logo {
+    :is(body:has(.az-home), body.az-public-info-page) .az-logo {
         flex-basis: 135px;
         width: 135px;
         height: 54px;
     }
 
-    body:has(.az-home) .az-logo-img {
+    :is(body:has(.az-home), body.az-public-info-page) .az-logo-img {
         width: 135px;
         max-width: 135px;
         max-height: 42px;
     }
 
-    body:has(.az-home) .az-nav { gap: 18px; }
-    body:has(.az-home) .az-nav > a,
-    body:has(.az-home) .az-nav-drop-btn {
+    :is(body:has(.az-home), body.az-public-info-page) .az-nav { gap: 18px; }
+    :is(body:has(.az-home), body.az-public-info-page) .az-nav > a,
+    :is(body:has(.az-home), body.az-public-info-page) .az-nav-drop-btn {
         min-height: 44px;
         padding-inline: 14px;
         font-size: 15px;
         font-weight: 750;
     }
 
-    body:has(.az-home) .az-header-right { gap: 12px; }
-    body:has(.az-home) .az-wallet-pill,
-    body:has(.az-home) .az-icon-btn,
-    body:has(.az-home) .az-locale-btn,
-    body:has(.az-home) .az-preference-btn,
-    body:has(.az-home) .az-profile-btn { height: 44px; }
+    :is(body:has(.az-home), body.az-public-info-page) .az-header-right { gap: 12px; }
+    :is(body:has(.az-home), body.az-public-info-page) .az-wallet-pill,
+    :is(body:has(.az-home), body.az-public-info-page) .az-icon-btn,
+    :is(body:has(.az-home), body.az-public-info-page) .az-locale-btn,
+    :is(body:has(.az-home), body.az-public-info-page) .az-preference-btn,
+    :is(body:has(.az-home), body.az-public-info-page) .az-profile-btn { height: 44px; }
 
-    body:has(.az-home) .az-icon-btn,
-    body:has(.az-home) .az-locale-btn,
-    body:has(.az-home) .az-profile-btn {
+    :is(body:has(.az-home), body.az-public-info-page) .az-icon-btn,
+    :is(body:has(.az-home), body.az-public-info-page) .az-locale-btn,
+    :is(body:has(.az-home), body.az-public-info-page) .az-profile-btn {
         width: 44px;
         min-width: 44px;
     }
 
-    body:has(.az-home) .az-avatar { width: 34px; height: 34px; }
+    :is(body:has(.az-home), body.az-public-info-page) .az-avatar { width: 34px; height: 34px; }
 }
 
 /* SUPPORT LIVE BADGE */
@@ -2437,19 +2446,22 @@ body.dark .az-profile-dropdown .dropdown-divider {
 
 /* Home header/hero proportion overrides stay last to preserve one height authority. */
 @media (min-width: 1101px) {
-    body.az-home-page .az-header {
+    body.az-home-page .az-header,
+    body.az-public-info-page .az-header {
         min-height: calc(72px + env(safe-area-inset-top)) !important;
     }
 }
 
 @media (min-width: 769px) and (max-width: 1100px) {
-    body.az-home-page .az-header {
+    body.az-home-page .az-header,
+    body.az-public-info-page .az-header {
         min-height: calc(66px + env(safe-area-inset-top)) !important;
     }
 }
 
 @media (max-width: 768px) {
-    body.az-home-page .az-header {
+    body.az-home-page .az-header,
+    body.az-public-info-page .az-header {
         min-height: calc(60px + env(safe-area-inset-top)) !important;
     }
 }

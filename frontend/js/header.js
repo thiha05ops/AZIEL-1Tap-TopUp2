@@ -192,7 +192,9 @@ function renderHeader() {
     });
 
     preferenceSummaries.forEach(node => {
-        node.textContent = isThailand ? "TH · EN · ฿" : "MM · EN · Ks";
+        node.textContent = isThailand
+            ? `TH · ${languageLabel} · ฿`
+            : `MM · ${languageLabel} · Ks`;
     });
 
     mobilePreferenceSummaries.forEach(node => {
