@@ -25,6 +25,9 @@ async function run() {
     const header = read("frontend/components/header.html");
     const headerJs = read("frontend/js/header.js");
     const headerCss = read("frontend/css/theme/aziel-header.css");
+    const en = read("frontend/lang/en.js");
+    const my = read("frontend/lang/my.js");
+    const th = read("frontend/lang/th.js");
     const homeHtml = read("frontend/home.html");
     const userState = read("frontend/js/user-state.js");
     const i18n = read("frontend/js/i18n.js");
@@ -56,7 +59,10 @@ async function run() {
     notIncludes(header, "languageSelect", "Header must not expose separate language select.");
 
     includes(headerJs, "mobilePreferenceBtn", "Mobile drawer must expose the preference row.");
-    includes(headerJs, "Region & Preferences", "Mobile drawer preference label missing.");
+    includes(headerJs, 'utility.dataset.i18nAriaLabel = "preferences.title"', "Mobile preference control must use the canonical localized accessibility label.");
+    [en, my, th].forEach((catalog, index) => {
+        includes(catalog, '"preferences.title"', `Mobile preference label missing from ${["English", "Myanmar", "Thai"][index]} catalog.`);
+    });
     includes(headerJs, "data-mobile-preference-summary", "Mobile drawer summary missing.");
 
     includes(locale, "AZIEL_STOREFRONT_PREFERENCES", "Public preference runtime must expose one storefront preference authority.");

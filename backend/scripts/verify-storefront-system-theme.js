@@ -17,8 +17,9 @@ function notIncludes(source, needle, message) {
 }
 
 function run() {
-    const sharedTheme = read("frontend/js/theme.js");
-    const homeTheme = read("frontend/core/settings/theme.js");
+    const sharedThemeLoader = read("frontend/js/theme.js");
+    const sharedTheme = read("frontend/core/settings/theme.js");
+    const homeTheme = sharedTheme;
     const siteSettings = read("frontend/js/site-settings.js");
     const designSystem = read("frontend/css/theme/aziel-design-system.css");
     const homeCss = read("frontend/css/home/marketplace-reference.css");
@@ -29,17 +30,13 @@ function run() {
     const aboutHtml = read("frontend/about.html");
     const adminHtml = read("frontend/admin.html");
 
-    [
-        sharedTheme,
-        homeTheme,
-        siteSettings,
-        designSystem
-    ].forEach((source, index) => {
-        includes(source, "prefers-color-scheme", `Theme source ${index} must use prefers-color-scheme.`);
+    [sharedTheme, designSystem].forEach((source, index) => {
+        includes(source, "prefers-color-scheme", `Canonical theme source ${index} must use prefers-color-scheme.`);
     });
+    includes(sharedThemeLoader, "/core/settings/theme.js", "Shared theme compatibility loader must delegate to the canonical theme authority.");
 
     includes(homeTheme, 'window.matchMedia("(prefers-color-scheme: dark)")', "Home theme must derive from current system dark preference.");
-    includes(sharedTheme, 'window.matchMedia("(prefers-color-scheme: light)")', "Shared public theme must derive from current system preference.");
+    includes(sharedTheme, 'window.matchMedia("(prefers-color-scheme: dark)")', "Shared public theme must derive from current system preference.");
     includes(homeTheme, 'mode: "system"', "Home theme mode must be system.");
     includes(sharedTheme, 'mode: "system"', "Shared theme mode must be system.");
     includes(homeTheme, 'media.addEventListener?.("change"', "Home theme must react to OS/browser theme changes.");
@@ -81,8 +78,8 @@ function run() {
     ].forEach(needle => includes(homeCss, needle, `Home marketplace theme audit missing ${needle}`));
 
     includes(homeHtml, "/core/settings/theme.js", "Home must use storefront system theme runtime.");
-    includes(productHtml, "/js/theme.js", "Product page must use shared system theme runtime.");
-    includes(aboutHtml, "/js/theme.js", "Public content page must use shared system theme runtime.");
+    includes(productHtml, "/core/settings/theme.js", "Product page must use the canonical system theme runtime.");
+    includes(aboutHtml, "/core/settings/theme.js", "Public content page must use the canonical system theme runtime.");
     notIncludes(adminHtml, "/core/settings/theme.js", "Admin must not be moved onto the storefront Home theme runtime.");
 
     return {

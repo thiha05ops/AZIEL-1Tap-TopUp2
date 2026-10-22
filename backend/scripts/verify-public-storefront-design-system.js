@@ -53,9 +53,14 @@ function main() {
     assert(!headerJs.includes("header.classList.add(\"nav-hidden\")"), "Header JS must not use legacy nav-hidden ownership.");
     assert(header.includes("#azHeaderMount") && header.includes("position: sticky;"), "Public header mount must use sticky in-flow ownership.");
     assert(header.includes(".az-header") && header.includes("position: relative;"), "Header element should be relative inside the sticky mount.");
-    const headerBlock = header.match(/\.az-header\s*\{[\s\S]*?\}/)?.[0] || "";
-    assert(headerBlock.includes("position: relative;"), "Public header must remain relative.");
-    assert(!headerBlock.includes("position: fixed;"), "Public header must not be fixed.");
+    assert(
+        /\.az-header\s*\{[^}]*position:\s*relative;[^}]*\}/.test(header),
+        "Canonical public header must remain relative."
+    );
+    assert(
+        !/\.az-header\s*\{[^}]*position:\s*fixed;[^}]*\}/.test(header),
+        "Public header must not be fixed."
+    );
     assert(headerShim.includes("compatibility shim"), "Legacy header-scroll.js must be a no-op shim.");
     assert(!headerShim.includes("addEventListener(\"scroll\""), "Legacy header-scroll.js must not bind scroll events.");
     assert(header.includes("#azHeaderMount.az-nav-hidden .az-nav"), "CSS must expose canonical nav-row hidden state.");
@@ -75,21 +80,45 @@ function main() {
         "width: 100dvw;",
         "commitHomeAmbientBuffer",
         "ensureHomeAmbientBuffers",
-        "home?.style.setProperty(\"--az-banner-ambient-image\""
+        "zone.style.setProperty(\"--az-banner-ambient-image\""
     ].forEach(token => {
         const source = token.startsWith(".") || token.includes("100dvw") ? home : homeRuntime;
         assert(source.includes(token), `Home full-bleed ambient missing ${token}`);
     });
 
-    assert(!homeRuntime.includes("createElement(\"canvas\")"), "Home runtime must not use canvas RGB extraction.");
+    assert(
+        homeRuntime.includes("sampleHeroImageColors") &&
+        homeRuntime.includes('const width = 24;') &&
+        homeRuntime.includes('const height = 12;') &&
+        homeRuntime.includes("return fallbackHeroColors();"),
+        "Home color sampling must remain bounded and fail safely."
+    );
     assert(home.includes("width: min(900px, 74%) !important;"), "Home desktop carousel V2.6 side-preview geometry missing.");
     assert(home.includes("width: 98% !important;"), "Home mobile dominant slide geometry missing.");
     assert(home.includes(".az-banner-zone,\n.az-trust-row,\n.az-section,\n.az-dashboard-grid,\n.az-footer"), "Home must constrain content inside a full-width hero shell.");
     assert(homeHtml.includes('id="latestPromotionsPanel"') && homeHtml.includes('id="latestPromotionsList"'), "Home Latest Promotions approved container must remain.");
-    assert(homeHtml.includes('/notifications.html?filter=promotions'), "Home Latest Promotions View All must deep link to Promotions.");
-    assert(homePromotionRuntime.includes("promo-empty-state") && homePromotionRuntime.includes("promo-item skeleton"), "Latest Promotions must preserve compact empty and skeleton states inside the approved container.");
-    assert(homePromotionRuntime.includes("fa-solid fa-gift") && homePromotionRuntime.indexOf("<div>") < homePromotionRuntime.indexOf("fa-solid fa-gift"), "Latest Promotions must keep text-first rows with the icon on the right.");
-    assert(home.includes(".promotion-preview-item") && home.includes("grid-template-columns: minmax(0, 1fr) auto auto"), "Latest Promotions compact row geometry must be preserved.");
+    assert(homeHtml.includes('/notifications?filter=promotions'), "Home Latest Promotions View All must deep link to Promotions.");
+    assert(
+        homePromotionRuntime.includes('panel.dataset.promotionPreviewState = "loading"')
+        && homePromotionRuntime.includes('panel.dataset.promotionPreviewState = "empty"')
+        && homePromotionRuntime.includes('panel.dataset.promotionPreviewState = "error"')
+        && homePromotionRuntime.includes("section.hidden = true"),
+        "Latest Promotions must fail closed through explicit loading, empty, and error states without exposing an empty section."
+    );
+    assert(
+        homePromotionRuntime.includes('class="home-exclusive-content"')
+        && homePromotionRuntime.includes('class="home-exclusive-view"')
+        && homePromotionRuntime.includes("fa-solid fa-angle-right")
+        && homePromotionRuntime.indexOf('class="home-exclusive-content"') < homePromotionRuntime.indexOf('class="home-exclusive-view"'),
+        "Latest Promotions must keep offer content before its trailing View Package action."
+    );
+    const marketplaceReference = read("frontend/css/home/marketplace-reference.css");
+    assert(
+        marketplaceReference.includes(".az-home .home-commerce-offer")
+        && marketplaceReference.includes(".az-home .home-exclusive-content")
+        && marketplaceReference.includes(".az-home .home-exclusive-view"),
+        "Latest Promotions commerce-card geometry must remain in the active home stylesheet."
+    );
 
     [
         "@media (max-width: 520px)",
@@ -129,8 +158,8 @@ function main() {
     assert((search.match(/id="azSearchCloseBtn"/g) || []).length === 1, "Search overlay must create exactly one close button.");
     assert(search.includes('class="az-search-clear"') && search.includes('hidden>'), "Search clear button must be hidden in the empty state.");
     assert(search.includes('class="az-search-close"'), "Search close button must be a distinct always-visible action.");
-    assert(search.includes('placeholder="Search games, gift cards..."'), "Search overlay must use the polished desktop placeholder.");
-    assert(search.includes('"Search games..."'), "Search overlay must shorten placeholder on narrow mobile widths.");
+    assert(search.includes('t("search.placeholder", "Search games, gift cards...")'), "Search overlay must use the localized polished desktop placeholder.");
+    assert(search.includes('t("search.placeholderCompact", "Search games...")'), "Search overlay must use the localized short placeholder on narrow mobile widths.");
     assert(search.includes("No results found") && search.includes("Mobile Legends") && search.includes("Weekly Pass"), "Search empty state suggestions missing.");
     assert(!search.includes("tracking.html"), "Search must not include order/private tracking destinations.");
 

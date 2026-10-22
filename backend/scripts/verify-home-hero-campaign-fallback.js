@@ -74,8 +74,8 @@ function verifyRuntimeFallbacks() {
     includes(runtime, "bindManagedCarousel", "Multiple campaigns must preserve carousel behavior.");
     includes(runtime, "dotsBox.hidden = true", "Single/default banner must hide dots.");
 
-    includes(homeHtml, "assets/banners/hero-desktop-wide.webp?v=20260829-p4", "HTML default desktop hero must remain available before JS.");
-    includes(homeHtml, "assets/banners/hero-mobile.webp?v=20260829-p4", "HTML default mobile hero must remain available before JS.");
+    includes(homeHtml, "assets/banners/hero-desktop-wide.webp?v=20260901-empty-store-v2", "HTML default desktop hero must remain available before JS.");
+    includes(homeHtml, "assets/banners/hero-mobile.webp?v=20260901-empty-store-v2", "HTML default mobile hero must remain available before JS.");
     includes(homeHtml, "data-managed-content-state=\"fallback\"", "HTML must start with safe fallback state.");
 
     includes(service, "isEligibleBanner(item, now)", "Home campaign selection must respect enabled/date eligibility.");

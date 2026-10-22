@@ -84,10 +84,6 @@ body.az-public-info-page {
     pointer-events: auto;
 }
 
-#azHeaderMount.az-header-hidden .az-header {
-    transform: translateY(calc(-100% - env(safe-area-inset-top)));
-}
-
 #azHeaderMount.az-header-visible .az-header,
 #azHeaderMount:focus-within .az-header,
 #azHeaderMount:has(.mobile-menu-open) .az-header,
@@ -1106,10 +1102,6 @@ body.theme-dark .az-nav-drop-menu a i {
             calc(env(safe-area-inset-top) + 8px) 14px 8px !important;
         align-items: center !important;
         overflow: visible !important;
-    }
-
-    #azHeaderMount.az-header-hidden .az-header {
-        transform: translateY(calc(-100% - env(safe-area-inset-top))) !important;
     }
 
     #azHeaderMount.az-header-visible .az-header,

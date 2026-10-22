@@ -410,7 +410,11 @@ function renderHeaderNav() {
         utility.id = "mobilePreferenceBtn";
         utility.type = "button";
         utility.className = "az-mobile-market-utility";
-        utility.setAttribute("aria-label", "Region and preferences");
+        utility.dataset.i18nAriaLabel = "preferences.title";
+        utility.setAttribute(
+            "aria-label",
+            window.AZIEL_I18N?.t?.("preferences.title", "Region & Preferences") || "Region & Preferences"
+        );
         utility.setAttribute("aria-haspopup", "dialog");
         utility.setAttribute("aria-expanded", "false");
         utility.setAttribute("aria-controls", "azPreferencePanel");
@@ -901,7 +905,6 @@ function initCanonicalHeaderScroll() {
     const forceVisible = () => {
         mount.classList.remove("az-utility-collapsed");
         mount.classList.add("az-header-visible");
-        mount.classList.remove("az-header-hidden");
         mount.classList.add("az-nav-visible");
         mount.classList.remove("az-nav-hidden");
         header.classList.remove("nav-hidden");
@@ -915,7 +918,6 @@ function initCanonicalHeaderScroll() {
 
         mount.classList.add("az-utility-collapsed");
         mount.classList.add("az-header-visible");
-        mount.classList.remove("az-header-hidden");
         mount.classList.add("az-nav-visible");
         mount.classList.remove("az-nav-hidden");
         header.classList.remove("nav-hidden");
