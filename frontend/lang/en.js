@@ -1550,7 +1550,3 @@ Object.assign(window.AZIEL_LANG.en, {
     "faqPage.items.27.question":"Are prices and product availability permanent?","faqPage.items.27.answer":"No. Prices, currencies, packages, and availability may change based on catalog configuration, region, supplier conditions, provider fees, or product availability.",
     "faqPage.items.28.question":"Why might a package or payment method be temporarily unavailable?","faqPage.items.28.answer":"A package or payment method may be unavailable because of maintenance, provider outage, region limits, catalog changes, account eligibility, or manual risk controls."
 });
-
-Object.assign(window.AZIEL_LANG.en, {
-    "info.legalEnglishOnlyNotice": "Legally reviewed Myanmar and Thai versions are not yet available. The English policy text is currently shown."
-});

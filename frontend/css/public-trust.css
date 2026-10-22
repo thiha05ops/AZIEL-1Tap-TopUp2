@@ -6,7 +6,6 @@ body {
         linear-gradient(180deg, var(--bg, #0d0d0f), var(--bg-soft, #121214));
     color: var(--text, #fff);
 }
-
 .trust-page {
     width: min(1120px, calc(100% - 32px));
     margin: 0 auto;
@@ -222,15 +221,4 @@ body {
     .trust-btn {
         width: 100%;
     }
-}
-
-.policy-language-notice {
-    margin: 0 0 1rem;
-    padding: 0.75rem 1rem;
-    border: 1px solid rgba(255, 255, 255, 0.14);
-    border-radius: 0.75rem;
-    color: var(--az-text-secondary, #c8c8d0);
-    background: rgba(255, 255, 255, 0.04);
-    font-size: 0.9rem;
-    line-height: 1.55;
 }

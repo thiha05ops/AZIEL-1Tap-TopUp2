@@ -60,9 +60,9 @@ for (const language of ["my", "th"]) {
 const policyPages = pages.filter((page) => page.includes("/policies/"));
 for (const page of policyPages) {
   const html = fs.readFileSync(path.join(root, page), "utf8");
-    if (!/data-i18n=["']info\.legalEnglishOnlyNotice["']/.test(html)) {
-      failures.push(`${page}: missing English-only legal translation notice`);
-    }
+  if (/data-i18n=["']info\.legalEnglishOnlyNotice["']/.test(html)) {
+    failures.push(`${page}: obsolete English-only legal translation notice remains`);
+  }
   const elementPattern = /<([a-z][\w-]*)\b[^>]*data-i18n=["'](policy\.[^"']+)["'][^>]*>([\s\S]*?)<\/\1>/gi;
   let match;
   while ((match = elementPattern.exec(html))) {
@@ -74,11 +74,8 @@ for (const page of policyPages) {
 }
 
 const i18nRuntime = fs.readFileSync(path.join(root, "frontend/js/i18n.js"), "utf8");
-for (const route of ["/policies/privacy", "/policies/terms", "/policies/payment", "/policies/refund", "/policies/support"]) {
-  if (!i18nRuntime.includes(`"${route}"`)) failures.push(`English-only legal route missing from i18n guard: ${route}`);
-}
-if (!/startsWith\(["']policy\.["']\)/.test(i18nRuntime) || !/AZIEL_LANG\?\.en/.test(i18nRuntime) || !/setAttribute\(["']lang["'], ["']en["']\)/.test(i18nRuntime)) {
-  failures.push("English-only legal presentation guard is incomplete");
+if (/LEGAL_POLICY_ROUTES|isEnglishOnlyLegalPolicy|legalEnglishOnlyNotice/.test(i18nRuntime)) {
+  failures.push("obsolete English-only legal presentation guard remains");
 }
 
 const expectedSlogan = {
