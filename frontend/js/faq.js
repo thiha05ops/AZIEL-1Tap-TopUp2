@@ -23,7 +23,7 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     });
 
-    search?.addEventListener("input", () => {
+    const filterQuestions = () => {
         const keyword = search.value.toLowerCase().trim();
         let visibleCount = 0;
 
@@ -37,5 +37,8 @@ document.addEventListener("DOMContentLoaded", () => {
         if (noResults) {
             noResults.hidden = visibleCount > 0;
         }
-    });
+    };
+
+    search?.addEventListener("input", filterQuestions);
+    window.addEventListener("aziel:languageChanged", filterQuestions);
 });

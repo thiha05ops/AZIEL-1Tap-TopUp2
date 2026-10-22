@@ -5,6 +5,13 @@
     const LANG_KEY = "azielLanguage";
     const LEGACY_LANG_KEYS = ["language", "azielLang", "selectedLanguage"];
     const SUPPORTED_LANGS = new Set(["en", "my", "th"]);
+    const LEGAL_POLICY_ROUTES = new Set([
+        "/policies/privacy",
+        "/policies/terms",
+        "/policies/payment",
+        "/policies/refund",
+        "/policies/support"
+    ]);
     const missingKeys = new Set();
     let activeLang = "";
     let readyPromise = null;
@@ -73,6 +80,23 @@
         const english = window.AZIEL_LANG?.en || {};
         const localized = window.AZIEL_LANG?.[lang] || {};
         return { ...english, ...localized };
+    }
+
+    function isEnglishOnlyLegalPolicy() {
+        const pathname = String(window.location?.pathname || "").replace(/\/+$/, "") || "/";
+        return LEGAL_POLICY_ROUTES.has(pathname);
+    }
+
+    function translationValue(dict, key) {
+        if (isEnglishOnlyLegalPolicy() && String(key || "").startsWith("policy.")) {
+            return window.AZIEL_LANG?.en?.[key];
+        }
+        return dict[key];
+    }
+
+    function markLegalPolicyLanguage(el, key) {
+        if (!el || !isEnglishOnlyLegalPolicy() || !String(key || "").startsWith("policy.")) return;
+        el.setAttribute("lang", "en");
     }
 
     function normalizeText(value) {
@@ -173,9 +197,10 @@
     function translateDataAttributes(root, dict) {
         root.querySelectorAll("[data-i18n]").forEach(el => {
             const key = el.dataset.i18n;
-            const value = dict[key];
+            const value = translationValue(dict, key);
 
             if (value) el.textContent = value;
+            markLegalPolicyLanguage(el, key);
         });
 
         root.querySelectorAll("[data-i18n-placeholder]").forEach(el => {
@@ -187,9 +212,10 @@
 
         root.querySelectorAll("[data-i18n-title]").forEach(el => {
             const key = el.dataset.i18nTitle;
-            const value = dict[key];
+            const value = translationValue(dict, key);
 
             if (value) el.title = value;
+            markLegalPolicyLanguage(el, key);
         });
 
         root.querySelectorAll("[data-i18n-aria-label]").forEach(el => {
@@ -207,6 +233,12 @@
         root.querySelectorAll("[data-i18n-alt]").forEach(el => {
             const value = dict[el.dataset.i18nAlt];
             if (value) el.alt = value;
+        });
+
+        root.querySelectorAll("[data-i18n-content]").forEach(el => {
+            const key = el.dataset.i18nContent;
+            const value = translationValue(dict, key);
+            if (value) el.setAttribute("content", value);
         });
     }
 

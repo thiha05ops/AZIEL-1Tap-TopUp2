@@ -36,6 +36,7 @@ body {
     font-size: clamp(42px, 8vw, 84px);
     line-height: .96;
     letter-spacing: -2px;
+    overflow-wrap: anywhere;
 }
 
 .trust-hero p {
@@ -64,12 +65,14 @@ body {
     margin-bottom: 12px;
     font-size: clamp(25px, 4vw, 42px);
     letter-spacing: -.02em;
+    overflow-wrap: anywhere;
 }
 
 .trust-section p,
 .trust-section li {
     color: var(--text-secondary, #b7c0d4);
     line-height: 1.8;
+    overflow-wrap: anywhere;
 }
 
 .trust-grid,
@@ -219,4 +222,15 @@ body {
     .trust-btn {
         width: 100%;
     }
+}
+
+.policy-language-notice {
+    margin: 0 0 1rem;
+    padding: 0.75rem 1rem;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 0.75rem;
+    color: var(--az-text-secondary, #c8c8d0);
+    background: rgba(255, 255, 255, 0.04);
+    font-size: 0.9rem;
+    line-height: 1.55;
 }

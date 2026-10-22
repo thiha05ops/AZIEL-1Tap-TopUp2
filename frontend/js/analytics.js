@@ -152,7 +152,7 @@
         if (document.getElementById("azielAnalyticsConsentStyles")) return;
         const style = document.createElement("style");
         style.id = "azielAnalyticsConsentStyles";
-        style.textContent = `#azielAnalyticsConsent{position:fixed;z-index:2147483000;left:16px;right:16px;bottom:16px;display:flex;gap:16px;align-items:center;justify-content:space-between;max-width:900px;margin:auto;padding:16px 18px;border:1px solid rgba(255,255,255,.16);border-radius:14px;background:#10101c;color:#fff;box-shadow:0 12px 40px rgba(0,0,0,.45);font:500 14px/1.5 system-ui,sans-serif}#azielAnalyticsConsent h2{margin:0 0 4px;font:700 17px/1.3 system-ui,sans-serif}#azielAnalyticsConsent p{margin:0}#azielAnalyticsConsent a{color:#9bdcff}#azielAnalyticsConsent div[data-consent-copy]{min-width:0}#azielAnalyticsConsent div[data-consent-actions]{display:flex;gap:8px;flex:none}#azielAnalyticsConsent button{min-width:92px;border:1px solid rgba(255,255,255,.25);border-radius:9px;padding:9px 12px;background:#25253a;color:#fff;cursor:pointer}#azielAnalyticsConsent button[data-choice=granted]{background:#5c5cff;border-color:#7777ff}.aziel-privacy-settings-link{appearance:none;border:0;background:none;padding:0;color:inherit;font:inherit;text-decoration:underline;text-underline-offset:2px;cursor:pointer}@media(max-width:640px){#azielAnalyticsConsent{align-items:stretch;flex-direction:column}#azielAnalyticsConsent div[data-consent-actions],#azielAnalyticsConsent button{width:100%}}`;
+        style.textContent = `#azielAnalyticsConsent{position:fixed;z-index:2147483000;left:16px;right:16px;bottom:16px;display:flex;gap:16px;align-items:center;justify-content:space-between;max-width:900px;margin:auto;padding:16px 18px;border:1px solid rgba(255,255,255,.16);border-radius:14px;background:#10101c;color:#fff;box-shadow:0 12px 40px rgba(0,0,0,.45);font:500 14px/1.5 system-ui,sans-serif}body.az-preferences-open #azielAnalyticsConsent{z-index:99998}#azielAnalyticsConsent h2{margin:0 0 4px;font:700 17px/1.3 system-ui,sans-serif}#azielAnalyticsConsent p{margin:0}#azielAnalyticsConsent a{color:#9bdcff}#azielAnalyticsConsent div[data-consent-copy]{min-width:0}#azielAnalyticsConsent div[data-consent-actions]{display:flex;gap:8px;flex:none}#azielAnalyticsConsent button{min-width:92px;border:1px solid rgba(255,255,255,.25);border-radius:9px;padding:9px 12px;background:#25253a;color:#fff;cursor:pointer}#azielAnalyticsConsent button[data-choice=granted]{background:#5c5cff;border-color:#7777ff}.aziel-privacy-settings-link{appearance:none;border:0;background:none;padding:0;color:inherit;font:inherit;text-decoration:underline;text-underline-offset:2px;cursor:pointer}@media(max-width:640px){#azielAnalyticsConsent{align-items:stretch;flex-direction:column}#azielAnalyticsConsent div[data-consent-actions],#azielAnalyticsConsent button{width:100%}}`;
         document.head.appendChild(style);
     }
     function showConsentBanner() {
@@ -162,12 +162,14 @@
         banner.id = "azielAnalyticsConsent";
         banner.setAttribute("role", "dialog");
         banner.setAttribute("aria-label", "Analytics privacy choice");
-        banner.innerHTML = `<div data-consent-copy><h2>Cookies &amp; Privacy</h2><p>We use optional analytics cookies to understand how visitors use AZIEL and improve your experience. <a href="/policies/privacy">Privacy Policy</a></p></div><div data-consent-actions><button type="button" data-choice="denied">Decline</button><button type="button" data-choice="granted">Accept</button></div>`;
+        banner.dataset.i18nAriaLabel = "analyticsConsent.ariaLabel";
+        banner.innerHTML = `<div data-consent-copy><h2 data-i18n="analyticsConsent.title">Cookies &amp; Privacy</h2><p><span data-i18n="analyticsConsent.description">We use optional analytics cookies to understand how visitors use AZIEL and improve your experience.</span> <a href="/policies/privacy" data-i18n="analyticsConsent.privacyPolicy">Privacy Policy</a></p></div><div data-consent-actions><button type="button" data-choice="denied" data-i18n="analyticsConsent.decline">Decline</button><button type="button" data-choice="granted" data-i18n="analyticsConsent.accept">Accept</button></div>`;
         banner.addEventListener("click", event => {
             const selected = event.target.closest("button[data-choice]")?.dataset.choice;
             if (selected === "granted" || selected === "denied") choose(selected);
         });
         document.body.appendChild(banner);
+        window.AZIEL_I18N?.translatePage?.(banner);
     }
     function installPrivacySettingsLink() {
         if (!eligiblePath(normalizedPath()) || document.querySelector("[data-aziel-privacy-settings]")) return;
@@ -178,6 +180,7 @@
         link.href = "#privacy-settings";
         link.className = "aziel-privacy-settings-link";
         link.dataset.azielPrivacySettings = "true";
+        link.dataset.i18n = "analyticsConsent.settings";
         link.textContent = "Privacy Settings";
         link.addEventListener("click", event => {
             event.preventDefault();
@@ -186,6 +189,7 @@
         });
         const target = footer.querySelector(".footer-copy") || footer;
         target.append(document.createTextNode(" · "), link);
+        window.AZIEL_I18N?.translatePage?.(link.parentElement || footer);
     }
 
     function navigationHook(method) {
