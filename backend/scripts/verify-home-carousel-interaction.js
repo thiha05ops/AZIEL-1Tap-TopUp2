@@ -85,7 +85,7 @@ function verifyManagedRuntimeInteraction() {
     assert(!markup.includes('class="az-banner-arrow'), "Home markup must not provide a legacy second arrow pair.");
     assert(!runtime.includes("az-banner-arrow"), "Canonical runtime must not render arrow controls.");
     assert(!heroCss.includes("az-banner-arrow"), "Canonical Home CSS must not retain arrow-control presentation.");
-    assert(heroCss.includes("aspect-ratio: 1640 / 856 !important") && heroCss.includes("width: calc(100% - 24px) !important") && heroCss.includes("height: auto !important"), "Every responsive hero slide must own the universal 1640:856 geometry.");
+    assert(heroCss.includes("aspect-ratio: 2000 / 720 !important") && heroCss.includes("aspect-ratio: 800 / 540 !important") && heroCss.includes("@media (max-width: 480px)") && heroCss.includes("height: auto !important"), "Home slides must reserve desktop 2000:720 and mobile 800:540 geometry.");
     assert(!runtime.includes("syncBannerAspectRatio") && !heroCss.includes("--az-active-banner-aspect-ratio"), "Image load timing must not change the reserved carousel geometry.");
     assert(!heroCss.includes("perspective:") && !runtime.includes("rotateY("), "The film strip must remain flat without 3D-card treatment.");
     assert(heroCss.includes("display: flex !important") && heroCss.includes("gap: var(--az-banner-slide-gap") && heroCss.includes("flex: 0 0 var(--az-banner-slide-width"), "Managed banners must form one continuous flex track.");

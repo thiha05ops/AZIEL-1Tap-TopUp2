@@ -76,7 +76,10 @@ async function getManagedState() {
 }
 
 async function loadMediaMap(banners = []) {
-    const ids = Array.from(new Set(banners.map(item => item.mediaAssetId).filter(Boolean)));
+    const ids = Array.from(new Set(banners.flatMap(item => [
+        item.mediaAssetId,
+        item.mobileMediaAssetId
+    ]).filter(Boolean)));
     if (!ids.length) return new Map();
     const assets = await MediaAsset.find({ assetId: { $in: ids }, status: "active" }).lean();
     return new Map(assets.map(asset => [asset.assetId, asset]));
@@ -84,12 +87,15 @@ async function loadMediaMap(banners = []) {
 
 function projectPublicHomeBanner(banner = {}, mediaMap = new Map()) {
     const asset = mediaMap.get(banner.mediaAssetId);
+    const mobileAsset = mediaMap.get(banner.mobileMediaAssetId);
     if (!asset) return null;
 
     return {
         id: String(banner._id || ""),
         name: banner.name,
         imageUrl: asset.secureUrl || asset.url || "",
+        desktopImageUrl: asset.secureUrl || asset.url || "",
+        mobileImageUrl: mobileAsset?.secureUrl || mobileAsset?.url || "",
         imageAltText: asset.altText || banner.name || "AZIEL home banner",
         sortOrder: Number(banner.sortOrder || 0),
         ctaLabel: banner.ctaLabel || "",
@@ -100,12 +106,15 @@ function projectPublicHomeBanner(banner = {}, mediaMap = new Map()) {
 
 function projectAdminHomeBanner(banner = {}, mediaMap = new Map()) {
     const asset = mediaMap.get(banner.mediaAssetId);
+    const mobileAsset = mediaMap.get(banner.mobileMediaAssetId);
 
     return {
         id: String(banner._id || ""),
         name: banner.name,
         mediaAssetId: banner.mediaAssetId,
         mediaAsset: projectMediaAsset(asset),
+        mobileMediaAssetId: banner.mobileMediaAssetId || "",
+        mobileMediaAsset: projectMediaAsset(mobileAsset),
         enabled: banner.enabled === true,
         sortOrder: Number(banner.sortOrder || 0),
         ctaLabel: banner.ctaLabel || "",
@@ -132,6 +141,9 @@ function buildHomeBannerPayload(patch = {}, existing = null) {
         mediaAssetId: Object.prototype.hasOwnProperty.call(patch, "mediaAssetId")
             ? cleanText(patch.mediaAssetId, 96)
             : source.mediaAssetId,
+        mobileMediaAssetId: Object.prototype.hasOwnProperty.call(patch, "mobileMediaAssetId")
+            ? cleanText(patch.mobileMediaAssetId, 96)
+            : source.mobileMediaAssetId || "",
         enabled: Object.prototype.hasOwnProperty.call(patch, "enabled")
             ? parseBoolean(patch.enabled)
             : source.enabled === true,
@@ -200,6 +212,9 @@ async function createHomeBanner({ patch = {}, actor = "admin" } = {}) {
     }
 
     await assertAssetCategory(payload.mediaAssetId, "home_banner");
+    if (payload.mobileMediaAssetId) {
+        await assertAssetCategory(payload.mobileMediaAssetId, "home_banner");
+    }
 
     const banner = await HomeBanner.create({
         ...payload,
@@ -225,6 +240,9 @@ async function updateHomeBanner({ bannerId, patch = {}, actor = "admin" } = {}) 
     }
 
     await assertAssetCategory(payload.mediaAssetId, "home_banner");
+    if (payload.mobileMediaAssetId) {
+        await assertAssetCategory(payload.mobileMediaAssetId, "home_banner");
+    }
 
     Object.entries(payload).forEach(([key, value]) => {
         banner.set(key, value);

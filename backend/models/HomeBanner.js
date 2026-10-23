@@ -13,6 +13,12 @@ const homeBannerSchema = new mongoose.Schema(
             trim: true,
             index: true
         },
+        mobileMediaAssetId: {
+            type: String,
+            trim: true,
+            default: "",
+            index: true
+        },
         enabled: {
             type: Boolean,
             default: true

@@ -29,6 +29,9 @@ function verifyBackendOwnership() {
     includes("backend/services/homeBannerService.js", "require(\"../models/HomeBanner\")", "HomeBanner service must own HomeBanner data.");
     includes("backend/services/homeBannerService.js", "require(\"../models/HomeBannerState\")", "HomeBanner service must preserve managed-empty state.");
     includes("backend/services/homeBannerService.js", "assertAssetCategory(payload.mediaAssetId, \"home_banner\")", "HomeBanner media must require home_banner assets.");
+    includes("backend/models/HomeBanner.js", "mobileMediaAssetId", "HomeBanner must support an optional mobile artwork reference.");
+    includes("backend/services/homeBannerService.js", "assertAssetCategory(payload.mobileMediaAssetId, \"home_banner\")", "Optional mobile artwork must require home_banner assets.");
+    includes("backend/services/homeBannerService.js", "mobileImageUrl", "Public HomeBanner projection must expose optional mobile artwork.");
     includes("backend/services/homeBannerService.js", "parseCtaTarget", "HomeBanner service must reuse shared CTA validation.");
     includes("backend/services/homeBannerService.js", "parseSchedule", "HomeBanner service must reuse shared schedule validation.");
     includes("backend/services/homeBannerService.js", "isEligibleBanner", "HomeBanner service must use shared active interval eligibility.");
@@ -50,20 +53,19 @@ function verifyRoutes() {
         assert(routes.includes(pattern), `backend/routes/homeBanners.js: missing ${pattern}`);
     });
 
-    includes("backend/server.js", "const homeBannerRoutes = require(\"./routes/homeBanners\");", "Server must import HomeBanner routes.");
-    includes("backend/server.js", "app.use(\"/api\", homeBannerRoutes);", "Server must mount HomeBanner routes.");
+    includes("backend/server.js", "\"homeBanners\"", "Server route registry must include HomeBanner routes.");
 }
 
 function verifyMediaCategoryAndSafeDelete() {
     includes("backend/models/MediaAsset.js", "\"home_banner\"", "MediaAsset enum must include home_banner.");
     includes("backend/services/mediaService.js", "\"home_banner\"", "Media service category contract must include home_banner.");
     includes("backend/services/mediaService.js", "const HomeBanner = require(\"../models/HomeBanner\");", "Media safe-delete must import HomeBanner.");
-    includes("backend/services/mediaService.js", "HomeBanner.countDocuments({ mediaAssetId: assetId })", "Media safe-delete must count HomeBanner references.");
+    includes("backend/services/mediaService.js", "{ mobileMediaAssetId: assetId }", "Media safe-delete must count desktop and mobile HomeBanner references.");
     includes("backend/services/mediaService.js", "homeBanners,", "Media reference projection must expose homeBanners count.");
 }
 
 function verifyAdminUi() {
-    includes("frontend/admin.html", "data-section=\"site-content\"", "Admin nav must expose Site Content.");
+    includes("frontend/admin.html", "data-mobile-section=\"site-content\"", "Admin navigation must expose Site Content.");
     includes("frontend/admin.html", "id=\"section-site-content\"", "Admin section must exist.");
     includes("frontend/admin.html", "id=\"adminHomeBannersList\"", "Admin Home Banners list must exist.");
     includes("frontend/admin.html", "value=\"home_banner\"", "Admin Media Library must expose home_banner category.");
@@ -71,6 +73,8 @@ function verifyAdminUi() {
     includes("frontend/js/admin-app.js", "\"site-content\"", "Admin section titles must register site-content.");
     includes("frontend/js/admin-home-banners.js", "/api/admin/home-banners", "Admin controller must call HomeBanner APIs.");
     includes("frontend/js/admin-home-banners.js", "category: \"home_banner\"", "Admin media selector must filter home_banner assets.");
+    includes("frontend/js/admin-home-banners.js", "mobileMediaAssetId: homeBannerEditorMobileAssetId", "Admin editor must persist optional mobile artwork.");
+    includes("frontend/js/admin-home-banners.js", "homeBannerMobileMediaClear", "Admin editor must allow optional mobile artwork to be cleared.");
     includes("frontend/js/admin-media.js", "value=\"home_banner\"", "Media upload modal must allow home_banner.");
     includes("frontend/css/admin/admin-design-system.css", ".home-banner-row", "Admin CSS must style HomeBanner rows.");
     matches("frontend/css/admin/admin-design-system.css", /@media\s*\(max-width:\s*767px\)[\s\S]*\.home-banner-row/, "Admin HomeBanner rows must use the canonical phone breakpoint.");
@@ -83,6 +87,8 @@ function verifyCustomerRuntime() {
     includes("frontend/js/home-banner-runtime.js", "renderDefaultFallback(zone, track, dotsBox, \"no-eligible-campaigns\")", "Home runtime must render the default hero for managed-empty state.");
     includes("frontend/js/home-banner-runtime.js", "az-banner-card", "Home runtime must preserve existing carousel card class.");
     includes("frontend/js/home-banner-runtime.js", "azBannerDots", "Home runtime must preserve existing dots container.");
+    includes("frontend/js/home-banner-runtime.js", "(max-width: 480px)", "Home runtime must select mobile artwork at the 480px breakpoint.");
+    includes("frontend/js/home-banner-runtime.js", "mobileImage ? `<source", "Desktop-only legacy banners must omit the mobile source.");
 }
 
 function verifyNoFakeControls() {

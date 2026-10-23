@@ -145,8 +145,8 @@
         return `
             <div class="az-banner-card active" data-home-banner-id="${escapeAttr(DEFAULT_HOME_HERO.id)}" data-home-banner-source="default" style="--az-banner-object-position: ${escapeAttr(DEFAULT_HOME_HERO.objectPosition)}; --az-banner-card-image: ${escapeAttr(cssUrl(resolveBannerBackgroundUrl(DEFAULT_HOME_HERO.desktopImageUrl)))}">
                 <picture>
-                    <source media="(min-width: 769px)" srcset="${escapeAttr(DEFAULT_HOME_HERO.desktopImageUrl)}" type="image/webp">
-                    <img src="${escapeAttr(DEFAULT_HOME_HERO.mobileImageUrl)}" alt="${escapeAttr(DEFAULT_HOME_HERO.imageAltText)}" width="1280" height="719" loading="eager" decoding="async" fetchpriority="high" style="object-position: var(--az-banner-object-position)">
+                    <source media="(max-width: 480px)" srcset="${escapeAttr(DEFAULT_HOME_HERO.mobileImageUrl)}" type="image/webp">
+                    <img src="${escapeAttr(DEFAULT_HOME_HERO.desktopImageUrl)}" alt="${escapeAttr(DEFAULT_HOME_HERO.imageAltText)}" width="2000" height="720" loading="eager" decoding="async" fetchpriority="high" style="object-position: var(--az-banner-object-position)">
                 </picture>
             </div>
         `;
@@ -189,10 +189,10 @@
     }
 
     async function preloadFirstResponsiveBanner(banner = {}) {
-        const desktop = window.matchMedia("(min-width: 769px)").matches;
-        const selectedUrl = desktop
-            ? (banner.desktopImageUrl || banner.imageUrl)
-            : (banner.mobileImageUrl || banner.imageUrl);
+        const mobile = window.matchMedia("(max-width: 480px)").matches;
+        const selectedUrl = mobile && banner.mobileImageUrl
+            ? banner.mobileImageUrl
+            : (banner.desktopImageUrl || banner.imageUrl);
         if (selectedUrl) await preloadImage(selectedUrl);
     }
 
@@ -226,12 +226,12 @@
             const fetchPriority = index === 0 ? "high" : "auto";
 
             const desktopImage = banner.desktopImageUrl || banner.imageUrl;
-            const mobileImage = banner.mobileImageUrl || banner.imageUrl;
+            const mobileImage = banner.mobileImageUrl || "";
             return `
                 <a href="${escapeAttr(target)}" class="az-banner-card" data-home-banner-id="${escapeAttr(banner.id)}" aria-label="${escapeAttr(label)}" style="--az-banner-object-position: ${escapeAttr(resolveObjectPosition(banner))}">
                     <picture>
-                        <source media="(min-width: 769px)" srcset="${escapeAttr(desktopImage)}">
-                        <img src="${escapeAttr(mobileImage)}" alt="${escapeAttr(label)}" width="3840" height="1200" loading="${loading}" decoding="async" fetchpriority="${fetchPriority}" crossorigin="anonymous" style="object-position: var(--az-banner-object-position)">
+                        ${mobileImage ? `<source media="(max-width: 480px)" srcset="${escapeAttr(mobileImage)}">` : ""}
+                        <img src="${escapeAttr(desktopImage)}" alt="${escapeAttr(label)}" width="2000" height="720" loading="${loading}" decoding="async" fetchpriority="${fetchPriority}" crossorigin="anonymous" style="object-position: var(--az-banner-object-position)">
                     </picture>
                 </a>
             `;
@@ -249,11 +249,14 @@
                 image.dataset.defaulted = "true";
                 const picture = image.closest("picture");
                 picture?.querySelectorAll("source").forEach(source => {
-                    source.srcset = DEFAULT_HOME_HERO.desktopImageUrl;
+                    source.srcset = DEFAULT_HOME_HERO.mobileImageUrl;
                 });
-                image.src = DEFAULT_HOME_HERO.mobileImageUrl;
+                image.src = DEFAULT_HOME_HERO.desktopImageUrl;
                 image.alt = image.alt || DEFAULT_HOME_HERO.imageAltText;
-                updateHeroAtmosphere(track.closest(".az-banner-zone"), image, { forceUrl: DEFAULT_HOME_HERO.mobileImageUrl });
+                const fallbackUrl = window.matchMedia("(max-width: 480px)").matches
+                    ? DEFAULT_HOME_HERO.mobileImageUrl
+                    : DEFAULT_HOME_HERO.desktopImageUrl;
+                updateHeroAtmosphere(track.closest(".az-banner-zone"), image, { forceUrl: fallbackUrl });
             });
         });
     }

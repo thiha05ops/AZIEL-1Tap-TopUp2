@@ -200,7 +200,12 @@ async function getAssetReferenceCounts(assetId) {
         CatalogProduct.countDocuments({ "presentation.mobilePackagePreview.assetId": assetId }),
         CatalogPackage.countDocuments({ iconAssetId: assetId }),
         GameBanner.countDocuments({ mediaAssetId: assetId }),
-        HomeBanner.countDocuments({ mediaAssetId: assetId }),
+        HomeBanner.countDocuments({
+            $or: [
+                { mediaAssetId: assetId },
+                { mobileMediaAssetId: assetId }
+            ]
+        }),
         Campaign.countDocuments({ mediaAssetId: assetId, archivedAt: null })
     ]);
 

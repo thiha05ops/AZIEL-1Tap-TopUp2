@@ -68,14 +68,16 @@ function verifyRuntimeFallbacks() {
     includes(runtime, "zone.dataset.heroAuthority = \"default\"", "Default fallback state must be identifiable.");
     includes(runtime, "bindManagedImageFallbacks", "Malformed/broken campaign media must fall back safely.");
     includes(runtime, "image.addEventListener(\"error\"", "Campaign media error handling missing.");
-    includes(runtime, "image.src = DEFAULT_HOME_HERO.mobileImageUrl", "Broken mobile campaign media must fall back to default asset.");
-    includes(runtime, "source.srcset = DEFAULT_HOME_HERO.desktopImageUrl", "Broken desktop campaign media must fall back to default asset.");
+    includes(runtime, "image.src = DEFAULT_HOME_HERO.desktopImageUrl", "Broken campaign media must restore the default desktop asset.");
+    includes(runtime, "source.srcset = DEFAULT_HOME_HERO.mobileImageUrl", "Broken mobile campaign media must restore the default mobile source.");
+    includes(runtime, "(max-width: 480px)", "Responsive campaign artwork must use the approved mobile breakpoint.");
+    includes(runtime, "mobileImage ? `<source", "Legacy desktop-only campaigns must omit the optional mobile source.");
     includes(runtime, "banners.length === 1", "Single campaign must preserve non-carousel behavior.");
     includes(runtime, "bindManagedCarousel", "Multiple campaigns must preserve carousel behavior.");
     includes(runtime, "dotsBox.hidden = true", "Single/default banner must hide dots.");
 
-    includes(homeHtml, "assets/banners/hero-desktop-wide.webp?v=20260901-empty-store-v2", "HTML default desktop hero must remain available before JS.");
-    includes(homeHtml, "assets/banners/hero-mobile.webp?v=20260901-empty-store-v2", "HTML default mobile hero must remain available before JS.");
+    includes(homeHtml, "assets/banners/hero-desktop-wide.webp", "HTML default desktop hero must remain available before JS.");
+    includes(homeHtml, "assets/banners/hero-mobile.webp", "HTML default mobile hero must remain available before JS.");
     includes(homeHtml, "data-managed-content-state=\"fallback\"", "HTML must start with safe fallback state.");
 
     includes(service, "isEligibleBanner(item, now)", "Home campaign selection must respect enabled/date eligibility.");

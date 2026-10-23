@@ -4,6 +4,7 @@
 let adminHomeBannersInitialized = false;
 let adminHomeBanners = [];
 let homeBannerEditorAssetId = "";
+let homeBannerEditorMobileAssetId = "";
 let homeBannerSavePending = false;
 const homeBannerActionsInFlight = new Set();
 
@@ -154,6 +155,7 @@ function openHomeBannerEditor(banner = null) {
     ensureHomeBannerEditorModal();
     const modal = document.getElementById("homeBannerEditorModal");
     homeBannerEditorAssetId = banner?.mediaAssetId || "";
+    homeBannerEditorMobileAssetId = banner?.mobileMediaAssetId || "";
 
     modal.querySelector("#homeBannerTitle").textContent = banner ? adminT("edit_banner", "Edit Banner") : adminT("add_home_banner", "Add Banner");
     modal.querySelector("#homeBannerName").value = banner?.name || "";
@@ -165,13 +167,24 @@ function openHomeBannerEditor(banner = null) {
     modal.querySelector("#homeBannerCtaTarget").value = banner?.ctaTarget || "";
     modal.querySelector("#homeBannerStarts").value = toHomeBannerDatetimeValue(banner?.startsAt);
     modal.querySelector("#homeBannerEnds").value = toHomeBannerDatetimeValue(banner?.endsAt);
-    modal.querySelector("#homeBannerMediaLabel").textContent = banner?.mediaAsset?.name || adminT("select_banner_image", "Select Banner Image");
+    modal.querySelector("#homeBannerMediaLabel").textContent = banner?.mediaAsset?.name || adminT("select_banner_image", "Select Desktop Image");
+    modal.querySelector("#homeBannerMobileMediaLabel").textContent = banner?.mobileMediaAsset?.name || adminT("optional", "Optional");
 
     modal.querySelector("#homeBannerMedia").onclick = async () => {
         const asset = await window.AZIEL_ADMIN_MEDIA_SELECTOR?.open?.({ category: "home_banner" });
         if (!asset) return;
         homeBannerEditorAssetId = asset.assetId;
         modal.querySelector("#homeBannerMediaLabel").textContent = asset.name || asset.assetId;
+    };
+    modal.querySelector("#homeBannerMobileMedia").onclick = async () => {
+        const asset = await window.AZIEL_ADMIN_MEDIA_SELECTOR?.open?.({ category: "home_banner" });
+        if (!asset) return;
+        homeBannerEditorMobileAssetId = asset.assetId;
+        modal.querySelector("#homeBannerMobileMediaLabel").textContent = asset.name || asset.assetId;
+    };
+    modal.querySelector("#homeBannerMobileMediaClear").onclick = () => {
+        homeBannerEditorMobileAssetId = "";
+        modal.querySelector("#homeBannerMobileMediaLabel").textContent = adminT("optional", "Optional");
     };
     modal.querySelector("#homeBannerCancel").onclick = () => modal.classList.remove("show");
     modal.querySelector("#homeBannerSave").onclick = () => readAndSaveHomeBanner(banner);
@@ -192,8 +205,11 @@ function ensureHomeBannerEditorModal() {
             <label>${adminT("banner_name", "Banner Name")} <input id="homeBannerName" type="text"></label>
             <label class="catalog-toggle-row"><span>${adminT("enabled", "Enabled")}</span><input id="homeBannerEnabled" type="checkbox" checked></label>
             <label>${adminT("sort_order", "Sort Order")} <input id="homeBannerSort" type="number" step="1" value="0"></label>
-            <button id="homeBannerMedia" class="admin-secondary-btn" type="button">${adminT("select_banner_image", "Select Banner Image")}</button>
+            <button id="homeBannerMedia" class="admin-secondary-btn" type="button">${adminT("select_banner_image", "Select Desktop Image")} · 2000 × 720</button>
             <p id="homeBannerMediaLabel"></p>
+            <button id="homeBannerMobileMedia" class="admin-secondary-btn" type="button">${adminT("select_banner_image", "Select Mobile Image")} · 800 × 540 · ${adminT("optional", "Optional")}</button>
+            <button id="homeBannerMobileMediaClear" type="button">${adminT("clear", "Clear Mobile Image")}</button>
+            <p id="homeBannerMobileMediaLabel"></p>
             <label>${adminT("cta_label", "CTA Label")} · English <input id="homeBannerCtaLabel" type="text" maxlength="40"></label>
             <label>${adminT("cta_label", "CTA Label")} · မြန်မာ <input id="homeBannerCtaLabelMy" type="text" maxlength="40"></label>
             <label>${adminT("cta_label", "CTA Label")} · ไทย <input id="homeBannerCtaLabelTh" type="text" maxlength="40"></label>
@@ -222,6 +238,7 @@ async function readAndSaveHomeBanner(existing = null) {
     const payload = {
         name: modal.querySelector("#homeBannerName")?.value || "",
         mediaAssetId: homeBannerEditorAssetId,
+        mobileMediaAssetId: homeBannerEditorMobileAssetId,
         enabled: Boolean(modal.querySelector("#homeBannerEnabled")?.checked),
         sortOrder: modal.querySelector("#homeBannerSort")?.value || 0,
         ctaLabel: modal.querySelector("#homeBannerCtaLabel")?.value || "",

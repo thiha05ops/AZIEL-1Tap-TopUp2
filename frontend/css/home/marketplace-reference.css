@@ -314,13 +314,14 @@ body.dark .az-home {
 }
 
 .az-home-hero .az-banner-card {
+    display: block !important;
     position: relative !important;
     top: 0 !important;
     left: 50% !important;
     width: 100% !important;
     height: auto !important;
     max-width: none !important;
-    aspect-ratio: 1640 / 856 !important;
+    aspect-ratio: 2000 / 720 !important;
     border: 0 !important;
     border-radius: 0 !important;
     background:
@@ -406,7 +407,7 @@ body.dark .az-home {
     flex: 0 0 var(--az-banner-slide-width, 72vw);
     width: var(--az-banner-slide-width, 72vw) !important;
     height: auto !important;
-    aspect-ratio: 1640 / 856 !important;
+    aspect-ratio: 2000 / 720 !important;
     border-radius: 18px !important;
     overflow: hidden !important;
     opacity: .56 !important;
@@ -430,6 +431,13 @@ body.dark .az-home {
     height: 100% !important;
     object-fit: contain !important;
     border-radius: inherit !important;
+}
+
+@media (max-width: 480px) {
+    .az-home-hero .az-banner-card,
+    .az-home .az-home-hero[data-home-banners-managed="active"]:not([data-banner-count="1"]) .az-banner-card {
+        aspect-ratio: 800 / 540 !important;
+    }
 }
 
 .az-home-hero .az-banner-dots {
