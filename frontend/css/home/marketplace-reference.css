@@ -277,7 +277,7 @@ body.dark .az-home {
     width: min(var(--home-max), calc(100% - (var(--home-gutter) * 2))) !important;
     height: auto !important;
     min-height: 0 !important;
-    aspect-ratio: 16 / 5 !important;
+    aspect-ratio: auto !important;
     margin: 32px auto 0 !important;
     overflow: visible !important;
     border: 0 !important;
@@ -299,24 +299,28 @@ body.dark .az-home {
 }
 
 .az-home-hero .az-banner-track {
-    position: relative;
+    position: relative !important;
+    inset: auto !important;
     z-index: 1;
+    width: 100% !important;
+    height: auto !important;
     overflow: hidden !important;
     border-radius: inherit;
 }
 
-.az-home-hero .az-banner-track,
-.az-home-hero .az-banner-card,
 .az-home-hero .az-banner-card picture,
 .az-home-hero .az-banner-card img {
     height: 100% !important;
 }
 
 .az-home-hero .az-banner-card {
+    position: relative !important;
     top: 0 !important;
     left: 50% !important;
     width: 100% !important;
+    height: auto !important;
     max-width: none !important;
+    aspect-ratio: 1640 / 856 !important;
     border: 0 !important;
     border-radius: 0 !important;
     background:
@@ -334,13 +338,15 @@ body.dark .az-home {
     object-fit: contain !important;
     object-position: var(--az-banner-object-position, center center) !important;
     border-radius: 0 !important;
+    animation: none !important;
+    transform: none !important;
 }
 
 @media (min-width: 1024px) {
     .az-home .az-home-hero.az-banner-zone {
-        height: clamp(280px, 28vw, 330px) !important;
-        min-height: 280px !important;
-        max-height: 330px !important;
+        height: auto !important;
+        min-height: 0 !important;
+        max-height: none !important;
         aspect-ratio: auto !important;
         border-radius: 0 !important;
         box-shadow: none !important;
@@ -357,17 +363,17 @@ body.dark .az-home {
 
 @media (min-width: 1200px) {
     .az-home .az-home-hero.az-banner-zone {
-        height: clamp(330px, 26.5vw, 390px) !important;
-        min-height: 330px !important;
-        max-height: 390px !important;
+        height: auto !important;
+        min-height: 0 !important;
+        max-height: none !important;
     }
 }
 
 @media (min-width: 769px) and (max-width: 1023px) {
     .az-home .az-home-hero.az-banner-zone {
-        height: clamp(240px, 27vw, 280px) !important;
-        min-height: 240px !important;
-        max-height: 280px !important;
+        height: auto !important;
+        min-height: 0 !important;
+        max-height: none !important;
         aspect-ratio: auto !important;
     }
 }
@@ -399,7 +405,8 @@ body.dark .az-home {
     inset: auto !important;
     flex: 0 0 var(--az-banner-slide-width, 72vw);
     width: var(--az-banner-slide-width, 72vw) !important;
-    height: 100% !important;
+    height: auto !important;
+    aspect-ratio: 1640 / 856 !important;
     border-radius: 18px !important;
     overflow: hidden !important;
     opacity: .56 !important;
@@ -421,7 +428,7 @@ body.dark .az-home {
     inset: 0;
     width: 100% !important;
     height: 100% !important;
-    object-fit: cover !important;
+    object-fit: contain !important;
     border-radius: inherit !important;
 }
 
@@ -1132,7 +1139,8 @@ body.theme-light .az-home + .site-footer {
 
     .az-home .az-home-hero.az-banner-zone {
         width: calc(100% - 24px) !important;
-        aspect-ratio: 16 / 10 !important;
+        height: auto !important;
+        aspect-ratio: auto !important;
         min-height: 0 !important;
         max-height: none !important;
         margin-top: 24px !important;
