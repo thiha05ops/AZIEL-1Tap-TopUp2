@@ -32,6 +32,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         setLoading(true);
+        const loadingToken = window.AZIEL_LOADING?.start("password-otp-verification");
 
         try {
             const res = await fetch("/api/password/verify-otp", {
@@ -91,6 +92,8 @@ document.addEventListener("DOMContentLoaded", () => {
             console.log("Verify OTP error:", error);
             showMessage(t("common.serverErrorRetry", "Server error. Please try again."), "error");
             setLoading(false);
+        } finally {
+            window.AZIEL_LOADING?.finish(loadingToken);
         }
     });
 

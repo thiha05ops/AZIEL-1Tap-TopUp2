@@ -234,7 +234,7 @@
     async function ensureCatalogRuntime() {
         if (window.AZIEL_CATALOG) return;
         await loadScriptOnce("/js/catalog-presentation.js?v=20260714-phase7", "aziel-catalog-presentation");
-        await loadScriptOnce("/js/catalog-runtime.js?v=20260714-phase7", "aziel-catalog-runtime");
+        await loadScriptOnce("/js/catalog-runtime.js?v=20261026-native-performance-v1", "aziel-catalog-runtime");
     }
 
     function loadScriptOnce(src, key) {

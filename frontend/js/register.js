@@ -68,6 +68,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         registrationPending = true;
         setLoading(true);
+        const loadingToken = window.AZIEL_LOADING?.start("registration");
 
         try {
             const res = await fetch("/api/register", {
@@ -109,6 +110,8 @@ document.addEventListener("DOMContentLoaded", () => {
             showMessage(t("common.serverErrorTryAgain", "Server error. Try again."), "error");
             registrationPending = false;
             setLoading(false);
+        } finally {
+            window.AZIEL_LOADING?.finish(loadingToken);
         }
     });
 

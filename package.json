@@ -4,6 +4,8 @@
   "description": "AZIEL 1Tap TopUp Shop",
   "main": "backend/server.js",
   "scripts": {
+    "verify:native-mobile-ux": "node backend/scripts/verify-native-mobile-ux.js",
+    "verify:performance-phase2": "node backend/scripts/verify-performance-phase2.js",
     "verify:customer-session-auth": "node backend/scripts/verify-customer-session-auth.js",
     "verify:myanmyanpay-sandbox": "node backend/scripts/verify-myanmyanpay-sandbox-integration.js",
     "verify:myanmyanpay-production": "node backend/scripts/verify-myanmyanpay-production-readiness.js",

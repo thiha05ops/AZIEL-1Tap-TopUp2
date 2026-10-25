@@ -36,6 +36,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         verificationPending = true;
         setLoading(true);
+        const loadingToken = window.AZIEL_LOADING?.start("email-verification");
 
         try {
             const res = await fetch("/api/verify-email", {
@@ -92,6 +93,8 @@ document.addEventListener("DOMContentLoaded", () => {
             showMessage(t("common.serverErrorRetry", "Server error. Please try again."), "error");
             verificationPending = false;
             setLoading(false);
+        } finally {
+            window.AZIEL_LOADING?.finish(loadingToken);
         }
     });
 

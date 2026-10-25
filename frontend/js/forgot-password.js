@@ -23,6 +23,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         setLoading(true);
+        const loadingToken = window.AZIEL_LOADING?.start("password-otp-request");
 
         try {
             const res = await fetch("/api/password/send-otp", {
@@ -53,6 +54,8 @@ document.addEventListener("DOMContentLoaded", () => {
             console.log("Send OTP error:", error);
             showMessage(t("common.serverErrorRetry", "Server error. Please try again."), "error");
             setLoading(false);
+        } finally {
+            window.AZIEL_LOADING?.finish(loadingToken);
         }
     });
 

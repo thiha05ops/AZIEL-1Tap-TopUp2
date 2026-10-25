@@ -186,6 +186,25 @@ function projectAdminCatalogListProduct(product = {}) {
     };
 }
 
+function elapsedMs(startedAt) {
+    return Number(process.hrtime.bigint() - startedAt) / 1e6;
+}
+
+function sendTimedCatalogJson(res, payload, { requestStartedAt, serviceDurationMs, cache = "bypass", metric = "catalog" }) {
+    const serializationStartedAt = process.hrtime.bigint();
+    const body = JSON.stringify(payload);
+    const serializationDurationMs = elapsedMs(serializationStartedAt);
+    const applicationDurationMs = elapsedMs(requestStartedAt);
+    const cacheDescription = ["hit", "miss", "shared", "bypass"].includes(cache) ? cache : "bypass";
+
+    res.set("Server-Timing", [
+        `${metric}-service;dur=${serviceDurationMs.toFixed(1)};desc=\"${cacheDescription}\"`,
+        `${metric}-serialize;dur=${serializationDurationMs.toFixed(1)}`,
+        `${metric}-app;dur=${applicationDurationMs.toFixed(1)}`
+    ].join(", "));
+    return res.type("application/json").send(body);
+}
+
 router.get("/public/exclusive-offers", async (req, res) => {
     try {
         const customerMarket = String(
@@ -221,15 +240,24 @@ router.get("/public/exclusive-offers", async (req, res) => {
 });
 
 router.get("/catalog", async (req, res) => {
+    const requestStartedAt = process.hrtime.bigint();
     try {
         const customerMarket = String(req.query.region || req.headers["x-customer-region"] || "TH").trim().toUpperCase();
-        const products = await toPublicCatalog({ includeDisabled: false, customerMarket });
+        const timing = {};
+        const serviceStartedAt = process.hrtime.bigint();
+        const products = await toPublicCatalog({ includeDisabled: false, customerMarket, timing });
+        const serviceDurationMs = elapsedMs(serviceStartedAt);
 
         res.set("Cache-Control", "no-store");
-        return res.json({
+        return sendTimedCatalogJson(res, {
             success: true,
             ...projectSource(),
             products
+        }, {
+            requestStartedAt,
+            serviceDurationMs,
+            cache: timing.cache,
+            metric: "catalog"
         });
     } catch (error) {
         console.log("Public catalog error:", error?.code || error?.name || "CATALOG_ERROR");
@@ -344,13 +372,18 @@ router.get("/public/storefront-sections/:key", async (req, res) => {
 });
 
 router.get("/catalog/:productCode", async (req, res) => {
+    const requestStartedAt = process.hrtime.bigint();
     try {
         const customerMarket = String(req.query.region || req.headers["x-customer-region"] || "TH").trim().toUpperCase();
+        const timing = {};
+        const serviceStartedAt = process.hrtime.bigint();
         const product = await getCatalogProductDetail(req.params.productCode, {
             source: "database",
             includeDisabled: false,
-            customerMarket
+            customerMarket,
+            timing
         });
+        const serviceDurationMs = elapsedMs(serviceStartedAt);
 
         res.set("Cache-Control", "no-store");
         if (!product) {
@@ -374,10 +407,15 @@ router.get("/catalog/:productCode", async (req, res) => {
             });
         }
 
-        return res.json({
+        return sendTimedCatalogJson(res, {
             success: true,
             ...projectSource(),
             product
+        }, {
+            requestStartedAt,
+            serviceDurationMs,
+            cache: timing.cache,
+            metric: "catalog-detail"
         });
     } catch (error) {
         console.log("Public catalog detail error:", error?.code || error?.name || "CATALOG_ERROR");

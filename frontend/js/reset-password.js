@@ -59,6 +59,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         setLoading(true);
+        const loadingToken = window.AZIEL_LOADING?.start("password-reset");
 
         try {
             const res = await fetch("/api/password/reset", {
@@ -94,6 +95,8 @@ document.addEventListener("DOMContentLoaded", () => {
             console.log("Reset password error:", error);
             showMessage(t("common.serverErrorRetry", "Server error. Please try again."), "error");
             setLoading(false);
+        } finally {
+            window.AZIEL_LOADING?.finish(loadingToken);
         }
     });
 

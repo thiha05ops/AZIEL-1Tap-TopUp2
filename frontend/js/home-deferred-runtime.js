@@ -4,7 +4,7 @@
     window.__AZIEL_HOME_DEFERRED_RUNTIME_INITIALIZED__ = true;
     const scripts = [
         "/js/home-promotion-preview.js?v=20260920-storefront-performance-v1",
-        "/js/search.js?v=20260920-storefront-performance-v1",
+        "/js/search.js?v=20261026-native-performance-v1",
         "/js/live-chat.js?v=20260920-storefront-performance-v1",
         "/js/payment-trust-display.js?v=20260920-storefront-performance-v1",
         "/js/home-coupon-preview.js?v=20260920-storefront-performance-v1"

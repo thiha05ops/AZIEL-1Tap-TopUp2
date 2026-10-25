@@ -290,7 +290,7 @@ function openHeaderSearch(trigger = null) {
     }
 
     const script = document.createElement("script");
-    script.src = "/js/search.js?v=20260717-v26-search";
+    script.src = "/js/search.js?v=20261026-native-performance-v1";
     script.dataset.azielSearch = "true";
     script.onload = () => {
         window.AZIEL_SEARCH?.open?.(trigger || document.activeElement);

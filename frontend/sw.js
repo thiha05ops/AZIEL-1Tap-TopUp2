@@ -1,7 +1,7 @@
 const CACHE_PREFIX = "aziel-runtime";
 // Keep the suffix equal to the deterministic CORE_ASSETS content digest. The
 // migration verifier fails if a precached dependency changes without a bump.
-const SHELL_REVISION = "v8-d52339e9fc8db024";
+const SHELL_REVISION = "v8-fc1d9510c809108a";
 const CORE_CACHE = `${CACHE_PREFIX}-core-${SHELL_REVISION}`;
 const PAGE_CACHE = `${CACHE_PREFIX}-pages-v3-${SHELL_REVISION}`;
 const CODE_CACHE = `${CACHE_PREFIX}-code-${SHELL_REVISION}`;
@@ -14,6 +14,7 @@ const CORE_ASSETS = [
     "/css/theme/aziel-design-system.css",
     "/css/core/motion.css",
     "/css/core/ui-feedback.css",
+    "/css/core/loading-progress.css",
     "/css/core/main.css",
     "/css/core/layout.css",
     "/css/core/components.css",
@@ -34,6 +35,7 @@ const CORE_ASSETS = [
     "/js/campaign-runtime.js",
     "/js/auth-check.js",
     "/js/header-loader.js",
+    "/js/loading-manager.js",
     "/core/settings/theme.js",
     "/js/locale-switcher.js",
     "/js/catalog-presentation.js",
@@ -226,14 +228,22 @@ function createNormalizedCacheKey(request) {
 }
 
 /**
- * JavaScript, CSS and JSON:
- * Network-first ensures the latest deployed code is used immediately.
- * Cache is only an offline fallback.
+ * Immutable versioned code is safe to serve from Cache Storage immediately.
+ * Unversioned code remains network-first so a deployment can never be hidden
+ * behind an old runtime entry.
  */
 async function staleWhileRevalidateCodeAsset(event, request) {
     const cache = await caches.open(CODE_CACHE);
     const url = new URL(request.url);
     const cacheKey = isVersionedCodeAsset(url) ? request : createNormalizedCacheKey(request);
+
+    if (isVersionedCodeAsset(url)) {
+        const cached = await cache.match(cacheKey);
+        if (cached) return cached;
+        const response = await fetch(request);
+        if (response.ok && response.type === "basic") await cache.put(cacheKey, response.clone());
+        return response;
+    }
 
     try {
         const response = await fetch(request, { cache: "no-cache" });

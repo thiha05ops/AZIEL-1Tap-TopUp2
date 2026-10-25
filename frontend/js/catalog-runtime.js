@@ -181,6 +181,7 @@
         if (loadingPromise) return loadingPromise;
         if (!options.force && isFresh()) return catalog;
 
+        const loadingToken = window.AZIEL_LOADING?.start("catalog-data");
         status = "loading";
         emitCatalogUpdated({ loading: true, source: options.source || "catalog" });
 
@@ -209,6 +210,7 @@
             })
             .finally(() => {
                 loadingPromise = null;
+                window.AZIEL_LOADING?.finish(loadingToken);
             });
 
         return loadingPromise;

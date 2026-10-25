@@ -1,6 +1,43 @@
 // frontend/js/header-loader.js
 // AZIEL V2.5 Header Loader + i18n
 
+(function loadAzielLoadingManagerOnce() {
+    if (window.__AZIEL_LOADING_SCRIPT_LOADER__) return;
+    window.__AZIEL_LOADING_SCRIPT_LOADER__ = true;
+    if (!document.querySelector('link[data-aziel-native-ux="true"]')) {
+        const stylesheet = document.createElement("link");
+        stylesheet.rel = "stylesheet";
+        stylesheet.href = "/css/core/loading-progress.css?v=20261025-native-ux-v2";
+        stylesheet.dataset.azielNativeUx = "true";
+        document.head.appendChild(stylesheet);
+    }
+    const bootstrapState = window.__AZIEL_LOADING_BOOTSTRAP__ ||= { pending: new Set(), sequence: 0 };
+    if (!window.AZIEL_LOADING) {
+        window.AZIEL_LOADING = Object.freeze({
+            start(label = "operation") {
+                const token = `bootstrap:${label}:${++bootstrapState.sequence}`;
+                bootstrapState.pending.add(token);
+                return token;
+            },
+            finish(token) {
+                return bootstrapState.pending.delete(token);
+            },
+            track(value, label) {
+                const token = `bootstrap:${label || "operation"}:${++bootstrapState.sequence}`;
+                bootstrapState.pending.add(token);
+                return Promise.resolve(value).finally(() => bootstrapState.pending.delete(token));
+            },
+            isActive: () => bootstrapState.pending.size > 0
+        });
+    }
+    if (document.querySelector('script[data-aziel-loading-manager="true"]')) return;
+    const script = document.createElement("script");
+    script.src = "/js/loading-manager.js?v=20261025-native-ux-v2";
+    script.defer = true;
+    script.dataset.azielLoadingManager = "true";
+    document.head.appendChild(script);
+})();
+
 (function loadAzielAnalyticsOnce() {
     if (window.__AZIEL_ANALYTICS_LOADER__) return;
     window.__AZIEL_ANALYTICS_LOADER__ = true;

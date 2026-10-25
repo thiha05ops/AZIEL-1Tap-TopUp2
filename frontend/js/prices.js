@@ -231,6 +231,70 @@ async function loadAuthoritativePrice(item) {
 }
 
 async function settleAuthoritativePrices(items, requestId) {
+  try {
+    const response = await fetch("/api/pricing/preview-batch", {
+      method: "POST",
+      cache: "no-store",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({
+        items: items.map(item => ({
+          productCode: item.productCode,
+          packageCode: item.packageCode,
+          region: item.region,
+          currency: item.currency
+        }))
+      })
+    });
+    if ([404, 405].includes(response.status)) return settleAuthoritativePricesLegacy(items, requestId);
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data.success || !Array.isArray(data.results) || data.results.length !== items.length) {
+      throw new Error(data.message || "Authoritative pricing preview unavailable");
+    }
+    return data.results.map((result, index) => {
+      const expectedPackageCode = String(items[index]?.packageCode || "").trim().toUpperCase();
+      const resultPackageCode = String(result?.packageCode || "").trim().toUpperCase();
+      const resolvedPackageCode = String(result?.resolvedPackageCode || "").trim().toUpperCase();
+      const quotePackageCode = String(result?.quote?.packageCode || "").trim().toUpperCase();
+      const resultIdentityMatches = Boolean(
+        expectedPackageCode &&
+        resultPackageCode === expectedPackageCode
+      );
+      const quoteIdentityMatches = resultIdentityMatches &&
+        Boolean(resolvedPackageCode) &&
+        quotePackageCode === resolvedPackageCode;
+      if (result?.success && result.quote && quoteIdentityMatches) {
+        const amount = Number(result.quote.finalAmount);
+        if (Number.isFinite(amount) && amount > 0) {
+          return {
+            status: "fulfilled",
+            value: {
+              ...items[index],
+              amount,
+              price: amount,
+              referencePrice: Number(result.quote.referencePrice || 0),
+              saveAmount: Number(result.quote.saveAmount || 0),
+              discountPercent: Number(result.quote.discountPercent || 0),
+              authoritativePreview: result.quote
+            }
+          };
+        }
+      }
+      const error = new Error(
+        resultIdentityMatches
+          ? (result?.error?.message || "Authoritative package price unavailable")
+          : "Authoritative package identity mismatch"
+      );
+      error.code = result?.error?.availabilityCode || result?.error?.code || "PRICING_UNAVAILABLE";
+      error.businessUnavailable = ["PRODUCT_HIDDEN", "PRODUCT_DISABLED", "REGION_UNAVAILABLE", "PACKAGE_UNAVAILABLE", "SETUP_INCOMPLETE", "COMING_SOON"].includes(error.code);
+      return { status: "rejected", reason: error };
+    });
+  } catch (error) {
+    if (requestId !== pricingRenderRequestId) return null;
+    return items.map(() => ({ status: "rejected", reason: error }));
+  }
+}
+
+async function settleAuthoritativePricesLegacy(items, requestId) {
   const results = [];
   const concurrency = 4;
   for (let index = 0; index < items.length; index += concurrency) {

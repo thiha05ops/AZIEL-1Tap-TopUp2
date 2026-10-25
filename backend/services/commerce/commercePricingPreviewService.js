@@ -34,17 +34,21 @@ function normalizeCurrency(value, region) {
     return currency;
 }
 
-async function loadCatalogPackage(input = {}) {
+async function loadCatalogPackage(input = {}, dependencies = {}) {
     const productCode = text(input.productCode || input.gameKey).toLowerCase();
     const packageCode = upper(input.packageCode);
     const region = normalizeRegion(input.region);
     const currency = normalizeCurrency(input.currency, region);
     if (!productCode || !packageCode) throw new CommercePricingPreviewError("INVALID_PRICING_PREVIEW", "Package selection is required.");
-    const product = await CatalogProduct.findOne({ productCode }).lean();
+    const product = await (dependencies.findProduct
+        ? dependencies.findProduct(productCode)
+        : CatalogProduct.findOne({ productCode }).lean());
     if (!/^[a-z0-9][a-z0-9-]{0,79}$/.test(productCode) || !product || !isProductPubliclyEligible(product)) {
         throw new CommercePricingPreviewError("PRODUCT_UNAVAILABLE", "Selected product is no longer available.", 409, "PRODUCT_DISABLED");
     }
-    const pkg = await findCatalogPackageByIdentity(productCode, packageCode, { enabled: true, deletedAt: null });
+    const pkg = await (dependencies.findPackage
+        ? dependencies.findPackage(productCode, packageCode)
+        : findCatalogPackageByIdentity(productCode, packageCode, { enabled: true, deletedAt: null }));
     const price = pkg?.prices?.[region];
     if (!pkg || !price || price.enabled === false || upper(price.currency) !== currency) {
         throw new CommercePricingPreviewError("PACKAGE_UNAVAILABLE", "Selected package is no longer available.", 409, "PACKAGE_UNAVAILABLE");

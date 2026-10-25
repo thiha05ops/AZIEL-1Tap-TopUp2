@@ -32,7 +32,10 @@ function makeHarness({ legacy = true, failInstall = false, failNetwork = false }
             redirected: true,
             url: "https://aziel.test/"
         }]]));
-        stores.set(oldCode, new Map([["/js/live-chat.js", "OLD_UNGUARDED_LIVE_CHAT"]]));
+        stores.set(oldCode, new Map([
+            ["/js/live-chat.js", "OLD_UNGUARDED_LIVE_CHAT"],
+            ["/js/catalog-runtime.js?v=20260920-storefront-performance-v1", "OLD_CATALOG_RUNTIME"]
+        ]));
     }
     stores.set("unrelated-application-cache", new Map([["/keep", "KEEP"]]));
 
@@ -71,6 +74,7 @@ function makeHarness({ legacy = true, failInstall = false, failNetwork = false }
     const events = {};
     let claimed = 0;
     let skipped = 0;
+    let fetchCalls = 0;
     const navigations = [];
     const windowClients = [
         { url: "https://aziel.test/", navigate: async url => navigations.push(url) },
@@ -97,10 +101,13 @@ function makeHarness({ legacy = true, failInstall = false, failNetwork = false }
             }
         },
         fetch: async request => {
+            fetchCalls += 1;
             if (failNetwork) throw new Error("simulated offline network");
             const pathname = new URL(typeof request === "string" ? request : request.url, "https://aziel.test").pathname;
             const diskPath = path.join(root, "frontend", pathname.replace(/^\//, ""));
-            return new Response(fs.existsSync(diskPath) ? fs.readFileSync(diskPath) : "NETWORK", { status: 200 });
+            const response = new Response(fs.existsSync(diskPath) ? fs.readFileSync(diskPath) : "NETWORK", { status: 200 });
+            Object.defineProperty(response, "type", { value: "basic" });
+            return response;
         },
         self: {
             location: { origin: "https://aziel.test" },
@@ -138,7 +145,7 @@ function makeHarness({ legacy = true, failInstall = false, failNetwork = false }
         return { respondWithCalls, response: pending ? await pending : null };
     }
 
-    return { stores, dispatch, dispatchFetch, navigations, counts: () => ({ claimed, skipped }) };
+    return { stores, dispatch, dispatchFetch, navigations, counts: () => ({ claimed, skipped, fetchCalls }) };
 }
 
 (async () => {
@@ -163,6 +170,11 @@ function makeHarness({ legacy = true, failInstall = false, failNetwork = false }
     const contaminatedNavigation = await upgrade.dispatchFetch({ method: "GET", mode: "navigate", url: "https://aziel.test/" });
     assert.strictEqual(contaminatedNavigation.respondWithCalls, 0, "even contaminated legacy caches must not own navigation");
     assert.strictEqual(contaminatedNavigation.response, null);
+    const upgradedCatalogUrl = "https://aziel.test/js/catalog-runtime.js?v=20261026-native-performance-v1";
+    const upgradeFetchesBefore = upgrade.counts().fetchCalls;
+    const upgradedCatalog = await upgrade.dispatchFetch({ method: "GET", mode: "cors", url: upgradedCatalogUrl });
+    assert.notStrictEqual(await upgradedCatalog.response.text(), "OLD_CATALOG_RUNTIME", "new release URLs must not reuse an old worker's cached asset");
+    assert.strictEqual(upgrade.counts().fetchCalls, upgradeFetchesBefore + 1, "new release URLs must make one cold network request");
     await upgrade.dispatch("install");
     assert.strictEqual(upgrade.counts().skipped, 1, "successful atomic precache must allow activation");
     await upgrade.dispatch("activate");
@@ -215,6 +227,10 @@ function makeHarness({ legacy = true, failInstall = false, failNetwork = false }
 
     const codeAsset = await fresh.dispatchFetch({ method: "GET", mode: "cors", url: "https://aziel.test/js/live-chat.js?v=1" });
     assert.strictEqual(codeAsset.respondWithCalls, 1, "static code assets must remain Service Worker managed");
+    const fetchesAfterColdCode = fresh.counts().fetchCalls;
+    const warmCodeAsset = await fresh.dispatchFetch({ method: "GET", mode: "cors", url: "https://aziel.test/js/live-chat.js?v=1" });
+    assert.strictEqual(await warmCodeAsset.response.text(), currentLiveChat, "warm versioned code must use the cached response");
+    assert.strictEqual(fresh.counts().fetchCalls, fetchesAfterColdCode, "warm versioned code must not wait on the network");
     const mediaAsset = await fresh.dispatchFetch({ method: "GET", mode: "cors", url: "https://aziel.test/assets/brand/icon-192.png" });
     assert.strictEqual(mediaAsset.respondWithCalls, 1, "static media assets must remain Service Worker managed");
 

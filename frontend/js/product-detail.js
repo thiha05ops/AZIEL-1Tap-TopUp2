@@ -39,11 +39,14 @@
     document.getElementById("packages")?.setAttribute("data-game", productCode);
 
     async function bootstrap() {
+        const loadingToken = window.AZIEL_LOADING?.start("product-catalog");
         try {
             await window.AZIEL_CATALOG?.ensureFresh?.();
         } catch (_) {
             document.documentElement.dataset.publicProductState = "HIDDEN";
             return null;
+        } finally {
+            window.AZIEL_LOADING?.finish(loadingToken);
         }
         const product = window.AZIEL_CATALOG?.getProduct?.(productCode);
         if (!product) {

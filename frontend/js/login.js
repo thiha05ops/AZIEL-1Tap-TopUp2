@@ -139,6 +139,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         setLoading(true);
+        const loadingToken = window.AZIEL_LOADING?.start("login");
 
         try {
             const res = await fetch(apiUrl("/api/login"), {
@@ -184,11 +185,14 @@ document.addEventListener("DOMContentLoaded", () => {
             console.log("Login error:", error);
             showMessage(authT("common.serverErrorRetry", "Server error. Please try again."), "error");
             setLoading(false);
+        } finally {
+            window.AZIEL_LOADING?.finish(loadingToken);
         }
     });
 
     async function verifyTwoFactorLogin(twoFactorCode) {
         setLoading(true);
+        const loadingToken = window.AZIEL_LOADING?.start("login-2fa");
 
         try {
             const recoveryMode = /[A-Za-z0-9]{8}-[A-Za-z0-9]{8}/.test(twoFactorCode);
@@ -218,6 +222,8 @@ document.addEventListener("DOMContentLoaded", () => {
             console.log("2FA login error:", error);
             showMessage(authT("common.serverErrorRetry", "Server error. Please try again."), "error");
             setLoading(false);
+        } finally {
+            window.AZIEL_LOADING?.finish(loadingToken);
         }
     }
 

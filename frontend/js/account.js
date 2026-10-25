@@ -44,23 +44,28 @@ function accountApiUrl(path) {
 }
 
 async function initAccount() {
-    await ensureAZIELState();
+    const loadingToken = window.AZIEL_LOADING?.start("account");
+    try {
+        await ensureAZIELState();
 
-    currentUser = window.AZIEL?.user || null;
+        currentUser = window.AZIEL?.user || null;
 
-    if (!currentUser) {
-        window.location.href = "/login";
-        return;
+        if (!currentUser) {
+            window.location.href = "/login";
+            return;
+        }
+
+        renderAccount();
+
+        await Promise.all([
+            loadHistory(),
+            refreshAccountData()
+        ]);
+
+        await loadSecurityData();
+    } finally {
+        window.AZIEL_LOADING?.finish(loadingToken);
     }
-
-    renderAccount();
-
-    await Promise.all([
-        loadHistory(),
-        refreshAccountData()
-    ]);
-
-    await loadSecurityData();
 
     window.addEventListener("aziel:ready", async () => {
         currentUser = window.AZIEL?.user || null;

@@ -15,6 +15,7 @@ const {
 } = require("../services/promoCodeService");
 const { CatalogError } = require("../services/catalogService");
 const { resolveCommercePricingPreview, CommercePricingPreviewError } = require("../services/commerce/commercePricingPreviewService");
+const { resolveCommercePricingPreviewBatch } = require("../services/commerce/commercePricingPreviewBatchService");
 
 function sendPromoError(res, error) {
     if (error instanceof PromoError || error instanceof CatalogError || error instanceof CommercePricingPreviewError) {
@@ -32,6 +33,20 @@ function sendPromoError(res, error) {
         code: "PROMO_SERVER_ERROR",
         message: "Promo code request failed."
     });
+}
+
+function publicPricingError(error) {
+    if (error instanceof PromoError || error instanceof CatalogError || error instanceof CommercePricingPreviewError) {
+        return {
+            code: error.code,
+            ...(error.availabilityCode ? { availabilityCode: error.availabilityCode } : {}),
+            message: error.message
+        };
+    }
+    return {
+        code: "PRICING_PREVIEW_UNAVAILABLE",
+        message: "Pricing preview is temporarily unavailable."
+    };
 }
 
 router.get("/admin/promos", adminMiddleware, requireAdminPermission(PERMISSIONS.PROMOS_READ), async (req, res) => {
@@ -125,6 +140,30 @@ router.post("/pricing/preview", optionalAuthMiddleware, async (req, res) => {
             sessionId: req.sessionID || req.headers["x-session-id"] || ""
         });
         return res.json({ success: true, quote });
+    } catch (error) {
+        return sendPromoError(res, error);
+    }
+});
+
+router.post("/pricing/preview-batch", optionalAuthMiddleware, async (req, res) => {
+    try {
+        const items = Array.isArray(req.body?.items) ? req.body.items : [];
+        if (!items.length || items.length > 60) {
+            return res.status(400).json({
+                success: false,
+                code: "INVALID_PRICING_PREVIEW_BATCH",
+                message: "Pricing preview batch must contain between 1 and 60 packages."
+            });
+        }
+
+        const results = await resolveCommercePricingPreviewBatch(items, {
+            user: req.user || null,
+            sessionId: req.sessionID || req.headers["x-session-id"] || ""
+        }, {
+            projectError: publicPricingError
+        });
+        res.set("Cache-Control", "no-store");
+        return res.json({ success: true, results });
     } catch (error) {
         return sendPromoError(res, error);
     }

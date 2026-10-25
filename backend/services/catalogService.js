@@ -1094,6 +1094,8 @@ async function toDatabasePublicCatalog({ includeDisabled = true, includeAssetPro
 
 const PUBLIC_CATALOG_CACHE_TTL_MS = 15_000;
 const publicCatalogCache = new Map();
+const publicCatalogInFlight = new Map();
+let publicCatalogCacheGeneration = 0;
 
 function publicCatalogCacheKey(options = {}) {
     return [
@@ -1148,30 +1150,63 @@ async function toPublicCatalog(options = {}) {
 
     if (cacheEligible) {
         const cached = readPublicCatalogCache(cacheKey);
-        if (cached) return cached;
+        if (cached) {
+            if (options.timing) options.timing.cache = "hit";
+            return cached;
+        }
+        const pending = publicCatalogInFlight.get(cacheKey);
+        if (pending) {
+            if (options.timing) options.timing.cache = "shared";
+            return pending;
+        }
     }
 
-    const products = await toDatabasePublicCatalog({
-        includeDisabled: options.includeDisabled !== false,
-        includeAssetProjection: Boolean(options.includeAssetProjection),
-        includeAdminPricing: Boolean(options.includeAdminPricing),
-        customerMarket: options.customerMarket || "TH",
-        publicationProjectionMode: options.publicationProjectionMode
-    });
+    if (options.timing) options.timing.cache = cacheEligible ? "miss" : "bypass";
+    const generation = publicCatalogCacheGeneration;
+    const load = toDatabasePublicCatalog({
+            includeDisabled: options.includeDisabled !== false,
+            includeAssetProjection: Boolean(options.includeAssetProjection),
+            includeAdminPricing: Boolean(options.includeAdminPricing),
+            customerMarket: options.customerMarket || "TH",
+            publicationProjectionMode: options.publicationProjectionMode
+        })
+        .then(products =>
+            cacheEligible && generation === publicCatalogCacheGeneration
+                ? writePublicCatalogCache(cacheKey, products)
+                : products
+        );
 
-    return cacheEligible ? writePublicCatalogCache(cacheKey, products) : products;
+    if (!cacheEligible) return load;
+
+    if (publicCatalogInFlight.size >= 20) return load;
+    publicCatalogInFlight.set(cacheKey, load);
+    try {
+        return await load;
+    } finally {
+        if (publicCatalogInFlight.get(cacheKey) === load) publicCatalogInFlight.delete(cacheKey);
+    }
 }
 
 
 const PUBLIC_PRODUCT_DETAIL_CACHE_TTL_MS = 15_000;
 const publicProductDetailCache = new Map();
+const publicProductDetailInFlight = new Map();
 
 function clearPublicCatalogCaches(productCode = "") {
     const normalized = normalizeProductCode(productCode);
+    publicCatalogCacheGeneration += 1;
     publicCatalogCache.clear();
-    if (!normalized) publicProductDetailCache.clear();
-    else for (const key of publicProductDetailCache.keys()) {
-        if (key.startsWith(`${normalized}:`)) publicProductDetailCache.delete(key);
+    publicCatalogInFlight.clear();
+    if (!normalized) {
+        publicProductDetailCache.clear();
+        publicProductDetailInFlight.clear();
+    } else {
+        for (const key of publicProductDetailCache.keys()) {
+            if (key.startsWith(`${normalized}:`)) publicProductDetailCache.delete(key);
+        }
+        for (const key of publicProductDetailInFlight.keys()) {
+            if (key.startsWith(`${normalized}:`)) publicProductDetailInFlight.delete(key);
+        }
     }
 }
 
@@ -1222,6 +1257,7 @@ async function getCatalogProductDetail(productCode, options = {}) {
     if (!/^[a-z0-9][a-z0-9-]{0,79}$/.test(normalizedCode)) return null;
 
     const cacheEligible =
+        options.__skipPublicDedupe !== true &&
         (options.source || getCatalogSource()) === "database" &&
         options.includeAdminPricing !== true &&
         options.includeAssetProjection !== true &&
@@ -1234,8 +1270,36 @@ async function getCatalogProductDetail(productCode, options = {}) {
 
     if (cacheEligible) {
         const cached = readPublicProductDetailCache(cacheKey);
-        if (cached) return cached;
+        if (cached) {
+            if (options.timing) options.timing.cache = "hit";
+            return cached;
+        }
+        const pending = publicProductDetailInFlight.get(cacheKey);
+        if (pending) {
+            if (options.timing) options.timing.cache = "shared";
+            return pending;
+        }
+
+        if (options.timing) options.timing.cache = "miss";
+        const generation = publicCatalogCacheGeneration;
+        const load = getCatalogProductDetail(productCode, {
+            ...options,
+            __skipPublicDedupe: true
+        }).then(product =>
+            product && generation === publicCatalogCacheGeneration
+                ? writePublicProductDetailCache(cacheKey, product)
+                : product
+        );
+        if (publicProductDetailInFlight.size >= 100) return load;
+        publicProductDetailInFlight.set(cacheKey, load);
+        try {
+            return await load;
+        } finally {
+            if (publicProductDetailInFlight.get(cacheKey) === load) publicProductDetailInFlight.delete(cacheKey);
+        }
     }
+
+    if (options.timing && !options.timing.cache) options.timing.cache = "bypass";
 
     /*
      * Admin callers require the existing broad/admin projection semantics.
