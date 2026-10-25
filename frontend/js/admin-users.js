@@ -127,7 +127,7 @@ function renderUsers(users) {
         <button class="customer-row ${String(user._id) === String(selectedCustomerId) ? "active" : ""}" type="button" data-customer-id="${escapeHTML(user._id || "")}">
             <span class="customer-avatar">${avatarMarkup(user)}</span>
             <span class="customer-row-main">
-                <strong>${escapeHTML(user.username || "Unknown")}</strong>
+                <strong>${escapeHTML(user.displayUsername || user.username || "Unknown")}</strong>
                 <small>${escapeHTML(user.customerId || "No AZIEL ID")} · ${escapeHTML(regionLabel(user.region))} · ${escapeHTML(formatDate(user.lastActivityAt || user.createdAt))}</small>
                 <span class="customer-tags">${renderTagBadges(user.tags || [], 3)}</span>
             </span>

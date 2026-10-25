@@ -10,6 +10,15 @@ const userSchema = new mongoose.Schema(
             trim: true
         },
 
+        // Registration spelling shown to customers and admins. `username`
+        // remains the canonical, unique identity key used by existing records.
+        displayUsername: {
+            type: String,
+            default: "",
+            trim: true,
+            immutable: true
+        },
+
         customerId: {
             type: String,
             trim: true,

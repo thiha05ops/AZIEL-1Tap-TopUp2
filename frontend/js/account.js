@@ -239,7 +239,7 @@ function renderProfile() {
     setProfileBaseline(name);
 
     setValue("profileCustomerIdReadOnly", user.customerId || "");
-    setValue("profileUsername", user.username || "");
+    setValue("profileUsername", user.displayUsername || user.username || "");
     setValue("profileEmail", user.email || "");
 
     setValue(

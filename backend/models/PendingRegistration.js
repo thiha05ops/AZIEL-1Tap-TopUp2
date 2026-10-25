@@ -17,6 +17,12 @@ const pendingRegistrationSchema = new mongoose.Schema(
             index: true
         },
 
+        displayUsername: {
+            type: String,
+            default: "",
+            trim: true
+        },
+
         passwordHash: {
             type: String,
             required: true

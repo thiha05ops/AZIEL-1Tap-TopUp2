@@ -16,9 +16,12 @@ const {
 const {
     RegistrationError,
     beginRegistration,
-    toRegistrationResponse,
-    verifyRegistrationOtp
+    toRegistrationResponse
 } = require("../services/registrationService");
+const {
+    findCustomerForLogin,
+    verifyRegistrationAndIssueSession
+} = require("../services/customerAuthService");
 const {
     consumeChallenge,
     consumeRecoveryCode,
@@ -68,26 +71,23 @@ router.post("/register", async (req, res) => {
 
 router.post("/verify-email", async (req, res) => {
     try {
-        const result = await verifyRegistrationOtp(req.body);
-        const user = result.user;
-
-        await recordSecurityEvent(user, {
-            type: "email.verified",
-            title: "Email verified"
-        });
+        const result = await verifyRegistrationAndIssueSession(req.body, req);
+        setAuthCookie(res, result.session.sessionId);
 
         return res.json({
             success: true,
             message: result.message,
-            user: {
-                username: user.username,
-                email: user.email,
-                displayName: user.displayName || user.username,
-                region: user.region || "MM",
-                role: user.role || "user"
-            }
+            user: result.user
         });
     } catch (error) {
+        if (error?.registrationCompleted) {
+            console.log("Post-registration sign-in error:", error);
+            return res.status(500).json({
+                success: false,
+                code: "REGISTRATION_SESSION_FAILED",
+                message: "Account created, but automatic sign-in failed. Please sign in."
+            });
+        }
         if (!(error instanceof RegistrationError)) {
             console.log("Verify email error:", error);
         }
@@ -113,12 +113,8 @@ router.post("/login", async (req, res) => {
             });
         }
 
-        const user = await User.findOne({
-            $or: [
-                { username: loginId },
-                { email: loginId }
-            ]
-        });
+        const lookup = await findCustomerForLogin(loginId);
+        const user = lookup.user;
 
         if (!user) {
             return res.json({

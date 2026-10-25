@@ -5,6 +5,7 @@ const User = require("../models/User");
 const Session = require("../models/Session");
 const SecurityEvent = require("../models/SecurityEvent");
 const { parseDeviceInfoFromRequest } = require("./deviceInfoService");
+const { getDisplayUsername } = require("./userIdentityService");
 
 const JWT_SECRET = process.env.JWT_SECRET || "aziel_jwt_secret";
 const JWT_EXPIRES_IN = "15d";
@@ -93,6 +94,7 @@ function projectUser(user) {
         id: String(user._id),
         customerId: user.customerId || "",
         username: user.username,
+        displayUsername: getDisplayUsername(user),
         email: user.email || "",
         displayName: user.displayName || user.username,
         region: user.region || "MM",

@@ -1,6 +1,7 @@
 // frontend/js/verify-email.js
 
 document.addEventListener("DOMContentLoaded", () => {
+    let verificationPending = false;
     const form = document.getElementById("verifyEmailForm");
     const msg = document.getElementById("msg");
     const btn = document.getElementById("verifyEmailBtn");
@@ -22,6 +23,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     form.addEventListener("submit", async (e) => {
         e.preventDefault();
+        if (verificationPending) return;
 
         const otp = otpInput.value.trim();
 
@@ -30,11 +32,13 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
 
+        verificationPending = true;
         setLoading(true);
 
         try {
             const res = await fetch("/api/verify-email", {
                 method: "POST",
+                credentials: "include",
                 headers: {
                     "Content-Type": "application/json"
                 },
@@ -48,21 +52,35 @@ document.addEventListener("DOMContentLoaded", () => {
 
             if (!data.success) {
                 showMessage(data.message || "Email verification failed.", "error");
+
+                if (data.code === "REGISTRATION_SESSION_FAILED") {
+                    localStorage.removeItem("verifyEmail");
+                    setTimeout(() => {
+                        window.location.href = "/login";
+                    }, 1400);
+                    return;
+                }
+
+                verificationPending = false;
                 setLoading(false);
                 return;
             }
 
             localStorage.removeItem("verifyEmail");
+            window.AZIEL_AUTH_STATE.persistCustomer(data.user);
 
-            showMessage("Account created ✅ Redirecting to login...", "success");
+            showMessage("Account created ✅ Redirecting...", "success");
+
+            const redirectUrl = window.AZIEL_AUTH_STATE.resolvePostLoginRedirect();
 
             setTimeout(() => {
-                window.location.href = "/login";
+                window.location.href = redirectUrl;
             }, 900);
 
         } catch (error) {
             console.log("Verify email error:", error);
             showMessage("Server error. Please try again.", "error");
+            verificationPending = false;
             setLoading(false);
         }
     });

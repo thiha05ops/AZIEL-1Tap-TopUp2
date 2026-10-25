@@ -213,18 +213,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function completeLogin(data) {
-        localStorage.removeItem("token");
-        localStorage.removeItem("username");
-        sessionStorage.removeItem("token");
-        sessionStorage.removeItem("username");
-
-        localStorage.setItem("isLogin", "true");
-        localStorage.setItem("displayName", data.user.displayName || data.user.username);
-        localStorage.setItem("region", data.user.region || "MM");
-        localStorage.setItem("email", data.user.email || "");
-        localStorage.setItem("role", data.user.role || "user");
-
-        localStorage.setItem("username", data.user.username);
+        window.AZIEL_AUTH_STATE.persistCustomer(data.user);
 
         showMessage(authT("auth.login.success", "Login success. Redirecting..."), "success");
 

@@ -209,6 +209,38 @@ async function main() {
     assert(userModel.records[0].emailVerifiedAt, "emailVerifiedAt should be set");
     assert.strictEqual(pendingModel.records.length, 0, "pending challenge should be consumed/removed");
 
+    const preservedPendingModel = new FakePendingRegistrationModel();
+    const preservedUserModel = new FakeUserModel();
+    const preservedOtp = await issueChallenge({
+        pendingModel: preservedPendingModel,
+        userModel: preservedUserModel,
+        email: "nainglwin@gmail.com",
+        username: "Naing Lwin"
+    });
+    assert.strictEqual(preservedPendingModel.records[0].username, "nainglwin");
+    assert.strictEqual(preservedPendingModel.records[0].displayUsername, "Naing Lwin");
+
+    const preservedResult = await verifyRegistrationOtp(
+        { email: "nainglwin@gmail.com", otp: preservedOtp },
+        { PendingRegistrationModel: preservedPendingModel, UserModel: preservedUserModel, env }
+    );
+    assert.strictEqual(preservedResult.user.username, "nainglwin");
+    assert.strictEqual(preservedResult.user.displayUsername, "Naing Lwin");
+    assert.strictEqual(preservedResult.user.displayName, "Naing Lwin");
+
+    await assert.rejects(
+        () => beginRegistration(
+            { username: "NAING   LWIN", email: "anothernaing@gmail.com", password },
+            {
+                PendingRegistrationModel: preservedPendingModel,
+                UserModel: preservedUserModel,
+                sendVerifyOTP: async () => assert.fail("canonical duplicate must not send OTP"),
+                env
+            }
+        ),
+        error => error?.code === "REGISTRATION_USERNAME_TAKEN"
+    );
+
     const maxPendingModel = new FakePendingRegistrationModel();
     const maxUserModel = new FakeUserModel();
     const maxOtp = await issueChallenge({ pendingModel: maxPendingModel, userModel: maxUserModel, email: "maxqa@gmail.com", username: "maxqa" });

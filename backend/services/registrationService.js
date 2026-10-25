@@ -31,6 +31,10 @@ function normalizeUsername(username) {
         .replace(/\s+/g, "");
 }
 
+function normalizeDisplayUsername(username) {
+    return String(username || "").trim();
+}
+
 function normalizeOtp(otp) {
     return String(otp || "").trim();
 }
@@ -66,7 +70,8 @@ function hashOtp(otp, email, env = process.env) {
 }
 
 function validateRegistrationInput(input = {}) {
-    const username = normalizeUsername(input.username);
+    const displayUsername = normalizeDisplayUsername(input.username);
+    const username = normalizeUsername(displayUsername);
     const email = normalizeEmail(input.email);
     const password = String(input.password || "");
 
@@ -98,7 +103,7 @@ function validateRegistrationInput(input = {}) {
         );
     }
 
-    return { username, email, password };
+    return { username, displayUsername, email, password };
 }
 
 async function ensureNoUserConflict({ username, email }, deps) {
@@ -183,8 +188,9 @@ async function beginRegistration(input, options = {}) {
     const challengeData = {
         email: normalized.email,
         username: normalized.username,
+        displayUsername: normalized.displayUsername,
         passwordHash,
-        displayName: normalized.username,
+        displayName: normalized.displayUsername,
         otpHash: hashOtp(otp, normalized.email, deps.env),
         otpExpiresAt,
         otpAttempts: 0,
@@ -323,6 +329,7 @@ async function verifyRegistrationOtp(input, options = {}) {
         const verifiedAt = now;
         const user = await deps.UserModel.create({
             username: consumed.username,
+            displayUsername: consumed.displayUsername || consumed.username,
             email: consumed.email,
             password: consumed.passwordHash,
             displayName: consumed.displayName || consumed.username,
@@ -396,6 +403,7 @@ module.exports = {
     generateOtp,
     hashOtp,
     normalizeEmail,
+    normalizeDisplayUsername,
     normalizeOtp,
     normalizeUsername,
     toRegistrationResponse,
