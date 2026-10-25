@@ -105,9 +105,13 @@ document.addEventListener("DOMContentLoaded", () => {
             if (passwordInput.type === "password") {
                 passwordInput.type = "text";
                 if (icon) icon.className = "fa-regular fa-eye";
+                togglePassword.setAttribute("aria-pressed", "true");
+                togglePassword.setAttribute("aria-label", authT("auth.password.hide", "Hide password"));
             } else {
                 passwordInput.type = "password";
                 if (icon) icon.className = "fa-regular fa-eye-slash";
+                togglePassword.setAttribute("aria-pressed", "false");
+                togglePassword.setAttribute("aria-label", authT("auth.password.show", "Show password"));
             }
         });
     }
@@ -153,7 +157,12 @@ document.addEventListener("DOMContentLoaded", () => {
             const data = await res.json();
 
             if (!data.success) {
-                showMessage(data.code ? window.AZIEL_LOCALE?.translateError?.(data.code, data.message || authT("auth.login.failed", "Login failed")) : (data.message || authT("auth.login.failed", "Login failed")), "error");
+                showMessage(
+                    data.code
+                        ? window.AZIEL_LOCALE?.translateError?.(data.code, authT("auth.login.failed", "Username, email, or password is incorrect."))
+                        : authT("auth.login.failed", "Username, email, or password is incorrect."),
+                    "error"
+                );
                 setLoading(false);
                 return;
             }
@@ -163,7 +172,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 twoFactorBox.hidden = false;
                 passwordInput.value = "";
                 btn.textContent = authT("auth.twoFactor.verify", "Verify Code");
-                showMessage(data.message || authT("auth.twoFactor.requiredMessage", "Two-factor verification required."), "success");
+                showMessage(authT("auth.twoFactor.requiredMessage", "Two-factor verification required."), "success");
                 setLoading(false);
                 document.getElementById("twoFactorCode")?.focus();
                 return;
@@ -198,7 +207,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const data = await res.json();
 
             if (!data.success) {
-                showMessage(data.message || authT("auth.twoFactor.failed", "Two-factor verification failed"), "error");
+                showMessage(authT("auth.twoFactor.failed", "Two-factor verification failed"), "error");
                 setLoading(false);
                 return;
             }

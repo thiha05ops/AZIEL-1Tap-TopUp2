@@ -1,6 +1,7 @@
 // frontend/js/register.js
 
 document.addEventListener("DOMContentLoaded", () => {
+    let registrationPending = false;
     const t = (key, fallback) => window.AZIEL_LOCALE?.t?.(key, fallback) || fallback;
     const form = document.getElementById("registerForm");
     const msg = document.getElementById("msg");
@@ -29,12 +30,18 @@ document.addEventListener("DOMContentLoaded", () => {
                 ? "fa-regular fa-eye"
                 : "fa-regular fa-eye-slash";
         }
+        togglePassword.setAttribute("aria-pressed", String(isHidden));
+        togglePassword.setAttribute("aria-label", t(
+            isHidden ? "auth.password.hideBoth" : "auth.password.showBoth",
+            isHidden ? "Hide passwords" : "Show passwords"
+        ));
     });
 
     form.addEventListener("submit", async (e) => {
         e.preventDefault();
+        if (registrationPending) return;
 
-        const username = document.getElementById("username").value.trim().toLowerCase();
+        const username = document.getElementById("username").value.trim();
         const email = document.getElementById("email").value.trim().toLowerCase();
         const password = passwordInput.value.trim();
         const confirmPassword = confirmPasswordInput.value.trim();
@@ -59,6 +66,7 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
 
+        registrationPending = true;
         setLoading(true);
 
         try {
@@ -77,7 +85,13 @@ document.addEventListener("DOMContentLoaded", () => {
             const data = await res.json();
 
             if (!data.success) {
-                showMessage(data.message || t("auth.register.failed", "Register failed"), "error");
+                showMessage(
+                    data.code
+                        ? window.AZIEL_LOCALE?.translateError?.(data.code, t("auth.register.failed", "Registration could not be completed."))
+                        : t("auth.register.failed", "Registration could not be completed."),
+                    "error"
+                );
+                registrationPending = false;
                 setLoading(false);
                 return;
             }
@@ -93,6 +107,7 @@ document.addEventListener("DOMContentLoaded", () => {
         } catch (error) {
             console.log("Register error:", error);
             showMessage(t("common.serverErrorTryAgain", "Server error. Try again."), "error");
+            registrationPending = false;
             setLoading(false);
         }
     });
