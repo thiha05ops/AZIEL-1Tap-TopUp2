@@ -16,8 +16,11 @@ window.AZIEL_LANG.my = {
     nav_logout: "အကောင့်ထွက်ရန်",
     pwa_install_action: "AZIEL ကို ထည့်သွင်းမည်",
     pwa_install_ios_title: "AZIEL ကို ပင်မမျက်နှာပြင်သို့ ထည့်ရန်",
-    pwa_install_ios_safari: "Share ကိုနှိပ်ပြီး Add to Home Screen ကို ရွေးပါ။",
-    pwa_install_ios_other: "Browser ၏ Share menu ကိုဖွင့်ပြီး Add to Home Screen ကို ရွေးပါ။",
+    pwa_install_ios_safari: "Safari တွင် အောက်ပါအဆင့်များအတိုင်း လုပ်ဆောင်ပါ။",
+    pwa_install_ios_other: "Browser တွင် အောက်ပါအဆင့်များအတိုင်း လုပ်ဆောင်ပါ။",
+    pwa_install_step_share: "Share ကိုနှိပ်ပါ",
+    pwa_install_step_home: "Add to Home Screen ကိုရွေးပါ",
+    pwa_install_step_add: "Add ကိုနှိပ်ပါ",
     pwa_install_close: "နားလည်ပါပြီ",
 
     action_buy_now: "ဝယ်မည်",
@@ -1483,7 +1486,7 @@ window.AZIEL_LANG.my = {
 };
 
 Object.assign(window.AZIEL_LANG.my, {
-    "analyticsConsent.ariaLabel": "Analytics ကိုယ်ရေးလုံခြုံမှု ရွေးချယ်မှု", "analyticsConsent.title": "Cookies နှင့် ကိုယ်ရေးလုံခြုံမှု", "analyticsConsent.description": "AZIEL ကို လာရောက်အသုံးပြုပုံကို နားလည်ပြီး သင့်အတွေ့အကြုံကို မြှင့်တင်ရန် ရွေးချယ်နိုင်သော analytics cookies များကို အသုံးပြုပါသည်။", "analyticsConsent.privacyPolicy": "ကိုယ်ရေးအချက်အလက် မူဝါဒ", "analyticsConsent.decline": "ငြင်းပယ်မည်", "analyticsConsent.accept": "လက်ခံမည်", "analyticsConsent.settings": "ကိုယ်ရေးလုံခြုံမှု ဆက်တင်များ",
+    "analyticsConsent.ariaLabel": "Analytics ကိုယ်ရေးလုံခြုံမှု ရွေးချယ်မှု", "analyticsConsent.title": "Cookies နှင့် ကိုယ်ရေးလုံခြုံမှု", "analyticsConsent.description": "AZIEL ပိုမိုကောင်းမွန်စေရန် ရွေးချယ်နိုင်သော Analytics cookies ကို အသုံးပြုပါသည်။", "analyticsConsent.privacyPolicy": "ကိုယ်ရေးအချက်အလက် မူဝါဒ", "analyticsConsent.decline": "ငြင်းပယ်မည်", "analyticsConsent.accept": "လက်ခံမည်", "analyticsConsent.settings": "ကိုယ်ရေးလုံခြုံမှု ဆက်တင်များ",
     "about.meta.description": "ဂိမ်းငွေဖြည့်ခြင်း၊ Wallet ဝန်ဆောင်မှုများနှင့် အကူအညီပေးခြင်းတို့အတွက် ဒစ်ဂျစ်တယ်ကူးသန်းရောင်းဝယ်ရေး ပလက်ဖောင်း AZIEL 1Tap Shop အကြောင်း လေ့လာပါ။",
     "info.backHome": "← ပင်မစာမျက်နှာသို့", "info.legal": "ဥပဒေနှင့် မူဝါဒ", "info.openSupportCenter": "အကူအညီစင်တာကို ဖွင့်ရန်",
     "policy.updated.july2026": "နောက်ဆုံးပြင်ဆင်သည့်ရက်: ၂၀၂၆ ဇူလိုင်", "policy.updated.october2026": "နောက်ဆုံးပြင်ဆင်သည့်ရက်: ၂၀၂၆ အောက်တိုဘာ",

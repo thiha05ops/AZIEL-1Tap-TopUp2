@@ -510,6 +510,7 @@ function renderHeaderNav() {
     markActiveHeaderLinks();
     initHeaderDropdowns();
     translateHeader();
+    window.AZIEL_PWA_INSTALL?.syncActions?.();
 }
 
 function getFallbackStorefrontSections() {

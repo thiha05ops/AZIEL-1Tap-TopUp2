@@ -2631,14 +2631,20 @@ body.dark .az-profile-dropdown .dropdown-divider {
     }
 }
 
+.az-pwa-standalone [data-aziel-install-action] {
+    display: none !important;
+}
+
 .az-pwa-install-dialog {
-    width: min(420px, calc(100% - 32px));
+    width: min(480px, 100%);
+    max-width: none;
+    margin: auto auto 0;
     padding: 0;
     border: 1px solid var(--border, rgba(148, 163, 184, .22));
-    border-radius: 16px;
+    border-radius: 20px 20px 0 0;
     color: var(--text, #f8fafc);
     background: var(--surface, #111126);
-    box-shadow: 0 24px 70px rgba(0, 0, 0, .36);
+    box-shadow: 0 -16px 48px rgba(0, 0, 0, .28);
 }
 
 .az-pwa-install-dialog::backdrop {
@@ -2647,15 +2653,23 @@ body.dark .az-profile-dropdown .dropdown-divider {
 }
 
 .az-pwa-install-dialog__body {
+    position: relative;
     display: grid;
-    gap: 12px;
-    padding: 22px;
+    gap: 10px;
+    padding: 10px 18px max(18px, env(safe-area-inset-bottom));
 }
 
 .az-pwa-install-dialog h2,
 .az-pwa-install-dialog p { margin: 0; }
-.az-pwa-install-dialog p { color: var(--text-secondary, #cbd5e1); line-height: 1.65; }
-.az-pwa-install-dialog button {
+.az-pwa-install-dialog h2 { padding-right: 36px; font-size: 19px; line-height: 1.35; }
+.az-pwa-install-dialog p { color: var(--text-secondary, #cbd5e1); font-size: 13px; line-height: 1.5; }
+.az-pwa-install-dialog__handle { width: 38px; height: 4px; margin: 0 auto 2px; border-radius: 999px; background: var(--border, rgba(148,163,184,.38)); }
+.az-pwa-install-dialog button.az-pwa-install-dialog__x { position: absolute; top: 16px; right: 14px; width: 36px; height: 36px; padding: 0; display: grid; place-items: center; border: 0; border-radius: 999px; color: var(--text, #f8fafc); background: color-mix(in srgb, var(--surface-raised, #222238) 82%, transparent); }
+.az-pwa-install-dialog__x svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; }
+.az-pwa-install-steps { margin: 2px 0; padding: 0; display: grid; gap: 6px; list-style: none; }
+.az-pwa-install-steps li { min-height: 42px; padding: 7px 10px; display: flex; align-items: center; gap: 10px; border: 1px solid var(--border, rgba(148,163,184,.2)); border-radius: 10px; color: var(--text, #f8fafc); background: color-mix(in srgb, var(--surface-raised, #222238) 72%, transparent); font-size: 13px; line-height: 1.35; }
+.az-pwa-install-steps svg { width: 21px; height: 21px; flex: 0 0 auto; fill: none; stroke: var(--primary, #7c3aed); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.az-pwa-install-dialog button.az-pwa-install-dialog__done {
     min-height: 44px;
     border: 0;
     border-radius: 10px;
@@ -2666,6 +2680,10 @@ body.dark .az-profile-dropdown .dropdown-divider {
     font-weight: 600;
     line-height: 1.2;
     cursor: pointer;
+}
+
+@media (min-width: 520px) {
+    .az-pwa-install-dialog { margin-bottom: max(16px, env(safe-area-inset-bottom)); border-radius: 20px; }
 }
 
 /* Mobile-only elements must never alter desktop navigation layout. */

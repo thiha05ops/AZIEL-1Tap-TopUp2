@@ -1,7 +1,7 @@
 const CACHE_PREFIX = "aziel-runtime";
 // Keep the suffix equal to the deterministic CORE_ASSETS content digest. The
 // migration verifier fails if a precached dependency changes without a bump.
-const SHELL_REVISION = "v10-faf74fe4cd4fa0b0";
+const SHELL_REVISION = "v10-8fa0821c339f3da4";
 const CORE_CACHE = `${CACHE_PREFIX}-core-${SHELL_REVISION}`;
 const PAGE_CACHE = `${CACHE_PREFIX}-pages-v3-${SHELL_REVISION}`;
 const CODE_CACHE = `${CACHE_PREFIX}-code-${SHELL_REVISION}`;
@@ -15,7 +15,7 @@ const CORE_ASSETS = [
     "/css/core/motion.css",
     "/css/core/ui-feedback.css",
     "/css/core/loading-progress.css",
-    "/css/core/offline-home.css?v=20261026-pwa-offline-v1",
+    "/css/core/offline-home.css?v=20261027-pwa-phase2-v1",
     "/css/core/main.css",
     "/css/core/layout.css",
     "/css/core/components.css",
@@ -37,7 +37,7 @@ const CORE_ASSETS = [
     "/js/auth-check.js",
     "/js/header-loader.js",
     "/js/pwa-install.js",
-    "/js/offline-home.js?v=20261026-pwa-offline-v1",
+    "/js/offline-home.js?v=20261027-pwa-phase2-v1",
     "/js/loading-manager.js",
     "/core/settings/theme.js",
     "/js/locale-switcher.js",
@@ -60,6 +60,8 @@ const CORE_ASSETS = [
     "/assets/brand/favicon-32.png",
     "/assets/brand/favicon-48.png",
     "/assets/brand/aziel-logo-primary.svg",
+    "/assets/icons/offline-signal.svg",
+    "/assets/icons/offline-game.svg",
     "/assets/brand/icon-192.png",
     "/assets/brand/icon-512.png",
     "/assets/brand/apple-touch-icon.png"

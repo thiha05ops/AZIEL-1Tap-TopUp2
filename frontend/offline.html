@@ -4,37 +4,48 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="robots" content="noindex, nofollow">
-    <meta name="theme-color" content="#070716">
+    <meta name="theme-color" content="#f5f6fb">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="AZIEL">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
+    <script>(function(){var d=document.documentElement,v=null;try{v=localStorage.getItem("azielTheme")||localStorage.getItem("theme");}catch(e){}var m=v==="dark"||v==="light"?v:(window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light");d.classList.add("theme-"+m);d.dataset.theme=m;}());</script>
     <link rel="manifest" href="/manifest.json">
     <link rel="stylesheet" href="/css/theme/aziel-design-system.css">
-    <link rel="stylesheet" href="/css/core/offline-home.css?v=20261026-pwa-offline-v1">
+    <link rel="stylesheet" href="/css/core/offline-home.css?v=20261027-pwa-phase2-v1">
     <link rel="icon" type="image/png" sizes="32x32" href="/assets/brand/favicon-32.png">
     <link rel="apple-touch-icon" sizes="180x180" href="/assets/brand/apple-touch-icon.png">
     <title>Offline | AZIEL 1Tap Shop</title>
 </head>
-<body>
-    <header class="offline-header">
-        <img src="/assets/brand/aziel-logo-primary.svg" alt="AZIEL" width="132" height="42">
-        <span class="offline-status" data-offline-status>Offline</span>
+<body class="offline-home-page">
+    <header class="offline-header" aria-label="AZIEL storefront">
+        <button class="offline-icon-control" type="button" disabled aria-label="Menu unavailable offline"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+        <img class="offline-logo" src="/assets/brand/aziel-logo-primary.svg" alt="AZIEL" width="112" height="36">
+        <div class="offline-header-spacer"></div>
+        <span class="offline-region" aria-disabled="true"><svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.4 3 14.6 0 18M12 3c-3 3.4-3 14.6 0 18"/></svg><span data-offline-region>MM · Ks</span></span>
+        <span class="offline-profile" aria-disabled="true"><svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4.5 21a7.5 7.5 0 0 1 15 0"/></svg></span>
     </header>
-    <main>
-        <section class="offline-hero" aria-labelledby="offlineTitle">
-            <p class="offline-eyebrow" data-offline-copy="eyebrow">AZIEL 1Tap Shop</p>
-            <h1 id="offlineTitle" data-offline-copy="title">You're offline</h1>
-            <p data-offline-copy="description">Your public Home is available in offline mode. Connect to refresh games, prices, and promotions.</p>
-            <p class="offline-notice" role="status" aria-live="polite" data-offline-notice>Connection required for live actions.</p>
-            <button type="button" data-offline-retry><span data-offline-copy="retry">Try connection</span></button>
+    <main class="offline-main">
+        <section class="offline-state-panel" aria-labelledby="offlineTitle">
+            <img src="/assets/icons/offline-signal.svg" alt="" width="44" height="44">
+            <div class="offline-state-copy">
+                <span class="offline-status" data-offline-status>Offline</span>
+                <h1 id="offlineTitle" data-offline-copy="title">Connection unavailable</h1>
+                <p data-offline-copy="description">Browse the saved Home layout while AZIEL reconnects.</p>
+                <p class="offline-notice" role="status" aria-live="polite" data-offline-notice>Online access is required for live actions.</p>
+            </div>
+            <button class="offline-retry" type="button" data-offline-retry><span data-offline-copy="retry">Retry</span></button>
         </section>
-        <section class="offline-preview" aria-label="AZIEL storefront preview" aria-disabled="true">
-            <div class="offline-card"><span aria-hidden="true">🎮</span><strong data-offline-copy="games">Games</strong></div>
-            <div class="offline-card"><span aria-hidden="true">🎁</span><strong data-offline-copy="services">Digital services</strong></div>
-            <div class="offline-card"><span aria-hidden="true">🏷️</span><strong data-offline-copy="offers">AZIEL offers</strong></div>
+        <section class="offline-preview" aria-label="Saved storefront layout" aria-disabled="true">
+            <div class="offline-section-heading"><h2 data-offline-copy="section">Explore AZIEL</h2><span data-offline-copy="connectionRequired">Connection required</span></div>
+            <div class="offline-card-grid">
+                <article class="offline-card" inert><div class="offline-card-media"><img src="/assets/icons/offline-game.svg" alt=""></div><span class="skeleton-line skeleton-line--wide"></span><span class="skeleton-line"></span></article>
+                <article class="offline-card" inert><div class="offline-card-media"><img src="/assets/icons/offline-game.svg" alt=""></div><span class="skeleton-line skeleton-line--wide"></span><span class="skeleton-line"></span></article>
+                <article class="offline-card" inert><div class="offline-card-media"><img src="/assets/icons/offline-game.svg" alt=""></div><span class="skeleton-line skeleton-line--wide"></span><span class="skeleton-line"></span></article>
+                <article class="offline-card" inert><div class="offline-card-media"><img src="/assets/icons/offline-game.svg" alt=""></div><span class="skeleton-line skeleton-line--wide"></span><span class="skeleton-line"></span></article>
+            </div>
         </section>
     </main>
-    <script src="/js/offline-home.js?v=20261026-pwa-offline-v1" defer></script>
+    <script src="/js/offline-home.js?v=20261027-pwa-phase2-v1" defer></script>
 </body>
 </html>

@@ -16,8 +16,11 @@ window.AZIEL_LANG.en = {
     nav_logout: "Logout",
     pwa_install_action: "Install AZIEL",
     pwa_install_ios_title: "Add AZIEL to Home Screen",
-    pwa_install_ios_safari: "Tap Share, then choose Add to Home Screen.",
-    pwa_install_ios_other: "Open your browser's Share menu, then choose Add to Home Screen.",
+    pwa_install_ios_safari: "In Safari, follow these steps:",
+    pwa_install_ios_other: "In your browser, follow these steps:",
+    pwa_install_step_share: "Tap Share",
+    pwa_install_step_home: "Choose Add to Home Screen",
+    pwa_install_step_add: "Tap Add",
     pwa_install_close: "Got it",
 
     action_buy_now: "Buy Now",
@@ -1485,7 +1488,7 @@ window.AZIEL_LANG.en = {
 };
 
 Object.assign(window.AZIEL_LANG.en, {
-    "analyticsConsent.ariaLabel": "Analytics privacy choice", "analyticsConsent.title": "Cookies & Privacy", "analyticsConsent.description": "We use optional analytics cookies to understand how visitors use AZIEL and improve your experience.", "analyticsConsent.privacyPolicy": "Privacy Policy", "analyticsConsent.decline": "Decline", "analyticsConsent.accept": "Accept", "analyticsConsent.settings": "Privacy Settings",
+    "analyticsConsent.ariaLabel": "Analytics privacy choice", "analyticsConsent.title": "Cookies & Privacy", "analyticsConsent.description": "Optional analytics help us improve AZIEL.", "analyticsConsent.privacyPolicy": "Privacy Policy", "analyticsConsent.decline": "Decline", "analyticsConsent.accept": "Accept", "analyticsConsent.settings": "Privacy Settings",
     "about.meta.description": "Learn about AZIEL 1Tap Shop, a digital commerce platform for game top-ups, wallet services, and support.",
     "info.backHome": "← Back Home", "info.legal": "Legal", "info.openSupportCenter": "Open Support Center",
     "policy.updated.july2026": "Last Updated: July 2026", "policy.updated.october2026": "Last Updated: October 2026",

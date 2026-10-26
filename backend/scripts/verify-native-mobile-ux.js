@@ -131,7 +131,7 @@ for (const file of htmlFiles) {
     const html = fs.readFileSync(file, "utf8");
     assert.doesNotMatch(html, /user-scalable\s*=\s*no|max(?:imum)?-scale\s*=\s*1(?:[\s,"'])/i, `${file} blocks pinch zoom`);
     if (html.includes("header-loader.js")) {
-        assert.match(html, /header-loader\.js\?v=20261026-pwa-offline-v1/, `${file} must use the current immutable loader version`);
+        assert.match(html, /header-loader\.js\?v=20261027-pwa-phase2-v1/, `${file} must use the current immutable loader version`);
     }
 }
 

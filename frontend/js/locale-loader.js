@@ -3,7 +3,7 @@
     if (window.AZIEL_LOCALE_LOADER) return;
 
     const SUPPORTED = new Set(["en", "my", "th"]);
-    const VERSION = "20261022-default-my-v1";
+    const VERSION = "20261027-pwa-phase2-v1";
     const pending = new Map();
 
     function normalize(lang) {

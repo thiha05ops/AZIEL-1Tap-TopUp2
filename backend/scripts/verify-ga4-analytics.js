@@ -63,7 +63,7 @@ ok(allowed.storage.get("aziel.analyticsConsent") === "denied" && allowed.window[
 const loader = fs.readFileSync(path.join(root, "frontend/js/header-loader.js"), "utf8");
 ok(loader.includes("__AZIEL_ANALYTICS_LOADER__") && loader.includes("/js/analytics.js"), "shared frontend loader includes analytics exactly once");
 const publicFiles = ["home.html", "explore.html", "mobile-games.html", "pc-games.html", "gift-cards.html", "social-topup.html", "entertainment.html", "mobile-recharge.html", "about.html", "contact.html", "faq.html", "help.html", "coming-soon.html", "product.html", "product-unavailable.html", "policies/privacy.html", "policies/terms.html", "policies/payment.html", "policies/refund.html", "policies/support.html"];
-ok(publicFiles.every(file => fs.readFileSync(path.join(root, "frontend", file), "utf8").includes("header-loader.js?v=20261021-ga4-consent-v1")), "all public storefront entry pages reference the cache-busted shared loader");
+ok(publicFiles.every(file => fs.readFileSync(path.join(root, "frontend", file), "utf8").includes("header-loader.js?v=20261027-pwa-phase2-v1")), "all public storefront entry pages reference the cache-busted shared loader");
 const security = require(path.join(root, "backend/config/security"));
 const csp = security.getCspConnectSources({ NODE_ENV: "production" });
 ok(csp.includes("https://www.google-analytics.com") && csp.includes("https://region1.google-analytics.com"), "GA4 collection endpoints are in connect-src");

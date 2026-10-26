@@ -1,6 +1,11 @@
 // frontend/js/header-loader.js
 // AZIEL V2.5 Header Loader + i18n
 
+(function markStandaloneBeforeHeaderPaint() {
+    const standalone = window.matchMedia?.("(display-mode: standalone)")?.matches || navigator.standalone === true;
+    document.documentElement.classList.toggle("az-pwa-standalone", Boolean(standalone));
+})();
+
 (function loadAzielLoadingManagerOnce() {
     if (window.__AZIEL_LOADING_SCRIPT_LOADER__) return;
     window.__AZIEL_LOADING_SCRIPT_LOADER__ = true;
@@ -43,7 +48,7 @@
     window.__AZIEL_PWA_INSTALL_SCRIPT_LOADER__ = true;
     if (document.querySelector('script[data-aziel-pwa-install="true"]')) return;
     const script = document.createElement("script");
-    script.src = "/js/pwa-install.js?v=20261026-pwa-offline-v1";
+    script.src = "/js/pwa-install.js?v=20261027-pwa-phase2-v1";
     script.defer = true;
     script.dataset.azielPwaInstall = "true";
     document.head.appendChild(script);
@@ -54,7 +59,7 @@
     window.__AZIEL_ANALYTICS_LOADER__ = true;
     if (document.querySelector('script[data-aziel-analytics="true"]')) return;
     const script = document.createElement("script");
-    script.src = "/js/analytics.js?v=20261021-ga4-consent-v1";
+    script.src = "/js/analytics.js?v=20261027-pwa-phase2-v1";
     script.defer = true;
     script.dataset.azielAnalytics = "true";
     document.head.appendChild(script);

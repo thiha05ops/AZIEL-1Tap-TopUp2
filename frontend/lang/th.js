@@ -16,8 +16,11 @@ window.AZIEL_LANG.th = {
     nav_logout: "ออกจากระบบ",
     pwa_install_action: "ติดตั้ง AZIEL",
     pwa_install_ios_title: "เพิ่ม AZIEL ไปยังหน้าจอโฮม",
-    pwa_install_ios_safari: "แตะแชร์ แล้วเลือก เพิ่มไปยังหน้าจอโฮม",
-    pwa_install_ios_other: "เปิดเมนูแชร์ของเบราว์เซอร์ แล้วเลือก เพิ่มไปยังหน้าจอโฮม",
+    pwa_install_ios_safari: "ใน Safari ให้ทำตามขั้นตอนต่อไปนี้",
+    pwa_install_ios_other: "ในเบราว์เซอร์ ให้ทำตามขั้นตอนต่อไปนี้",
+    pwa_install_step_share: "แตะ แชร์",
+    pwa_install_step_home: "เลือก เพิ่มไปยังหน้าจอโฮม",
+    pwa_install_step_add: "แตะ เพิ่ม",
     pwa_install_close: "เข้าใจแล้ว",
 
     action_buy_now: "ซื้อเลย",
@@ -1484,7 +1487,7 @@ window.AZIEL_LANG.th = {
 };
 
 Object.assign(window.AZIEL_LANG.th, {
-    "analyticsConsent.ariaLabel": "ตัวเลือกความเป็นส่วนตัวสำหรับ Analytics", "analyticsConsent.title": "คุกกี้และความเป็นส่วนตัว", "analyticsConsent.description": "เราใช้คุกกี้ Analytics ที่เลือกได้เพื่อทำความเข้าใจการใช้งาน AZIEL และปรับปรุงประสบการณ์ของคุณ", "analyticsConsent.privacyPolicy": "นโยบายความเป็นส่วนตัว", "analyticsConsent.decline": "ปฏิเสธ", "analyticsConsent.accept": "ยอมรับ", "analyticsConsent.settings": "การตั้งค่าความเป็นส่วนตัว",
+    "analyticsConsent.ariaLabel": "ตัวเลือกความเป็นส่วนตัวสำหรับ Analytics", "analyticsConsent.title": "คุกกี้และความเป็นส่วนตัว", "analyticsConsent.description": "Analytics แบบเลือกได้ช่วยให้เราปรับปรุง AZIEL", "analyticsConsent.privacyPolicy": "นโยบายความเป็นส่วนตัว", "analyticsConsent.decline": "ปฏิเสธ", "analyticsConsent.accept": "ยอมรับ", "analyticsConsent.settings": "การตั้งค่าความเป็นส่วนตัว",
     "about.meta.description": "ทำความรู้จัก AZIEL 1Tap Shop แพลตฟอร์มดิจิทัลสำหรับเติมเกม บริการ Wallet และการช่วยเหลือลูกค้า",
     "info.backHome": "← กลับหน้าหลัก", "info.legal": "กฎหมาย", "info.openSupportCenter": "เปิดศูนย์ช่วยเหลือ",
     "policy.updated.july2026": "อัปเดตล่าสุด: กรกฎาคม 2026", "policy.updated.october2026": "อัปเดตล่าสุด: ตุลาคม 2026",
