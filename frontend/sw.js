@@ -1,7 +1,7 @@
 const CACHE_PREFIX = "aziel-runtime";
 // Keep the suffix equal to the deterministic CORE_ASSETS content digest. The
 // migration verifier fails if a precached dependency changes without a bump.
-const SHELL_REVISION = "v8-fc1d9510c809108a";
+const SHELL_REVISION = "v10-faf74fe4cd4fa0b0";
 const CORE_CACHE = `${CACHE_PREFIX}-core-${SHELL_REVISION}`;
 const PAGE_CACHE = `${CACHE_PREFIX}-pages-v3-${SHELL_REVISION}`;
 const CODE_CACHE = `${CACHE_PREFIX}-code-${SHELL_REVISION}`;
@@ -15,6 +15,7 @@ const CORE_ASSETS = [
     "/css/core/motion.css",
     "/css/core/ui-feedback.css",
     "/css/core/loading-progress.css",
+    "/css/core/offline-home.css?v=20261026-pwa-offline-v1",
     "/css/core/main.css",
     "/css/core/layout.css",
     "/css/core/components.css",
@@ -35,6 +36,8 @@ const CORE_ASSETS = [
     "/js/campaign-runtime.js",
     "/js/auth-check.js",
     "/js/header-loader.js",
+    "/js/pwa-install.js",
+    "/js/offline-home.js?v=20261026-pwa-offline-v1",
     "/js/loading-manager.js",
     "/core/settings/theme.js",
     "/js/locale-switcher.js",
@@ -81,6 +84,30 @@ const PUBLIC_HTML_ALLOWLIST = new Set([
     "/faq",
     "/about",
     "/contact",
+    "/policies/privacy",
+    "/policies/terms",
+    "/policies/payment",
+    "/policies/refund",
+    "/policies/support"
+]);
+
+// Only canonical, public, non-personalized routes may receive the offline
+// shell. Auth, customer, checkout, payment, OAuth, and product-price routes
+// deliberately remain browser/network owned.
+const OFFLINE_NAVIGATION_ALLOWLIST = new Set([
+    "/",
+    "/explore",
+    "/mobile-games",
+    "/pc-games",
+    "/gift-cards",
+    "/social-topup",
+    "/entertainment",
+    "/mobile-recharge",
+    "/about",
+    "/contact",
+    "/faq",
+    "/help",
+    "/coming-soon",
     "/policies/privacy",
     "/policies/terms",
     "/policies/payment",
@@ -148,6 +175,12 @@ self.addEventListener("message", event => {
     if (event.data?.type === "CLEAR_RUNTIME_CACHES") {
         event.waitUntil(clearRuntimeCaches());
     }
+
+    if (event.data?.type === "REFRESH_PUBLIC_HOME") {
+        event.waitUntil(refreshPublicHomePresentation().then(result => {
+            event.ports?.[0]?.postMessage(result);
+        }));
+    }
 });
 
 self.addEventListener("fetch", event => {
@@ -159,11 +192,12 @@ self.addEventListener("fetch", event => {
 
     if (url.origin !== self.location.origin) return;
 
-    // Top-level HTML navigations must remain owned by the browser network
-    // stack. This general rule supersedes the former OAUTH_NAVIGATION_PATHS-only
-    // bypass: redirect-followed Responses returned through respondWith() can be
-    // rejected by WebKit and can strand already-installed storefront clients.
-    if (request.mode === "navigate") return;
+    if (request.mode === "navigate") {
+        if (isOfflineSafeNavigation(url)) {
+            event.respondWith(networkFirstPublicNavigation(event, request));
+        }
+        return;
+    }
 
     if (url.pathname === "/api/public/home-presentation") {
         event.respondWith(staleWhileRevalidatePresentation(event, request));
@@ -193,6 +227,23 @@ function isNeverCachePath(pathname) {
 
 function isPublicHtml(pathname) {
     return PUBLIC_HTML_ALLOWLIST.has(pathname);
+}
+
+function isOfflineSafeNavigation(url) {
+    return !url.searchParams.has("code") &&
+        !url.searchParams.has("state") &&
+        !url.searchParams.has("payment") &&
+        OFFLINE_NAVIGATION_ALLOWLIST.has(url.pathname);
+}
+
+async function networkFirstPublicNavigation(event, request) {
+    try {
+        const preload = await event.preloadResponse;
+        return preload || await fetch(request);
+    } catch {
+        return await caches.match("/offline.html", { cacheName: CORE_CACHE }) ||
+            new Response("AZIEL is offline.", { status: 503, headers: { "Content-Type": "text/plain; charset=utf-8" } });
+    }
 }
 
 function isCodeAsset(pathname) {
@@ -238,7 +289,7 @@ async function staleWhileRevalidateCodeAsset(event, request) {
     const cacheKey = isVersionedCodeAsset(url) ? request : createNormalizedCacheKey(request);
 
     if (isVersionedCodeAsset(url)) {
-        const cached = await cache.match(cacheKey);
+        const cached = await cache.match(cacheKey) || await caches.match(cacheKey);
         if (cached) return cached;
         const response = await fetch(request);
         if (response.ok && response.type === "basic") await cache.put(cacheKey, response.clone());
@@ -277,6 +328,25 @@ async function staleWhileRevalidatePresentation(event, request) {
         status: 503,
         headers: { "Content-Type": "application/json" }
     });
+}
+
+async function refreshPublicHomePresentation() {
+    const cache = await caches.open(PRESENTATION_CACHE);
+    const regions = ["MM", "TH"];
+    const results = await Promise.allSettled(regions.map(async region => {
+        const request = new Request(new URL(`/api/public/home-presentation?region=${region}`, self.location.origin), {
+            credentials: "omit",
+            cache: "no-cache"
+        });
+        const response = await fetch(request);
+        if (!response.ok) throw new Error(`home-presentation-${region}-${response.status}`);
+        await cache.put(request, response.clone());
+        return region;
+    }));
+    return {
+        ok: results.every(result => result.status === "fulfilled"),
+        refreshed: results.filter(result => result.status === "fulfilled").map(result => result.value)
+    };
 }
 
 /**

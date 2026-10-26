@@ -14,6 +14,11 @@ window.AZIEL_LANG.th = {
     nav_login: "เข้าสู่ระบบ",
     nav_register: "สมัครสมาชิก",
     nav_logout: "ออกจากระบบ",
+    pwa_install_action: "ติดตั้ง AZIEL",
+    pwa_install_ios_title: "เพิ่ม AZIEL ไปยังหน้าจอโฮม",
+    pwa_install_ios_safari: "แตะแชร์ แล้วเลือก เพิ่มไปยังหน้าจอโฮม",
+    pwa_install_ios_other: "เปิดเมนูแชร์ของเบราว์เซอร์ แล้วเลือก เพิ่มไปยังหน้าจอโฮม",
+    pwa_install_close: "เข้าใจแล้ว",
 
     action_buy_now: "ซื้อเลย",
     action_continue: "ดำเนินการต่อ",

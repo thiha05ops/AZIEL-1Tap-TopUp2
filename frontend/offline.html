@@ -1,81 +1,40 @@
 <!DOCTYPE html>
-<html lang="en">
-
+<html lang="my">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <link rel="manifest" href="/manifest.json">
-<title>Offline | AZIEL 1Tap Shop</title>
     <meta name="robots" content="noindex, nofollow">
     <meta name="theme-color" content="#070716">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="AZIEL">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
+    <link rel="manifest" href="/manifest.json">
     <link rel="stylesheet" href="/css/theme/aziel-design-system.css">
-    <link rel="stylesheet" href="/css/core/main.css">
-    <style>
-        body {
-            min-height: 100svh;
-            display: grid;
-            place-items: center;
-            padding: 24px;
-            color: var(--text, #f8fafc);
-            background: var(--bg, #070716);
-        }
-
-        main {
-            width: min(440px, 100%);
-            display: grid;
-            gap: 12px;
-            text-align: center;
-        }
-
-        h1 {
-            margin: 0;
-            font-size: 28px;
-            letter-spacing: 0;
-        }
-
-        p {
-            margin: 0;
-            color: var(--text-secondary, #cbd5e1);
-            line-height: 1.6;
-        }
-
-        a {
-            width: fit-content;
-            min-height: 42px;
-            margin: 8px auto 0;
-            padding: 0 16px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 999px;
-            background: rgba(139, 92, 246, .16);
-            color: var(--primary, #a78bfa);
-            font-weight: 900;
-            text-decoration: none;
-        }
-
-        a:focus-visible {
-            outline: 3px solid rgba(139, 92, 246, .72);
-            outline-offset: 3px;
-        }
-    </style>
-    <link rel="icon" type="image/png" sizes="16x16" href="/assets/brand/favicon-16.png">
+    <link rel="stylesheet" href="/css/core/offline-home.css?v=20261026-pwa-offline-v1">
     <link rel="icon" type="image/png" sizes="32x32" href="/assets/brand/favicon-32.png">
-    <link rel="icon" type="image/png" sizes="48x48" href="/assets/brand/favicon-48.png">
     <link rel="apple-touch-icon" sizes="180x180" href="/assets/brand/apple-touch-icon.png">
+    <title>Offline | AZIEL 1Tap Shop</title>
 </head>
-
 <body>
+    <header class="offline-header">
+        <img src="/assets/brand/aziel-logo-primary.svg" alt="AZIEL" width="132" height="42">
+        <span class="offline-status" data-offline-status>Offline</span>
+    </header>
     <main>
-        <h1>You're offline</h1>
-        <p>AZIEL needs a connection for wallet, orders, notifications, and checkout. Public pages will reload when your
-            connection returns.</p>
-        <a href="/">Try Home</a>
+        <section class="offline-hero" aria-labelledby="offlineTitle">
+            <p class="offline-eyebrow" data-offline-copy="eyebrow">AZIEL 1Tap Shop</p>
+            <h1 id="offlineTitle" data-offline-copy="title">You're offline</h1>
+            <p data-offline-copy="description">Your public Home is available in offline mode. Connect to refresh games, prices, and promotions.</p>
+            <p class="offline-notice" role="status" aria-live="polite" data-offline-notice>Connection required for live actions.</p>
+            <button type="button" data-offline-retry><span data-offline-copy="retry">Try connection</span></button>
+        </section>
+        <section class="offline-preview" aria-label="AZIEL storefront preview" aria-disabled="true">
+            <div class="offline-card"><span aria-hidden="true">🎮</span><strong data-offline-copy="games">Games</strong></div>
+            <div class="offline-card"><span aria-hidden="true">🎁</span><strong data-offline-copy="services">Digital services</strong></div>
+            <div class="offline-card"><span aria-hidden="true">🏷️</span><strong data-offline-copy="offers">AZIEL offers</strong></div>
+        </section>
     </main>
+    <script src="/js/offline-home.js?v=20261026-pwa-offline-v1" defer></script>
 </body>
-
 </html>

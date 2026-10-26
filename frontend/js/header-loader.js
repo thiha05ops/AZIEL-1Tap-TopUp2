@@ -38,6 +38,17 @@
     document.head.appendChild(script);
 })();
 
+(function loadAzielPwaInstallOnce() {
+    if (window.__AZIEL_PWA_INSTALL_SCRIPT_LOADER__) return;
+    window.__AZIEL_PWA_INSTALL_SCRIPT_LOADER__ = true;
+    if (document.querySelector('script[data-aziel-pwa-install="true"]')) return;
+    const script = document.createElement("script");
+    script.src = "/js/pwa-install.js?v=20261026-pwa-offline-v1";
+    script.defer = true;
+    script.dataset.azielPwaInstall = "true";
+    document.head.appendChild(script);
+})();
+
 (function loadAzielAnalyticsOnce() {
     if (window.__AZIEL_ANALYTICS_LOADER__) return;
     window.__AZIEL_ANALYTICS_LOADER__ = true;
@@ -214,6 +225,7 @@ function getFallbackLabel(key) {
         nav_transactions: "Transactions",
         nav_orders: "Orders",
         nav_support: "Support",
+        pwa_install_action: "Install AZIEL",
         nav_features: "Features",
         nav_platform: "Platform",
         nav_money_transfer: "Money Transfer"

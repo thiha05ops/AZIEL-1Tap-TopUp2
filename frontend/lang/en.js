@@ -14,6 +14,11 @@ window.AZIEL_LANG.en = {
     nav_login: "Login",
     nav_register: "Register",
     nav_logout: "Logout",
+    pwa_install_action: "Install AZIEL",
+    pwa_install_ios_title: "Add AZIEL to Home Screen",
+    pwa_install_ios_safari: "Tap Share, then choose Add to Home Screen.",
+    pwa_install_ios_other: "Open your browser's Share menu, then choose Add to Home Screen.",
+    pwa_install_close: "Got it",
 
     action_buy_now: "Buy Now",
     action_continue: "Continue",

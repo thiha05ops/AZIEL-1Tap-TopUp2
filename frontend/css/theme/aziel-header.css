@@ -2499,8 +2499,19 @@ body.dark .az-profile-dropdown .dropdown-divider {
         order: 50;
     }
 
+    .az-header > .az-nav > .az-pwa-install-action {
+        order: 60;
+        border: 0;
+        color: inherit;
+        background: transparent;
+        font-family: inherit;
+        text-align: left;
+        cursor: pointer;
+    }
+
     .az-header > .az-nav > a.az-nav-link,
     .az-header > .az-nav > a.az-mobile-drawer-link,
+    .az-header > .az-nav > button.az-mobile-drawer-link,
     .az-header > .az-nav > .az-nav-dropdown > .az-nav-drop-btn {
         display: flex !important;
         width: 100% !important;
@@ -2614,6 +2625,47 @@ body.dark .az-profile-dropdown .dropdown-divider {
         transition: none !important;
         transform: translateX(var(--az-drawer-drag-x, 0px)) !important;
     }
+
+    .az-pwa-install-action[hidden] {
+        display: none !important;
+    }
+}
+
+.az-pwa-install-dialog {
+    width: min(420px, calc(100% - 32px));
+    padding: 0;
+    border: 1px solid var(--border, rgba(148, 163, 184, .22));
+    border-radius: 16px;
+    color: var(--text, #f8fafc);
+    background: var(--surface, #111126);
+    box-shadow: 0 24px 70px rgba(0, 0, 0, .36);
+}
+
+.az-pwa-install-dialog::backdrop {
+    background: rgba(2, 2, 12, .68);
+    backdrop-filter: blur(4px);
+}
+
+.az-pwa-install-dialog__body {
+    display: grid;
+    gap: 12px;
+    padding: 22px;
+}
+
+.az-pwa-install-dialog h2,
+.az-pwa-install-dialog p { margin: 0; }
+.az-pwa-install-dialog p { color: var(--text-secondary, #cbd5e1); line-height: 1.65; }
+.az-pwa-install-dialog button {
+    min-height: 44px;
+    border: 0;
+    border-radius: 10px;
+    color: #fff;
+    background: var(--primary, #7c3aed);
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.2;
+    cursor: pointer;
 }
 
 /* Mobile-only elements must never alter desktop navigation layout. */

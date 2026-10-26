@@ -360,9 +360,9 @@ async function main() {
     vm.runInContext(deferred, deferredContext);
     vm.runInContext(deferred, deferredContext);
     assert.strictEqual(deferredLoadListeners, 1, "duplicate deferred runtime execution must not install duplicate loaders");
-    assert.ok(sw.includes('if (request.mode === "navigate") return;') && sw.includes("staleWhileRevalidateCodeAsset"), "HTML navigation must be browser-owned while code remains SWR");
+    assert.ok(sw.includes("networkFirstPublicNavigation") && sw.includes("staleWhileRevalidateCodeAsset"), "safe public navigation must be network-first while code remains SWR");
     assert.ok(sw.includes("/api/public/home-presentation") && sw.includes("PRESENTATION_CACHE"), "presentation API needs its own safe cache");
-    assert.ok(sw.indexOf('if (request.mode === "navigate") return;') < sw.indexOf("if (isNeverCachePath(url.pathname))"), "all HTML navigation must bypass Service Worker response handling");
+    assert.ok(sw.indexOf('if (request.mode === "navigate")') < sw.indexOf("if (isNeverCachePath(url.pathname))"), "navigation policy must run before API handling");
     assert.ok(!pwa.includes("15 * 60 * 1000"), "service worker must not force a 15-minute update loop");
     assert.ok(route.includes('router.get("/public/home-presentation"') && route.includes("isProductPresentationVisible"), "routes must use new scoped services");
     assert.ok(!service.includes("CatalogPackage") && !service.includes("SupplierProductMapping"), "presentation service must not construct commerce inventory");

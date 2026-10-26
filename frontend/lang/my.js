@@ -14,6 +14,11 @@ window.AZIEL_LANG.my = {
     nav_login: "အကောင့်ဝင်ရန်",
     nav_register: "အကောင့်ဖွင့်ရန်",
     nav_logout: "အကောင့်ထွက်ရန်",
+    pwa_install_action: "AZIEL ကို ထည့်သွင်းမည်",
+    pwa_install_ios_title: "AZIEL ကို ပင်မမျက်နှာပြင်သို့ ထည့်ရန်",
+    pwa_install_ios_safari: "Share ကိုနှိပ်ပြီး Add to Home Screen ကို ရွေးပါ။",
+    pwa_install_ios_other: "Browser ၏ Share menu ကိုဖွင့်ပြီး Add to Home Screen ကို ရွေးပါ။",
+    pwa_install_close: "နားလည်ပါပြီ",
 
     action_buy_now: "ဝယ်မည်",
     action_continue: "ဆက်လုပ်မည်",

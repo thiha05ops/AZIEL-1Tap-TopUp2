@@ -26,13 +26,18 @@ function main() {
 
     assert(sw.includes("NEVER_CACHE_PREFIXES"), "Service worker must declare API exclusions.");
     assert(!sw.includes('"/auth/google/success"'), "Service worker must not restore obsolete Google token transport.");
-    assert(sw.includes('if (request.mode === "navigate") return;'), "All top-level navigation must remain browser-owned.");
-    assert(sw.indexOf('if (request.mode === "navigate") return;') < sw.indexOf("if (isNeverCachePath(url.pathname))"), "Navigation bypass must precede API and static handling.");
+    assert(sw.includes("OFFLINE_NAVIGATION_ALLOWLIST"), "Offline navigation must use an explicit public-route allowlist.");
+    assert(sw.includes("networkFirstPublicNavigation"), "Safe public navigation must have a network-first offline fallback.");
+    assert(sw.indexOf('if (request.mode === "navigate")') < sw.indexOf("if (isNeverCachePath(url.pathname))"), "Navigation policy must precede API and static handling.");
+    ["/login", "/register", "/account", "/orders", "/wallet", "/checkout", "/payment", "/support"].forEach(route => {
+        const block = sw.slice(sw.indexOf("const OFFLINE_NAVIGATION_ALLOWLIST"), sw.indexOf("]);", sw.indexOf("const OFFLINE_NAVIGATION_ALLOWLIST")));
+        assert(!block.includes(`"${route}"`), `${route} must not receive the offline shell.`);
+    });
     assert(sw.includes('"/api/"'), "Service worker must keep non-navigation API requests network-only.");
     assert(!sw.includes('caches.match("/home.html")'), "Navigation must not fall back to the redirecting Home alias.");
     assert(sw.includes("staleWhileRevalidateCodeAsset") && sw.includes("cacheFirstMediaAsset"), "Code and media assets must use the declared cache strategies.");
     assert(sw.includes("caches.delete"), "Service worker must clean stale cache versions.");
-    assert(offline.includes("noindex, nofollow") && offline.includes("You're offline"), "Offline page must be restrained and not indexed.");
+    assert(offline.includes("noindex, nofollow") && offline.includes("offline-home.js"), "Offline Home must be restrained, interactive, and not indexed.");
 
     console.log("Public PWA verification passed.");
 }

@@ -119,7 +119,8 @@ function main() {
     assert(account.includes('setText("profileCustomerId", user.customerId || "")'), "profile summary must consume the public customerId");
     assert(account.includes('setValue("profileCustomerIdReadOnly", user.customerId || "")'), "profile field must consume the public customerId");
     assert(worker.includes('"/api/"'));
-    assert(worker.includes("OAUTH_NAVIGATION_PATHS"), "the worker must explicitly leave OAuth navigations browser-owned");
+    const offlineNavigationBlock = worker.slice(worker.indexOf("const OFFLINE_NAVIGATION_ALLOWLIST"), worker.indexOf("]);", worker.indexOf("const OFFLINE_NAVIGATION_ALLOWLIST")));
+    assert(offlineNavigationBlock && !offlineNavigationBlock.includes("/api/auth") && !offlineNavigationBlock.includes("/login"), "OAuth and authentication navigations must remain browser-owned");
     assert(!worker.includes('"/auth/google/success"'), "obsolete Google success transport must not return");
     assert(!social.includes("res.redirect("), "OAuth routes must not emit HTTP redirects through a service worker");
     assert(!social.includes("AUTH_ORIGIN"), "obsolete auth origin must not reroute OAuth");

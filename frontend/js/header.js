@@ -491,6 +491,10 @@ function renderHeaderNav() {
             <i class="fa-regular fa-circle-question az-mobile-nav-icon" aria-hidden="true"></i>
             <span data-i18n="nav_support">Support</span>
         </a>
+        <button class="az-mobile-drawer-link az-pwa-install-action" type="button" data-aziel-install-action hidden>
+            <i class="fa-solid fa-download az-mobile-nav-icon" aria-hidden="true"></i>
+            <span data-i18n="pwa_install_action">Install AZIEL</span>
+        </button>
 
         <div class="az-mobile-drawer-social" aria-label="AZIEL social links">
             <span data-i18n="followUs">Follow Us</span>

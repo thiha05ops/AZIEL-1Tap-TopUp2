@@ -103,7 +103,7 @@ async function main() {
         assert(!coreAssets.has(alias), `redirecting legacy alias must not be precached: ${alias}`);
     });
     assert(!sw.includes('caches.match("/home.html")'), "redirecting Home alias must not be used as a navigation fallback");
-    assert(sw.includes('if (request.mode === "navigate") return;'), "top-level clean-route navigation must remain browser-owned");
+    assert(sw.includes("OFFLINE_NAVIGATION_ALLOWLIST") && sw.includes("networkFirstPublicNavigation"), "canonical public routes must own the bounded offline fallback");
 
     const oauth = fs.readFileSync(path.join(root, "backend/routes/socialAuth.js"), "utf8");
     assert(oauth.includes("/api/auth/google/callback"));

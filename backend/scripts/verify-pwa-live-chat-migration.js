@@ -105,7 +105,8 @@ function makeHarness({ legacy = true, failInstall = false, failNetwork = false }
             if (failNetwork) throw new Error("simulated offline network");
             const pathname = new URL(typeof request === "string" ? request : request.url, "https://aziel.test").pathname;
             const diskPath = path.join(root, "frontend", pathname.replace(/^\//, ""));
-            const response = new Response(fs.existsSync(diskPath) ? fs.readFileSync(diskPath) : "NETWORK", { status: 200 });
+            const isFile = fs.existsSync(diskPath) && fs.statSync(diskPath).isFile();
+            const response = new Response(isFile ? fs.readFileSync(diskPath) : "NETWORK", { status: 200 });
             Object.defineProperty(response, "type", { value: "basic" });
             return response;
         },
@@ -158,7 +159,7 @@ function makeHarness({ legacy = true, failInstall = false, failNetwork = false }
         digest.update(fs.readFileSync(path.join(root, "frontend", asset.replace(/^\//, ""))));
         digest.update("\0");
     });
-    const expectedRevision = `v8-${digest.digest("hex").slice(0, 16)}`;
+    const expectedRevision = `v10-${digest.digest("hex").slice(0, 16)}`;
     assert(swSource.includes(`const SHELL_REVISION = "${expectedRevision}"`), "precache content changed without a shell revision bump");
     assert(swSource.includes('"/js/live-chat.js"') && swSource.includes('"/css/support/live-chat.css"'));
     assert(swSource.indexOf("cache.addAll(CORE_ASSETS)") < swSource.indexOf("self.skipWaiting()"));
@@ -168,8 +169,8 @@ function makeHarness({ legacy = true, failInstall = false, failNetwork = false }
     assert.strictEqual(contaminatedEntry.redirected, true);
     assert.strictEqual(contaminatedEntry.url, "https://aziel.test/");
     const contaminatedNavigation = await upgrade.dispatchFetch({ method: "GET", mode: "navigate", url: "https://aziel.test/" });
-    assert.strictEqual(contaminatedNavigation.respondWithCalls, 0, "even contaminated legacy caches must not own navigation");
-    assert.strictEqual(contaminatedNavigation.response, null);
+    assert.strictEqual(contaminatedNavigation.respondWithCalls, 1, "safe public navigation must be network-first");
+    assert.strictEqual(await contaminatedNavigation.response.text(), "NETWORK", "legacy page caches must not satisfy live navigation");
     const upgradedCatalogUrl = "https://aziel.test/js/catalog-runtime.js?v=20261026-native-performance-v1";
     const upgradeFetchesBefore = upgrade.counts().fetchCalls;
     const upgradedCatalog = await upgrade.dispatchFetch({ method: "GET", mode: "cors", url: upgradedCatalogUrl });
@@ -200,7 +201,6 @@ function makeHarness({ legacy = true, failInstall = false, failNetwork = false }
     assert.deepStrictEqual(fresh.navigations, [], "fresh install must not reload a client");
 
     for (const url of [
-        "https://aziel.test/",
         "https://aziel.test/login",
         "https://aziel.test/products/afk-journey",
         "https://aziel.test/api/auth/google?returnTo=%2Faccount",
@@ -209,6 +209,10 @@ function makeHarness({ legacy = true, failInstall = false, failNetwork = false }
         const result = await fresh.dispatchFetch({ method: "GET", mode: "navigate", url });
         assert.strictEqual(result.respondWithCalls, 0, `${new URL(url).pathname} navigation must remain browser-owned`);
     }
+
+    const publicNavigation = await fresh.dispatchFetch({ method: "GET", mode: "navigate", url: "https://aziel.test/" });
+    assert.strictEqual(publicNavigation.respondWithCalls, 1, "canonical public Home must use network-first fallback handling");
+    assert.strictEqual(await publicNavigation.response.text(), "NETWORK");
 
     for (const url of [
         "https://aziel.test/api/auth/google",
@@ -221,9 +225,17 @@ function makeHarness({ legacy = true, failInstall = false, failNetwork = false }
     }
 
     assert(
-        swSource.indexOf('if (request.mode === "navigate") return;') < swSource.indexOf("if (isNeverCachePath(url.pathname))"),
-        "browser-owned navigation bypass must precede generic API handling"
+        swSource.indexOf('if (request.mode === "navigate")') < swSource.indexOf("if (isNeverCachePath(url.pathname))"),
+        "bounded navigation policy must precede generic API handling"
     );
+
+    const offline = makeHarness({ legacy: false, failNetwork: true });
+    await offline.dispatch("install");
+    const offlineHome = await offline.dispatchFetch({ method: "GET", mode: "navigate", url: "https://aziel.test/" });
+    assert.strictEqual(offlineHome.respondWithCalls, 1);
+    assert((await offlineHome.response.text()).includes("data-offline-notice"), "offline cold launch must return the precached Home shell");
+    const offlineLogin = await offline.dispatchFetch({ method: "GET", mode: "navigate", url: "https://aziel.test/login" });
+    assert.strictEqual(offlineLogin.respondWithCalls, 0, "offline auth navigation must never receive the public shell");
 
     const codeAsset = await fresh.dispatchFetch({ method: "GET", mode: "cors", url: "https://aziel.test/js/live-chat.js?v=1" });
     assert.strictEqual(codeAsset.respondWithCalls, 1, "static code assets must remain Service Worker managed");

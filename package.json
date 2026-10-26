@@ -362,6 +362,7 @@
     "verify:promptpay-consolidation": "node backend/scripts/verify-promptpay-consolidation.js",
     "verify:i18n": "node backend/scripts/verify-i18n-coverage.js",
     "verify:pwa-icons": "node backend/scripts/verify-pwa-icons.js",
+    "verify:pwa-install-offline": "node backend/scripts/verify-pwa-install-offline-home.js",
     "verify:canonical-brand-assets": "node backend/scripts/verify-canonical-brand-assets.js"
   },
   "keywords": [],
