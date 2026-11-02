@@ -121,7 +121,7 @@ async function startRun(observedAt, key) {
             selections: async () => [{ productCode: "game", packageCode: "PKG", supplierMappingId: mappingId }],
             mappings: async () => [{ _id: mappingId, supplierId, supplierCode: "TEST", productCode: "game", packageCode: "PKG", supplierCatalogOfferId: offerA, supplierProductCode: "game", supplierPackageCode: String(offerA), supplierCostAuthority: { rawSupplierCost: 13, supplierCurrency: "THB", capturedAt: t1 } }],
             offers: async () => [{ ...offer(offerA, new Date("2026-10-20T00:00:00.000Z"), 99), catalogLifecycleState: "ACTIVE" }],
-            observations: async () => [latestRow], approval: async () => null, createManifest: async value => value,
+            observations: async () => [latestRow], availability: async () => [{ supplierCatalogOfferId: offerA, state: "AVAILABLE", observedAt: latestRow.observedAt, staleAt: null, observationRunId: partial._id }], approval: async () => null, createManifest: async value => value,
             consumeApproval: async () => null, updateRun: async () => null
         }, clock: () => new Date(partial.startedAt.getTime() + 1000) });
         const weeklyResult = await weekly.reconcile({ supplierCode: "TEST", ingestionRunId: partial._id, dryRun: true, policy: { maximumObservationAgeMs: 86400000, maximumAutomaticChangePercent: 20 }, actor: {} });

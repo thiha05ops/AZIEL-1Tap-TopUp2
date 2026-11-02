@@ -232,11 +232,11 @@ async function main() {
     const mapping = { _id: "m1", supplierId: String(first.supplierId), supplierCode: "FAZERCARDS", supplierCatalogOfferId: String(first._id), productCode: "mlbb", packageCode: "MLBB_10", supplierProductCode: first.supplierProductCode, supplierPackageCode: first.supplierOfferCode, updatedAt: later, supplierCostAuthority: {} };
     const currentOffer = { ...second, _id: String(second._id), supplierId: String(second.supplierId), supplierCatalogProductId: String(second.supplierCatalogProductId) };
     const observation = { ...run2Rows[0], supplierCatalogOfferId: String(run2Rows[0].supplierCatalogOfferId), supplierId: String(run2Rows[0].supplierId), ingestionRunId: String(run2Rows[0].ingestionRunId) };
-    const baseRepos = { selections: async () => [selection], mappings: async () => [mapping], offers: async () => [currentOffer], observations: async () => [observation], supplier: async () => supplier, approval: async () => null, createManifest: async value => ({ _id: value.manifestHash, ...value }), consumeApproval: async () => null, updateRun: async () => null };
+    const baseRepos = { selections: async () => [selection], mappings: async () => [mapping], offers: async () => [currentOffer], observations: async () => [observation], availability: async () => [{ supplierCatalogOfferId: currentOffer._id, state: "AVAILABLE", observedAt: observation.observedAt, staleAt: null, observationRunId: observation.ingestionRunId }], supplier: async () => supplier, approval: async () => null, createManifest: async value => ({ _id: value.manifestHash, ...value }), consumeApproval: async () => null, updateRun: async () => null };
     const policy = { maximumObservationAgeMs: 86_400_000, maximumAutomaticChangePercent: 20 };
     const preparedService = createWeeklySupplierCostSyncService({ repositories: baseRepos, promoter: async () => ({ replayed: false }), clock: () => later });
     const prepared = await preparedService.reconcile({ supplierCode: "FAZERCARDS", ingestionRunId: String(run2), prepare: true, policy, actor: {} });
-    equal(prepared.initialCandidateCount, 1, "v2 evidence preserves initial approval candidate behavior");
+    equal(prepared.decisions[0].status, "DRY_RUN_ACCEPTABLE", "v2 evidence is eligible for automatic verified promotion");
     const approvalCandidate = immutableCandidate({ ...prepared.decisions[0], status: "ACCEPTABLE", mapping, offer: currentOffer, observation });
     const approvalHash = manifestHash([approvalCandidate]);
     const approvedRepos = { ...baseRepos, approval: async hash => hash === approvalHash ? { manifestHash: approvalHash, status: "APPROVED", maximumInitialPromotions: 1, expiresAt: new Date(later.getTime() + 60_000), candidates: [approvalCandidate], approvedBy: { adminId: "444444444444444444444444", username: "owner", role: "OWNER" } } : null };
@@ -249,7 +249,7 @@ async function main() {
     const missingService = createWeeklySupplierCostSyncService({ repositories: { ...baseRepos, observations: async () => [] }, promoter: async () => { throw new Error("must not promote"); }, clock: () => later });
     equal((await missingService.reconcile({ supplierCode: "FAZERCARDS", ingestionRunId: "missing", dryRun: true, policy, actor: {} })).decisions[0].code, "FRESH_RUN_OBSERVATION_MISSING", "missing evidence fails closed");
     const staleService = createWeeklySupplierCostSyncService({ repositories: { ...baseRepos, observations: async () => [{ ...observation, observedAt: new Date(later.getTime() - 90_000_000) }] }, promoter: async () => { throw new Error("must not promote"); }, clock: () => later });
-    equal((await staleService.reconcile({ supplierCode: "FAZERCARDS", ingestionRunId: "stale", dryRun: true, policy, actor: {} })).decisions[0].code, "STALE_OBSERVATION", "stale evidence fails closed");
+    equal((await staleService.reconcile({ supplierCode: "FAZERCARDS", ingestionRunId: observation.ingestionRunId, dryRun: true, policy, actor: {} })).decisions[0].code, "STALE_OBSERVATION", "stale evidence fails closed");
 
     const lockMapping = { ...mapping, supplierCostAuthority: { rawSupplierCost: 1, supplierCurrency: "USD" } }, lock = sourceLock(lockMapping, currentOffer);
     assert.throws(() => validateLock({ ...lock, observedAt: now.toISOString() }, lock), error => error.code === "COST_RECONFIRMATION_REQUIRED"); checks += 1;

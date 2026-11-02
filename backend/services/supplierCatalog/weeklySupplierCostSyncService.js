@@ -6,6 +6,7 @@ const SupplierProductMapping = require("../../models/SupplierProductMapping");
 const SupplierCatalogOffer = require("../../models/SupplierCatalogOffer");
 const SupplierCatalogCostObservation = require("../../models/SupplierCatalogCostObservation");
 const SupplierCatalogIngestionRun = require("../../models/SupplierCatalogIngestionRun");
+const SupplierOfferAvailability = require("../../models/SupplierOfferAvailability");
 const Supplier = require("../../models/Supplier");
 const Approval = require("../../models/WeeklySupplierCostApproval");
 const { readSupplierCostEvidencePolicy } = require("../../config/supplierCostEvidencePolicy");
@@ -65,12 +66,13 @@ function validateLegacyRunEvidence(run, observations, expectedRunId) {
 function createRepositories(models = {}, options = {}) {
     const Selection = models.Selection || PackageSupplierSelection, Mapping = models.Mapping || SupplierProductMapping;
     const Offer = models.Offer || SupplierCatalogOffer, Observation = models.Observation || SupplierCatalogCostObservation;
-    const Run = models.Run || SupplierCatalogIngestionRun, SupplierModel = models.Supplier || Supplier, ApprovalModel = models.Approval || Approval;
+    const Run = models.Run || SupplierCatalogIngestionRun, Availability = models.Availability || SupplierOfferAvailability, SupplierModel = models.Supplier || Supplier, ApprovalModel = models.Approval || Approval;
     const evidencePolicy = options.evidencePolicy || readSupplierCostEvidencePolicy(), evidence = options.evidenceRepositories || createSupplierCostEvidenceRepositories(models.evidenceModels || {}), latestCosts = options.latestCostService || createSupplierLatestCostService(models.latestCostModels || {});
     return {
         selections: () => Selection.find({ customerMarket: "GLOBAL" }).lean(),
         mappings: ids => Mapping.find({ _id: { $in: ids }, archivedAt: null }).lean(),
         offers: ids => Offer.find({ _id: { $in: ids } }).lean(),
+        availability: ids => Availability.find({ supplierCatalogOfferId: { $in: ids } }).lean(),
         observations: async (ids, runId) => {
             if (evidencePolicy.latestOnlyEnabled) {
                 if (!runId) return latestCosts.forOffers(ids);
@@ -98,7 +100,7 @@ function createRepositories(models = {}, options = {}) {
     };
 }
 
-function validateCandidate({ selection, mapping, offer, observation, expectedSupplier, now, maximumObservationAgeMs, maximumAutomaticChangePercent }) {
+function validateCandidate({ selection, mapping, offer, observation, availability, ingestionRunId, expectedSupplier, now, maximumObservationAgeMs, maximumAutomaticChangePercent }) {
     if (!mapping) return result(selection, "REVIEW_REQUIRED", "GLOBAL_MAPPING_MISSING");
     if (id(mapping._id) !== id(selection.supplierMappingId)) return result(selection, "REVIEW_REQUIRED", "GLOBAL_MAPPING_IDENTITY_CONFLICT");
     if (!expectedSupplier || !id(mapping.supplierId) || id(mapping.supplierId) !== id(expectedSupplier._id) || upper(mapping.supplierCode) !== upper(expectedSupplier.supplierCode)) return result(selection, "REVIEW_REQUIRED", "GLOBAL_MAPPING_WRONG_SUPPLIER");
@@ -108,18 +110,22 @@ function validateCandidate({ selection, mapping, offer, observation, expectedSup
     if (mapping.supplierProductCode !== offer.supplierProductCode || mapping.supplierPackageCode !== offer.supplierOfferCode) return result(selection, "REVIEW_REQUIRED", "NATIVE_SKU_IDENTITY_CONFLICT");
     if (upper(offer.catalogLifecycleState) !== "ACTIVE") return result(selection, "REVIEW_REQUIRED", "SUPPLIER_OFFER_NOT_ACTIVE");
     if (!observation) return result(selection, "REVIEW_REQUIRED", "FRESH_RUN_OBSERVATION_MISSING");
+    if (!ingestionRunId || id(observation.ingestionRunId) !== id(ingestionRunId)) return result(selection, "REVIEW_REQUIRED", "OBSERVATION_RUN_IDENTITY_CONFLICT");
     if (!id(observation.supplierId) || id(observation.supplierId) !== id(offer.supplierId)) return result(selection, "REVIEW_REQUIRED", "OBSERVATION_SUPPLIER_IDENTITY_CONFLICT");
+    if (!upper(observation.catalogNamespace) || upper(observation.catalogNamespace) !== upper(offer.catalogNamespace)) return result(selection, "REVIEW_REQUIRED", "OBSERVATION_NAMESPACE_CONFLICT");
     const amount = Number(observation.amount), observedAt = new Date(observation.observedAt);
     if (!Number.isFinite(amount) || amount <= 0 || !upper(observation.currency) || !Number.isFinite(observedAt.getTime())) return result(selection, "REJECTED", "INVALID_SUPPLIER_COST");
     if (id(observation.supplierCatalogOfferId) !== id(offer._id) || observation.supplierProductCode !== offer.supplierProductCode || observation.supplierOfferCode !== offer.supplierOfferCode) return result(selection, "REVIEW_REQUIRED", "OBSERVATION_IDENTITY_CONFLICT");
     if (Number(now) - observedAt.getTime() > maximumObservationAgeMs) return result(selection, "REVIEW_REQUIRED", "STALE_OBSERVATION", { observedAt });
+    const availabilityObservedAt = new Date(availability?.observedAt);
+    if (!availability || id(availability.supplierCatalogOfferId) !== id(offer._id) || id(availability.observationRunId) !== id(ingestionRunId) || upper(availability.state) !== "AVAILABLE" || !Number.isFinite(availabilityObservedAt.getTime()) || Number(now) - availabilityObservedAt.getTime() > maximumObservationAgeMs || (availability.staleAt && new Date(availability.staleAt).getTime() <= Number(now))) return result(selection, "REVIEW_REQUIRED", "SUPPLIER_AVAILABILITY_NOT_CONFIRMED");
     if (upper(offer.supplierCost?.currency) !== upper(observation.currency) || Number(offer.supplierCost?.amount) !== amount) return result(selection, "REVIEW_REQUIRED", "OBSERVATION_OFFER_COST_CONFLICT");
     const comparison = compareSupplierCost(offer.supplierCost, mapping.supplierCostAuthority);
     if (comparison.state === "CURRENCY_MISMATCH") return result(selection, "REVIEW_REQUIRED", "CURRENCY_MISMATCH", { comparison });
     if (comparison.state === "INVALID_OBSERVATION" || comparison.state === "UNCOMPARABLE") return result(selection, "REJECTED", comparison.state, { comparison });
     if (comparison.state === "MATCH") return result(selection, "UNCHANGED", "COST_AUTHORITY_CURRENT", { comparison, observation, mapping, offer, initialAuthority: false });
-    if (comparison.comparable && Math.abs(Number(comparison.percentageDelta)) > maximumAutomaticChangePercent) return result(selection, "REVIEW_REQUIRED", "LARGE_COST_MOVEMENT", { comparison });
-    return result(selection, "ACCEPTABLE", hasAuthority(mapping) ? "FRESH_EXACT_SELECTED_COST" : "INITIAL_AUTHORITY_APPROVAL_REQUIRED", { comparison, observation, mapping, offer, initialAuthority: !hasAuthority(mapping) });
+    const warnings = comparison.comparable && Math.abs(Number(comparison.percentageDelta)) > maximumAutomaticChangePercent ? ["LARGE_COST_MOVEMENT"] : [];
+    return result(selection, "ACCEPTABLE", hasAuthority(mapping) ? "FRESH_EXACT_SELECTED_COST" : "FRESH_EXACT_INITIAL_COST", { comparison, observation, mapping, offer, availability, warnings, initialAuthority: !hasAuthority(mapping) });
 }
 
 function createWeeklySupplierCostSyncService(options = {}) {
@@ -131,40 +137,23 @@ function createWeeklySupplierCostSyncService(options = {}) {
         const scopedSelections = selections.filter(selection => { const mapping = allMappingMap.get(id(selection.supplierMappingId)); return !mapping || upper(mapping.supplierCode) === upper(supplierCode); });
         const offers = await repos.offers(scopedSelections.map(row => allMappingMap.get(id(row.supplierMappingId))?.supplierCatalogOfferId).filter(Boolean));
         const offerMap = new Map(offers.map(row => [id(row._id), row]));
-        const observations = await repos.observations(offers.map(row => row._id), ingestionRunId || null), observationMap = new Map();
+        const offerIds = offers.map(row => row._id);
+        const [observations, availabilityRows] = await Promise.all([repos.observations(offerIds, ingestionRunId || null), repos.availability(offerIds)]), observationMap = new Map(), availabilityMap = new Map(availabilityRows.map(row => [id(row.supplierCatalogOfferId), row]));
         observations.forEach(row => { if (!observationMap.has(id(row.supplierCatalogOfferId))) observationMap.set(id(row.supplierCatalogOfferId), row); });
-        const decisions = scopedSelections.map(selection => { const mapping = allMappingMap.get(id(selection.supplierMappingId)), catalogOffer = mapping ? offerMap.get(id(mapping.supplierCatalogOfferId)) : null, observation = catalogOffer ? observationMap.get(id(catalogOffer._id)) : null, offer = observation?.evidenceMode === "LATEST_ONLY" ? { ...catalogOffer, supplierCost: { amount: observation.amount, currency: observation.currency, observedAt: observation.observedAt }, sourceRevision: observation.sourceRevision, rawSnapshotHash: observation.rawSnapshotHash } : catalogOffer; return validateCandidate({ selection, mapping, offer, observation, expectedSupplier, now: clock().getTime(), maximumObservationAgeMs: policy.maximumObservationAgeMs, maximumAutomaticChangePercent: policy.maximumAutomaticChangePercent }); });
-        const initialCandidates = decisions.filter(row => row.status === "ACCEPTABLE" && row.initialAuthority).map(immutableCandidate), initialManifestHash = initialCandidates.length ? manifestHash(initialCandidates) : "";
-        let approval = approvalHash ? await repos.approval(approvalHash) : null;
-        if (initialCandidates.length && prepare) approval = await repos.createManifest({ manifestHash: initialManifestHash, candidates: initialCandidates, status: "PENDING" });
-        const approvalMappingIds = new Set((approval?.candidates || []).map(row => id(row.mappingId)));
-        const currentApprovedCandidates = decisions.filter(row => approvalMappingIds.has(row.mappingId) && row.mapping && row.offer && row.observation).map(immutableCandidate);
-        const approvalExact = Boolean(approval && currentApprovedCandidates.length === approval.candidates.length && manifestHash(currentApprovedCandidates) === approval.manifestHash && currentApprovedCandidates.every(candidate => approval.candidates.some(approved => id(approved.mappingId) === candidate.mappingId && exactCandidate(candidate, approved))));
+        const decisions = scopedSelections.map(selection => { const mapping = allMappingMap.get(id(selection.supplierMappingId)), catalogOffer = mapping ? offerMap.get(id(mapping.supplierCatalogOfferId)) : null, observation = catalogOffer ? observationMap.get(id(catalogOffer._id)) : null, offer = observation?.evidenceMode === "LATEST_ONLY" ? { ...catalogOffer, supplierCost: { amount: observation.amount, currency: observation.currency, observedAt: observation.observedAt }, sourceRevision: observation.sourceRevision, rawSnapshotHash: observation.rawSnapshotHash } : catalogOffer; return validateCandidate({ selection, mapping, offer, observation, availability: catalogOffer ? availabilityMap.get(id(catalogOffer._id)) : null, ingestionRunId, expectedSupplier, now: clock().getTime(), maximumObservationAgeMs: policy.maximumObservationAgeMs, maximumAutomaticChangePercent: policy.maximumAutomaticChangePercent }); });
+        const initialCandidates = [], initialManifestHash = "", approval = null;
         for (const decision of decisions.filter(row => row.status === "ACCEPTABLE")) {
-            if (initialOnly && !decision.initialAuthority) { decision.status = "REVIEW_REQUIRED"; decision.code = "APPROVAL_SCOPE_EXCLUDES_EXISTING_AUTHORITY"; continue; }
-            if (decision.initialAuthority) {
-                const approved = approvalExact && ["APPROVED", "CONSUMED"].includes(approval.status) && Number(approval.maximumInitialPromotions) >= approval.candidates.length && (approval.status === "CONSUMED" || new Date(approval.expiresAt).getTime() > clock().getTime());
-                const approvedCandidate = approved && approval.candidates?.find(row => id(row.mappingId) === decision.mappingId);
-                if (!approved || !approvedCandidate || !exactCandidate(immutableCandidate(decision), approvedCandidate)) { decision.status = "REVIEW_REQUIRED"; decision.code = approval ? "INITIAL_AUTHORITY_APPROVAL_MISMATCH" : "INITIAL_AUTHORITY_APPROVAL_REQUIRED"; continue; }
-            }
             if (dryRun || prepare) { decision.status = "DRY_RUN_ACCEPTABLE"; continue; }
             try {
                 await assertLease();
-                const token = `weekly-cost:${ingestionRunId}:${approval?.manifestHash || "existing"}:${decision.mappingId}:${observedCostHash(decision.offer)}`;
-                const promotionActor = decision.initialAuthority ? {
-                    id: approval.approvedBy.adminId,
-                    username: approval.approvedBy.username,
-                    role: approval.approvedBy.role
-                } : actor;
-                const promoted = await promoter({ mappingId: decision.mappingId, supplierCatalogOfferId: id(decision.offer), sourceLock: sourceLock(decision.mapping, decision.offer), confirmed: true, reason: `Validated weekly supplier cost sync ${ingestionRunId}`, idempotencyToken: token.slice(0, 200) }, { actor: promotionActor, requestId: `weekly-cost-${ingestionRunId}` });
+                const token = `weekly-cost:${ingestionRunId}:verified-api:${decision.mappingId}:${observedCostHash(decision.offer)}`;
+                const promoted = await promoter({ mappingId: decision.mappingId, supplierCatalogOfferId: id(decision.offer), ingestionRunId, verificationMode: "AUTOMATIC_VERIFIED_API", maximumObservationAgeMs: policy.maximumObservationAgeMs, warnings: decision.warnings, sourceLock: sourceLock(decision.mapping, decision.offer, ingestionRunId), confirmed: true, reason: `Verified supplier API cost sync ${ingestionRunId}`, idempotencyToken: token.slice(0, 200) }, { actor, requestId: `weekly-cost-${ingestionRunId}` });
                 decision.status = promoted.replayed ? "IDEMPOTENT_REPLAY" : "UPDATED"; decision.code = promoted.replayed ? "ALREADY_APPLIED" : "COST_AUTHORITY_UPDATED";
             } catch (error) { decision.status = "REVIEW_REQUIRED"; decision.code = error.code || "COST_AUTHORITY_UPDATE_FAILED"; }
         }
-        const sanitized = decisions.map(({ mapping, offer, observation, ...row }) => row);
-        const summary = { schemaVersion: 2, supplierCode: upper(supplierCode), ingestionRunId: String(ingestionRunId || ""), dryRun: dryRun || prepare, mode: prepare ? "PREPARE" : dryRun ? "DRY_RUN" : "APPLY", completedAt: clock(), total: sanitized.length, updated: sanitized.filter(row => row.status === "UPDATED").length, replayed: sanitized.filter(row => row.status === "IDEMPOTENT_REPLAY").length, unchanged: sanitized.filter(row => row.status === "UNCHANGED").length, reviewRequired: sanitized.filter(row => row.status === "REVIEW_REQUIRED").length, rejected: sanitized.filter(row => row.status === "REJECTED").length, initialCandidateCount: initialCandidates.length, initialManifestHash, approvalId: id(approval), planHash: sha(canonicalJson(sanitized.map(row => [row.productCode, row.packageCode, row.mappingId, row.status, row.code]))), decisions: sanitized };
-        const approvedOutcomes = sanitized.filter(row => approvalMappingIds.has(row.mappingId) && ["UPDATED", "IDEMPOTENT_REPLAY", "UNCHANGED"].includes(row.status));
-        if (!dryRun && !prepare && approvalExact && approvedOutcomes.length === approval.candidates.length) await repos.consumeApproval(approval._id, { ingestionRunId, planHash: summary.planHash, updated: summary.updated, replayed: summary.replayed });
-        if (!dryRun && ingestionRunId) await repos.updateRun(ingestionRunId, summary);
+        const sanitized = decisions.map(({ mapping, offer, observation, availability, ...row }) => row);
+        const summary = { schemaVersion: 3, supplierCode: upper(supplierCode), ingestionRunId: String(ingestionRunId || ""), dryRun: dryRun || prepare, mode: prepare ? "PREPARE" : dryRun ? "DRY_RUN" : "APPLY", completedAt: clock(), total: sanitized.length, updated: sanitized.filter(row => row.status === "UPDATED").length, replayed: sanitized.filter(row => row.status === "IDEMPOTENT_REPLAY").length, unchanged: sanitized.filter(row => row.status === "UNCHANGED").length, reviewRequired: sanitized.filter(row => row.status === "REVIEW_REQUIRED").length, blocked: sanitized.filter(row => ["REVIEW_REQUIRED", "REJECTED"].includes(row.status)).length, warningCount: sanitized.filter(row => row.warnings?.length).length, rejected: sanitized.filter(row => row.status === "REJECTED").length, initialCandidateCount: initialCandidates.length, initialManifestHash, approvalId: id(approval), planHash: sha(canonicalJson(sanitized.map(row => [row.productCode, row.packageCode, row.mappingId, row.status, row.code]))), decisions: sanitized };
+        if (!dryRun && !prepare && ingestionRunId) await repos.updateRun(ingestionRunId, summary);
         return summary;
     }
     return Object.freeze({ reconcile });

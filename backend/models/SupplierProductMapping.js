@@ -122,6 +122,11 @@ const supplierProductMappingSchema = new mongoose.Schema(
             source: { type: String, trim: true, maxlength: 120, default: "" },
             providerProductCode: { type: String, trim: true, maxlength: 120, default: "" },
             providerOfferCode: { type: String, trim: true, maxlength: 120, default: "" },
+            ingestionRunId: { type: mongoose.Schema.Types.ObjectId, ref: "SupplierCatalogIngestionRun", default: null },
+            observedAt: { type: Date, default: null },
+            rawSnapshotHash: { type: String, trim: true, lowercase: true, match: /^[a-f0-9]{64}$/, default: undefined },
+            observedCostHash: { type: String, trim: true, lowercase: true, match: /^[a-f0-9]{64}$/, default: undefined },
+            verificationMode: { type: String, enum: ["", "AUTOMATIC_VERIFIED_API", "MANUAL_REVIEW"], default: "" },
             fundingCost: { type: Number, min: 0, default: 0 },
             otherAcquisitionCost: { type: Number, min: 0, default: 0 }
         },

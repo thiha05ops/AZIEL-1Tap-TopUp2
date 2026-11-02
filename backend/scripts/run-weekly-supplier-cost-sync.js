@@ -7,7 +7,6 @@ const crypto = require("crypto");
 const mongoose = require("mongoose");
 const connectDB = require("../config/db");
 const AdminAccount = require("../models/AdminAccount");
-const Approval = require("../models/WeeklySupplierCostApproval");
 const { ROLES, STATUSES } = require("../services/adminAuthorizationService");
 const { SUPPLIERS, readWeeklySupplierCostSyncPolicy } = require("../config/supplierCatalogIngestionPolicy");
 const { runSupplierCatalogIngestion } = require("../services/supplierCatalog/supplierCatalogIngestionOrchestrator");
@@ -38,11 +37,12 @@ async function withJobLease(policy, operation) {
 async function main() {
     const dryRun = process.argv.includes("--dry-run"), prepare = process.argv.includes("--prepare-initial-manifest");
     const applyHash = argument("apply-approved-manifest"), policy = readWeeklySupplierCostSyncPolicy(process.env);
+    if (prepare || applyHash) throw Object.assign(new Error("Approval-manifest supplier-cost operations are obsolete. Run the verified API synchronization workflow instead."), { code: "SUPPLIER_COST_APPROVAL_MANIFEST_OPERATION_OBSOLETE" });
     if (!dryRun && !policy.enabled) throw Object.assign(new Error("Weekly supplier cost sync is disabled."), { code: "SUPPLIER_WEEKLY_COST_SYNC_DISABLED" });
     if (!dryRun && !validObjectId(policy.automationActorId)) throw Object.assign(new Error("A dedicated audited automation identity is required."), { code: "SUPPLIER_WEEKLY_COST_AUTOMATION_ACTOR_REQUIRED" });
     await connectDB();
     const actor = dryRun ? {} : await loadAutomationActor(policy.automationActorId);
-    if (!dryRun && !prepare && !applyHash) {
+    if (!dryRun) {
         const job = await createWeeklySupplierCostJobService().runNow({ trigger: "WEEKLY", actor });
         console.log(JSON.stringify({ result: ["SUCCEEDED", "PARTIAL"].includes(job.status) ? "PASS" : job.status, mode: "WEEKLY", job }, null, 2));
         if (!["SUCCEEDED", "RETRY_SCHEDULED"].includes(job.status)) process.exitCode = 1;
@@ -50,28 +50,20 @@ async function main() {
     }
     const operation = async assertLease => {
         const sync = createWeeklySupplierCostSyncService(), output = [];
-        if (applyHash) {
-            const approval = await Approval.findById(applyHash).lean();
-            if (!approval || !approval.candidates?.length) throw Object.assign(new Error("Approved manifest not found."), { code: "APPROVAL_MANIFEST_NOT_FOUND" });
-            const supplierCode = approval.candidates[0].supplierCode, ingestionRunId = String(approval.candidates[0].ingestionRunId);
-            await assertLease();
-            output.push({ supplierCode, costSync: await sync.reconcile({ supplierCode, ingestionRunId, approvalHash: applyHash, initialOnly: true, policy, actor, assertLease }) });
-            return output;
-        }
         for (const supplierCode of SUPPLIERS) {
             try {
                 if (dryRun) { output.push({ supplierCode, costSync: await sync.reconcile({ supplierCode, dryRun: true, policy, actor: {}, assertLease }) }); continue; }
                 await assertLease();
-                const ingestion = await runSupplierCatalogIngestion({ supplierCode, trigger: "EXTERNAL_SCHEDULED", reason: prepare ? "Prepare owner-reviewed initial supplier-cost manifest" : "Weekly supplier cost observation refresh", reconcileSellability: false, actor });
+                const ingestion = await runSupplierCatalogIngestion({ supplierCode, trigger: "EXTERNAL_SCHEDULED", reason: "Weekly supplier cost observation refresh", reconcileSellability: false, actor });
                 await assertLease();
-                const costSync = await sync.reconcile({ supplierCode, ingestionRunId: ingestion.runId, prepare, policy, actor, assertLease });
+                const costSync = await sync.reconcile({ supplierCode, ingestionRunId: ingestion.runId, policy, actor, assertLease });
                 output.push({ supplierCode, ingestion, costSync });
             } catch (error) { output.push({ supplierCode, error: { code: error.code || error.name, message: String(error.message || "Weekly sync failed").slice(0, 300) } }); }
         }
         return output;
     };
     const results = dryRun ? await operation(async () => true) : await withJobLease(policy, operation);
-    console.log(JSON.stringify({ result: results.some(row => row.error) ? "PARTIAL" : "PASS", mode: applyHash ? "APPLY_APPROVED" : prepare ? "PREPARE" : dryRun ? "DRY_RUN" : "APPLY", schedule: { local: policy.scheduleLocal, timeZone: policy.scheduleTimeZone, cronUtc: policy.cronUtc }, results }, null, 2));
+    console.log(JSON.stringify({ result: results.some(row => row.error) ? "PARTIAL" : "PASS", mode: dryRun ? "DRY_RUN" : "APPLY", schedule: { local: policy.scheduleLocal, timeZone: policy.scheduleTimeZone, cronUtc: policy.cronUtc }, results }, null, 2));
     if (results.some(row => row.error)) process.exitCode = 1;
 }
 

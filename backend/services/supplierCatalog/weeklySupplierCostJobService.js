@@ -72,12 +72,8 @@ function createWeeklySupplierCostJobService(options = {}) {
                     const ingestion = await ingest({ supplierCode, trigger: job.trigger === "WEEKLY" ? "EXTERNAL_SCHEDULED" : "ADMIN_MANUAL", reason: `${job.trigger} supplier cost synchronization`, reconcileSellability: false, actor: actorSnapshot(actor) });
                     await assertLease();
                     const costSync = await sync.reconcile({ supplierCode, ingestionRunId: ingestion.runId, policy, actor, assertLease });
-                    let pendingInitialApproval = 0;
-                    if (costSync.initialCandidateCount > 0) {
-                        const prepared = await sync.reconcile({ supplierCode, ingestionRunId: ingestion.runId, policy, actor, prepare: true, assertLease });
-                        pendingInitialApproval = prepared.initialCandidateCount;
-                    }
-                    supplierResults.push({ supplierCode, status: "SUCCEEDED", updated: costSync.updated, unchanged: costSync.unchanged, reviewRequired: costSync.reviewRequired, failed: costSync.rejected, pendingInitialApproval });
+                    const resultStatus = costSync.blocked > 0 ? "COMPLETED_WITH_BLOCKED_RECORDS" : "SUCCEEDED";
+                    supplierResults.push({ supplierCode, status: resultStatus, updated: costSync.updated, unchanged: costSync.unchanged, reviewRequired: costSync.reviewRequired, blocked: costSync.blocked, warnings: costSync.warningCount, failed: costSync.rejected, pendingInitialApproval: 0 });
                 } catch (error) {
                     if (leaseFenceFailure(error)) throw error;
                     const failure = { supplierCode, ...safeError(error), transient: transientFailure(error) }; failures.push(failure);

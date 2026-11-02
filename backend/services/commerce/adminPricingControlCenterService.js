@@ -144,7 +144,7 @@ async function loadDailyPricingWorkspace({ supplierId = "", supplierMarket = "",
         if (!pkg) return [];
         const product = productMap.get(mapping.productCode);
         if (!product || !text(mapping.supplierProductCode) || !text(mapping.supplierPackageCode)) return [];
-        const observedSupplierCost = offerMap.get(String(mapping.supplierCatalogOfferId))?.supplierCost || null;
+        const observedSupplierCost = authorityObservedCost(mapping);
         const costState = workspaceSupplierCostState(mapping, observedSupplierCost);
         const supplierCostEvidence = costState.authoritativeEvidence;
         const supplierCost = costState.approvedSupplierCost;
@@ -299,7 +299,7 @@ async function loadDailyPricingProductDetail({ supplierId = "", productCode = ""
     const resolved = resolvePricingInventoryMappings({ mappings, packageMap, productMap, offerMap });
     const rows = resolved.map(mapping => {
         const pkg = packageMap.get(`${mapping.productCode}:${mapping.packageCode}`);
-        const observedSupplierCost = offerMap.get(String(mapping.supplierCatalogOfferId))?.supplierCost || null;
+        const observedSupplierCost = authorityObservedCost(mapping);
         const costState = workspaceSupplierCostState(mapping, observedSupplierCost);
         const evidence = costState.authoritativeEvidence;
         const exactMappingReady = Boolean(text(mapping.supplierProductCode)) && Boolean(text(mapping.supplierPackageCode));
@@ -389,11 +389,11 @@ function pricingMappingPreference(mapping = {}, pkg = {}, observedSupplierCost =
     ];
 }
 
-function comparePricingMappingPreference(left, right, packageMap, offerMap) {
+function comparePricingMappingPreference(left, right, packageMap) {
     const leftPackage = packageMap.get(`${left.productCode}:${left.packageCode}`) || {};
     const rightPackage = packageMap.get(`${right.productCode}:${right.packageCode}`) || {};
-    const leftScore = pricingMappingPreference(left, leftPackage, offerMap.get(String(left.supplierCatalogOfferId))?.supplierCost || null);
-    const rightScore = pricingMappingPreference(right, rightPackage, offerMap.get(String(right.supplierCatalogOfferId))?.supplierCost || null);
+    const leftScore = pricingMappingPreference(left, leftPackage, authorityObservedCost(left));
+    const rightScore = pricingMappingPreference(right, rightPackage, authorityObservedCost(right));
     for (let index = 0; index < leftScore.length; index += 1) {
         if (leftScore[index] !== rightScore[index]) return rightScore[index] - leftScore[index];
     }
@@ -406,7 +406,7 @@ function resolvePricingInventoryMappings({ mappings = [], packageMap = new Map()
         const product = productMap.get(mapping.productCode);
         if (!pkg || !product || pkg.deletedAt || product.deletedAt) return false;
         if (!text(mapping.supplierProductCode) || !text(mapping.supplierPackageCode)) return false;
-        const observedSupplierCost = offerMap.get(String(mapping.supplierCatalogOfferId))?.supplierCost || null;
+        const observedSupplierCost = authorityObservedCost(mapping);
         return Number.isFinite(workspaceSupplierCostState(mapping, observedSupplierCost).previewSupplierCost);
     });
     const groups = new Map();
@@ -416,7 +416,7 @@ function resolvePricingInventoryMappings({ mappings = [], packageMap = new Map()
         groups.get(identity).push(mapping);
     });
     return [...groups.values()]
-        .map(group => group.sort((left, right) => comparePricingMappingPreference(left, right, packageMap, offerMap))[0])
+        .map(group => group.sort((left, right) => comparePricingMappingPreference(left, right, packageMap))[0])
         .sort((left, right) => `${left.productCode}:${left.packageCode}:${left._id}`.localeCompare(`${right.productCode}:${right.packageCode}:${right._id}`));
 }
 
@@ -603,31 +603,48 @@ function readinessReason(code, message) {
 }
 
 function workspaceSupplierCostState(mapping = {}, observedSupplierCost = null) {
-    const authoritativeEvidence = mapping.supplierCostAuthority?.rawSupplierCost != null
-        ? mapping.supplierCostAuthority
-        : mapping.mappingMetadata?.supplierCost || {};
+    const authoritativeEvidence = mapping.supplierCostAuthority || {};
     const approvedRaw = authoritativeEvidence.rawSupplierCost ?? authoritativeEvidence.priceUsd ?? authoritativeEvidence.netDealerPrice;
     const approved = Number(approvedRaw);
     const observed = Number(observedSupplierCost?.amount);
-    const authoritative = approvedRaw != null && approvedRaw !== "" && Number.isFinite(approved);
+    const timestamp = new Date(authoritativeEvidence.observedAt || authoritativeEvidence.capturedAt);
+    const maximumAgeMs = Number(mapping.mappingMetadata?.costAuthorityMaximumAgeSeconds || 86400) * 1000;
+    const timestampValid = Number.isFinite(timestamp.getTime()) && timestamp.getTime() <= Date.now() + 300000;
+    const stale = timestampValid && Date.now() - timestamp.getTime() > maximumAgeMs;
+    const exactProviderIdentity = text(authoritativeEvidence.providerProductCode) === text(mapping.supplierProductCode) && text(authoritativeEvidence.providerOfferCode) === text(mapping.supplierPackageCode);
+    const mode = upper(authoritativeEvidence.verificationMode);
+    const hashesValid = /^[a-f0-9]{64}$/.test(text(authoritativeEvidence.rawSnapshotHash).toLowerCase()) && /^[a-f0-9]{64}$/.test(text(authoritativeEvidence.observedCostHash).toLowerCase());
+    const automaticEvidenceValid = mode === "AUTOMATIC_VERIFIED_API" && Boolean(authoritativeEvidence.ingestionRunId) && hashesValid;
+    const manualEvidenceValid = mode === "MANUAL_REVIEW" && hashesValid;
+    const authoritative = approvedRaw != null && approvedRaw !== "" && Number.isFinite(approved) && approved > 0 && Boolean(upper(authoritativeEvidence.supplierCurrency)) && timestampValid && !stale && exactProviderIdentity && (automaticEvidenceValid || manualEvidenceValid);
     const observedFact = Number.isFinite(observed);
     const comparison = compareSupplierCost(observedSupplierCost, authoritativeEvidence);
     const provisional = false;
-    const stale = authoritative && mapping.supplierCostAuthority?.capturedAt &&
-        Date.now() - new Date(mapping.supplierCostAuthority.capturedAt).getTime() > Number(mapping.mappingMetadata?.costAuthorityMaximumAgeSeconds || 86400) * 1000;
     return {
         authoritativeEvidence,
         authoritative,
         provisional,
         approvedSupplierCost: authoritative ? approved : null,
-        previewSupplierCost: observedFact ? observed : authoritative ? approved : null,
+        // Daily Pricing consumes only the promoted mapping authority. The
+        // SupplierCatalogOffer cache may contain a historical cost for an SKU
+        // that disappeared from the current authenticated supplier response.
+        previewSupplierCost: authoritative ? approved : null,
         comparison,
-        status: stale ? "STALE" : comparison.state === "CURRENCY_MISMATCH" || (comparison.comparable && comparison.state !== "MATCH")
+        status: stale ? "STALE" : !timestampValid || !exactProviderIdentity || (!automaticEvidenceValid && !manualEvidenceValid) ? "INVALID_AUTHORITY"
+            : comparison.state === "CURRENCY_MISMATCH" || (comparison.comparable && comparison.state !== "MATCH")
             ? "REVIEW_REQUIRED"
             : authoritative ? "AUTHORITATIVE"
                 : observedFact ? "OBSERVED"
                     : "MISSING"
     };
+}
+
+function authorityObservedCost(mapping = {}) {
+    const authority = mapping.supplierCostAuthority || {};
+    const observedAt = authority.observedAt || authority.capturedAt;
+    const amount = Number(authority.rawSupplierCost);
+    if (!Number.isFinite(amount) || amount <= 0 || !upper(authority.supplierCurrency) || !observedAt) return null;
+    return { amount, currency: upper(authority.supplierCurrency), observedAt };
 }
 
 function canonicalPricingRegions(product = {}, pkg = {}, region = "ALL", { allowDisabledPackage = false, allowDisabledProduct = false, preparationRegions = [] } = {}) {
@@ -1186,19 +1203,6 @@ async function markMappingPricingReady(row = {}, actor = "admin") {
     ) {
         throw new AdminPricingControlCenterError("PRICING_AUTHORITY_REQUIRED", "Approved supplier cost authority is required before pricing can be marked ready.", 409);
     }
-    const currentOffer = await SupplierCatalogOffer.exists({
-        _id: row.supplierCatalogOfferId,
-        supplierId: row.supplierId,
-        supplierProductCode: text(row.supplierProductCode),
-        supplierOfferCode: text(row.supplierPackageCode),
-        catalogLifecycleState: "ACTIVE",
-        "supplierCost.amount": approvedCost,
-        "supplierCost.currency": upper(row.supplierCurrency),
-        "supplierCost.observedAt": observedAt
-    });
-    if (!currentOffer) {
-        throw new AdminPricingControlCenterError("PRICING_SOURCE_EVIDENCE_DRIFT", "Current supplier catalog evidence changed during publication. Pricing readiness was not updated.", 409);
-    }
     const result = await SupplierProductMapping.updateOne(
         {
             _id: row.mappingId,
@@ -1309,10 +1313,6 @@ async function batchPreviewDailyPricing({ rows = [], couponCode = "", actor = nu
     const mappingMap = mappingIds.length
         ? new Map((await SupplierProductMapping.find({ _id: { $in: mappingIds }, supplierId: supplier.supplierId, archivedAt: null }).lean()).map(mapping => [String(mapping._id), mapping]))
         : new Map();
-    const mappingOffers = mappingIds.length
-        ? await SupplierCatalogOffer.find({ _id: { $in: [...mappingMap.values()].map(mapping => mapping.supplierCatalogOfferId).filter(Boolean) } }).lean()
-        : [];
-    const mappingOfferMap = new Map(mappingOffers.map(offer => [String(offer._id), offer]));
     const packageIds = rows.filter(row => !row.packageCode && mongoose.Types.ObjectId.isValid(text(row.packageId))).map(row => row.packageId);
     const packagesById = packageIds.length
         ? new Map((await CatalogPackage.find({ _id: { $in: packageIds }, deletedAt: null }).select("_id productCode packageCode").lean()).map(pkg => [String(pkg._id), pkg]))
@@ -1326,7 +1326,7 @@ async function batchPreviewDailyPricing({ rows = [], couponCode = "", actor = nu
         if (text(row.mappingId) && (!mapping || String(mapping.supplierId) !== supplier.supplierId)) {
             return { ...row, productCode: row.productCode || row.productId, newSupplierCost: null, authorityError: "SUPPLIER_MAPPING_UNAVAILABLE" };
         }
-        const observedSupplierCost = mappingOfferMap.get(String(mapping?.supplierCatalogOfferId))?.supplierCost || null;
+        const observedSupplierCost = authorityObservedCost(mapping);
         const costState = workspaceSupplierCostState(mapping, observedSupplierCost);
         const supplierCostEvidence = costState.authoritativeEvidence;
         const mapped = mapping ? {

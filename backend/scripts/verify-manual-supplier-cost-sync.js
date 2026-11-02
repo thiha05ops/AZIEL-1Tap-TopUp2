@@ -35,7 +35,7 @@ async function main() {
     const service = createWeeklySupplierCostJobService({
         JobModel, ApprovalModel: { countDocuments: async () => 2 }, leases, ownerAuthorization,
         ingest: async input => { ingestions += 1; ingestionTriggers.push(input.trigger); equal(input.reconcileSellability, false, "manual ingestion cannot alter sellability"); return { runId: `run-${ingestions}` }; },
-        sync: { reconcile: async input => { reconciliations += 1; return input.prepare ? { initialCandidateCount: 1 } : { updated: 1, unchanged: 2, reviewRequired: 1, rejected: 0, initialCandidateCount: 1 }; } },
+        sync: { reconcile: async () => { reconciliations += 1; return { updated: 1, unchanged: 2, reviewRequired: 1, blocked: 1, warningCount: 0, rejected: 0, initialCandidateCount: 0 }; } },
         policyReader: () => ({ enabled: false, manualEnabled: true, jobLeaseTtlMs: 60000, maximumObservationAgeMs: 1000, maximumAutomaticChangePercent: 20 }),
         clock: () => now, defer: fn => deferred.push(fn)
     });
@@ -45,7 +45,8 @@ async function main() {
     equal(jobs[0].requestedBy.username, "owner-db", "persisted Owner identity is stored");
     await assert.rejects(() => service.enqueueManual({ actor: { persistedOwner: true } }), error => error.code === "WEEKLY_SUPPLIER_COST_SYNC_ALREADY_RUNNING"); checks += 1;
     await deferred.shift()();
-    equal(jobs[0].status, "SUCCEEDED"); equal(jobs[0].supplierResults.length, 2); equal(ingestions, 2); equal(reconciliations, 4, "initial candidates are prepared separately without replacing routine reconciliation");
+    equal(jobs[0].status, "SUCCEEDED"); equal(jobs[0].supplierResults.length, 2); equal(ingestions, 2); equal(reconciliations, 2, "each supplier has one authoritative apply pass");
+    equal(jobs[0].supplierResults[0].status, "COMPLETED_WITH_BLOCKED_RECORDS", "reporting distinguishes blocked records from full success");
     equal(ingestionTriggers.join(","), "ADMIN_MANUAL,ADMIN_MANUAL", "manual supplier ingestion uses the canonical persisted trigger");
     const status = await service.status(queued.jobId); equal(status.jobId, queued.jobId);
     const modeSummary = await service.summary(); equal(modeSummary.modes.manualEnabled, true, "status reports manual sync enabled"); equal(modeSummary.modes.weeklyEnabled, false, "status reports weekly sync disabled");

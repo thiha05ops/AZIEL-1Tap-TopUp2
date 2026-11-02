@@ -19,9 +19,10 @@ const selection = { productCode: "mlbb", packageCode: "MLBB_10", customerMarket:
 const supplier = { _id: "s1", supplierCode: "FAZERCARDS" };
 const mapping = { _id: "m1", supplierId: "s1", supplierCode: "FAZERCARDS", supplierCatalogOfferId: "o1", productCode: "mlbb", packageCode: "MLBB_10", supplierProductCode: "mobile_legends_global", supplierPackageCode: "10_diamonds", updatedAt: now, supplierCostAuthority: { rawSupplierCost: 1, supplierCurrency: "USD", capturedAt: now, fundingCost: 0, otherAcquisitionCost: 0 } };
 const offer = { _id: "o1", supplierId: "s1", supplierCatalogProductId: "sp1", catalogNamespace: "FAZERCARDS_RESELLER_CATALOG", supplierProductCode: "mobile_legends_global", supplierOfferCode: "10_diamonds", catalogLifecycleState: "ACTIVE", supplierCost: { amount: 1.1, currency: "USD", observedAt: now }, sourceRevision: "r1", rawSnapshotHash: "a".repeat(64) };
-const observation = { supplierCatalogOfferId: "o1", supplierCatalogProductId: "sp1", supplierId: "s1", supplierProductCode: offer.supplierProductCode, supplierOfferCode: offer.supplierOfferCode, amount: 1.1, currency: "USD", observedAt: now, ingestionRunId: "111111111111111111111111" };
+const observation = { supplierCatalogOfferId: "o1", supplierCatalogProductId: "sp1", supplierId: "s1", catalogNamespace: offer.catalogNamespace, supplierProductCode: offer.supplierProductCode, supplierOfferCode: offer.supplierOfferCode, amount: 1.1, currency: "USD", observedAt: now, ingestionRunId: "111111111111111111111111" };
+const availability = { supplierCatalogOfferId: "o1", state: "AVAILABLE", observedAt: now, staleAt: null, observationRunId: observation.ingestionRunId };
 const policy = { maximumObservationAgeMs: 86_400_000, maximumAutomaticChangePercent: 20 };
-const candidate = overrides => validateCandidate({ selection: overrides?.selection || selection, mapping: overrides?.mapping === undefined ? mapping : overrides.mapping, offer: overrides?.offer === undefined ? offer : overrides.offer, observation: overrides?.observation === undefined ? observation : overrides.observation, expectedSupplier: overrides?.expectedSupplier === undefined ? supplier : overrides.expectedSupplier, now: now.getTime(), maximumObservationAgeMs: policy.maximumObservationAgeMs, maximumAutomaticChangePercent: policy.maximumAutomaticChangePercent });
+const candidate = overrides => validateCandidate({ selection: overrides?.selection || selection, mapping: overrides?.mapping === undefined ? mapping : overrides.mapping, offer: overrides?.offer === undefined ? offer : overrides.offer, observation: overrides?.observation === undefined ? observation : overrides.observation, availability: overrides?.availability === undefined ? availability : overrides.availability, ingestionRunId: overrides?.ingestionRunId || observation.ingestionRunId, expectedSupplier: overrides?.expectedSupplier === undefined ? supplier : overrides.expectedSupplier, now: now.getTime(), maximumObservationAgeMs: policy.maximumObservationAgeMs, maximumAutomaticChangePercent: policy.maximumAutomaticChangePercent });
 
 async function main() {
     const weeklyDefault = readWeeklySupplierCostSyncPolicy({});
@@ -43,13 +44,20 @@ async function main() {
     equal(candidate({ mapping: { ...mapping, supplierId: "s2" } }).code, "GLOBAL_MAPPING_WRONG_SUPPLIER");
     equal(candidate({ offer: { ...offer, supplierId: "s2" } }).code, "SUPPLIER_OFFER_IDENTITY_CONFLICT");
     equal(candidate({ observation: { ...observation, supplierId: "s2" } }).code, "OBSERVATION_SUPPLIER_IDENTITY_CONFLICT");
-    equal(candidate({ mapping: { ...mapping, supplierCostAuthority: { ...mapping.supplierCostAuthority, rawSupplierCost: 0.5 } } }).code, "LARGE_COST_MOVEMENT");
+    equal(candidate({ observation: { ...observation, catalogNamespace: "WRONG" } }).code, "OBSERVATION_NAMESPACE_CONFLICT");
+    const largeMovement = candidate({ mapping: { ...mapping, supplierCostAuthority: { ...mapping.supplierCostAuthority, rawSupplierCost: 0.5 } } });
+    equal(largeMovement.status, "ACCEPTABLE");
+    equal(largeMovement.warnings[0], "LARGE_COST_MOVEMENT", "large verified movement is an audited warning, not a blocker");
     equal(candidate({ mapping: { ...mapping, supplierCostAuthority: { ...mapping.supplierCostAuthority, supplierCurrency: "THB" } } }).code, "CURRENCY_MISMATCH");
     equal(candidate({ observation: { ...observation, observedAt: new Date(now.getTime() - 90_000_000) } }).code, "STALE_OBSERVATION");
+    equal(candidate({ availability: { ...availability, state: "UNKNOWN" } }).code, "SUPPLIER_AVAILABILITY_NOT_CONFIRMED");
+    equal(candidate({ availability: { ...availability, observationRunId: "different" } }).code, "SUPPLIER_AVAILABILITY_NOT_CONFIRMED");
+    equal(candidate({ availability: { ...availability, observedAt: new Date(now.getTime() - 90_000_000) } }).code, "SUPPLIER_AVAILABILITY_NOT_CONFIRMED");
+    equal(candidate({ ingestionRunId: "different" }).code, "OBSERVATION_RUN_IDENTITY_CONFLICT");
 
     const promoted = new Set(), updates = [];
     const repos = {
-        selections: async () => [selection], mappings: async () => [mapping], offers: async () => [offer], observations: async () => [observation], supplier: async () => supplier,
+        selections: async () => [selection], mappings: async () => [mapping], offers: async () => [offer], observations: async () => [observation], availability: async () => [availability], supplier: async () => supplier,
         approval: async () => null, createManifest: async value => ({ _id: "a1", ...value }), consumeApproval: async () => null,
         updateRun: async (runId, sync) => updates.push({ runId, sync })
     };
@@ -59,12 +67,12 @@ async function main() {
         return { replayed };
     };
     const service = createWeeklySupplierCostSyncService({ repositories: repos, promoter, clock: () => now });
-    const first = await service.reconcile({ supplierCode: "FAZERCARDS", ingestionRunId: "r1", policy, actor: { id: "1".repeat(24), username: "supplier-cost-sync", role: "SYSTEM" } });
+    const first = await service.reconcile({ supplierCode: "FAZERCARDS", ingestionRunId: observation.ingestionRunId, policy, actor: { id: "1".repeat(24), username: "supplier-cost-sync", role: "SYSTEM" } });
     equal(first.updated, 1);
     equal(updates.length, 1);
-    const replay = await service.reconcile({ supplierCode: "FAZERCARDS", ingestionRunId: "r1", policy, actor: { id: "1".repeat(24), username: "supplier-cost-sync", role: "SYSTEM" } });
+    const replay = await service.reconcile({ supplierCode: "FAZERCARDS", ingestionRunId: observation.ingestionRunId, policy, actor: { id: "1".repeat(24), username: "supplier-cost-sync", role: "SYSTEM" } });
     equal(replay.replayed, 1, "duplicate invocation is idempotent");
-    const dry = await service.reconcile({ supplierCode: "FAZERCARDS", ingestionRunId: "r2", dryRun: true, policy, actor: {} });
+    const dry = await service.reconcile({ supplierCode: "FAZERCARDS", ingestionRunId: observation.ingestionRunId, dryRun: true, policy, actor: {} });
     equal(dry.decisions[0].status, "DRY_RUN_ACCEPTABLE");
     equal(updates.length, 2, "dry run does not update run metadata");
     const missingMappingService = createWeeklySupplierCostSyncService({ repositories: { ...repos, mappings: async () => [], offers: async () => [], observations: async () => [] }, promoter, clock: () => now });
@@ -76,43 +84,23 @@ async function main() {
 
     const initialMapping = { ...mapping, supplierCostAuthority: {} };
     const initialDecision = candidate({ mapping: initialMapping });
-    equal(initialDecision.code, "INITIAL_AUTHORITY_APPROVAL_REQUIRED");
+    equal(initialDecision.code, "FRESH_EXACT_INITIAL_COST");
     const approvedCandidate = immutableCandidate(initialDecision), approvedHash = manifestHash([approvedCandidate]);
-    const initialRepos = {
-        ...repos, mappings: async () => [initialMapping],
-        approval: async hash => hash === approvedHash ? { _id: "a1", manifestHash: approvedHash, status: "APPROVED", maximumInitialPromotions: 1, expiresAt: new Date(now.getTime() + 60_000), candidates: [approvedCandidate], approvedBy: { adminId: "1".repeat(24), username: "owner", role: "OWNER" } } : null
-    };
-    let initialPromotions = 0, initialPromotionActor = null;
-    const initialService = createWeeklySupplierCostSyncService({ repositories: initialRepos, promoter: async (_input, context) => { initialPromotions += 1; initialPromotionActor = context.actor; return { replayed: initialPromotions > 1 }; }, clock: () => now });
-    const noApproval = await initialService.reconcile({ supplierCode: "FAZERCARDS", ingestionRunId: observation.ingestionRunId, policy, actor: {} });
-    equal(noApproval.updated, 0, "initial authority is never promoted without approval");
-    equal(noApproval.decisions[0].code, "INITIAL_AUTHORITY_APPROVAL_REQUIRED");
-    const prepared = await initialService.reconcile({ supplierCode: "FAZERCARDS", ingestionRunId: observation.ingestionRunId, prepare: true, policy, actor: {} });
-    equal(prepared.mode, "PREPARE");
-    equal(prepared.initialManifestHash, approvedHash, "phase A persists the exact deterministic candidate manifest");
-    equal(initialPromotions, 0, "phase A cannot promote authority");
-    const approved = await initialService.reconcile({ supplierCode: "FAZERCARDS", ingestionRunId: observation.ingestionRunId, approvalHash: approvedHash, initialOnly: true, policy, actor: {} });
-    equal(approved.updated, 1, "exact approved initial manifest may promote");
-    equal(initialPromotionActor.role, "OWNER", "initial promotion audit identity comes from persisted approval");
-    equal(initialPromotionActor.username, "owner", "scheduler cannot replace the approving Owner identity");
-    const approvedReplay = await initialService.reconcile({ supplierCode: "FAZERCARDS", ingestionRunId: observation.ingestionRunId, approvalHash: approvedHash, initialOnly: true, policy, actor: {} });
-    equal(approvedReplay.replayed, 1, "approved manifest replay is idempotent");
-    const changedObservation = { ...observation, amount: 1.11 };
-    const changedOffer = { ...offer, supplierCost: { ...offer.supplierCost, amount: 1.11 } };
-    const changedService = createWeeklySupplierCostSyncService({ repositories: { ...initialRepos, offers: async () => [changedOffer], observations: async () => [changedObservation] }, promoter: async () => { throw new Error("must not promote"); }, clock: () => now });
-    const changed = await changedService.reconcile({ supplierCode: "FAZERCARDS", ingestionRunId: observation.ingestionRunId, approvalHash: approvedHash, initialOnly: true, policy, actor: {} });
-    equal(changed.decisions[0].code, "INITIAL_AUTHORITY_APPROVAL_MISMATCH", "changed candidates invalidate owner approval");
-    const expiredRepos = { ...initialRepos, approval: async () => ({ ...(await initialRepos.approval(approvedHash)), expiresAt: new Date(now.getTime() - 1) }) };
-    const expiredService = createWeeklySupplierCostSyncService({ repositories: expiredRepos, promoter: async () => { throw new Error("must not promote"); }, clock: () => now });
-    const expired = await expiredService.reconcile({ supplierCode: "FAZERCARDS", ingestionRunId: observation.ingestionRunId, approvalHash: approvedHash, initialOnly: true, policy, actor: {} });
-    equal(expired.updated, 0, "expired approval cannot promote initial authority");
-    equal(expired.decisions[0].code, "INITIAL_AUTHORITY_APPROVAL_MISMATCH");
+    const initialRepos = { ...repos, mappings: async () => [initialMapping] };
+    let initialPromotions = 0, promotedInput = null;
+    const initialService = createWeeklySupplierCostSyncService({ repositories: initialRepos, promoter: async input => { initialPromotions += 1; promotedInput = input; return { replayed: initialPromotions > 1 }; }, clock: () => now });
+    const automatic = await initialService.reconcile({ supplierCode: "FAZERCARDS", ingestionRunId: observation.ingestionRunId, policy, actor: { id: "1".repeat(24), username: "automation", role: "SYSTEM" } });
+    equal(automatic.updated, 1, "verified exact API evidence automatically establishes initial authority");
+    equal(promotedInput.verificationMode, "AUTOMATIC_VERIFIED_API");
+    equal(promotedInput.ingestionRunId, observation.ingestionRunId);
+    const automaticReplay = await initialService.reconcile({ supplierCode: "FAZERCARDS", ingestionRunId: observation.ingestionRunId, policy, actor: {} });
+    equal(automaticReplay.replayed, 1, "automatic initial promotion replay is idempotent");
     let interruptedAttempts = 0;
     const interruptedService = createWeeklySupplierCostSyncService({ repositories: initialRepos, promoter: async () => { interruptedAttempts += 1; if (interruptedAttempts === 1) throw Object.assign(new Error("interrupted"), { code: "SIMULATED_INTERRUPTION" }); return { replayed: false }; }, clock: () => now });
-    const interrupted = await interruptedService.reconcile({ supplierCode: "FAZERCARDS", ingestionRunId: observation.ingestionRunId, approvalHash: approvedHash, initialOnly: true, policy, actor: {} });
+    const interrupted = await interruptedService.reconcile({ supplierCode: "FAZERCARDS", ingestionRunId: observation.ingestionRunId, policy, actor: {} });
     equal(interrupted.decisions[0].code, "SIMULATED_INTERRUPTION", "interrupted promotion remains reviewable and unconsumed");
-    const resumed = await interruptedService.reconcile({ supplierCode: "FAZERCARDS", ingestionRunId: observation.ingestionRunId, approvalHash: approvedHash, initialOnly: true, policy, actor: {} });
-    equal(resumed.updated, 1, "interrupted promotion can resume with the same immutable approval");
+    const resumed = await interruptedService.reconcile({ supplierCode: "FAZERCARDS", ingestionRunId: observation.ingestionRunId, policy, actor: {} });
+    equal(resumed.updated, 1, "interrupted promotion can resume with the same immutable evidence");
 
     let approvalRecord = { _id: "a1", manifestHash: approvedHash, candidates: [approvedCandidate], status: "PENDING", maximumInitialPromotions: null, expiresAt: null, approvedBy: {} };
     const ApprovalModel = {
@@ -154,13 +142,15 @@ async function main() {
     leaseNow = new Date(now.getTime() + 500); await leaseService.renew(lease, 1000); ok(leaseRecord.expiresAt > new Date(now.getTime() + 1000), "weekly job lease renews safely");
     leaseNow = new Date(now.getTime() + 2000); await assert.rejects(() => leaseService.assertOwned(lease), error => error.code === "WEEKLY_SUPPLIER_COST_SYNC_LEASE_LOST"); checks += 1;
 
-    const currentMapping = { ...mapping, supplierCostAuthority: { ...mapping.supplierCostAuthority, capturedAt: new Date() } };
+    const currentMapping = { ...mapping, supplierCostAuthority: { ...mapping.supplierCostAuthority, capturedAt: new Date(), observedAt: new Date(), providerProductCode: mapping.supplierProductCode, providerOfferCode: mapping.supplierPackageCode, ingestionRunId: observation.ingestionRunId, rawSnapshotHash: "a".repeat(64), observedCostHash: "b".repeat(64), verificationMode: "AUTOMATIC_VERIFIED_API" } };
     const authority = workspaceSupplierCostState(currentMapping, offer.supplierCost);
     equal(authority.status, "REVIEW_REQUIRED");
-    equal(authority.previewSupplierCost, 1.1, "fresh observed cost drives internal preview");
-    equal(workspaceSupplierCostState({ supplierCostAuthority: {} }, offer.supplierCost).status, "OBSERVED");
+    equal(authority.previewSupplierCost, 1, "promoted authority drives internal preview");
+    equal(workspaceSupplierCostState({ supplierCostAuthority: {} }, offer.supplierCost).previewSupplierCost, null, "unpromoted catalog observation cannot drive preview");
+    equal(workspaceSupplierCostState({ ...currentMapping, supplierCostAuthority: { ...currentMapping.supplierCostAuthority, capturedAt: new Date(0), observedAt: new Date(0) } }, offer.supplierCost).previewSupplierCost, null, "stale authority cannot drive preview");
+    equal(workspaceSupplierCostState({ ...currentMapping, supplierCostAuthority: {}, mappingMetadata: { supplierCost: { rawSupplierCost: 99, supplierCurrency: "USD" } } }, offer.supplierCost).previewSupplierCost, null, "legacy mapping metadata cannot drive preview");
     equal(workspaceSupplierCostState({ supplierCostAuthority: { rawSupplierCost: null } }, null).approvedSupplierCost, null, "missing authority never becomes a zero-cost fallback");
-    equal(workspaceSupplierCostState({ supplierCostAuthority: currentMapping.supplierCostAuthority }, { ...offer.supplierCost, amount: 1 }).status, "AUTHORITATIVE");
+    equal(workspaceSupplierCostState(currentMapping, { ...offer.supplierCost, amount: 1 }).status, "AUTHORITATIVE");
 
     let inFlight = 0, maximumInFlight = 0;
     const concurrentStage = await fazer.stageCatalog({
@@ -196,6 +186,7 @@ async function main() {
     ok(job.includes("dryRun ? await operation(async () => true) : await withJobLease"), "dry-run bypasses the database-backed job lease and remains read-only");
     ok(job.includes("const heartbeat = setInterval") && !job.includes("scheduleJob") && !job.includes("node-cron"), "the only in-process timer renews the durable job lease; scheduling remains external");
     ok(!job.includes("approve-manifest") && !job.includes('role: "OWNER"'), "automation CLI cannot approve or impersonate an OWNER");
+    ok(job.includes("SUPPLIER_COST_APPROVAL_MANIFEST_OPERATION_OBSOLETE") && !job.includes("Approval.findById"), "obsolete manifest operations fail closed without loading or applying a manifest");
     ok(job.includes("loadAutomationActor") && job.includes("role: { $ne: ROLES.OWNER }") && job.includes("automationActorId"), "scheduler loads a persisted active non-OWNER audit identity");
     ok(approvalSource.includes("requireAuthenticatedOwner") && ownerAuthorizationSource.includes("AdminModel.findOne") && ownerAuthorizationSource.includes("SessionModel.findOne") && ownerAuthorizationSource.includes("status: STATUSES.ACTIVE") && ownerAuthorizationSource.includes("role: ROLES.OWNER"), "approval service verifies persisted active OWNER and live Admin session state");
     ok(supplierRoutes.includes('/admin/weekly-supplier-cost/manifests/:manifestHash/approve') && supplierRoutes.includes("PERMISSIONS.OWNER_ROUTING_MANAGE"), "approval is exposed only through authenticated Owner-authorized Admin infrastructure");
@@ -206,9 +197,9 @@ async function main() {
     ok(pricingUi.includes("UNPUBLISHED"), "draft recommendation is explicitly unpublished");
     ok(syncSource.includes('customerMarket: "GLOBAL"'), "only GLOBAL selections are considered");
     ok(syncSource.includes("supplierProductCode !== offer.supplierProductCode"), "native supplier SKU identity is exact");
-    ok(syncSource.includes("LARGE_COST_MOVEMENT"), "large changes fail to review");
+    ok(syncSource.includes("LARGE_COST_MOVEMENT"), "large changes retain an audited warning");
     ok(syncSource.includes("SUPPLIER_OFFER_IDENTITY_CONFLICT") && syncSource.includes("OBSERVATION_SUPPLIER_IDENTITY_CONFLICT"), "supplier identity is exact across mapping, offer and observation");
-    ok(syncSource.includes("INITIAL_AUTHORITY_APPROVAL_REQUIRED"), "missing initial approval fails closed");
+    ok(syncSource.includes("AUTOMATIC_VERIFIED_API"), "verified API evidence promotes initial authority automatically");
 
     console.log(JSON.stringify({ result: "PASS", checks, schedule: { local: weeklyDefault.scheduleLocal, timeZone: weeklyDefault.scheduleTimeZone, cronUtc: weeklyDefault.cronUtc }, catalogWritesInOfflineTest: 0, productionConnections: 0, supplierCalls: 0, publicationWrites: 0, orderWrites: 0, paymentWrites: 0, fulfillmentWrites: 0 }, null, 2));
 }
