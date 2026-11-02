@@ -406,8 +406,11 @@ function resolvePricingInventoryMappings({ mappings = [], packageMap = new Map()
         const product = productMap.get(mapping.productCode);
         if (!pkg || !product || pkg.deletedAt || product.deletedAt) return false;
         if (!text(mapping.supplierProductCode) || !text(mapping.supplierPackageCode)) return false;
-        const observedSupplierCost = authorityObservedCost(mapping);
-        return Number.isFinite(workspaceSupplierCostState(mapping, observedSupplierCost).previewSupplierCost);
+        // Inventory discovery is based on exact supplier identity, not cost
+        // readiness. Missing, stale, or review-required authority remains
+        // visible so Admin can resolve it; preview/publication enforce the
+        // validated-authority requirement separately.
+        return true;
     });
     const groups = new Map();
     eligible.forEach(mapping => {

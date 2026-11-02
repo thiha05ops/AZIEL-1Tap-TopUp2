@@ -6,7 +6,8 @@ const fs = require("fs");
 const path = require("path");
 const {
     pricingTargetRegions,
-    resolvePricingInventoryMappings
+    resolvePricingInventoryMappings,
+    workspaceSupplierCostState
 } = require("../services/commerce/adminPricingControlCenterService");
 
 const mapping = (id, productCode, packageCode, region, offerCode, options = {}) => ({
@@ -32,7 +33,10 @@ const mappings = [
     mapping("01", "black-clover-m", "BCM_1", "ASIA", "asia-1"),
     mapping("02", "mlbb", "MLBB_1", "TH", "th-1", { enabled: true, productionRole: "PRIMARY", approvedCost: 10 }),
     mapping("03", "mlbb", "MLBB_1", "GLOBAL", "global-1", { approvedCost: 11 }),
-    mapping("04", "pubg", "PUBG_1", "GLOBAL", "global-2"),
+    {
+        ...mapping("04", "pubg", "PUBG_1", "GLOBAL", "global-2"),
+        mappingMetadata: { costSyncDecision: { decision: "REVIEW_REQUIRED", reason: "INITIAL_AUTHORITY_APPROVAL_REQUIRED" } }
+    },
     mapping("05", "freefire", "FF_1", "TH", "th-2", { enabled: true, productionRole: "PRIMARY" }),
     mapping("06", "tarisland", "TAR_1", "ASIA", "asia-2"),
     mapping("07", "pubg", "PUBG_DELETED", "GLOBAL", "global-deleted"),
@@ -70,6 +74,15 @@ assert.strictEqual(mlbb[0].region, "GLOBAL");
 assert.strictEqual(resolved.find(item => item.productCode === "freefire").region, "TH", "WonDD-style TH metadata must remain discoverable.");
 assert(!resolved.some(item => item.packageCode === "PUBG_DELETED"));
 assert(!resolved.some(item => item.packageCode === "FF_BAD"));
+assert(resolved.some(item => String(item._id) === "01"), "An exact mapping with missing cost authority must remain navigable.");
+assert(resolved.some(item => String(item._id) === "04"), "An exact mapping with review-required cost must remain navigable.");
+
+const missingCostState = workspaceSupplierCostState(resolved.find(item => String(item._id) === "01"));
+const reviewCostState = workspaceSupplierCostState(resolved.find(item => String(item._id) === "04"));
+assert.strictEqual(missingCostState.previewSupplierCost, null, "Missing authority must never fabricate a preview cost.");
+assert.strictEqual(reviewCostState.previewSupplierCost, null, "Review-required authority must never become a preview cost.");
+assert.notStrictEqual(missingCostState.status, "AUTHORITATIVE");
+assert.notStrictEqual(reviewCostState.status, "AUTHORITATIVE");
 
 const root = path.resolve(__dirname, "../..");
 const service = fs.readFileSync(path.join(root, "backend/services/commerce/adminPricingControlCenterService.js"), "utf8");
@@ -89,5 +102,8 @@ console.log(JSON.stringify({
     authoritativeMappingRegion: mlbb[0].region,
     exactMappingIdentityPreserved: true,
     deletedPackagesExcluded: true,
-    malformedMappingsExcluded: true
+    malformedMappingsExcluded: true,
+    missingCostMappingsRemainNavigable: true,
+    reviewRequiredMappingsRemainNavigable: true,
+    unverifiedCostsRemainUnavailableForPricing: true
 }, null, 2));
