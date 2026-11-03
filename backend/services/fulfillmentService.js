@@ -862,7 +862,18 @@ async function startFulfillmentForOrder(orderId, payload = {}, context = {}) {
         supplierRequest: {
             executionMode: mapping.executionMode,
             supplierProductCode: mapping.supplierProductCode,
-            supplierPackageCode: mapping.supplierPackageCode
+            supplierPackageCode: mapping.supplierPackageCode,
+            costAuthoritySnapshot: mapping.supplierCostAuthority ? {
+                amount: mapping.supplierCostAuthority.rawSupplierCost,
+                currency: mapping.supplierCostAuthority.supplierCurrency,
+                observedAt: mapping.supplierCostAuthority.observedAt || mapping.supplierCostAuthority.capturedAt,
+                ingestionRunId: mapping.supplierCostAuthority.ingestionRunId,
+                rawSnapshotHash: mapping.supplierCostAuthority.rawSnapshotHash,
+                observedCostHash: mapping.supplierCostAuthority.observedCostHash,
+                verificationMode: mapping.supplierCostAuthority.verificationMode,
+                providerProductCode: mapping.supplierCostAuthority.providerProductCode,
+                providerOfferCode: mapping.supplierCostAuthority.providerOfferCode
+            } : null
         },
         supplierResult: normalizeSupplierResult({
             status: "PENDING",

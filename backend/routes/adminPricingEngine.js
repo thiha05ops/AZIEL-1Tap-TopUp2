@@ -381,7 +381,8 @@ router.post("/admin/pricing-engine/workspace/publish", adminMiddleware, requireA
             region: req.body?.region || "",
             supplierId: req.body?.supplierId || "",
             actor: req.admin?.username || "admin",
-            admin: req.admin || null
+            admin: req.admin || null,
+            unifiedSellable: req.body?.unifiedSellable !== false
         });
         await writeAdminAudit({
             actor: req.admin,

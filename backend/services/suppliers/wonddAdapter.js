@@ -151,7 +151,7 @@ function createWonddAdapter(options = {}) {
         if (failure) return failure;
         const orderId = clean(response.orderid || response.orderId);
         if (!orderId) return supplierResult("FAILED", "WONDD_ACCEPTANCE_REFERENCE_MISSING", {}, "WonDD accepted the request without an order reference.", "", "CONFIGURATION", false);
-        return supplierResult("PENDING", "ACCEPTED", { responseCode: "00", submittedAt: new Date().toISOString() }, "WonDD accepted the top-up for processing.", orderId);
+        return supplierResult("PENDING", "ACCEPTED", { responseCode: "00", submittedAt: new Date().toISOString(), provider: response }, "WonDD accepted the top-up for processing.", orderId);
     }
 
     async function checkStatus(input = {}) {

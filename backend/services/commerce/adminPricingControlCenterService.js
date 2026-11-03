@@ -15,6 +15,7 @@ const { createPricingQuote } = require("./pricingQuoteRuntime");
 const { loadCommercePromotionContext } = require("./commercePromotionBridgeService");
 const { resolveCommercePricingPreviewDetailed } = require("./commercePricingPreviewService");
 const { updatePackage } = require("../catalogAdminService");
+const { publishEligiblePackage } = require("./unifiedSalesPublicationService");
 const { clearPublishedSupplierCostDraftRows } = require("./pricingWorkspaceDraftService");
 const { resolvePricingSupplier } = require("./pricingSupplierService");
 const { SUPPLIER_CURRENCY } = require("../../constants/commerce");
@@ -1565,7 +1566,8 @@ async function publishDailyPricing({
     admin = null,
     region = "",
     supplierId = "",
-    skipDraftCleanup = false
+    skipDraftCleanup = false,
+    unifiedSellable = false
 } = {}) {
     const selectedRegions = pricingTargetRegions(region || "ALL");
     if (!selectedRegions.length) {
@@ -1668,7 +1670,7 @@ async function publishDailyPricing({
         }
 
         const publicationDecision = selectedPublicationDecision(row);
-        if (publicationDecision.action === "NO_OP") {
+        if (publicationDecision.action === "NO_OP" && unifiedSellable !== true) {
             let readinessConfirmed = false;
             if (
                 row.mappingReadiness?.pricingReady !== true &&
@@ -1723,7 +1725,7 @@ async function publishDailyPricing({
                 continue;
             }
 
-            if (regionalPreview.changed !== true) {
+            if (regionalPreview.changed !== true && unifiedSellable !== true) {
                 unchangedValidRegions.push(selectedRegion);
                 results.push({
                     region: selectedRegion,
@@ -1811,15 +1813,19 @@ async function publishDailyPricing({
         };
 
         try {
-            const update = await updatePackage({
-                productCode: row.productCode,
-                packageCode: row.packageCode,
-                patch,
-                actor
-            });
+            const update = unifiedSellable === true
+                ? await publishEligiblePackage({
+                    mappingId: row.mappingId,
+                    regions: publishableRegions,
+                    pricePatches,
+                    regionalPreviews: Object.fromEntries((row.regions || []).map(item => [item.region, item])),
+                    pricingPublicationEvidence: patch.pricingPublicationEvidence,
+                    confirmed: true
+                }, { actor: admin || { username: actor } })
+                : await updatePackage({ productCode: row.productCode, packageCode: row.packageCode, patch, actor });
 
             if (
-                update.changed === true &&
+                (update.changed === true || update.published === true) &&
                 new Set([...publishableRegions, ...unchangedValidRegions]).size === selectedRegions.length &&
                 shouldMarkMappingPricingReady(row, admin)
             ) {
@@ -1831,11 +1837,11 @@ async function publishDailyPricing({
                     region: selectedRegion,
                     productCode: row.productCode,
                     packageCode: row.packageCode,
-                    published: update.changed === true,
+                    published: update.changed === true || update.published === true,
                     supplierCost: normalized.newSupplierCost,
                     sellingPrice: pricePatches[selectedRegion].amount,
-                    skipped: update.changed !== true,
-                    reason: update.changed ? "" : "No changes",
+                    skipped: update.changed !== true && update.published !== true,
+                    reason: (update.changed || update.published) ? "" : "No changes",
                     changedFields: update.changedFields || []
                 });
             });
