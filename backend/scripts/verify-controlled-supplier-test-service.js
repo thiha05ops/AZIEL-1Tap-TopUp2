@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 "use strict";
 const assert = require("assert");
-const { authorizeControlledAttempt, executeControlledSupplierTest } = require("../services/controlledSupplierTestService");
+const { authorizeControlledAttempt, executeControlledSupplierTest, controlledAssessmentBlockers } = require("../services/controlledSupplierTestService");
 const id = value => ({ toString: () => value });
 async function main() {
     const mapping = { _id: id("m1"), supplierId: "s1", supplierCode: "FAZERCARDS", productCode: "freefire", packageCode: "FF_33_DIA", productionRole: "DISABLED", archivedAt: null, toObject() { return this; } };
@@ -14,6 +14,11 @@ async function main() {
     assert.strictEqual((await executeControlledSupplierTest(input, deps)).dispatched, true);
     await assert.rejects(() => authorizeControlledAttempt({ ...input, authorizationToken: "wrong" }, deps), error => error.code === "CONTROLLED_TEST_AUTHORIZATION_INVALID");
     await assert.rejects(() => authorizeControlledAttempt({ ...input, explicitApproval: false }, deps), error => error.code === "CONTROLLED_TEST_APPROVAL_REQUIRED");
+    const globalMapping = { ...mapping, region: "GLOBAL" };
+    const validPrices = { prices: { TH: { enabled: true, amount: 100 }, MM: { enabled: true, amount: 1000 } } };
+    assert.deepStrictEqual(controlledAssessmentBlockers({ blockers: ["MAPPING_DISABLED", "PRODUCTION_PRICE_NOT_PUBLISHED"], package: validPrices }, globalMapping), []);
+    assert.deepStrictEqual(controlledAssessmentBlockers({ blockers: ["MAPPING_DISABLED", "FULFILLMENT_NOT_READY"], package: validPrices }, globalMapping), ["FULFILLMENT_NOT_READY"]);
+    assert.deepStrictEqual(controlledAssessmentBlockers({ blockers: ["MAPPING_DISABLED", "PRODUCTION_PRICE_NOT_PUBLISHED"], package: { prices: { TH: { enabled: true, amount: 100 } } } }, globalMapping), ["PRODUCTION_PRICE_NOT_PUBLISHED"]);
     attempt.supplierRequest.submissionState = "SUBMISSION_UNCERTAIN";
     await assert.rejects(() => authorizeControlledAttempt(input, deps), error => error.code === "CONTROLLED_TEST_ALREADY_SUBMITTED");
     console.log("Controlled supplier test service passed: explicit binding, one-shot lock, and uncertain-submission blocking verified with mocks.");

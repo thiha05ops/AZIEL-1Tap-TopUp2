@@ -4,6 +4,9 @@
 const assert = require("assert");
 const mongoose = require("mongoose");
 const { MongoMemoryReplSet } = require("mongodb-memory-server");
+process.env.SUPPLIER_COST_LATEST_ONLY_ENABLED = "true";
+process.env.SUPPLIER_COST_AUTHORITY_MUTATIONS_ENABLED = "true";
+process.env.PUBG_MOBILE_AUTO_COST_RECOVERY_ENABLED = "true";
 const Admin = require("../models/AdminAccount");
 const Audit = require("../models/AdminAuditLog");
 const Package = require("../models/CatalogPackage");
@@ -13,8 +16,11 @@ const StoreSelection = require("../models/StoreCatalogSelection");
 const Supplier = require("../models/Supplier");
 const Run = require("../models/SupplierCatalogIngestionRun");
 const Offer = require("../models/SupplierCatalogOffer");
+const SupplierProduct = require("../models/SupplierCatalogProduct");
 const Availability = require("../models/SupplierOfferAvailability");
 const Mapping = require("../models/SupplierProductMapping");
+const LatestCost = require("../models/SupplierCatalogLatestCost");
+const CostChange = require("../models/SupplierCostAuthorityChange");
 const { observedCostHash } = require("../services/supplierCatalog/supplierCostComparisonService");
 const { contractFingerprint } = require("../services/suppliers/fazercardsFulfillmentContractService");
 const { selectedRouteSnapshot } = require("../services/supplierProductionSelectionService");
@@ -27,6 +33,7 @@ const {
     CUTOVER_OPERATION, CUTOVER_CONFIRMATION, ROLLBACK_OPERATION, ROLLBACK_CONFIRMATION,
     createPubgMobileAutoCutoverService
 } = require("../services/supplierCatalog/pubgMobileAutoCutoverService");
+const { CONFIRMATION: RECOVERY_CONFIRMATION, createPubgMobileAutoCostRecoveryService } = require("../services/supplierCatalog/pubgMobileAutoCostRecoveryService");
 
 const NOW = new Date();
 const ownerId = new mongoose.Types.ObjectId();
@@ -41,15 +48,16 @@ function contract(productCode, sourceHash, offerHash) {
 }
 
 async function clear() {
-    for (const Model of [Admin, Audit, Attempt, PackageSelection, StoreSelection, Mapping, Availability, Offer, Run, Package, Supplier]) await Model.deleteMany({});
+    for (const Model of [Admin, Audit, Attempt, PackageSelection, StoreSelection, Mapping, Availability, LatestCost, CostChange, Offer, SupplierProduct, Run, Package, Supplier]) await Model.deleteMany({});
 }
 
 async function seed() {
     await clear();
-    const supplierId = new mongoose.Types.ObjectId(), runId = new mongoose.Types.ObjectId(), productId = new mongoose.Types.ObjectId();
+    const supplierId = new mongoose.Types.ObjectId(), runId = new mongoose.Types.ObjectId(), productId = new mongoose.Types.ObjectId(), runKey = `cutover-${Date.now()}`;
     await Admin.collection.insertOne({ _id: ownerId, username: actor.username, usernameNormalized: actor.username, displayName: "Isolated Owner", passwordHash: "not-a-real-secret", role: "OWNER", status: "ACTIVE", createdAt: NOW, updatedAt: NOW });
     await Supplier.collection.insertOne({ _id: supplierId, supplierCode: "FAZERCARDS", name: "FazerCards", enabled: true, mode: "API", supplierCurrency: "USD", supportedRegions: ["GLOBAL"], createdAt: NOW, updatedAt: NOW });
-    await Run.collection.insertOne({ _id: runId, supplierId, catalogNamespace: NAMESPACE, runKey: `cutover-${Date.now()}`, status: "SUCCEEDED_COMPLETE", coverageState: "COMPLETE", startedAt: new Date(NOW - 1000), completedAt: NOW, createdAt: NOW, updatedAt: NOW });
+    await SupplierProduct.collection.insertOne({ _id: productId, supplierId, catalogNamespace: NAMESPACE, supplierProductCode: TARGET_PRODUCT_CODE, displayName: "PUBG Mobile Auto", supplierMarketCode: "GLOBAL", supportState: "SUPPORTED", rawSnapshotHash: "d".repeat(64), firstSeenAt: NOW, lastSeenAt: NOW, lastObservedAt: NOW, lastChangedAt: NOW, createdAt: NOW, updatedAt: NOW });
+    await Run.collection.insertOne({ _id: runId, supplierId, catalogNamespace: NAMESPACE, runKey, status: "SUCCEEDED_COMPLETE", coverageState: "COMPLETE", startedAt: NOW, completedAt: NOW, createdAt: NOW, updatedAt: NOW });
     const storePackages = [];
     for (let index = 0; index < PACKAGE_MIGRATIONS.length; index += 1) {
         const item = PACKAGE_MIGRATIONS[index], sourceOfferId = new mongoose.Types.ObjectId(), targetOfferId = new mongoose.Types.ObjectId(), sourceId = new mongoose.Types.ObjectId(), targetId = new mongoose.Types.ObjectId();
@@ -57,6 +65,7 @@ async function seed() {
         for (const [offerId, productCode, amount, hashChar] of [[sourceOfferId, SOURCE_PRODUCT_CODE, 10 + index, "a"], [targetOfferId, TARGET_PRODUCT_CODE, 9 + index, "b"]]) {
             const offer = { _id: offerId, supplierCatalogProductId: productId, supplierId, catalogNamespace: NAMESPACE, supplierProductCode: productCode, supplierOfferCode: item.offerCode, supplierOfferName: item.name, supplierCost: { amount, currency: "USD", observedAt: NOW }, catalogLifecycleState: "ACTIVE", reconciliationState: "EXACT_CANONICAL_MATCH", firstSeenAt: NOW, lastSeenAt: NOW, lastObservedAt: NOW, lastChangedAt: NOW, rawSnapshotHash: hashChar.repeat(64), rawSnapshot: {}, createdAt: NOW, updatedAt: NOW };
             await Offer.collection.insertOne(offer);
+            if (productCode === TARGET_PRODUCT_CODE) await LatestCost.collection.insertOne({ _id: offerId, schemaVersion: 1, supplierCatalogProductId: productId, supplierId, catalogNamespace: NAMESPACE, supplierProductCode: productCode, supplierOfferCode: item.offerCode, amount, currency: "USD", validatedObservedAt: NOW, sourceRevision: offer.rawSnapshotHash, rawSnapshotHash: offer.rawSnapshotHash, observedCostHash: observedCostHash(offer), ingestionRunId: runId, runKey, coverageState: "COMPLETE", publishedAt: NOW });
             await Availability.collection.insertOne({ supplierCatalogOfferId: offerId, state: "AVAILABLE", evidenceCode: "AUTHENTICATED_API", observedAt: NOW, staleAt: null, lastAvailableAt: NOW, consecutiveMissingCount: 0, observationRunId: runId, coverageComplete: true, createdAt: NOW, updatedAt: NOW });
             const mappingId = productCode === SOURCE_PRODUCT_CODE ? sourceId : targetId;
             const sourceHash = productCode === SOURCE_PRODUCT_CODE ? "c".repeat(64) : "d".repeat(64);
@@ -79,8 +88,27 @@ async function run() {
     const repl = await MongoMemoryReplSet.create({ binary: { version: "7.0.14" }, replSet: { count: 1, storageEngine: "wiredTiger" } });
     try {
         await mongoose.connect(repl.getUri("aziel_pubg_cutover"), { autoIndex: true });
-        for (const Model of [Admin, Audit, Attempt, PackageSelection, StoreSelection, Mapping, Availability, Offer, Run, Package, Supplier]) await Model.syncIndexes();
+        for (const Model of [Admin, Audit, Attempt, PackageSelection, StoreSelection, Mapping, Availability, LatestCost, CostChange, Offer, SupplierProduct, Run, Package, Supplier]) await Model.syncIndexes();
         await seed();
+        const sixtyCode = PACKAGE_MIGRATIONS.find(item => item.offerCode === "60_uc").packageCode;
+        await Mapping.updateOne({ packageCode: sixtyCode, supplierProductCode: TARGET_PRODUCT_CODE }, { $set: { "supplierCostAuthority.verificationMode": "MANUAL_REVIEW", "supplierCostAuthority.ingestionRunId": null, "supplierCostAuthority.observedCostHash": "f".repeat(64) } });
+        const blockedDiagnosis = await service().diagnose();
+        assert.strictEqual(blockedDiagnosis.state, "BLOCKED");
+        assert(blockedDiagnosis.packages.find(value => value.packageCode === sixtyCode).blockers.some(value => value.code === "COST_AUTHORITY_INVALID"));
+        assert.strictEqual(blockedDiagnosis.packages.filter(value => value.blockers.length).length, 1, "diagnosis must continue through all six packages");
+        const recovery = createPubgMobileAutoCostRecoveryService({ clock: () => NOW, env: process.env });
+        const recoveryPlan = await recovery.inspect();
+        assert.strictEqual(recoveryPlan.state, "READY");
+        assert.strictEqual(recoveryPlan.summary.acceptable, 1, "only the invalid 60 UC authority should require re-attestation");
+        const recoveryOutcomes = await Promise.allSettled([
+            recovery.recover({ planHash: recoveryPlan.planHash, confirmed: true, confirmation: RECOVERY_CONFIRMATION }, actor),
+            recovery.recover({ planHash: recoveryPlan.planHash, confirmed: true, confirmation: RECOVERY_CONFIRMATION }, actor)
+        ]);
+        assert(recoveryOutcomes.some(value => value.status === "fulfilled"), "at least one concurrent recovery must complete");
+        assert.strictEqual(await CostChange.countDocuments({ canonicalPackageCode: sixtyCode, promotionMode: "AUTOMATIC_VERIFIED_API", warnings: "AUTHORITY_EVIDENCE_REATTESTED" }), 1);
+        const replayPlan = await recovery.inspect();
+        const recoveryReplay = await recovery.recover({ planHash: replayPlan.planHash, confirmed: true, confirmation: RECOVERY_CONFIRMATION }, actor);
+        assert.strictEqual(recoveryReplay.applied, false);
         const api = service(), plan = await api.preflight();
         assert.strictEqual(plan.state, "READY");
         const disabledPackageCode = PACKAGE_MIGRATIONS.find(item => item.offerCode === "1800_uc").packageCode;
@@ -163,12 +191,15 @@ async function run() {
         const staleTarget = await Offer.findOne({ supplierProductCode: TARGET_PRODUCT_CODE }).lean();
         await Availability.updateOne({ supplierCatalogOfferId: staleTarget._id }, { $set: { staleAt: NOW } });
         await assert.rejects(() => service().preflight(), error => error.code === "AVAILABILITY_NOT_CURRENT");
+        const staleRecovery = await createPubgMobileAutoCostRecoveryService({ clock: () => NOW, env: process.env }).inspect();
+        assert.strictEqual(staleRecovery.state, "BLOCKED");
+        assert(staleRecovery.decisions.some(value => value.code === "SUPPLIER_AVAILABILITY_NOT_CONFIRMED"));
 
-        console.log(JSON.stringify({ result: "PASS", mongoVersion: "7.0.14", isolatedReplicaSet: true, packages: 6, disabled1800UcPreserved: true, disabled1800UcPublicPurchasable: false, invalidExistingPriceBlocked: true, canonicalPackageIdsPreserved: true, atomicCutover: true, exactOnePrimary: true, storePresentationOrderPreserved: true, newOrderRoute: TARGET_PRODUCT_CODE, paidHistoricalRoute: SOURCE_PRODUCT_CODE, customerPricesUnchanged: true, historicalAttemptsUnchanged: true, transactionRollback: true, staleEvidenceBlocked: true, missingCostAuthorityBlocked: true, invalidContractBlocked: true, providerGateBlocked: true, stalePlanBlocked: true, cutoverIdempotent: true, rollbackIdempotent: true, auditsVerified: true, supplierCalls: 0, productionConnections: 0 }, null, 2));
+        console.log(JSON.stringify({ result: "PASS", mongoVersion: "7.0.14", isolatedReplicaSet: true, packages: 6, consolidatedSixPackageDiagnosis: true, verifiedCostAuthorityRecovery: true, sameAmountEvidenceReattestation: true, recoveryConcurrentSafe: true, recoveryIdempotent: true, recoveryStaleEvidenceBlocked: true, disabled1800UcPreserved: true, disabled1800UcPublicPurchasable: false, invalidExistingPriceBlocked: true, canonicalPackageIdsPreserved: true, atomicCutover: true, exactOnePrimary: true, storePresentationOrderPreserved: true, newOrderRoute: TARGET_PRODUCT_CODE, paidHistoricalRoute: SOURCE_PRODUCT_CODE, customerPricesUnchanged: true, historicalAttemptsUnchanged: true, transactionRollback: true, staleEvidenceBlocked: true, missingCostAuthorityBlocked: true, invalidContractBlocked: true, providerGateBlocked: true, stalePlanBlocked: true, cutoverIdempotent: true, rollbackIdempotent: true, auditsVerified: true, supplierCalls: 0, productionConnections: 0 }, null, 2));
     } finally {
         await mongoose.disconnect().catch(() => null);
         await repl.stop();
     }
 }
 
-run().catch(error => { console.error(error); process.exitCode = 1; });
+run().catch(error => { console.dir(error, { depth: 8 }); process.exitCode = 1; });

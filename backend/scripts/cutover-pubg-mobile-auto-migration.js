@@ -8,13 +8,17 @@ const {
     ROLLBACK_CONFIRMATION,
     createPubgMobileAutoCutoverService
 } = require("../services/supplierCatalog/pubgMobileAutoCutoverService");
+const {
+    CONFIRMATION: COST_RECOVERY_CONFIRMATION,
+    createPubgMobileAutoCostRecoveryService
+} = require("../services/supplierCatalog/pubgMobileAutoCostRecoveryService");
 
 const args = Object.fromEntries(process.argv.slice(2).map(value => {
     const [key, ...rest] = value.replace(/^--/, "").split("=");
     return [key, rest.join("=") || true];
 }));
 const mode = String(args.mode || "preflight").trim().toLowerCase();
-const mutations = new Set(["cutover", "rollback"]);
+const mutations = new Set(["cutover", "rollback", "recover-cost-authorities"]);
 
 function required(name) {
     const value = String(args[name] || "").trim();
@@ -40,17 +44,23 @@ function publicResult(value) {
 }
 
 async function run() {
-    if (!process.env.MONGODB_URI) throw new Error("MONGODB_URI is required.");
-    await mongoose.connect(process.env.MONGODB_URI, { autoIndex: false, readPreference: mutations.has(mode) ? "primary" : "secondaryPreferred" });
+    const mongoUri = process.env.MONGO_URI || process.env.MONGODB_URI;
+    if (!mongoUri) throw new Error("MONGO_URI is required.");
+    await mongoose.connect(mongoUri, { autoIndex: false, readPreference: mutations.has(mode) ? "primary" : "secondaryPreferred" });
     const service = createPubgMobileAutoCutoverService();
+    const recovery = createPubgMobileAutoCostRecoveryService();
     let result;
-    if (mode === "preflight") result = await service.preflight();
+    if (mode === "diagnose") result = await service.diagnose();
+    else if (mode === "preflight") result = await service.preflight();
+    else if (mode === "cost-recovery-preflight") result = await recovery.inspect();
+    else if (mode === "recover-cost-authorities") result = await recovery.recover({ planHash: required("plan-hash"), confirmed: args.confirm === COST_RECOVERY_CONFIRMATION, confirmation: args.confirm }, { adminId: required("owner-id"), username: required("owner-username"), role: "OWNER" });
     else if (mode === "verify") result = await service.verifyPostCutover({ planHash: required("plan-hash") });
     else if (mode === "rollback-preflight") result = await service.rollbackPreflight({ cutoverPlanHash: required("cutover-plan-hash") });
     else if (mode === "cutover") result = await service.cutover({ planHash: required("plan-hash"), confirmed: args.confirm === CUTOVER_CONFIRMATION, confirmation: args.confirm, requestId: required("request-id") }, { adminId: required("owner-id"), username: required("owner-username"), role: "OWNER" });
     else if (mode === "rollback") result = await service.rollback({ planHash: required("plan-hash"), cutoverPlanHash: required("cutover-plan-hash"), confirmed: args.confirm === ROLLBACK_CONFIRMATION, confirmation: args.confirm, requestId: required("request-id") }, { adminId: required("owner-id"), username: required("owner-username"), role: "OWNER" });
     else throw new Error(`Unsupported --mode=${mode}.`);
-    console.log(JSON.stringify({ result: "PASS", mode, readOnly: !mutations.has(mode), ...publicResult(result) }, null, 2));
+    const output = ["diagnose", "cost-recovery-preflight", "recover-cost-authorities"].includes(mode) ? result : publicResult(result);
+    console.log(JSON.stringify({ result: "PASS", mode, readOnly: !mutations.has(mode), ...output }, null, 2));
 }
 
 run().catch(error => {

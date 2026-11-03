@@ -182,6 +182,33 @@ function createPubgMobileAutoCutoverService(dependencies = {}) {
         return { state: mode === "TARGET_ACTIVE" ? "CUTOVER_COMPLETE" : "READY", planHash: sha256(manifest), manifest, ...state, rows };
     }
 
+    async function diagnose({ maximumObservationAgeMs = 24 * 60 * 60 * 1000 } = {}) {
+        fail(Number.isFinite(Number(maximumObservationAgeMs)) && Number(maximumObservationAgeMs) > 0 && Number(maximumObservationAgeMs) <= 24 * 60 * 60 * 1000, "OBSERVATION_AGE_INVALID", "Observation age must be positive and cannot exceed 24 hours.");
+        const state = await loadState(), rows = exactRows(state), now = clock(), adapter = adapterResolver(state.supplier), globalBlockers = [];
+        const capture = (target, fn) => { try { fn(); } catch (error) { target.push({ code: error.code || error.name || "VALIDATION_FAILED", message: error.message, details: error.details || {} }); } };
+        const mode = stateMode(rows, state);
+        if (mode === "CONFLICT") globalBlockers.push({ code: "CUTOVER_STATE_CONFLICT", message: "Mapping roles and selection authorities are inconsistent." });
+        if (!(adapter?.isConfigured?.() === true && adapter?.isAutoFulfillmentEnabled?.(PRODUCT_CODE) === true)) globalBlockers.push({ code: "PROVIDER_NOT_READY", message: "Configured enabled FazerCards automatic fulfillment is required." });
+        const reports = rows.map(row => {
+            const blockers = [];
+            if (!validExistingPrices(row)) blockers.push({ code: "CUSTOMER_PRICE_INVALID", message: "Valid existing THB and MMK prices are required." });
+            capture(blockers, () => assertCurrentEvidence(row, state, now, maximumObservationAgeMs));
+            const readiness = row.target.mappingMetadata?.readiness || {};
+            for (const flag of ["supplierMapped", "pricingReady", "inputReady", "validationReady", "fulfillmentReady"]) if (readiness[flag] !== true) blockers.push({ code: `TARGET_${flag.replace(/[A-Z]/g, value => `_${value}`).toUpperCase()}_MISSING`, message: `${flag} is not verified.` });
+            const contract = verifiedMappingContract(row.target), contractVerified = Boolean(contract && contract.supplierProductCode === TARGET_PRODUCT_CODE && contract.fields?.length === 1 && contract.fields[0].customerField === "playerId" && contract.fields[0].providerField === "player_id");
+            if (!contractVerified) blockers.push({ code: "TARGET_CONTRACT_INVALID", message: "Exact player_id contract is not verified." });
+            const assessment = assessMappingReadiness({ mode: READINESS_MODES.NEW_ORDER_SELECTABLE, mapping: { ...row.target, enabled: true, productionRole: "PRIMARY" }, supplier: state.supplier, offer: row.targetOffer, availability: row.targetAvailability, customerMarket: "TH", adapter });
+            if (!assessment.ready) blockers.push({ code: "TARGET_NOT_SELECTABLE", message: "Target route is not selectable.", details: { blockers: assessment.blockers } });
+            const controlledFulfillmentVerified = Boolean(contractVerified && state.successfulAttempts.some(value => id(value.supplierMappingId) === id(row.target) && clean(value.supplierRequest?.categoryId) === TARGET_PRODUCT_CODE && clean(value.supplierRequest?.offerId) === row.expected.offerCode && clean(value.supplierRequest?.inputContractFingerprint) === clean(contract.fingerprint) && Object.hasOwn(value.supplierRequest?.fields || {}, "player_id")));
+            if (!controlledFulfillmentVerified) blockers.push({ code: "CONTROLLED_FULFILLMENT_REQUIRED", message: "Successful exact-contract controlled fulfillment evidence is required." });
+            return { packageCode: row.expected.packageCode, canonicalPackageId: id(row.pkg), canonicalEnabled: row.pkg.enabled === true, sourceMappingId: id(row.source), targetMappingId: id(row.target), readiness, contractVerified, controlledFulfillmentVerified, targetAuthority: authoritySnapshot(row.target), offer: { id: id(row.targetOffer), productCode: row.targetOffer.supplierProductCode, offerCode: row.targetOffer.supplierOfferCode, costObservedAt: row.targetOffer.supplierCost?.observedAt || null }, availability: { state: row.targetAvailability.state, observedAt: row.targetAvailability.observedAt, ingestionRunId: id(row.targetAvailability.observationRunId) }, blockers };
+        });
+        const runIds = [...new Set(rows.map(row => id(row.targetAvailability.observationRunId)).filter(Boolean))];
+        if (runIds.length !== 1) globalBlockers.push({ code: "TARGET_RUN_MISMATCH", message: "All target evidence must use one completed ingestion run.", runIds });
+        const blockerCount = globalBlockers.length + reports.reduce((sum, row) => sum + row.blockers.length, 0);
+        return { state: blockerCount ? "BLOCKED" : mode === "TARGET_ACTIVE" ? "CUTOVER_COMPLETE" : "READY", mode, blockerCount, globalBlockers, packages: reports, safety: { canonicalWrites: 0, priceWrites: 0, orderWrites: 0, paymentWrites: 0, fulfillmentAttemptWrites: 0, supplierCalls: 0 } };
+    }
+
     async function verifyPostCutover({ planHash = "" } = {}, { session = null } = {}) {
         const state = await loadState({ session }), rows = exactRows(state);
         fail(stateMode(rows, state) === "TARGET_ACTIVE", "POST_CUTOVER_STATE_INVALID", "Target mappings are not the sole selected PRIMARY routes.");
@@ -286,7 +313,7 @@ function createPubgMobileAutoCutoverService(dependencies = {}) {
         return result;
     }
 
-    return Object.freeze({ preflight, cutover, verifyPostCutover, rollbackPreflight, rollback });
+    return Object.freeze({ diagnose, preflight, cutover, verifyPostCutover, rollbackPreflight, rollback });
 }
 
 module.exports = Object.freeze({ CUTOVER_OPERATION, CUTOVER_CONFIRMATION, ROLLBACK_OPERATION, ROLLBACK_CONFIRMATION, PubgMobileAutoCutoverError, createPubgMobileAutoCutoverService });
