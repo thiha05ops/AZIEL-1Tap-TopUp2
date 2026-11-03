@@ -61,6 +61,8 @@
     "verify:fazercards-catalog-ingestion": "node backend/scripts/verify-fazercards-catalog-ingestion.js",
     "verify:pubg-mobile-auto-migration": "node backend/scripts/verify-pubg-mobile-auto-migration.js",
     "verify:pubg-mobile-auto-migration-db": "node backend/scripts/verify-pubg-mobile-auto-migration-db.js",
+    "pubg-mobile-auto:cutover": "node backend/scripts/cutover-pubg-mobile-auto-migration.js",
+    "verify:pubg-mobile-auto-cutover-db": "node backend/scripts/verify-pubg-mobile-auto-cutover-db.js",
     "plan:pubg-mobile-auto-migration": "node backend/scripts/prepare-pubg-mobile-auto-migration.js",
     "verify:fazercards-catalog-zero-side-effects": "node backend/scripts/verify-fazercards-catalog-zero-side-effects.js",
     "dry-run:fazercards-catalog": "node backend/scripts/dry-run-fazercards-catalog.js",
