@@ -44,11 +44,11 @@ function pricingContext(region) {
     };
 }
 
-function promotionContext(region, currency) {
+function promotionContext(region, currency, discountValue = 1) {
     return {
         promotions: [{
             id: "promo-10", code: "TEST10", name: "Test 10", enabled: true, status: "ACTIVE",
-            promotionType: "PERCENTAGE_DISCOUNT", discountValue: 10, maximumDiscountAmount: 0,
+            promotionType: "PERCENTAGE_DISCOUNT", discountValue, maximumDiscountAmount: 0,
             minimumOrderAmount: 0, priority: 0, stackable: false, exclusive: true,
             requiresCoupon: true, couponCode: "TEST10", targeting: { regions: [region], currencies: [currency], packages: [], gameIds: [] },
             scopes: [{ scopeType: "REGION", scopeReference: region }]
@@ -59,12 +59,12 @@ function promotionContext(region, currency) {
     };
 }
 
-async function preview(region, promo = false) {
+async function preview(region, promo = false, discountValue = 1) {
     const currency = region === "TH" ? "THB" : "MMK";
     return resolveCommercePricingPreview({ productCode: "mlbb", packageCode: "MLBB_22", region, currency, promoCode: promo ? "TEST10" : "" }, {}, {
         loadCatalogPackage: async () => ({ pkg, price: { amount: region === "TH" ? 14.1 : 1689.9, currency, enabled: true, publishedPriceMode: "POLICY_DERIVED" }, productCode: "mlbb", packageCode: "MLBB_22", region, currency }),
         buildPricingContext: async () => pricingContext(region),
-        loadPromotionContext: async () => promotionContext(region, currency),
+        loadPromotionContext: async () => promotionContext(region, currency, discountValue),
         now: "2026-08-09T00:00:00.000Z",
         quoteId: `AZP-FIXTURE-${region}-${promo ? "PROMO" : "BASE"}`
     });
@@ -75,15 +75,14 @@ async function main() {
     assert.strictEqual(th.baseAmount, 15);
     assert.strictEqual(th.finalAmount, 15);
     const thPromo = await preview("TH", true);
-    assert.strictEqual(thPromo.discountAmount, 2, "display discount must reconcile whole-baht original and final prices");
-    assert.strictEqual(thPromo.finalAmount, 13, "10% promotion must run against precise 14.1 before whole-baht settlement");
+    assert.strictEqual(thPromo.discountAmount, 1, "display discount must reconcile whole-baht original and final prices");
+    assert.strictEqual(thPromo.finalAmount, 14, "a safe promotion must settle above the authoritative financial floor");
+    await assert.rejects(() => preview("TH", true, 10), error => error.code === "PROMOTION_FINANCIAL_FLOOR_VIOLATION", "a promotion settling below cost must fail closed");
 
     const mm = await preview("MM");
     assert.strictEqual(mm.baseAmount, 1703);
     assert.strictEqual(mm.finalAmount, 1703);
-    const mmPromo = await preview("MM", true);
-    assert.strictEqual(mmPromo.discountAmount, 170.3);
-    assert.strictEqual(mmPromo.finalAmount, 1533, "MMK customer settlement authority rounds the final payable amount to zero decimals");
+    await assert.rejects(() => preview("MM", true), error => error.code === "PROMOTION_FINANCIAL_FLOOR_VIOLATION", "a zero-margin MMK price must reject every discount that falls below cost");
 
     const tampered = await resolveCommercePricingPreview({
         productCode: "mlbb", packageCode: "MLBB_22", region: "TH", currency: "THB",

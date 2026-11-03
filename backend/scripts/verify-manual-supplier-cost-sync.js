@@ -35,7 +35,7 @@ async function main() {
     const service = createWeeklySupplierCostJobService({
         JobModel, ApprovalModel: { countDocuments: async () => 2 }, leases, ownerAuthorization,
         ingest: async input => { ingestions += 1; ingestionTriggers.push(input.trigger); equal(input.reconcileSellability, false, "manual ingestion cannot alter sellability"); return { runId: `run-${ingestions}` }; },
-        sync: { reconcile: async () => { reconciliations += 1; return { updated: 1, unchanged: 2, reviewRequired: 1, blocked: 1, warningCount: 0, rejected: 0, initialCandidateCount: 0 }; } },
+        sync: { reconcile: async input => { reconciliations += 1; equal(input.scope, "ALL_EXACT_MAPPINGS", "manual sync covers every eligible exact mapping"); return { updated: 1, unchanged: 2, reviewRequired: 1, blocked: 1, warningCount: 0, rejected: 0, initialCandidateCount: 0 }; } },
         policyReader: () => ({ enabled: false, manualEnabled: true, jobLeaseTtlMs: 60000, maximumObservationAgeMs: 1000, maximumAutomaticChangePercent: 20 }),
         clock: () => now, defer: fn => deferred.push(fn)
     });

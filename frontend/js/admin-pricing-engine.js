@@ -313,7 +313,10 @@
     }
 
     function statusView(row, preview, regionFilter = ["TH", "MM"]) {
-        if (row.previewEligible === false) return { status: "BLOCKED", reason: row.previewabilityReason || "Supplier cost is unavailable for preview", regions: [] };
+        if (row.previewEligible === false) {
+            const blockers = row.supplierCostBlockers || row.readinessReasons || [];
+            return { status: "BLOCKED", reason: row.previewabilityReason || "Supplier cost is unavailable for preview", regions: [], code: blockers[0]?.code || "SUPPLIER_COST_NOT_READY", blockerCodes: blockers.map(item => item.code) };
+        }
         if (!daily.edits.has(rowKey(row)) && row.previewSupplierCost == null && row.supplierCost == null && row.savedDraftSupplierCost == null) return { status: "MISSING", reason: "Supplier cost required", regions: [] };
         if (preview == null) {
             if (daily.previewError) return { status: "BLOCKED", reason: `Pricing preview unavailable: ${daily.previewError}`, regions: [], code: "PREVIEW_FAILED" };
@@ -459,7 +462,7 @@
                 <td><label class="pricing-cost-input"><input type="number" min="0.000001" step="0.000001" value="${value}" placeholder="${row.observedSupplierCost ?? ""}" data-supplier-cost="${key}" ${blocked ? `disabled title="${blocked}"` : ""}><span>${row.supplierCurrency || supplier?.supplierCurrency || "-"}</span></label><small>${row.observedSupplierCost != null ? `Observed ${row.observedSupplierCost} ${row.observedSupplierCurrency} · ${text(row.supplierCostAuthorityState || row.supplierCostStatus)}` : "Supplier catalog cost unavailable"}</small><small>${row.supplierCostDifferencePercent == null ? "" : `Cost change ${Number(row.supplierCostDifferencePercent).toFixed(2)}%`}</small><small>Draft recommendation · UNPUBLISHED</small></td>
                 <td>${profitControls}</td>
                 <td class="pricing-desktop-region">${regionalResult(row, preview, "TH")}</td><td class="pricing-desktop-region">${regionalResult(row, preview, "MM")}</td>
-                <td><span class="pricing-status is-${displayStatus.toLowerCase()}">${displayStatus}</span><small>${view.reason}</small><small>${row.storeCatalogStatus === "SELECTED" ? "In Store Catalog" : "Not in Store Catalog"}</small></td>
+                <td><span class="pricing-status is-${displayStatus.toLowerCase()}">${displayStatus}</span><small>${view.code ? `${text(view.code)} · ` : ""}${view.reason}</small><small>${row.storeCatalogStatus === "SELECTED" ? "In Store Catalog" : "Not in Store Catalog"}</small></td>
                 <td>${reviewCostAction}<button class="admin-secondary-btn" type="button" data-publish-package="${key}" ${selectionEligible ? "" : "disabled"}>Publish</button></td>
             </tr>`;
         }).join("");

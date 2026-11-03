@@ -144,13 +144,14 @@ async function main() {
 
     const currentMapping = { ...mapping, supplierCostAuthority: { ...mapping.supplierCostAuthority, capturedAt: new Date(), observedAt: new Date(), providerProductCode: mapping.supplierProductCode, providerOfferCode: mapping.supplierPackageCode, ingestionRunId: observation.ingestionRunId, rawSnapshotHash: "a".repeat(64), observedCostHash: "b".repeat(64), verificationMode: "AUTOMATIC_VERIFIED_API" } };
     const authority = workspaceSupplierCostState(currentMapping, offer.supplierCost);
-    equal(authority.status, "REVIEW_REQUIRED");
-    equal(authority.previewSupplierCost, 1, "promoted authority drives internal preview");
+    equal(authority.status, "INVALID_AUTHORITY");
+    equal(authority.previewSupplierCost, null, "automatic authority requires matching validated latest evidence");
     equal(workspaceSupplierCostState({ supplierCostAuthority: {} }, offer.supplierCost).previewSupplierCost, null, "unpromoted catalog observation cannot drive preview");
     equal(workspaceSupplierCostState({ ...currentMapping, supplierCostAuthority: { ...currentMapping.supplierCostAuthority, capturedAt: new Date(0), observedAt: new Date(0) } }, offer.supplierCost).previewSupplierCost, null, "stale authority cannot drive preview");
     equal(workspaceSupplierCostState({ ...currentMapping, supplierCostAuthority: {}, mappingMetadata: { supplierCost: { rawSupplierCost: 99, supplierCurrency: "USD" } } }, offer.supplierCost).previewSupplierCost, null, "legacy mapping metadata cannot drive preview");
     equal(workspaceSupplierCostState({ supplierCostAuthority: { rawSupplierCost: null } }, null).approvedSupplierCost, null, "missing authority never becomes a zero-cost fallback");
-    equal(workspaceSupplierCostState(currentMapping, { ...offer.supplierCost, amount: 1 }).status, "AUTHORITATIVE");
+    const exactLatest = { ...offer.supplierCost, amount: 1, ingestionRunId: observation.ingestionRunId, rawSnapshotHash: currentMapping.supplierCostAuthority.rawSnapshotHash, observedCostHash: currentMapping.supplierCostAuthority.observedCostHash };
+    equal(workspaceSupplierCostState(currentMapping, exactLatest).status, "AUTHORITATIVE");
 
     let inFlight = 0, maximumInFlight = 0;
     const concurrentStage = await fazer.stageCatalog({

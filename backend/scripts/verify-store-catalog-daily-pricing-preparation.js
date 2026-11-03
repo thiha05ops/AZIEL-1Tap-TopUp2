@@ -46,9 +46,9 @@ assert.deepStrictEqual(canonicalPricingRegions(product, { ...packages[1], delete
 mappings.forEach((mapping, index) => {
     const state = workspaceSupplierCostState(mapping, { amount: observed[index], currency: "USD" });
     assert.strictEqual(state.approvedSupplierCost, null);
-    assert.strictEqual(state.previewSupplierCost, observed[index]);
+    assert.strictEqual(state.previewSupplierCost, null);
     assert.strictEqual(state.provisional, false);
-    assert.strictEqual(state.status, "COST_READY");
+    assert(state.blockerCodes.includes("SUPPLIER_COST_AUTHORITY_MISSING"));
     assert.strictEqual(mapping.supplierCostAuthority.rawSupplierCost, null, "Preparation must not approve observed cost.");
     const blockers = storePublicationReadinessReasons({ mapping, pkg: packages[index], selections: [selection], regions: ["TH"] });
     assert(blockers.some(item => item.code === "SUPPLIER_MAPPING_DISABLED"), "Disabled mapping must remain publication-blocking.");
@@ -72,11 +72,11 @@ assert(preparationSource.includes("deletedAt: null"), "Deleted canonical package
 assert(preparationSource.includes('SupplierProductMapping.find({ supplierId: selected.id, archivedAt: null })'), "Supplier mappings must be Daily Pricing inventory authority.");
 assert(preparationSource.includes('pricingTargetRegions("ALL")'), "Every pricing row must prepare TH and MM together.");
 assert(!preparationSource.includes("storeSelectionScoped"), "Store Catalog selection must not scope pricing inventory.");
-assert(preparationSource.includes("SUPPLIER_CATALOG_COST_REQUIRED"));
+assert(preparationSource.includes("costState.blockers"));
 assert(!preparationSource.includes("PackageMarketPublication"), "Workspace preparation must not mutate publication authority.");
 assert(frontend.includes("previewSupplierCost") && !frontend.includes("provisional preview only"));
-assert(frontend.includes("row.previewSupplierCost == null"), "Observed-cost candidates must not be mislabeled as missing cost.");
-assert(frontend.includes("Supplier catalog:"));
+assert(frontend.includes("row.previewSupplierCost == null"), "Missing verified authority must remain unavailable for preview.");
+assert(frontend.includes("supplierCostBlockers") && frontend.includes("view.code"), "Admin must display structured supplier-cost blockers.");
 assert(catalog.includes("explicitPublishedPackages") && catalog.includes("applyPublicPackageEligibility"), "Public catalog gates must remain independent and fail closed.");
 
 console.log(JSON.stringify({
@@ -85,9 +85,9 @@ console.log(JSON.stringify({
     visiblePreparationRows: { TH: 3, MM: 3 },
     disabledPackagesRetainedForPreparation: 2,
     deletedPackagesAllowed: 0,
-    supplierCatalogCostsUsable: 3,
+    supplierCatalogCostsUsable: 0,
     approvedCostsWritten: 0,
-    costReviewRequired: 0,
+    costReviewRequired: 3,
     publishableProvisionalRows: 0,
     publicCatalogMutations: 0,
     packagePublicationMutations: 0,

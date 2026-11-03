@@ -70,6 +70,13 @@ function createRepositories(models = {}, options = {}) {
     const evidencePolicy = options.evidencePolicy || readSupplierCostEvidencePolicy(), evidence = options.evidenceRepositories || createSupplierCostEvidenceRepositories(models.evidenceModels || {}), latestCosts = options.latestCostService || createSupplierLatestCostService(models.latestCostModels || {});
     return {
         selections: () => Selection.find({ customerMarket: "GLOBAL" }).lean(),
+        exactMappings: supplierId => Mapping.find({
+            supplierId,
+            archivedAt: null,
+            supplierCatalogOfferId: { $ne: null },
+            supplierProductCode: { $nin: [null, ""] },
+            supplierPackageCode: { $nin: [null, ""] }
+        }).lean(),
         mappings: ids => Mapping.find({ _id: { $in: ids }, archivedAt: null }).lean(),
         offers: ids => Offer.find({ _id: { $in: ids } }).lean(),
         availability: ids => Availability.find({ supplierCatalogOfferId: { $in: ids } }).lean(),
@@ -123,18 +130,40 @@ function validateCandidate({ selection, mapping, offer, observation, availabilit
     const comparison = compareSupplierCost(offer.supplierCost, mapping.supplierCostAuthority);
     if (comparison.state === "CURRENCY_MISMATCH") return result(selection, "REVIEW_REQUIRED", "CURRENCY_MISMATCH", { comparison });
     if (comparison.state === "INVALID_OBSERVATION" || comparison.state === "UNCOMPARABLE") return result(selection, "REJECTED", comparison.state, { comparison });
-    const authority = mapping.supplierCostAuthority || {}, exactAutomaticAuthority = upper(authority.verificationMode) === "AUTOMATIC_VERIFIED_API" && id(authority.ingestionRunId) === id(ingestionRunId) && authority.providerProductCode === mapping.supplierProductCode && authority.providerOfferCode === mapping.supplierPackageCode && String(authority.rawSnapshotHash || "") === String(offer.rawSnapshotHash || "") && String(authority.observedCostHash || "") === observedCostHash(offer) && new Date(authority.observedAt).getTime() === observedAt.getTime();
-    if (comparison.state === "MATCH" && exactAutomaticAuthority) return result(selection, "UNCHANGED", "COST_AUTHORITY_CURRENT", { comparison, observation, mapping, offer, initialAuthority: false });
+    if (comparison.state === "MATCH" && automaticAuthorityMatchesRun(mapping, offer, observation, ingestionRunId)) return result(selection, "UNCHANGED", "COST_AUTHORITY_CURRENT", { comparison, observation, mapping, offer, initialAuthority: false });
     if (comparison.state === "MATCH") return result(selection, "ACCEPTABLE", "COST_AUTHORITY_REATTESTATION_REQUIRED", { comparison, observation, mapping, offer, availability, warnings: ["AUTHORITY_EVIDENCE_REATTESTED"], initialAuthority: false });
     const warnings = comparison.comparable && Math.abs(Number(comparison.percentageDelta)) > maximumAutomaticChangePercent ? ["LARGE_COST_MOVEMENT"] : [];
     return result(selection, "ACCEPTABLE", hasAuthority(mapping) ? "FRESH_EXACT_SELECTED_COST" : "FRESH_EXACT_INITIAL_COST", { comparison, observation, mapping, offer, availability, warnings, initialAuthority: !hasAuthority(mapping) });
 }
 
+function automaticAuthorityMatchesRun(mapping, offer, observation, ingestionRunId) {
+    const authority = mapping?.supplierCostAuthority || {};
+    const authoritySnapshotHash = String(authority.rawSnapshotHash || "").toLowerCase();
+    const observationSnapshotHash = String(observation?.rawSnapshotHash || "").toLowerCase();
+    const offerSnapshotHash = String(offer?.rawSnapshotHash || "").toLowerCase();
+    return upper(authority.verificationMode) === "AUTOMATIC_VERIFIED_API" &&
+        id(authority.ingestionRunId) === id(ingestionRunId) &&
+        authority.providerProductCode === mapping.supplierProductCode &&
+        authority.providerOfferCode === mapping.supplierPackageCode &&
+        Boolean(authoritySnapshotHash) &&
+        authoritySnapshotHash === (observationSnapshotHash || offerSnapshotHash) &&
+        (!observationSnapshotHash || !offerSnapshotHash || observationSnapshotHash === offerSnapshotHash) &&
+        String(authority.observedCostHash || "").toLowerCase() === observedCostHash(offer) &&
+        new Date(authority.observedAt).getTime() === new Date(observation?.observedAt).getTime();
+}
+
 function createWeeklySupplierCostSyncService(options = {}) {
     const repos = options.repositories || createRepositories(options.models), promoter = options.promoter || promoteObservedCost, clock = options.clock || (() => new Date());
-    async function reconcile({ supplierCode, ingestionRunId = "", dryRun = false, prepare = false, initialOnly = false, approvalHash = "", policy, actor, assertLease = async () => true }) {
+    async function reconcile({ supplierCode, ingestionRunId = "", dryRun = false, prepare = false, initialOnly = false, approvalHash = "", scope = "SELECTED", policy, actor, assertLease = async () => true }) {
         const expectedSupplier = await repos.supplier(upper(supplierCode));
-        const selections = await repos.selections(), mappings = await repos.mappings(selections.map(row => row.supplierMappingId));
+        const selected = await repos.selections();
+        const exactMappings = scope === "ALL_EXACT_MAPPINGS" && expectedSupplier && repos.exactMappings
+            ? await repos.exactMappings(expectedSupplier._id)
+            : null;
+        const selections = exactMappings
+            ? exactMappings.map(mapping => ({ productCode: mapping.productCode, packageCode: mapping.packageCode, supplierMappingId: mapping._id, customerMarket: "GLOBAL" }))
+            : selected;
+        const mappings = exactMappings || await repos.mappings(selections.map(row => row.supplierMappingId));
         const allMappingMap = new Map(mappings.map(row => [id(row._id), row]));
         const scopedSelections = selections.filter(selection => { const mapping = allMappingMap.get(id(selection.supplierMappingId)); return !mapping || upper(mapping.supplierCode) === upper(supplierCode); });
         const offers = await repos.offers(scopedSelections.map(row => allMappingMap.get(id(row.supplierMappingId))?.supplierCatalogOfferId).filter(Boolean));
@@ -161,4 +190,4 @@ function createWeeklySupplierCostSyncService(options = {}) {
     return Object.freeze({ reconcile });
 }
 
-module.exports = Object.freeze({ createRepositories, validateLegacyRunEvidence, validateCandidate, immutableCandidate, candidateSnapshot, manifestHash, exactCandidate, createWeeklySupplierCostSyncService });
+module.exports = Object.freeze({ createRepositories, validateLegacyRunEvidence, validateCandidate, automaticAuthorityMatchesRun, immutableCandidate, candidateSnapshot, manifestHash, exactCandidate, createWeeklySupplierCostSyncService });
