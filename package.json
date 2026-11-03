@@ -357,6 +357,7 @@
     "verify:daily-pricing-workspace": "node backend/scripts/verify-daily-pricing-workspace.js",
     "verify:daily-pricing-supplier-cost-flow": "node backend/scripts/verify-daily-pricing-supplier-cost-flow.js",
     "verify:unified-sales-publication": "node backend/scripts/verify-unified-sales-publication.js",
+    "verify:owner-package-availability-boundary": "node backend/scripts/verify-owner-package-availability-boundary.js",
     "audit:supplier-charge-reconciliation": "node backend/scripts/audit-supplier-charge-reconciliation.js --read-only",
     "verify:daily-pricing-selective-publish": "node backend/scripts/verify-daily-pricing-selective-publish.js",
     "verify:daily-pricing-authority": "node backend/scripts/verify-daily-pricing-supplier-region-authority.js",

@@ -4274,7 +4274,7 @@ async function togglePackageAvailability(product, pkg) {
     const confirmed = await confirmCatalogAction({
         title: adminT(nextEnabled ? "enable_package" : "disable_package", nextEnabled ? "Enable Package" : "Disable Package"),
         message: nextEnabled
-            ? adminT("enable_package_message", "New purchases for this package will be allowed.")
+            ? adminT("enable_package_message", "This enables the canonical package for Admin pricing. Customer purchases still require a verified supplier route and explicit Publish.")
             : adminT("disable_package_message", "New purchases for this package will be blocked."),
         confirmText: adminT(nextEnabled ? "enable_package" : "disable_package", nextEnabled ? "Enable Package" : "Disable Package"),
         danger: !nextEnabled
