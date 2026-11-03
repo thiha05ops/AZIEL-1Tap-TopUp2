@@ -18,6 +18,7 @@ const Mapping = require("../models/SupplierProductMapping");
 const { observedCostHash } = require("../services/supplierCatalog/supplierCostComparisonService");
 const { contractFingerprint } = require("../services/suppliers/fazercardsFulfillmentContractService");
 const { selectedRouteSnapshot } = require("../services/supplierProductionSelectionService");
+const { assessMappingReadiness, READINESS_MODES } = require("../services/supplierMappingReadinessService");
 const { ensurePaidOrderFulfillmentWork } = require("../services/paidFulfillmentRoutingService");
 const {
     PRODUCT_CODE, SOURCE_PRODUCT_CODE, TARGET_PRODUCT_CODE, NAMESPACE, PACKAGE_MIGRATIONS
@@ -52,7 +53,7 @@ async function seed() {
     const storePackages = [];
     for (let index = 0; index < PACKAGE_MIGRATIONS.length; index += 1) {
         const item = PACKAGE_MIGRATIONS[index], sourceOfferId = new mongoose.Types.ObjectId(), targetOfferId = new mongoose.Types.ObjectId(), sourceId = new mongoose.Types.ObjectId(), targetId = new mongoose.Types.ObjectId();
-        await Package.collection.insertOne({ productCode: PRODUCT_CODE, packageCode: item.packageCode, name: item.name, enabled: true, deletedAt: null, prices: { TH: { amount: 100 + index, currency: "THB", enabled: true }, MM: { amount: 5000 + index, currency: "MMK", enabled: true } }, createdAt: NOW, updatedAt: NOW });
+        await Package.collection.insertOne({ productCode: PRODUCT_CODE, packageCode: item.packageCode, name: item.name, enabled: item.offerCode !== "1800_uc", deletedAt: null, prices: { TH: { amount: 100 + index, currency: "THB", enabled: true }, MM: { amount: 5000 + index, currency: "MMK", enabled: true } }, createdAt: NOW, updatedAt: NOW });
         for (const [offerId, productCode, amount, hashChar] of [[sourceOfferId, SOURCE_PRODUCT_CODE, 10 + index, "a"], [targetOfferId, TARGET_PRODUCT_CODE, 9 + index, "b"]]) {
             const offer = { _id: offerId, supplierCatalogProductId: productId, supplierId, catalogNamespace: NAMESPACE, supplierProductCode: productCode, supplierOfferCode: item.offerCode, supplierOfferName: item.name, supplierCost: { amount, currency: "USD", observedAt: NOW }, catalogLifecycleState: "ACTIVE", reconciliationState: "EXACT_CANONICAL_MATCH", firstSeenAt: NOW, lastSeenAt: NOW, lastObservedAt: NOW, lastChangedAt: NOW, rawSnapshotHash: hashChar.repeat(64), rawSnapshot: {}, createdAt: NOW, updatedAt: NOW };
             await Offer.collection.insertOne(offer);
@@ -75,22 +76,26 @@ function service(env = { PUBG_MOBILE_AUTO_CUTOVER_ENABLED: "true", PUBG_MOBILE_A
 }
 
 async function run() {
-    const repl = await MongoMemoryReplSet.create({ replSet: { count: 1, storageEngine: "wiredTiger" } });
+    const repl = await MongoMemoryReplSet.create({ binary: { version: "7.0.14" }, replSet: { count: 1, storageEngine: "wiredTiger" } });
     try {
         await mongoose.connect(repl.getUri("aziel_pubg_cutover"), { autoIndex: true });
         for (const Model of [Admin, Audit, Attempt, PackageSelection, StoreSelection, Mapping, Availability, Offer, Run, Package, Supplier]) await Model.syncIndexes();
         await seed();
         const api = service(), plan = await api.preflight();
         assert.strictEqual(plan.state, "READY");
+        const disabledPackageCode = PACKAGE_MIGRATIONS.find(item => item.offerCode === "1800_uc").packageCode;
+        const disabledBefore = await Package.findOne({ packageCode: disabledPackageCode }).lean();
+        assert.strictEqual(disabledBefore.enabled, false, "1800 UC fixture must be intentionally disabled");
         const storeOrder = plan.storeSelection.packages.map(value => value.packageCode);
-        const packagePrices = JSON.stringify((await Package.find().sort({ packageCode: 1 }).lean()).map(value => value.prices));
+        const packageState = JSON.stringify((await Package.find().sort({ packageCode: 1 }).lean()).map(value => ({ id: String(value._id), packageCode: value.packageCode, enabled: value.enabled, prices: value.prices })));
         const attemptCount = await Attempt.countDocuments();
         const oldMapping = plan.rows[0].source, oldSelection = plan.rows[0].packageSelection;
         const oldFrozenRoute = selectedRouteSnapshot(oldMapping, oldSelection, "TH");
         const result = await api.cutover(cutoverInput(plan), actor);
         assert(result.applied && result.primaryCounts.every(value => value === 1));
-        assert.strictEqual(await Audit.countDocuments({ action: CUTOVER_OPERATION }), 1);
-        assert.strictEqual(JSON.stringify((await Package.find().sort({ packageCode: 1 }).lean()).map(value => value.prices)), packagePrices, "customer prices changed");
+        const cutoverAudit = await Audit.findOne({ action: CUTOVER_OPERATION }).lean();
+        assert(cutoverAudit && cutoverAudit.metadata.packages.find(value => value.packageCode === disabledPackageCode)?.enabled === false, "audit must preserve the disabled package decision");
+        assert.strictEqual(JSON.stringify((await Package.find().sort({ packageCode: 1 }).lean()).map(value => ({ id: String(value._id), packageCode: value.packageCode, enabled: value.enabled, prices: value.prices }))), packageState, "canonical package identity, enabled state, or prices changed");
         assert.strictEqual(await Attempt.countDocuments(), attemptCount, "historical attempts changed");
         assert.strictEqual(await Mapping.countDocuments({ supplierProductCode: SOURCE_PRODUCT_CODE, enabled: true, productionRole: "DISABLED" }), 6, "old frozen routes must remain executable");
         assert.strictEqual(await Mapping.countDocuments({ supplierProductCode: TARGET_PRODUCT_CODE, enabled: true, productionRole: "PRIMARY" }), 6);
@@ -99,6 +104,12 @@ async function run() {
         const target = await Mapping.findById(selected.supplierMappingId).lean();
         const newRoute = selectedRouteSnapshot(target, selected, "TH");
         assert.strictEqual(newRoute.supplierProductCode, TARGET_PRODUCT_CODE, "new orders must select auto");
+        const disabledTarget = await Mapping.findOne({ packageCode: disabledPackageCode, supplierProductCode: TARGET_PRODUCT_CODE }).lean();
+        const disabledTargetOffer = await Offer.findById(disabledTarget.supplierCatalogOfferId).lean();
+        const disabledAvailability = await Availability.findOne({ supplierCatalogOfferId: disabledTargetOffer._id }).lean();
+        const disabledAssessment = assessMappingReadiness({ mode: READINESS_MODES.PUBLIC_PURCHASABLE, mapping: disabledTarget, supplier: plan.supplier, offer: disabledTargetOffer, availability: disabledAvailability, customerMarket: "TH", adapter, pkg: disabledBefore, publication: { published: true } });
+        assert.strictEqual(disabledAssessment.ready, false);
+        assert(disabledAssessment.blockers.includes("PACKAGE_NOT_PUBLIC_READY"), "disabled 1800 UC must remain unavailable for new purchases");
         let historicalStarts = 0;
         const paid = await ensurePaidOrderFulfillmentWork({ _id: new mongoose.Types.ObjectId(), orderId: "AZL-OLD-PAID", status: "paid", paymentStatus: "paid", product: { gameCode: PRODUCT_CODE, packageCode: oldMapping.packageCode }, commercial: { region: "TH" }, fulfilment: { routeSnapshot: oldFrozenRoute } }, { findAttemptByIdempotency: async () => null, startSupplierFulfillment: async (_orderId, payload) => { historicalStarts += 1; assert.strictEqual(String(payload.mappingId), String(oldMapping._id)); return { fulfillmentId: "FUL-OLD" }; } });
         assert.strictEqual(paid.reason, "SUPPLIER_FULFILLMENT_STARTED");
@@ -111,11 +122,16 @@ async function run() {
         assert.strictEqual(rollbackPlan.state, "READY");
         const rolledBack = await api.rollback(rollbackInput(rollbackPlan, plan.planHash), actor);
         assert(rolledBack.applied);
+        assert.strictEqual(JSON.stringify((await Package.find().sort({ packageCode: 1 }).lean()).map(value => ({ id: String(value._id), packageCode: value.packageCode, enabled: value.enabled, prices: value.prices }))), packageState, "rollback changed canonical package identity, enabled state, or prices");
         assert.strictEqual(await Mapping.countDocuments({ supplierProductCode: SOURCE_PRODUCT_CODE, productionRole: "PRIMARY" }), 6);
         assert.strictEqual(await Mapping.countDocuments({ supplierProductCode: TARGET_PRODUCT_CODE, enabled: true, productionRole: "DISABLED" }), 6, "target frozen routes must survive rollback");
         const rollbackReplay = await api.rollback(rollbackInput(rollbackPlan, plan.planHash), actor);
         assert.strictEqual(rollbackReplay.idempotentReplay, true);
         assert.strictEqual(await Audit.countDocuments({ action: ROLLBACK_OPERATION }), 1);
+
+        await seed();
+        await Package.updateOne({ packageCode: disabledPackageCode }, { $set: { "prices.MM.amount": 0 } });
+        await assert.rejects(() => service().preflight(), error => error.code === "CUSTOMER_PRICE_INVALID");
 
         await seed();
         const failureApi = service(), failurePlan = await failureApi.preflight(), originalCreate = Audit.create;
@@ -148,7 +164,7 @@ async function run() {
         await Availability.updateOne({ supplierCatalogOfferId: staleTarget._id }, { $set: { staleAt: NOW } });
         await assert.rejects(() => service().preflight(), error => error.code === "AVAILABILITY_NOT_CURRENT");
 
-        console.log(JSON.stringify({ result: "PASS", isolatedReplicaSet: true, packages: 6, atomicCutover: true, exactOnePrimary: true, storePresentationOrderPreserved: true, newOrderRoute: TARGET_PRODUCT_CODE, paidHistoricalRoute: SOURCE_PRODUCT_CODE, customerPricesUnchanged: true, historicalAttemptsUnchanged: true, transactionRollback: true, staleEvidenceBlocked: true, missingCostAuthorityBlocked: true, invalidContractBlocked: true, providerGateBlocked: true, stalePlanBlocked: true, cutoverIdempotent: true, rollbackIdempotent: true, auditsVerified: true, supplierCalls: 0, productionConnections: 0 }, null, 2));
+        console.log(JSON.stringify({ result: "PASS", mongoVersion: "7.0.14", isolatedReplicaSet: true, packages: 6, disabled1800UcPreserved: true, disabled1800UcPublicPurchasable: false, invalidExistingPriceBlocked: true, canonicalPackageIdsPreserved: true, atomicCutover: true, exactOnePrimary: true, storePresentationOrderPreserved: true, newOrderRoute: TARGET_PRODUCT_CODE, paidHistoricalRoute: SOURCE_PRODUCT_CODE, customerPricesUnchanged: true, historicalAttemptsUnchanged: true, transactionRollback: true, staleEvidenceBlocked: true, missingCostAuthorityBlocked: true, invalidContractBlocked: true, providerGateBlocked: true, stalePlanBlocked: true, cutoverIdempotent: true, rollbackIdempotent: true, auditsVerified: true, supplierCalls: 0, productionConnections: 0 }, null, 2));
     } finally {
         await mongoose.disconnect().catch(() => null);
         await repl.stop();

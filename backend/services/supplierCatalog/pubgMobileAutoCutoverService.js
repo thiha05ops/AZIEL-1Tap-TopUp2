@@ -43,6 +43,18 @@ const authoritySnapshot = mapping => {
     const value = mapping?.supplierCostAuthority || {};
     return { amount: value.rawSupplierCost ?? null, currency: upper(value.supplierCurrency), capturedAt: value.capturedAt || null, observedAt: value.observedAt || null, providerProductCode: clean(value.providerProductCode), providerOfferCode: clean(value.providerOfferCode), ingestionRunId: id(value.ingestionRunId), rawSnapshotHash: clean(value.rawSnapshotHash), observedCostHash: clean(value.observedCostHash), verificationMode: upper(value.verificationMode) };
 };
+const packageSnapshot = row => ({
+    id: id(row.pkg),
+    packageCode: row.expected.packageCode,
+    enabled: row.pkg.enabled === true,
+    TH: { amount: row.pkg.prices?.TH?.amount, currency: upper(row.pkg.prices?.TH?.currency), enabled: row.pkg.prices?.TH?.enabled === true },
+    MM: { amount: row.pkg.prices?.MM?.amount, currency: upper(row.pkg.prices?.MM?.currency), enabled: row.pkg.prices?.MM?.enabled === true }
+});
+const validExistingPrices = row => {
+    const snapshot = packageSnapshot(row);
+    return snapshot.TH.enabled && Number.isFinite(Number(snapshot.TH.amount)) && Number(snapshot.TH.amount) > 0 && snapshot.TH.currency === "THB" &&
+        snapshot.MM.enabled && Number.isFinite(Number(snapshot.MM.amount)) && Number(snapshot.MM.amount) > 0 && snapshot.MM.currency === "MMK";
+};
 
 function createPubgMobileAutoCutoverService(dependencies = {}) {
     const M = {
@@ -160,12 +172,13 @@ function createPubgMobileAutoCutoverService(dependencies = {}) {
         fail(mode !== "CONFLICT", "CUTOVER_STATE_CONFLICT", "Mapping roles and selection authorities are inconsistent.");
         const adapter = adapterResolver(state.supplier);
         fail(adapter?.isConfigured?.() === true && adapter?.isAutoFulfillmentEnabled?.(PRODUCT_CODE) === true, "PROVIDER_NOT_READY", "Configured enabled FazerCards automatic fulfillment is required.");
-        const prices = rows.map(row => ({ packageCode: row.expected.packageCode, TH: row.pkg.prices?.TH?.amount, MM: row.pkg.prices?.MM?.amount }));
-        fail(rows.every(row => row.pkg.enabled === true && row.pkg.prices?.TH?.enabled === true && Number(row.pkg.prices.TH.amount) > 0 && row.pkg.prices?.MM?.enabled === true && Number(row.pkg.prices.MM.amount) > 0), "CUSTOMER_PRICE_INVALID", "Published THB and MMK prices are required for all six packages.");
+        const packages = rows.map(packageSnapshot);
+        const prices = packages.map(value => ({ packageCode: value.packageCode, TH: value.TH.amount, MM: value.MM.amount }));
+        fail(rows.every(validExistingPrices), "CUSTOMER_PRICE_INVALID", "Valid existing THB and MMK prices are required for all six packages.");
         const targetRuns = rows.map(row => assertCurrentEvidence(row, state, now, maximumObservationAgeMs));
         fail(new Set(targetRuns.map(id)).size === 1, "TARGET_RUN_MISMATCH", "All target evidence must use one completed ingestion run.");
         rows.forEach(row => assertProviderReady(row, state, adapter));
-        const manifest = { schemaVersion: 1, operation: CUTOVER_OPERATION, productCode: PRODUCT_CODE, supplierId: id(state.supplier), mode, storeSelection: { id: id(state.storeSelection), decisionVersion: Number(state.storeSelection.decisionVersion), updatedAt: new Date(state.storeSelection.updatedAt).toISOString() }, prices, rows: rows.map(row => ({ packageCode: row.expected.packageCode, source: { id: id(row.source), updatedAt: new Date(row.source.updatedAt).toISOString(), version: Number(row.source.__v || 0) }, target: { id: id(row.target), updatedAt: new Date(row.target.updatedAt).toISOString(), version: Number(row.target.__v || 0), authority: authoritySnapshot(row.target), offerHash: row.targetOffer.rawSnapshotHash, availabilityObservedAt: new Date(row.targetAvailability.observedAt).toISOString() }, packageSelection: { id: id(row.packageSelection), decisionVersion: Number(row.packageSelection.decisionVersion), updatedAt: new Date(row.packageSelection.updatedAt).toISOString() } })) };
+        const manifest = { schemaVersion: 1, operation: CUTOVER_OPERATION, productCode: PRODUCT_CODE, supplierId: id(state.supplier), mode, storeSelection: { id: id(state.storeSelection), decisionVersion: Number(state.storeSelection.decisionVersion), updatedAt: new Date(state.storeSelection.updatedAt).toISOString() }, prices, packages, rows: rows.map(row => ({ packageCode: row.expected.packageCode, source: { id: id(row.source), updatedAt: new Date(row.source.updatedAt).toISOString(), version: Number(row.source.__v || 0) }, target: { id: id(row.target), updatedAt: new Date(row.target.updatedAt).toISOString(), version: Number(row.target.__v || 0), authority: authoritySnapshot(row.target), offerHash: row.targetOffer.rawSnapshotHash, availabilityObservedAt: new Date(row.targetAvailability.observedAt).toISOString() }, packageSelection: { id: id(row.packageSelection), decisionVersion: Number(row.packageSelection.decisionVersion), updatedAt: new Date(row.packageSelection.updatedAt).toISOString() } })) };
         return { state: mode === "TARGET_ACTIVE" ? "CUTOVER_COMPLETE" : "READY", planHash: sha256(manifest), manifest, ...state, rows };
     }
 
@@ -176,8 +189,8 @@ function createPubgMobileAutoCutoverService(dependencies = {}) {
         fail(primaryCounts.every(value => value === 1), "PRIMARY_CARDINALITY_INVALID", "Each package must have exactly one PRIMARY mapping.");
         const audit = await query(M.Audit.findOne({ action: CUTOVER_OPERATION, "metadata.planHash": clean(planHash) }), session).lean();
         fail(audit, "CUTOVER_AUDIT_MISSING", "Mandatory cutover audit is missing.");
-        const currentPrices = rows.map(row => ({ packageCode: row.expected.packageCode, TH: row.pkg.prices?.TH?.amount, MM: row.pkg.prices?.MM?.amount }));
-        fail(canonicalJson(currentPrices) === canonicalJson(audit.metadata?.prices), "SELLING_PRICE_CHANGED", "Customer selling prices changed after cutover.");
+        const currentPackages = rows.map(packageSnapshot);
+        fail(canonicalJson(currentPackages) === canonicalJson(audit.metadata?.packages), "CANONICAL_PACKAGE_CHANGED", "Canonical package identity, availability, or selling prices changed after cutover.");
         fail(canonicalJson(rows.map(row => id(row.source))) === canonicalJson(audit.metadata?.sourceMappingIds) && canonicalJson(rows.map(row => id(row.target))) === canonicalJson(audit.metadata?.targetMappingIds), "CUTOVER_AUDIT_INVALID", "Cutover audit mapping identities do not match current canonical rows.");
         return { verified: true, primaryCounts, auditId: id(audit), targetMappingIds: rows.map(row => id(row.target)), sourceMappingIds: rows.map(row => id(row.source)) };
     }
@@ -208,7 +221,7 @@ function createPubgMobileAutoCutoverService(dependencies = {}) {
                 const storePackages = state.storeSelection.packages.map(value => ({ packageCode: upper(value.packageCode), supplierProductMappingId: targetByPackage.get(upper(value.packageCode)) }));
                 const store = await M.StoreSelection.updateOne({ _id: state.storeSelection._id, decisionVersion: state.storeSelection.decisionVersion, updatedAt: state.storeSelection.updatedAt }, { $set: { packages: storePackages, selectedBy: clean(actor.username), selectedAt: clock(), provenance: { source: CUTOVER_OPERATION, sourceHash: sha256(state.manifest), planHash: state.planHash, reversible: true } }, $inc: { decisionVersion: 1 } }, { session, runValidators: true });
                 fail(store.modifiedCount === 1, "STORE_SELECTION_CONCURRENT_CHANGE", "Store Catalog selection changed during cutover.");
-                await M.Audit.create([{ actorAdminId: actor.adminId, actorUsernameSnapshot: clean(actor.username), actorRoleSnapshot: "OWNER", action: CUTOVER_OPERATION, resourceType: "StoreCatalogSelection", resourceId: id(state.storeSelection), requestId: clean(input.requestId), method: "SCRIPT", route: "cutover-pubg-mobile-auto-migration", metadata: { planHash: state.planHash, sourceMappingIds: state.rows.map(row => id(row.source)), targetMappingIds: state.rows.map(row => id(row.target)), prices: state.manifest.prices, storeSelectionDecisionVersionBefore: state.storeSelection.decisionVersion, packageSelectionDecisionVersionsBefore: state.rows.map(row => ({ id: id(row.packageSelection), version: row.packageSelection.decisionVersion })), futureOrdersOnly: true, canonicalChanges: 0, sellingPriceChanges: 0, historicalOrderChanges: 0, fulfillmentAttemptChanges: 0 } }], { session, ordered: true });
+                await M.Audit.create([{ actorAdminId: actor.adminId, actorUsernameSnapshot: clean(actor.username), actorRoleSnapshot: "OWNER", action: CUTOVER_OPERATION, resourceType: "StoreCatalogSelection", resourceId: id(state.storeSelection), requestId: clean(input.requestId), method: "SCRIPT", route: "cutover-pubg-mobile-auto-migration", metadata: { planHash: state.planHash, sourceMappingIds: state.rows.map(row => id(row.source)), targetMappingIds: state.rows.map(row => id(row.target)), prices: state.manifest.prices, packages: state.manifest.packages, storeSelectionDecisionVersionBefore: state.storeSelection.decisionVersion, packageSelectionDecisionVersionsBefore: state.rows.map(row => ({ id: id(row.packageSelection), version: row.packageSelection.decisionVersion })), futureOrdersOnly: true, canonicalChanges: 0, sellingPriceChanges: 0, historicalOrderChanges: 0, fulfillmentAttemptChanges: 0 } }], { session, ordered: true });
                 const verified = await verifyPostCutover({ planHash: state.planHash }, { session });
                 result = { applied: true, idempotentReplay: false, planHash: state.planHash, ...verified };
             }, { readConcern: { level: "snapshot" }, writeConcern: { w: "majority" }, readPreference: "primary" });
