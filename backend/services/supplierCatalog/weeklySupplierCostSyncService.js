@@ -123,7 +123,9 @@ function validateCandidate({ selection, mapping, offer, observation, availabilit
     const comparison = compareSupplierCost(offer.supplierCost, mapping.supplierCostAuthority);
     if (comparison.state === "CURRENCY_MISMATCH") return result(selection, "REVIEW_REQUIRED", "CURRENCY_MISMATCH", { comparison });
     if (comparison.state === "INVALID_OBSERVATION" || comparison.state === "UNCOMPARABLE") return result(selection, "REJECTED", comparison.state, { comparison });
-    if (comparison.state === "MATCH") return result(selection, "UNCHANGED", "COST_AUTHORITY_CURRENT", { comparison, observation, mapping, offer, initialAuthority: false });
+    const authority = mapping.supplierCostAuthority || {}, exactAutomaticAuthority = upper(authority.verificationMode) === "AUTOMATIC_VERIFIED_API" && id(authority.ingestionRunId) === id(ingestionRunId) && authority.providerProductCode === mapping.supplierProductCode && authority.providerOfferCode === mapping.supplierPackageCode && String(authority.rawSnapshotHash || "") === String(offer.rawSnapshotHash || "") && String(authority.observedCostHash || "") === observedCostHash(offer) && new Date(authority.observedAt).getTime() === observedAt.getTime();
+    if (comparison.state === "MATCH" && exactAutomaticAuthority) return result(selection, "UNCHANGED", "COST_AUTHORITY_CURRENT", { comparison, observation, mapping, offer, initialAuthority: false });
+    if (comparison.state === "MATCH") return result(selection, "ACCEPTABLE", "COST_AUTHORITY_REATTESTATION_REQUIRED", { comparison, observation, mapping, offer, availability, warnings: ["AUTHORITY_EVIDENCE_REATTESTED"], initialAuthority: false });
     const warnings = comparison.comparable && Math.abs(Number(comparison.percentageDelta)) > maximumAutomaticChangePercent ? ["LARGE_COST_MOVEMENT"] : [];
     return result(selection, "ACCEPTABLE", hasAuthority(mapping) ? "FRESH_EXACT_SELECTED_COST" : "FRESH_EXACT_INITIAL_COST", { comparison, observation, mapping, offer, availability, warnings, initialAuthority: !hasAuthority(mapping) });
 }

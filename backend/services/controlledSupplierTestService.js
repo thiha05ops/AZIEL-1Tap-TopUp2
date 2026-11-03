@@ -10,6 +10,18 @@ const { dispatchSubmission } = require("./suppliers/supplierFulfillmentDispatche
 
 const clean = value => String(value == null ? "" : value).trim();
 function fail(code, message) { throw Object.assign(new Error(message), { code }); }
+function controlledAssessmentBlockers(assessment, mapping) {
+    const blockers = new Set(assessment?.blockers || []);
+    // A controlled test is deliberately bound to a disabled, non-PRIMARY route.
+    // Normal checkout still rejects this mapping; every other production gate remains required.
+    blockers.delete("MAPPING_DISABLED");
+    if (clean(mapping.region).toUpperCase() === "GLOBAL" && blockers.has("PRODUCTION_PRICE_NOT_PUBLISHED")) {
+        const prices = assessment?.package?.prices || {};
+        const valid = ["TH", "MM"].every(market => prices[market]?.enabled === true && Number(prices[market]?.amount) > 0);
+        if (valid) blockers.delete("PRODUCTION_PRICE_NOT_PUBLISHED");
+    }
+    return [...blockers];
+}
 function safeEqual(left, right) {
     const a = Buffer.from(clean(left)); const b = Buffer.from(clean(right));
     return a.length === b.length && a.length > 0 && crypto.timingSafeEqual(a, b);
@@ -37,7 +49,8 @@ async function authorizeControlledAttempt(input = {}, deps = {}) {
     if (attempt.routeType !== "SUPPLIER_API" || String(attempt.supplierMappingId) !== String(mapping._id) || String(attempt.orderId) !== String(order._id)) fail("CONTROLLED_TEST_ATTEMPT_MISMATCH", "The FulfillmentAttempt is not bound to the approved route.");
     if (attempt.status !== "IN_PROGRESS" || attempt.supplierReference || ["SUBMISSION_IN_FLIGHT", "SUBMISSION_UNCERTAIN", "ACCEPTED"].includes(attempt.supplierRequest?.submissionState)) fail("CONTROLLED_TEST_ALREADY_SUBMITTED", "This attempt cannot make another supplier submission.");
     const assessment = await (deps.assess || assessProductionMapping)(mapping.toObject ? mapping.toObject() : mapping);
-    if (!assessment.ready) fail("CONTROLLED_TEST_NOT_READY", `Controlled test is blocked: ${assessment.blockers.join(", ")}`);
+    const blockers = controlledAssessmentBlockers(assessment, mapping);
+    if (blockers.length) fail("CONTROLLED_TEST_NOT_READY", `Controlled test is blocked: ${blockers.join(", ")}`);
     return { attempt, order, mapping, supplier, exact };
 }
 
@@ -48,4 +61,4 @@ async function executeControlledSupplierTest(input = {}, deps = {}) {
     return { dispatched: true, fulfillmentId: authority.attempt.fulfillmentId, supplier: authority.mapping.supplierCode, product: authority.mapping.productCode, packageCode: authority.mapping.packageCode };
 }
 
-module.exports = { authorizeControlledAttempt, executeControlledSupplierTest };
+module.exports = { authorizeControlledAttempt, executeControlledSupplierTest, controlledAssessmentBlockers };
