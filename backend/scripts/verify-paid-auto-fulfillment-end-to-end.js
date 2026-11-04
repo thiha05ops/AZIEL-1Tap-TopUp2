@@ -31,6 +31,7 @@ async function scenario(supplierCode, market, providerStatus = "SUCCEEDED") {
     const deferred = [];
     const payloads = [];
     const transitions = [];
+    const manualRecoveries = [];
 
     class Attempt {
         constructor(value) { Object.assign(this, value); attempts.set(String(this._id), this); }
@@ -47,7 +48,7 @@ async function scenario(supplierCode, market, providerStatus = "SUCCEEDED") {
     };
     const processor = supplierCode === "WONDD"
         ? createWonddFulfillmentProcessor({ Attempt, Order: { findById: async () => order }, Mapping: { findById: async () => mapping }, adapter, transitionOrder: transition, schedule: callback => deferred.push(callback) })
-        : createFazerCardsFulfillmentProcessor({ Attempt, Order: { findById: async () => order }, Mapping: { findById: async () => mapping }, adapter, transitionOrder: transition, schedule: callback => deferred.push(callback) });
+        : createFazerCardsFulfillmentProcessor({ Attempt, Order: { findById: async () => order }, Mapping: { findById: async () => mapping }, adapter, transitionOrder: transition, recordManualRecovery: async (_order, _attempt, recovery) => manualRecoveries.push(recovery), schedule: callback => deferred.push(callback) });
 
     const repos = {
         async claim(orderId, token) { if (orderId !== order.orderId || order.fulfilment.paidHandoff.status !== "PENDING") return null; order.fulfilment.paidHandoff.status = "CLAIMED"; order.fulfilment.paidHandoff.claimToken = token; order.fulfilment.paidHandoff.attemptCount += 1; return order; },
@@ -83,7 +84,8 @@ async function scenario(supplierCode, market, providerStatus = "SUCCEEDED") {
     }
     assert.strictEqual(order.status, providerStatus === "FAILED" ? "failed" : "completed");
     assert.strictEqual(transitions.at(-1), providerStatus === "FAILED" ? "failed" : "completed");
-    return { supplierCode, market, attempts: attempts.size, submissions: payloads.length, finalStatus: order.status };
+    if (supplierCode === "FAZERCARDS" && providerStatus === "FAILED") assert.deepStrictEqual(manualRecoveries.map(item => item.state), ["ADMIN_MANUAL_RECOVERY_REQUIRED"]);
+    return { supplierCode, market, attempts: attempts.size, submissions: payloads.length, finalStatus: order.status, manualRecovery: manualRecoveries[0]?.state || "" };
 }
 
 (async () => {

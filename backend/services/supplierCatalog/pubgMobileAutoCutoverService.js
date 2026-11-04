@@ -25,6 +25,8 @@ const {
 
 const CUTOVER_OPERATION = "CUTOVER_PUBG_MOBILE_AUTO_V1";
 const CUTOVER_CONFIRMATION = "CUT OVER PUBG MOBILE GLOBAL TO AUTO";
+const UNVERIFIED_LAUNCH_STATUS = "OWNER_APPROVED_UNVERIFIED_LAUNCH";
+const UNVERIFIED_LAUNCH_ACKNOWLEDGEMENT = "OWNER APPROVES PUBG AUTO LAUNCH WITHOUT PRIOR SUCCESS";
 const ROLLBACK_OPERATION = "ROLLBACK_PUBG_MOBILE_AUTO_V1";
 const ROLLBACK_CONFIRMATION = "ROLL BACK PUBG MOBILE GLOBAL TO FAST";
 
@@ -157,11 +159,13 @@ function createPubgMobileAutoCutoverService(dependencies = {}) {
         fail(readiness.supplierMapped === true && readiness.inputReady === true && readiness.validationReady === true, "TARGET_READINESS_INCOMPLETE", `Target identity or customer-input readiness is incomplete for ${row.expected.packageCode}.`);
         const contract = verifiedMappingContract(row.target);
         fail(contract && contract.supplierProductCode === TARGET_PRODUCT_CODE && contract.fields?.length === 1 && contract.fields[0].customerField === "playerId" && contract.fields[0].providerField === "player_id", "TARGET_CONTRACT_INVALID", `Exact player_id contract is required for ${row.expected.packageCode}.`);
-        const controlled = state.successfulAttempts.find(value => id(value.supplierMappingId) === id(row.target) && clean(value.supplierRequest?.categoryId) === TARGET_PRODUCT_CODE && clean(value.supplierRequest?.offerId) === row.expected.offerCode && clean(value.supplierRequest?.inputContractFingerprint) === clean(contract.fingerprint) && Object.hasOwn(value.supplierRequest?.fields || {}, "player_id"));
-        fail(controlled, "CONTROLLED_FULFILLMENT_REQUIRED", `A successful exact-contract controlled fulfillment attempt is required for ${row.expected.packageCode}.`);
         const simulated = { ...row.target, enabled: true, productionRole: "PRIMARY", mappingMetadata: { ...(row.target.mappingMetadata || {}), readiness: { ...readiness, pricingReady: true, fulfillmentReady: true } } };
         const assessment = assessMappingReadiness({ mode: READINESS_MODES.NEW_ORDER_SELECTABLE, mapping: simulated, supplier: state.supplier, offer: row.targetOffer, availability: row.targetAvailability, customerMarket: "TH", adapter });
         fail(assessment.ready, "TARGET_NOT_SELECTABLE", `Target route is not selectable for ${row.expected.packageCode}.`, { blockers: assessment.blockers });
+    }
+
+    function exactControlledSuccess(row, state, contract = verifiedMappingContract(row.target)) {
+        return Boolean(contract && state.successfulAttempts.some(value => id(value.supplierMappingId) === id(row.target) && clean(value.supplierRequest?.categoryId) === TARGET_PRODUCT_CODE && clean(value.supplierRequest?.offerId) === row.expected.offerCode && clean(value.supplierRequest?.inputContractFingerprint) === clean(contract.fingerprint) && Object.hasOwn(value.supplierRequest?.fields || {}, "player_id")));
     }
 
     function stateMode(rows, state) {
@@ -187,7 +191,8 @@ function createPubgMobileAutoCutoverService(dependencies = {}) {
         fail(new Set(targetRuns.map(id)).size === 1, "TARGET_RUN_MISMATCH", "All target evidence must use one completed ingestion run.");
         rows.forEach(row => assertProviderReady(row, state, adapter));
         const manifest = { schemaVersion: 1, operation: CUTOVER_OPERATION, productCode: PRODUCT_CODE, supplierId: id(state.supplier), mode, storeSelection: { id: id(state.storeSelection), decisionVersion: Number(state.storeSelection.decisionVersion), updatedAt: new Date(state.storeSelection.updatedAt).toISOString(), packages: state.storeSelection.packages.map(value => ({ packageCode: value.packageCode, supplierProductMappingId: id(value.supplierProductMappingId) })) }, prices, packages, rows: rows.map(row => ({ packageCode: row.expected.packageCode, source: { id: id(row.source), updatedAt: new Date(row.source.updatedAt).toISOString(), version: Number(row.source.__v || 0) }, target: { id: id(row.target), updatedAt: new Date(row.target.updatedAt).toISOString(), version: Number(row.target.__v || 0), authority: authoritySnapshot(row.target), offerHash: row.targetOffer.rawSnapshotHash, availabilityObservedAt: new Date(row.targetAvailability.observedAt).toISOString() }, packageSelection: { id: id(row.packageSelection), decisionVersion: Number(row.packageSelection.decisionVersion), updatedAt: new Date(row.packageSelection.updatedAt).toISOString() } })) };
-        return { state: mode === "TARGET_ACTIVE" ? "CUTOVER_COMPLETE" : "READY", planHash: sha256(manifest), manifest, ...state, rows };
+        const unverifiedLaunchPackageCodes = rows.filter(row => !exactControlledSuccess(row, state)).map(row => row.expected.packageCode);
+        return { state: mode === "TARGET_ACTIVE" ? "CUTOVER_COMPLETE" : unverifiedLaunchPackageCodes.length ? "READY_REQUIRES_OWNER_APPROVAL" : "READY", planHash: sha256(manifest), manifest, unverifiedLaunchPackageCodes, ...state, rows };
     }
 
     async function diagnose({ maximumObservationAgeMs = 24 * 60 * 60 * 1000 } = {}) {
@@ -208,10 +213,11 @@ function createPubgMobileAutoCutoverService(dependencies = {}) {
             const simulatedReadiness = { ...readiness, pricingReady: true, fulfillmentReady: true };
             const assessment = assessMappingReadiness({ mode: READINESS_MODES.NEW_ORDER_SELECTABLE, mapping: { ...row.target, enabled: true, productionRole: "PRIMARY", mappingMetadata: { ...(row.target.mappingMetadata || {}), readiness: simulatedReadiness } }, supplier: state.supplier, offer: row.targetOffer, availability: row.targetAvailability, customerMarket: "TH", adapter });
             if (!assessment.ready) blockers.push({ code: "TARGET_NOT_SELECTABLE", message: "Target route is not selectable.", details: { blockers: assessment.blockers } });
-            const controlledFulfillmentVerified = Boolean(contractVerified && state.successfulAttempts.some(value => id(value.supplierMappingId) === id(row.target) && clean(value.supplierRequest?.categoryId) === TARGET_PRODUCT_CODE && clean(value.supplierRequest?.offerId) === row.expected.offerCode && clean(value.supplierRequest?.inputContractFingerprint) === clean(contract.fingerprint) && Object.hasOwn(value.supplierRequest?.fields || {}, "player_id")));
-            if (!controlledFulfillmentVerified) blockers.push({ code: "CONTROLLED_FULFILLMENT_REQUIRED", message: "Successful exact-contract controlled fulfillment evidence is required." });
-            return { packageCode: row.expected.packageCode, canonicalPackageId: id(row.pkg), canonicalEnabled: row.pkg.enabled === true, sourceMappingId: id(row.source), targetMappingId: id(row.target), readiness, cutoverAttestation: { pricingReady: "CURRENT_VERIFIED_COST_REQUIRED", fulfillmentReady: "EXACT_CONTROLLED_SUCCESS_REQUIRED" }, contractVerified, controlledFulfillmentVerified, targetAuthority: authoritySnapshot(row.target), offer: { id: id(row.targetOffer), productCode: row.targetOffer.supplierProductCode, offerCode: row.targetOffer.supplierOfferCode, costObservedAt: row.targetOffer.supplierCost?.observedAt || null }, availability: { state: row.targetAvailability.state, observedAt: row.targetAvailability.observedAt, ingestionRunId: id(row.targetAvailability.observationRunId) }, blockers };
+            const controlledFulfillmentVerified = contractVerified && exactControlledSuccess(row, state, contract);
+            return { packageCode: row.expected.packageCode, canonicalPackageId: id(row.pkg), canonicalEnabled: row.pkg.enabled === true, sourceMappingId: id(row.source), targetMappingId: id(row.target), readiness, launchVerificationStatus: controlledFulfillmentVerified ? "PROVEN_FULFILLMENT_SUCCESS" : "OWNER_APPROVAL_REQUIRED", controlledFulfillmentVerified, contractVerified, targetAuthority: authoritySnapshot(row.target), offer: { id: id(row.targetOffer), productCode: row.targetOffer.supplierProductCode, offerCode: row.targetOffer.supplierOfferCode, costObservedAt: row.targetOffer.supplierCost?.observedAt || null }, availability: { state: row.targetAvailability.state, observedAt: row.targetAvailability.observedAt, ingestionRunId: id(row.targetAvailability.observationRunId) }, blockers };
         });
+        const unverified = reports.filter(row => !row.controlledFulfillmentVerified).map(row => row.packageCode);
+        if (unverified.length) globalBlockers.push({ code: "OWNER_APPROVAL_REQUIRED", message: "Owner acknowledgement is required to launch PUBG Auto without prior successful fulfillment.", packageCodes: unverified });
         const runIds = [...new Set(rows.map(row => id(row.targetAvailability.observationRunId)).filter(Boolean))];
         if (runIds.length !== 1) globalBlockers.push({ code: "TARGET_RUN_MISMATCH", message: "All target evidence must use one completed ingestion run.", runIds });
         const blockerCount = globalBlockers.length + reports.reduce((sum, row) => sum + row.blockers.length, 0);
@@ -241,14 +247,18 @@ function createPubgMobileAutoCutoverService(dependencies = {}) {
             await session.withTransaction(async () => {
                 await assertOwner(actor, session);
                 const state = await preflight({ maximumObservationAgeMs: input.maximumObservationAgeMs }, { session });
+                if (state.unverifiedLaunchPackageCodes.length) fail(input.ownerApprovedUnverifiedLaunch === true && clean(input.unverifiedLaunchAcknowledgement) === UNVERIFIED_LAUNCH_ACKNOWLEDGEMENT, "OWNER_UNVERIFIED_LAUNCH_APPROVAL_REQUIRED", "Exact Owner acknowledgement for unverified PUBG Auto launch is required.", { packageCodes: state.unverifiedLaunchPackageCodes });
                 if (state.state === "CUTOVER_COMPLETE") { const verified = await verifyPostCutover({ planHash: clean(input.planHash) }, { session }); result = { applied: false, idempotentReplay: true, planHash: clean(input.planHash), ...verified }; return; }
                 fail(state.planHash === clean(input.planHash), "CUTOVER_PLAN_CHANGED", "Cutover evidence changed after review.");
+                const approvedAt = clock();
                 for (const row of state.rows) {
                     const demoted = await M.Mapping.updateOne({ _id: row.source._id, updatedAt: row.source.updatedAt, productionRole: "PRIMARY", enabled: true }, { $set: { productionRole: "DISABLED", "mappingMetadata.migration.cutoverOperation": CUTOVER_OPERATION, "mappingMetadata.migration.cutoverPlanHash": state.planHash } }, { session, runValidators: true });
                     fail(demoted.modifiedCount === 1, "SOURCE_MAPPING_CONCURRENT_CHANGE", `Source mapping changed for ${row.expected.packageCode}.`);
                 }
                 for (const row of state.rows) {
-                    const promoted = await M.Mapping.updateOne({ _id: row.target._id, updatedAt: row.target.updatedAt, productionRole: "DISABLED", enabled: false }, { $set: { enabled: true, productionRole: "PRIMARY", "mappingMetadata.readiness.pricingReady": true, "mappingMetadata.readiness.fulfillmentReady": true, "mappingMetadata.readiness.storefrontReady": true, "mappingMetadata.migration.cutoverOperation": CUTOVER_OPERATION, "mappingMetadata.migration.cutoverPlanHash": state.planHash } }, { session, runValidators: true });
+                    const controlled = exactControlledSuccess(row, state);
+                    const verification = controlled ? { status: "PROVEN_FULFILLMENT_SUCCESS", verifiedAt: approvedAt, evidence: "EXACT_SUCCESSFUL_FULFILLMENT_ATTEMPT" } : { status: UNVERIFIED_LAUNCH_STATUS, approvedAt, approvedBy: clean(actor.username), acknowledgement: UNVERIFIED_LAUNCH_ACKNOWLEDGEMENT, evidence: "OWNER_RISK_ACCEPTANCE_NO_PRIOR_SUCCESS" };
+                    const promoted = await M.Mapping.updateOne({ _id: row.target._id, updatedAt: row.target.updatedAt, productionRole: "DISABLED", enabled: false }, { $set: { enabled: true, productionRole: "PRIMARY", "mappingMetadata.readiness.pricingReady": true, "mappingMetadata.readiness.fulfillmentReady": true, "mappingMetadata.readiness.storefrontReady": true, "mappingMetadata.fulfillmentVerification": verification, "mappingMetadata.migration.cutoverOperation": CUTOVER_OPERATION, "mappingMetadata.migration.cutoverPlanHash": state.planHash } }, { session, runValidators: true });
                     fail(promoted.modifiedCount === 1, "TARGET_MAPPING_CONCURRENT_CHANGE", `Target mapping changed for ${row.expected.packageCode}.`);
                     const selection = await M.PackageSelection.updateOne({ _id: row.packageSelection._id, supplierMappingId: row.source._id, decisionVersion: row.packageSelection.decisionVersion, updatedAt: row.packageSelection.updatedAt }, { $set: { supplierMappingId: row.target._id, selectedByAdminId: actor.adminId, selectedByUsernameSnapshot: clean(actor.username), selectedAt: clock(), reason: "OWNER approved PUBG Mobile Global future-order cutover to pubg_mobile_auto" }, $inc: { decisionVersion: 1 } }, { session, runValidators: true });
                     fail(selection.modifiedCount === 1, "PACKAGE_SELECTION_CONCURRENT_CHANGE", `Checkout selection changed for ${row.expected.packageCode}.`);
@@ -260,7 +270,7 @@ function createPubgMobileAutoCutoverService(dependencies = {}) {
                 }));
                 const store = await M.StoreSelection.updateOne({ _id: state.storeSelection._id, decisionVersion: state.storeSelection.decisionVersion, updatedAt: state.storeSelection.updatedAt }, { $set: { packages: storePackages, selectedBy: clean(actor.username), selectedAt: clock(), provenance: { source: CUTOVER_OPERATION, sourceHash: sha256(state.manifest), planHash: state.planHash, reversible: true } }, $inc: { decisionVersion: 1 } }, { session, runValidators: true });
                 fail(store.modifiedCount === 1, "STORE_SELECTION_CONCURRENT_CHANGE", "Store Catalog selection changed during cutover.");
-                await M.Audit.create([{ actorAdminId: actor.adminId, actorUsernameSnapshot: clean(actor.username), actorRoleSnapshot: "OWNER", action: CUTOVER_OPERATION, resourceType: "StoreCatalogSelection", resourceId: id(state.storeSelection), requestId: clean(input.requestId), method: "SCRIPT", route: "cutover-pubg-mobile-auto-migration", metadata: { planHash: state.planHash, sourceMappingIds: state.rows.map(row => id(row.source)), targetMappingIds: state.rows.map(row => id(row.target)), prices: state.manifest.prices, packages: state.manifest.packages, storeSelectionDecisionVersionBefore: state.storeSelection.decisionVersion, packageSelectionDecisionVersionsBefore: state.rows.map(row => ({ id: id(row.packageSelection), version: row.packageSelection.decisionVersion })), futureOrdersOnly: true, canonicalChanges: 0, sellingPriceChanges: 0, historicalOrderChanges: 0, fulfillmentAttemptChanges: 0 } }], { session, ordered: true });
+                await M.Audit.create([{ actorAdminId: actor.adminId, actorUsernameSnapshot: clean(actor.username), actorRoleSnapshot: "OWNER", action: CUTOVER_OPERATION, resourceType: "StoreCatalogSelection", resourceId: id(state.storeSelection), requestId: clean(input.requestId), method: "SCRIPT", route: "cutover-pubg-mobile-auto-migration", metadata: { planHash: state.planHash, launchStatus: state.unverifiedLaunchPackageCodes.length ? UNVERIFIED_LAUNCH_STATUS : "PROVEN_FULFILLMENT_SUCCESS", unverifiedLaunchPackageCodes: state.unverifiedLaunchPackageCodes, acknowledgement: UNVERIFIED_LAUNCH_ACKNOWLEDGEMENT, sourceMappingIds: state.rows.map(row => id(row.source)), targetMappingIds: state.rows.map(row => id(row.target)), prices: state.manifest.prices, packages: state.manifest.packages, storeSelectionDecisionVersionBefore: state.storeSelection.decisionVersion, packageSelectionDecisionVersionsBefore: state.rows.map(row => ({ id: id(row.packageSelection), version: row.packageSelection.decisionVersion })), futureOrdersOnly: true, canonicalChanges: 0, sellingPriceChanges: 0, historicalOrderChanges: 0, fulfillmentAttemptChanges: 0 } }], { session, ordered: true });
                 const verified = await verifyPostCutover({ planHash: state.planHash }, { session });
                 result = { applied: true, idempotentReplay: false, planHash: state.planHash, ...verified };
             }, { readConcern: { level: "snapshot" }, writeConcern: { w: "majority" }, readPreference: "primary" });
@@ -331,4 +341,4 @@ function createPubgMobileAutoCutoverService(dependencies = {}) {
     return Object.freeze({ diagnose, preflight, cutover, verifyPostCutover, rollbackPreflight, rollback });
 }
 
-module.exports = Object.freeze({ CUTOVER_OPERATION, CUTOVER_CONFIRMATION, ROLLBACK_OPERATION, ROLLBACK_CONFIRMATION, PubgMobileAutoCutoverError, createPubgMobileAutoCutoverService });
+module.exports = Object.freeze({ CUTOVER_OPERATION, CUTOVER_CONFIRMATION, UNVERIFIED_LAUNCH_STATUS, UNVERIFIED_LAUNCH_ACKNOWLEDGEMENT, ROLLBACK_OPERATION, ROLLBACK_CONFIRMATION, PubgMobileAutoCutoverError, createPubgMobileAutoCutoverService });

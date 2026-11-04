@@ -382,7 +382,9 @@ router.post("/admin/pricing-engine/workspace/publish", adminMiddleware, requireA
             supplierId: req.body?.supplierId || "",
             actor: req.admin?.username || "admin",
             admin: req.admin || null,
-            unifiedSellable: req.body?.unifiedSellable !== false
+            unifiedSellable: req.body?.unifiedSellable !== false,
+            ownerApprovedUnverifiedLaunch: req.body?.ownerApprovedUnverifiedLaunch === true,
+            unverifiedLaunchAcknowledgement: req.body?.unverifiedLaunchAcknowledgement || ""
         });
         await writeAdminAudit({
             actor: req.admin,

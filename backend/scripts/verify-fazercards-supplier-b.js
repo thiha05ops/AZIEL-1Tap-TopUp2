@@ -160,10 +160,11 @@ async function main() {
     });
     const uncertainProcessor = createFazerCardsFulfillmentProcessor({
         Attempt: { async findById() { return uncertainAttempt; } }, Order: { async findById() { return order; } }, Mapping: { async findById() { return mapping; } },
-        adapter: uncertainAdapter, transitionOrder: async () => {}, schedule: () => { throw new Error("uncertain submission must not poll"); }
+        adapter: uncertainAdapter, transitionOrder: async () => {}, recordManualRecovery: async (_order, _attempt, recovery) => { assert.strictEqual(recovery.state, "RECONCILIATION_REQUIRED_BEFORE_RETRY"); }, schedule: () => { throw new Error("uncertain submission must not poll"); }
     });
     await uncertainProcessor.submit(uncertainAttempt._id);
     assert.strictEqual(uncertainAttempt.supplierRequest.submissionState, "SUBMISSION_UNCERTAIN");
+    assert.strictEqual(uncertainAttempt.supplierRequest.automaticRetryAllowed, false);
     assert.strictEqual(uncertainAttempt.supplierResult.failureCode, "FAZERCARDS_ORDER_REFERENCE_MISSING");
     await uncertainProcessor.submit(uncertainAttempt._id);
     assert.strictEqual(missingIdentityCalls, 1, "Missing identity remains fail-closed and is never automatically resubmitted.");

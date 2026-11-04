@@ -30,7 +30,7 @@ const {
     PRODUCT_CODE, SOURCE_PRODUCT_CODE, TARGET_PRODUCT_CODE, NAMESPACE, PACKAGE_MIGRATIONS
 } = require("../services/supplierCatalog/pubgMobileAutoMigrationService");
 const {
-    CUTOVER_OPERATION, CUTOVER_CONFIRMATION, ROLLBACK_OPERATION, ROLLBACK_CONFIRMATION,
+    CUTOVER_OPERATION, CUTOVER_CONFIRMATION, UNVERIFIED_LAUNCH_STATUS, UNVERIFIED_LAUNCH_ACKNOWLEDGEMENT, ROLLBACK_OPERATION, ROLLBACK_CONFIRMATION,
     createPubgMobileAutoCutoverService
 } = require("../services/supplierCatalog/pubgMobileAutoCutoverService");
 const { CONFIRMATION: RECOVERY_CONFIRMATION, createPubgMobileAutoCostRecoveryService } = require("../services/supplierCatalog/pubgMobileAutoCostRecoveryService");
@@ -40,6 +40,7 @@ const ownerId = new mongoose.Types.ObjectId();
 const adapter = { isConfigured: () => true, isAutoFulfillmentEnabled: () => true };
 const actor = { adminId: String(ownerId), username: "isolated-owner", role: "OWNER" };
 const cutoverInput = plan => ({ planHash: plan.planHash, confirmed: true, confirmation: CUTOVER_CONFIRMATION, requestId: "isolated-cutover" });
+const approvedCutoverInput = plan => ({ ...cutoverInput(plan), ownerApprovedUnverifiedLaunch: true, unverifiedLaunchAcknowledgement: UNVERIFIED_LAUNCH_ACKNOWLEDGEMENT });
 const rollbackInput = (plan, cutoverPlanHash) => ({ planHash: plan.planHash, cutoverPlanHash, confirmed: true, confirmation: ROLLBACK_CONFIRMATION, requestId: "isolated-rollback" });
 
 function contract(productCode, sourceHash, offerHash) {
@@ -115,8 +116,10 @@ async function run() {
         const replayPlan = await recovery.inspect();
         const recoveryReplay = await recovery.recover({ planHash: replayPlan.planHash, confirmed: true, confirmation: RECOVERY_CONFIRMATION }, actor);
         assert.strictEqual(recoveryReplay.applied, false);
+        await Attempt.deleteMany({ supplierMappingId: { $in: (await Mapping.find({ supplierProductCode: TARGET_PRODUCT_CODE }).distinct("_id")) } });
         const api = service(), plan = await api.preflight();
-        assert.strictEqual(plan.state, "READY");
+        assert.strictEqual(plan.state, "READY_REQUIRES_OWNER_APPROVAL");
+        assert.strictEqual(plan.unverifiedLaunchPackageCodes.length, 6);
         const disabledPackageCode = PACKAGE_MIGRATIONS.find(item => item.offerCode === "1800_uc").packageCode;
         const disabledBefore = await Package.findOne({ packageCode: disabledPackageCode }).lean();
         assert.strictEqual(disabledBefore.enabled, false, "1800 UC fixture must be intentionally disabled");
@@ -125,9 +128,14 @@ async function run() {
         const attemptCount = await Attempt.countDocuments();
         const oldMapping = plan.rows[0].source, oldSelection = plan.rows[0].packageSelection;
         const oldFrozenRoute = selectedRouteSnapshot(oldMapping, oldSelection, "TH");
-        const result = await api.cutover(cutoverInput(plan), actor);
+        await assert.rejects(() => api.cutover(cutoverInput(plan), actor), error => error.code === "OWNER_UNVERIFIED_LAUNCH_APPROVAL_REQUIRED");
+        const result = await api.cutover(approvedCutoverInput(plan), actor);
         assert(result.applied && result.primaryCounts.every(value => value === 1));
         const cutoverAudit = await Audit.findOne({ action: CUTOVER_OPERATION }).lean();
+        assert.strictEqual(cutoverAudit.metadata.launchStatus, UNVERIFIED_LAUNCH_STATUS);
+        assert.strictEqual(cutoverAudit.metadata.unverifiedLaunchPackageCodes.length, 6);
+        assert.strictEqual(await Attempt.countDocuments({ status: "SUCCEEDED" }), 0, "Owner approval must not fabricate successful fulfillment evidence");
+        assert.strictEqual(await Mapping.countDocuments({ supplierProductCode: TARGET_PRODUCT_CODE, "mappingMetadata.fulfillmentVerification.status": UNVERIFIED_LAUNCH_STATUS }), 6);
         assert(cutoverAudit && cutoverAudit.metadata.packages.find(value => value.packageCode === disabledPackageCode)?.enabled === false, "audit must preserve the disabled package decision");
         assert.strictEqual(JSON.stringify((await Package.find().sort({ packageCode: 1 }).lean()).map(value => ({ id: String(value._id), packageCode: value.packageCode, enabled: value.enabled, prices: value.prices }))), packageState, "canonical package identity, enabled state, or prices changed");
         assert.strictEqual(await Attempt.countDocuments(), attemptCount, "historical attempts changed");
@@ -150,7 +158,7 @@ async function run() {
         const paid = await ensurePaidOrderFulfillmentWork({ _id: new mongoose.Types.ObjectId(), orderId: "AZL-OLD-PAID", status: "paid", paymentStatus: "paid", product: { gameCode: PRODUCT_CODE, packageCode: oldMapping.packageCode }, commercial: { region: "TH" }, fulfilment: { routeSnapshot: oldFrozenRoute } }, { findAttemptByIdempotency: async () => null, startSupplierFulfillment: async (_orderId, payload) => { historicalStarts += 1; assert.strictEqual(String(payload.mappingId), String(oldMapping._id)); return { fulfillmentId: "FUL-OLD" }; } });
         assert.strictEqual(paid.reason, "SUPPLIER_FULFILLMENT_STARTED");
         assert.strictEqual(historicalStarts, 1, "paid old order must retain frozen fast route");
-        const replay = await api.cutover(cutoverInput(plan), actor);
+        const replay = await api.cutover(approvedCutoverInput(plan), actor);
         assert.strictEqual(replay.idempotentReplay, true);
         assert.strictEqual(await Audit.countDocuments({ action: CUTOVER_OPERATION }), 1);
 
@@ -204,7 +212,7 @@ async function run() {
         assert.strictEqual(staleRecovery.state, "BLOCKED");
         assert(staleRecovery.decisions.some(value => value.code === "SUPPLIER_AVAILABILITY_NOT_CONFIRMED"));
 
-        console.log(JSON.stringify({ result: "PASS", mongoVersion: "7.0.14", isolatedReplicaSet: true, packages: 6, consolidatedSixPackageDiagnosis: true, verifiedCostAuthorityRecovery: true, sameAmountEvidenceReattestation: true, recoveryConcurrentSafe: true, recoveryIdempotent: true, recoveryStaleEvidenceBlocked: true, disabled1800UcPreserved: true, disabled1800UcPublicPurchasable: false, invalidExistingPriceBlocked: true, canonicalPackageIdsPreserved: true, atomicCutover: true, exactOnePrimary: true, storePresentationOrderPreserved: true, unrelatedStoreSelectionPreserved: true, newOrderRoute: TARGET_PRODUCT_CODE, paidHistoricalRoute: SOURCE_PRODUCT_CODE, customerPricesUnchanged: true, historicalAttemptsUnchanged: true, transactionRollback: true, staleEvidenceBlocked: true, missingCostAuthorityBlocked: true, invalidContractBlocked: true, providerGateBlocked: true, stalePlanBlocked: true, cutoverIdempotent: true, rollbackIdempotent: true, auditsVerified: true, supplierCalls: 0, productionConnections: 0 }, null, 2));
+        console.log(JSON.stringify({ result: "PASS", mongoVersion: "7.0.14", isolatedReplicaSet: true, packages: 6, consolidatedSixPackageDiagnosis: true, ownerApprovedUnverifiedLaunch: true, fabricatedFulfillmentEvidence: 0, verifiedCostAuthorityRecovery: true, sameAmountEvidenceReattestation: true, recoveryConcurrentSafe: true, recoveryIdempotent: true, recoveryStaleEvidenceBlocked: true, disabled1800UcPreserved: true, disabled1800UcPublicPurchasable: false, invalidExistingPriceBlocked: true, canonicalPackageIdsPreserved: true, atomicCutover: true, exactOnePrimary: true, storePresentationOrderPreserved: true, unrelatedStoreSelectionPreserved: true, newOrderRoute: TARGET_PRODUCT_CODE, paidHistoricalRoute: SOURCE_PRODUCT_CODE, customerPricesUnchanged: true, historicalAttemptsUnchanged: true, transactionRollback: true, staleEvidenceBlocked: true, missingCostAuthorityBlocked: true, invalidContractBlocked: true, providerGateBlocked: true, stalePlanBlocked: true, cutoverIdempotent: true, rollbackIdempotent: true, auditsVerified: true, supplierCalls: 0, productionConnections: 0 }, null, 2));
     } finally {
         await mongoose.disconnect().catch(() => null);
         await repl.stop();

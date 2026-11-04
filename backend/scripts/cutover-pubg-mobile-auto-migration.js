@@ -5,6 +5,7 @@ require("dotenv").config();
 const mongoose = require("mongoose");
 const {
     CUTOVER_CONFIRMATION,
+    UNVERIFIED_LAUNCH_ACKNOWLEDGEMENT,
     ROLLBACK_CONFIRMATION,
     createPubgMobileAutoCutoverService
 } = require("../services/supplierCatalog/pubgMobileAutoCutoverService");
@@ -56,7 +57,7 @@ async function run() {
     else if (mode === "recover-cost-authorities") result = await recovery.recover({ planHash: required("plan-hash"), confirmed: args.confirm === COST_RECOVERY_CONFIRMATION, confirmation: args.confirm }, { adminId: required("owner-id"), username: required("owner-username"), role: "OWNER" });
     else if (mode === "verify") result = await service.verifyPostCutover({ planHash: required("plan-hash") });
     else if (mode === "rollback-preflight") result = await service.rollbackPreflight({ cutoverPlanHash: required("cutover-plan-hash") });
-    else if (mode === "cutover") result = await service.cutover({ planHash: required("plan-hash"), confirmed: args.confirm === CUTOVER_CONFIRMATION, confirmation: args.confirm, requestId: required("request-id") }, { adminId: required("owner-id"), username: required("owner-username"), role: "OWNER" });
+    else if (mode === "cutover") result = await service.cutover({ planHash: required("plan-hash"), confirmed: args.confirm === CUTOVER_CONFIRMATION, confirmation: args.confirm, ownerApprovedUnverifiedLaunch: args["approve-unverified-launch"] === true || args["approve-unverified-launch"] === "true", unverifiedLaunchAcknowledgement: args["risk-acknowledgement"] === UNVERIFIED_LAUNCH_ACKNOWLEDGEMENT ? args["risk-acknowledgement"] : "", requestId: required("request-id") }, { adminId: required("owner-id"), username: required("owner-username"), role: "OWNER" });
     else if (mode === "rollback") result = await service.rollback({ planHash: required("plan-hash"), cutoverPlanHash: required("cutover-plan-hash"), confirmed: args.confirm === ROLLBACK_CONFIRMATION, confirmation: args.confirm, requestId: required("request-id") }, { adminId: required("owner-id"), username: required("owner-username"), role: "OWNER" });
     else throw new Error(`Unsupported --mode=${mode}.`);
     const output = ["diagnose", "cost-recovery-preflight", "recover-cost-authorities"].includes(mode) ? result : publicResult(result);

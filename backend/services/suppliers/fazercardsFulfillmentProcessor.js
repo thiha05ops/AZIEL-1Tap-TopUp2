@@ -46,6 +46,10 @@ async function transitionOrder(order, target, reason) {
     }
 }
 
+async function recordManualRecovery(order, attempt, { state, reason, failureCode = "" }) {
+    await commerceOrderRepository.appendOperationalReference({ orderId: order.orderId, changedAt: new Date(), reference: { type: state === "ADMIN_MANUAL_RECOVERY_REQUIRED" ? "ADMIN_MANUAL_RECOVERY_REQUIRED" : "SUPPLIER_RECONCILIATION_REQUIRED", state, fulfillmentId: attempt.fulfillmentId, supplierCode: "FAZERCARDS", supplierReference: attempt.supplierReference || "", failureCode, reason, retryPermitted: false, recordedAt: new Date() } });
+}
+
 function createFazerCardsFulfillmentProcessor(deps = {}) {
     const Attempt = deps.Attempt || FulfillmentAttempt;
     const Order = deps.Order || CommerceOrder;
@@ -54,7 +58,22 @@ function createFazerCardsFulfillmentProcessor(deps = {}) {
     const CatalogProduct = deps.CatalogProduct || SupplierCatalogProduct;
     const adapter = deps.adapter || adapterDefault;
     const transition = deps.transitionOrder || transitionOrder;
+    const recoveryRecorder = deps.recordManualRecovery || recordManualRecovery;
     const schedule = deps.schedule || ((fn, delay) => setTimeout(fn, delay));
+
+    async function recordRecoverySafely(order, attempt, details) {
+        try {
+            await recoveryRecorder(order, attempt, details);
+        } catch (error) {
+            attempt.supplierRequest = {
+                ...(attempt.supplierRequest || {}),
+                manualAttention: true,
+                recoveryRecordState: "RECORDING_FAILED",
+                recoveryRecordFailureCode: String(error?.code || "MANUAL_RECOVERY_RECORD_FAILED")
+            };
+            await attempt.save().catch(() => undefined);
+        }
+    }
 
     async function reconcile(attempt, order, result) {
         attempt.supplierResult = normalizeSupplierResult(result);
@@ -63,11 +82,15 @@ function createFazerCardsFulfillmentProcessor(deps = {}) {
             attempt.status = "SUCCEEDED"; attempt.completedAt = new Date(); await attempt.save();
             await transition(order, "completed", `FazerCards completed ${attempt.fulfillmentId}`);
         } else if (result.status === "FAILED") {
-            attempt.status = "FAILED"; attempt.failureCode = result.failureCode || result.providerStatus; attempt.failureReason = result.safeMessage; attempt.normalizedFailureCategory = classifySupplierFailure(result).category; attempt.failedAt = new Date(); await attempt.save();
+            attempt.status = "FAILED"; attempt.failureCode = result.failureCode || result.providerStatus; attempt.failureReason = result.safeMessage; attempt.normalizedFailureCategory = classifySupplierFailure(result).category; attempt.failedAt = new Date(); attempt.supplierRequest = { ...(attempt.supplierRequest || {}), manualAttention: true, recoveryState: "ADMIN_MANUAL_RECOVERY_REQUIRED", automaticRetryAllowed: false }; await attempt.save();
             await transition(order, "failed", `FazerCards ${result.providerStatus} ${attempt.fulfillmentId}`);
+            await recordRecoverySafely(order, attempt, { state: "ADMIN_MANUAL_RECOVERY_REQUIRED", reason: result.safeMessage || "Supplier fulfillment failed.", failureCode: attempt.failureCode });
         } else {
-            attempt.supplierRequest = { ...(attempt.supplierRequest || {}), manualAttention: result.providerStatus === "UNKNOWN_PROVIDER_STATUS", lastReconciledAt: new Date() };
+            const reconciliationRequired = ["UNKNOWN_PROVIDER_STATUS", "STATUS_CHECK_ERROR", "SUBMISSION_UNCERTAIN"].includes(result.providerStatus);
+            const alreadyRecorded = attempt.supplierRequest?.recoveryState === "RECONCILIATION_REQUIRED_BEFORE_RETRY";
+            attempt.supplierRequest = { ...(attempt.supplierRequest || {}), manualAttention: reconciliationRequired, recoveryState: reconciliationRequired ? "RECONCILIATION_REQUIRED_BEFORE_RETRY" : attempt.supplierRequest?.recoveryState, automaticRetryAllowed: reconciliationRequired ? false : attempt.supplierRequest?.automaticRetryAllowed, lastReconciledAt: new Date() };
             await attempt.save();
+            if (reconciliationRequired && !alreadyRecorded) await recordRecoverySafely(order, attempt, { state: "RECONCILIATION_REQUIRED_BEFORE_RETRY", reason: result.safeMessage || "Supplier status requires reconciliation.", failureCode: result.failureCode || result.providerStatus });
         }
         return attempt;
     }
@@ -120,9 +143,11 @@ function createFazerCardsFulfillmentProcessor(deps = {}) {
         let result;
         try { result = await adapter.submitTopup({ categoryId: mapping.supplierProductCode, offerId: mapping.supplierPackageCode, fields, idempotencyKey: attempt.idempotencyKey, productCode: mapping.productCode }); }
         catch (error) {
-            attempt.supplierRequest = { ...(attempt.supplierRequest || {}), submissionState: error.submissionUncertain ? "SUBMISSION_UNCERTAIN" : "SUBMISSION_BLOCKED" };
+            attempt.supplierRequest = { ...(attempt.supplierRequest || {}), submissionState: error.submissionUncertain ? "SUBMISSION_UNCERTAIN" : "SUBMISSION_BLOCKED", manualAttention: error.submissionUncertain === true, recoveryState: error.submissionUncertain ? "RECONCILIATION_REQUIRED_BEFORE_RETRY" : attempt.supplierRequest?.recoveryState, automaticRetryAllowed: false };
             attempt.supplierResult = normalizeSupplierResult({ status: "PENDING", supplierCode: "FAZERCARDS", providerStatus: error.submissionUncertain ? "SUBMISSION_UNCERTAIN" : "SUBMISSION_BLOCKED", failureCode: error.code, safeMessage: error.submissionUncertain ? "Provider outcome is uncertain; retry only with the same idempotency key." : error.message });
-            await attempt.save(); return attempt;
+            await attempt.save();
+            if (error.submissionUncertain) await recordRecoverySafely(order, attempt, { state: "RECONCILIATION_REQUIRED_BEFORE_RETRY", reason: "Supplier submission outcome is uncertain; reconcile before any retry.", failureCode: error.code || "SUBMISSION_UNCERTAIN" });
+            return attempt;
         }
         if (result.supplierReference) { attempt.supplierReference = result.supplierReference; attempt.supplierResult = normalizeSupplierResult(result); attempt.supplierRequest = { ...(attempt.supplierRequest || {}), submissionState: "ACCEPTED", submittedAt: new Date() }; await attempt.save(); }
         await reconcile(attempt, order, result);

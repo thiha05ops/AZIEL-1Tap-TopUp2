@@ -17,28 +17,29 @@ const Store = require("../models/StoreCatalogSelection");
 const Selection = require("../models/PackageSupplierSelection");
 const Publication = require("../models/PackageMarketPublication");
 const Attempt = require("../models/FulfillmentAttempt");
-const { createUnifiedSalesPublicationService } = require("../services/commerce/unifiedSalesPublicationService");
+const Audit = require("../models/AdminAuditLog");
+const { UNVERIFIED_LAUNCH_STATUS, UNVERIFIED_LAUNCH_ACKNOWLEDGEMENT, createUnifiedSalesPublicationService } = require("../services/commerce/unifiedSalesPublicationService");
 const { reconcileAttempt } = require("../services/supplierChargeReconciliationService");
 const { observedCostHash } = require("../services/supplierCatalog/supplierCostComparisonService");
 
 const now = new Date(), hash = "a".repeat(64);
 const ids = Object.fromEntries(["supplier", "run", "supplierProduct", "offer", "mapping"].map(key => [key, new mongoose.Types.ObjectId()]));
 const pricePatches = { TH: { amount: 410, currency: "THB", enabled: true }, MM: { amount: 52000, currency: "MMK", enabled: true } };
-const input = { mappingId: ids.mapping, regions: ["TH", "MM"], pricePatches, regionalPreviews: { TH: { blockingErrors: [] }, MM: { blockingErrors: [] } }, confirmed: true };
+const input = { mappingId: ids.mapping, regions: ["TH", "MM"], pricePatches, regionalPreviews: { TH: { blockingErrors: [] }, MM: { blockingErrors: [] } }, confirmed: true, ownerApprovedUnverifiedLaunch: true, unverifiedLaunchAcknowledgement: UNVERIFIED_LAUNCH_ACKNOWLEDGEMENT };
 const actor = { role: "OWNER", username: "isolated-owner" };
 
 async function seed() {
     await Supplier.collection.insertOne({ _id: ids.supplier, supplierCode: "FAZERCARDS", name: "FazerCards", enabled: true, mode: "API", supplierCurrency: "USD", supportedRegions: ["GLOBAL"], createdAt: now, updatedAt: now });
     await Product.collection.insertOne({ productCode: "test_game", name: "Test Game", enabled: true, deletedAt: null, createdAt: now, updatedAt: now });
     await Package.collection.insertOne({ productCode: "test_game", packageCode: "PACK_1", name: "Pack 1", enabled: true, deletedAt: null, prices: { TH: { amount: 400, currency: "THB", enabled: true }, MM: { amount: 50000, currency: "MMK", enabled: true } }, createdAt: now, updatedAt: now });
-    await SupplierProduct.collection.insertOne({ _id: ids.supplierProduct, supplierId: ids.supplier, catalogNamespace: "FAZERCARDS_MASTER", supplierProductCode: "test_auto", displayName: "Test", supplierMarketCode: "GLOBAL", supportState: "SUPPORTED", rawSnapshotHash: hash, firstSeenAt: now, lastSeenAt: now, lastObservedAt: now, lastChangedAt: now, createdAt: now, updatedAt: now });
+    await SupplierProduct.collection.insertOne({ _id: ids.supplierProduct, supplierId: ids.supplier, catalogNamespace: "FAZERCARDS_MASTER", supplierProductCode: "pubg_mobile_auto", displayName: "Test", supplierMarketCode: "GLOBAL", supportState: "SUPPORTED", rawSnapshotHash: hash, firstSeenAt: now, lastSeenAt: now, lastObservedAt: now, lastChangedAt: now, createdAt: now, updatedAt: now });
     await Run.collection.insertOne({ _id: ids.run, supplierId: ids.supplier, catalogNamespace: "FAZERCARDS_MASTER", runKey: "isolated-run", status: "SUCCEEDED_COMPLETE", coverageState: "COMPLETE", startedAt: now, completedAt: now, createdAt: now, updatedAt: now });
-    const offer = { _id: ids.offer, supplierCatalogProductId: ids.supplierProduct, supplierId: ids.supplier, catalogNamespace: "FAZERCARDS_MASTER", supplierProductCode: "test_auto", supplierOfferCode: "pack_1", supplierOfferName: "Pack 1", supplierCost: { amount: 10, currency: "USD", observedAt: now }, catalogLifecycleState: "ACTIVE", reconciliationState: "EXACT_CANONICAL_MATCH", firstSeenAt: now, lastSeenAt: now, lastObservedAt: now, lastChangedAt: now, rawSnapshotHash: hash, rawSnapshot: {}, createdAt: now, updatedAt: now };
+    const offer = { _id: ids.offer, supplierCatalogProductId: ids.supplierProduct, supplierId: ids.supplier, catalogNamespace: "FAZERCARDS_MASTER", supplierProductCode: "pubg_mobile_auto", supplierOfferCode: "pack_1", supplierOfferName: "Pack 1", supplierCost: { amount: 10, currency: "USD", observedAt: now }, catalogLifecycleState: "ACTIVE", reconciliationState: "EXACT_CANONICAL_MATCH", firstSeenAt: now, lastSeenAt: now, lastObservedAt: now, lastChangedAt: now, rawSnapshotHash: hash, rawSnapshot: {}, createdAt: now, updatedAt: now };
     const costHash = observedCostHash(offer);
     await Offer.collection.insertOne(offer);
-    await Latest.collection.insertOne({ _id: ids.offer, schemaVersion: 1, supplierCatalogProductId: ids.supplierProduct, supplierId: ids.supplier, catalogNamespace: "FAZERCARDS_MASTER", supplierProductCode: "test_auto", supplierOfferCode: "pack_1", amount: 10, currency: "USD", validatedObservedAt: now, sourceRevision: hash, rawSnapshotHash: hash, observedCostHash: costHash, ingestionRunId: ids.run, runKey: "isolated-run", coverageState: "COMPLETE", publishedAt: now });
+    await Latest.collection.insertOne({ _id: ids.offer, schemaVersion: 1, supplierCatalogProductId: ids.supplierProduct, supplierId: ids.supplier, catalogNamespace: "FAZERCARDS_MASTER", supplierProductCode: "pubg_mobile_auto", supplierOfferCode: "pack_1", amount: 10, currency: "USD", validatedObservedAt: now, sourceRevision: hash, rawSnapshotHash: hash, observedCostHash: costHash, ingestionRunId: ids.run, runKey: "isolated-run", coverageState: "COMPLETE", publishedAt: now });
     await Availability.collection.insertOne({ supplierCatalogOfferId: ids.offer, state: "AVAILABLE", evidenceCode: "AUTHENTICATED_API", observedAt: now, staleAt: null, lastAvailableAt: now, consecutiveMissingCount: 0, observationRunId: ids.run, coverageComplete: true, createdAt: now, updatedAt: now });
-    await Mapping.collection.insertOne({ _id: ids.mapping, supplierId: ids.supplier, supplierCode: "FAZERCARDS", productCode: "test_game", packageCode: "PACK_1", supplierProductCode: "test_auto", supplierPackageCode: "pack_1", supplierCatalogOfferId: ids.offer, region: "GLOBAL", supplierMarketEvidence: { normalizedMarket: "GLOBAL", supplierMarketCode: "GLOBAL", marketClassification: "GLOBAL", restrictions: [], evidenceCode: "AUTHENTICATED_API", sourceProductHash: hash }, enabled: false, productionRole: "DISABLED", archivedAt: null, executionMode: "API", supplierCostAuthority: { rawSupplierCost: 10, supplierCurrency: "USD", capturedAt: now, observedAt: now, providerProductCode: "test_auto", providerOfferCode: "pack_1", ingestionRunId: ids.run, rawSnapshotHash: hash, observedCostHash: costHash, verificationMode: "AUTOMATIC_VERIFIED_API" }, mappingMetadata: { readiness: {} }, createdAt: now, updatedAt: now });
+    await Mapping.collection.insertOne({ _id: ids.mapping, supplierId: ids.supplier, supplierCode: "FAZERCARDS", productCode: "test_game", packageCode: "PACK_1", supplierProductCode: "pubg_mobile_auto", supplierPackageCode: "pack_1", supplierCatalogOfferId: ids.offer, region: "GLOBAL", supplierMarketEvidence: { normalizedMarket: "GLOBAL", supplierMarketCode: "GLOBAL", marketClassification: "GLOBAL", restrictions: [], evidenceCode: "AUTHENTICATED_API", sourceProductHash: hash }, enabled: false, productionRole: "DISABLED", archivedAt: null, executionMode: "API", supplierCostAuthority: { rawSupplierCost: 10, supplierCurrency: "USD", capturedAt: now, observedAt: now, providerProductCode: "pubg_mobile_auto", providerOfferCode: "pack_1", ingestionRunId: ids.run, rawSnapshotHash: hash, observedCostHash: costHash, verificationMode: "AUTOMATIC_VERIFIED_API" }, mappingMetadata: { readiness: {} }, createdAt: now, updatedAt: now });
 }
 
 async function main() {
@@ -48,11 +49,13 @@ async function main() {
         await seed();
         const readyTechnical = () => ({ blockers: [], fulfillmentContract: { version: 1, fields: [{ customerField: "playerId", providerField: "player_id", required: true }] } });
         const service = createUnifiedSalesPublicationService({}, { technicalAssessment: readyTechnical, readinessAssessment: () => ({ ready: true, blockers: [] }), adapterFor: () => ({ isConfigured: () => true }) });
+        const unapproved = await service.preflight({ ...input, ownerApprovedUnverifiedLaunch: false, unverifiedLaunchAcknowledgement: "" }); assert(unapproved.blockers.includes("OWNER_UNVERIFIED_LAUNCH_APPROVAL_REQUIRED"));
         const plan = await service.preflight(input); assert.equal(plan.ready, true, plan.blockers.join(","));
         const result = await service.publish(input, { actor }); assert.equal(result.purchasable, true);
         const [pkg, mapping, selection, store, publication] = await Promise.all([Package.findOne({ packageCode: "PACK_1" }).lean(), Mapping.findById(ids.mapping).lean(), Selection.findOne({ packageCode: "PACK_1" }).lean(), Store.findOne({ productCode: "test_game" }).lean(), Publication.findOne({ packageCode: "PACK_1" }).lean()]);
         assert.equal(pkg.prices.TH.amount, 410); assert.equal(pkg.prices.MM.amount, 52000); assert.equal(pkg.pricingPublicationHistory.length, 2);
         assert.equal(mapping.enabled, true); assert.equal(mapping.productionRole, "PRIMARY"); assert.equal(String(selection.supplierMappingId), String(ids.mapping)); assert.equal(store.status, "ACTIVE"); assert.equal(publication.published, true);
+        assert.equal(mapping.mappingMetadata.fulfillmentVerification.status, UNVERIFIED_LAUNCH_STATUS); assert.equal(await Audit.countDocuments({ action: UNVERIFIED_LAUNCH_STATUS }), 1); assert.equal(await Attempt.countDocuments({ status: "SUCCEEDED" }), 0);
         const replay = await service.publish(input, { actor }); assert.equal(replay.purchasable, true);
         const beforeRollback = await Package.findOne({ packageCode: "PACK_1" }).lean();
         const failingService = createUnifiedSalesPublicationService({}, { technicalAssessment: readyTechnical, readinessAssessment: () => ({ ready: false, blockers: ["ROUTE_NOT_PURCHASABLE"] }), adapterFor: () => ({ isConfigured: () => true }) });
@@ -71,7 +74,7 @@ async function main() {
         const difference = reconcileAttempt({ supplierRequest: { costAuthoritySnapshot: { amount: 10, currency: "USD" } }, supplierResult: { rawMetadata: { provider: { charged_amount: 9.5, currency: "USD" } } } });
         const missing = reconcileAttempt({ supplierRequest: { costAuthoritySnapshot: { amount: 10, currency: "USD" } }, supplierResult: { rawMetadata: {} } });
         assert.equal(match.status, "MATCH"); assert.equal(difference.status, "DIFFERENCE"); assert.equal(missing.status, "ACTUAL_CHARGE_UNAVAILABLE");
-        console.log(JSON.stringify({ result: "PASS", atomicPublication: true, transactionRollback: true, staleCostBlocked: true, idempotentReplay: true, disabledPackagePreserved: true, quoteChargeReconciliation: [match.status, difference.status, missing.status], productionConnections: 0, supplierCalls: 0 }, null, 2));
+        console.log(JSON.stringify({ result: "PASS", atomicPublication: true, ownerApprovedUnverifiedLaunch: true, fabricatedFulfillmentAttempts: 0, transactionRollback: true, staleCostBlocked: true, idempotentReplay: true, disabledPackagePreserved: true, quoteChargeReconciliation: [match.status, difference.status, missing.status], productionConnections: 0, supplierCalls: 0 }, null, 2));
     } finally { await mongoose.disconnect(); await repl.stop(); }
 }
 

@@ -44,7 +44,7 @@ async function main() {
         const route = fs.readFileSync(path.join(root, "backend/routes/catalog.js"), "utf8");
         assert(route.includes("requireAdminPermission(PERMISSIONS.CATALOG_MANAGE)") && route.includes("setPackageEnabledForSelling"));
         const pricing = fs.readFileSync(path.join(root, "backend/services/commerce/unifiedSalesPublicationService.js"), "utf8");
-        assert(pricing.includes("CANONICAL_PACKAGE_DISABLED") && pricing.includes("CONTROLLED_FULFILLMENT_REQUIRED"));
+        assert(pricing.includes("CANONICAL_PACKAGE_DISABLED") && pricing.includes("OWNER_UNVERIFIED_LAUNCH_APPROVAL_REQUIRED"));
         const checkout = fs.readFileSync(path.join(root, "backend/services/supplierProductionSelectionService.js"), "utf8");
         assert(checkout.includes("GLOBAL_SUPPLIER_SELECTION_REQUIRED") && checkout.includes("assessMappingReadiness"));
 

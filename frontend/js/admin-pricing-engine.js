@@ -27,6 +27,7 @@
     const money = (value, currency) => value == null ? "-" : `${Number(value).toLocaleString(undefined, { maximumFractionDigits: 2 })} ${currency}`;
     const publishOutcome = window.AZIEL_PRICING_PUBLISH_OUTCOME;
     const WORKSPACE_CHUNK_SIZE = 200;
+    const PUBG_AUTO_UNVERIFIED_ACKNOWLEDGEMENT = "OWNER APPROVES PUBG AUTO LAUNCH WITHOUT PRIOR SUCCESS";
     const chunks = rows => Array.from({ length: Math.ceil(rows.length / WORKSPACE_CHUNK_SIZE) }, (_, index) => rows.slice(index * WORKSPACE_CHUNK_SIZE, (index + 1) * WORKSPACE_CHUNK_SIZE));
 
     async function pricingFetch(url, options = {}) {
@@ -652,13 +653,19 @@
             });
         });
         if (!window.confirm(`Publish ${rows.length} selected package row(s)?\n\n${reviewLines.join("\n")}`)) return;
+        const requiresUnverifiedLaunchApproval = rows.some(row => text(row.supplierProductCode) === "pubg_mobile_auto" && upper(row.fulfillmentVerificationStatus) !== "PROVEN_FULFILLMENT_SUCCESS");
+        let unverifiedLaunchAcknowledgement = "";
+        if (requiresUnverifiedLaunchApproval) {
+            unverifiedLaunchAcknowledgement = window.prompt(`PUBG Mobile Auto has no prior successful real fulfillment evidence. Failed orders will require Admin Manual Recovery.\n\nType exactly:\n${PUBG_AUTO_UNVERIFIED_ACKNOWLEDGEMENT}`) || "";
+            if (unverifiedLaunchAcknowledgement !== PUBG_AUTO_UNVERIFIED_ACKNOWLEDGEMENT) return;
+        }
         daily.publishing = true;
         updatePublishState();
         $("pricingDailyState").textContent = "Publishing";
         const publishScope = `${daily.supplierId}|${daily.supplierMarket}|${daily.selectedProductId}|${daily.region}`;
         try {
             const batchResults = [];
-            for (const batch of chunks(rows)) batchResults.push(await pricingFetch("/api/admin/pricing-engine/workspace/publish", { method: "POST", body: JSON.stringify({ supplierId: daily.supplierId, region: publishRegion, rows: batch }) }));
+            for (const batch of chunks(rows)) batchResults.push(await pricingFetch("/api/admin/pricing-engine/workspace/publish", { method: "POST", body: JSON.stringify({ supplierId: daily.supplierId, region: publishRegion, rows: batch, ownerApprovedUnverifiedLaunch: requiresUnverifiedLaunchApproval, unverifiedLaunchAcknowledgement }) }));
             const result = {
                 results: batchResults.flatMap(item => item.results || []),
                 draftCleanup: { clearedKeys: batchResults.flatMap(item => item.draftCleanup?.clearedKeys || []) },

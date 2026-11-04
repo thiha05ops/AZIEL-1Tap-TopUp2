@@ -219,6 +219,7 @@ async function loadDailyPricingWorkspace({ supplierId = "", supplierMarket = "",
             fundingCost: Number(supplierCostEvidence.fundingCost || 0),
             otherAcquisitionCost: Number(supplierCostEvidence.otherAcquisitionCost || 0),
             mappingReadiness: mapping.mappingMetadata?.readiness || {}, packageEnabled: pkg.enabled !== false,
+            fulfillmentVerificationStatus: upper(mapping.mappingMetadata?.fulfillmentVerification?.status),
             storeCatalogStatus: storeCatalogSelection ? "SELECTED" : "NOT_SELECTED",
             priceEnabled: price?.enabled !== false && Boolean(price), region: pricingRegion, currency: price?.currency || REGION_CURRENCIES[pricingRegion],
             publishedPrice: price?.amount ?? null, publishedPriceMode: price?.publishedPriceMode || "",
@@ -1596,7 +1597,9 @@ async function publishDailyPricing({
     region = "",
     supplierId = "",
     skipDraftCleanup = false,
-    unifiedSellable = false
+    unifiedSellable = false,
+    ownerApprovedUnverifiedLaunch = false,
+    unverifiedLaunchAcknowledgement = ""
 } = {}) {
     const selectedRegions = pricingTargetRegions(region || "ALL");
     if (!selectedRegions.length) {
@@ -1849,7 +1852,9 @@ async function publishDailyPricing({
                     pricePatches,
                     regionalPreviews: Object.fromEntries((row.regions || []).map(item => [item.region, item])),
                     pricingPublicationEvidence: patch.pricingPublicationEvidence,
-                    confirmed: true
+                    confirmed: true,
+                    ownerApprovedUnverifiedLaunch,
+                    unverifiedLaunchAcknowledgement
                 }, { actor: admin || { username: actor } })
                 : await updatePackage({ productCode: row.productCode, packageCode: row.packageCode, patch, actor });
 

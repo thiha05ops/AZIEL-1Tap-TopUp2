@@ -15,6 +15,7 @@ const StoreCatalogSelection = require("../../models/StoreCatalogSelection");
 const PackageSupplierSelection = require("../../models/PackageSupplierSelection");
 const PackageMarketPublication = require("../../models/PackageMarketPublication");
 const FulfillmentAttempt = require("../../models/FulfillmentAttempt");
+const AdminAuditLog = require("../../models/AdminAuditLog");
 const { validateLatestRow } = require("../supplierCatalog/supplierLatestCostService");
 const { assessExistingPreparedRoute } = require("../supplierCatalog/supplierRoutePreparationService");
 const { READINESS_MODES, assessMappingReadiness } = require("../supplierMappingReadinessService");
@@ -24,6 +25,8 @@ const clean = value => String(value == null ? "" : value).trim();
 const upper = value => clean(value).toUpperCase();
 const id = value => clean(value?._id || value);
 const sha = value => crypto.createHash("sha256").update(JSON.stringify(value)).digest("hex");
+const UNVERIFIED_LAUNCH_STATUS = "OWNER_APPROVED_UNVERIFIED_LAUNCH";
+const UNVERIFIED_LAUNCH_ACKNOWLEDGEMENT = "OWNER APPROVES PUBG AUTO LAUNCH WITHOUT PRIOR SUCCESS";
 
 class UnifiedSalesPublicationError extends Error {
     constructor(code, message, statusCode = 409, details = {}) { super(message); this.name = "UnifiedSalesPublicationError"; this.code = code; this.statusCode = statusCode; this.details = details; }
@@ -63,7 +66,7 @@ function createUnifiedSalesPublicationService(models = {}, dependencies = {}) {
         Mapping: models.Mapping || SupplierProductMapping, Offer: models.Offer || SupplierCatalogOffer, SupplierProduct: models.SupplierProduct || SupplierCatalogProduct,
         Availability: models.Availability || SupplierOfferAvailability, LatestCost: models.LatestCost || SupplierCatalogLatestCost, Run: models.Run || SupplierCatalogIngestionRun,
         StoreSelection: models.StoreSelection || StoreCatalogSelection, PackageSelection: models.PackageSelection || PackageSupplierSelection,
-        Publication: models.Publication || PackageMarketPublication, Attempt: models.Attempt || FulfillmentAttempt
+        Publication: models.Publication || PackageMarketPublication, Attempt: models.Attempt || FulfillmentAttempt, Audit: models.Audit || AdminAuditLog
     };
     const adapterFor = dependencies.adapterFor || getSupplierAdapter;
     const technicalAssessment = dependencies.technicalAssessment || assessExistingPreparedRoute;
@@ -108,8 +111,9 @@ function createUnifiedSalesPublicationService(models = {}, dependencies = {}) {
             technical = technicalAssessment({ mapping: state.mapping, supplier: state.supplier, supplierProduct: state.supplierProduct, offer: state.offer, availability: state.availability, canonicalProduct: state.product, canonicalPackages: state.pkg ? [state.pkg] : [] }, input.regions, { adapterResolver: adapterFor });
             blockers.push(...(technical.blockers || []));
         }
-        if (clean(state.mapping?.supplierProductCode) === "pubg_mobile_auto" && !state.controlled) blockers.push("CONTROLLED_FULFILLMENT_REQUIRED");
-        const manifest = { mappingId: id(state.mapping), mappingUpdatedAt: state.mapping?.updatedAt || null, packageUpdatedAt: state.pkg?.updatedAt || null, offerHash: state.offer?.rawSnapshotHash || "", availabilityObservedAt: state.availability?.observedAt || null, costHash: state.latest?.observedCostHash || "", prices: input.pricePatches, regions: input.regions };
+        const unverifiedPubgAutoLaunch = clean(state.mapping?.supplierProductCode) === "pubg_mobile_auto" && !state.controlled;
+        if (unverifiedPubgAutoLaunch && !(input.ownerApprovedUnverifiedLaunch === true && clean(input.unverifiedLaunchAcknowledgement) === UNVERIFIED_LAUNCH_ACKNOWLEDGEMENT)) blockers.push("OWNER_UNVERIFIED_LAUNCH_APPROVAL_REQUIRED");
+        const manifest = { mappingId: id(state.mapping), mappingUpdatedAt: state.mapping?.updatedAt || null, packageUpdatedAt: state.pkg?.updatedAt || null, offerHash: state.offer?.rawSnapshotHash || "", availabilityObservedAt: state.availability?.observedAt || null, costHash: state.latest?.observedCostHash || "", launchStatus: unverifiedPubgAutoLaunch ? UNVERIFIED_LAUNCH_STATUS : "PROVEN_OR_NOT_REQUIRED", prices: input.pricePatches, regions: input.regions };
         return { ready: blockers.length === 0, blockers: [...new Set(blockers)].sort(), planHash: sha(manifest), manifest, state, technical };
     }
 
@@ -126,8 +130,11 @@ function createUnifiedSalesPublicationService(models = {}, dependencies = {}) {
             const otherPrimaries = await M.Mapping.find({ _id: { $ne: mapping._id }, productCode: mapping.productCode, packageCode: mapping.packageCode, region: mapping.region, productionRole: "PRIMARY", archivedAt: null }).session(session);
             for (const other of otherPrimaries) { other.enabled = false; other.productionRole = "DISABLED"; other.mappingMetadata = { ...(other.mappingMetadata || {}), readiness: { ...(other.mappingMetadata?.readiness || {}), storefrontReady: false } }; await other.save({ session }); }
             mapping.enabled = true; mapping.productionRole = "PRIMARY"; mapping.executionMode = "API";
-            mapping.mappingMetadata = { ...(mapping.mappingMetadata || {}), fulfillmentContract: plan.technical.fulfillmentContract, readiness: { ...(mapping.mappingMetadata?.readiness || {}), supplierMapped: true, inputReady: true, validationReady: true, fulfillmentReady: true, pricingReady: true, storefrontReady: true }, unifiedPublication: { planHash: plan.planHash, publishedAt: clock(), publishedBy: clean(context.actor.username) } };
+            const unverifiedPubgAutoLaunch = clean(mapping.supplierProductCode) === "pubg_mobile_auto" && !state.controlled;
+            const launchVerification = unverifiedPubgAutoLaunch ? { status: UNVERIFIED_LAUNCH_STATUS, approvedAt: clock(), approvedBy: clean(context.actor.username), acknowledgement: UNVERIFIED_LAUNCH_ACKNOWLEDGEMENT, evidence: "OWNER_RISK_ACCEPTANCE_NO_PRIOR_SUCCESS" } : { status: state.controlled ? "PROVEN_FULFILLMENT_SUCCESS" : "NOT_REQUIRED", verifiedAt: clock() };
+            mapping.mappingMetadata = { ...(mapping.mappingMetadata || {}), fulfillmentContract: plan.technical.fulfillmentContract, fulfillmentVerification: launchVerification, readiness: { ...(mapping.mappingMetadata?.readiness || {}), supplierMapped: true, inputReady: true, validationReady: true, fulfillmentReady: true, pricingReady: true, storefrontReady: true }, unifiedPublication: { planHash: plan.planHash, publishedAt: clock(), publishedBy: clean(context.actor.username) } };
             await mapping.save({ session });
+            if (unverifiedPubgAutoLaunch) await M.Audit.create([{ actorAdminId: context.actor.id || context.actor._id || null, actorUsernameSnapshot: clean(context.actor.username), actorRoleSnapshot: "OWNER", action: UNVERIFIED_LAUNCH_STATUS, resourceType: "SupplierProductMapping", resourceId: id(mapping), requestId: clean(context.requestId), method: "POST", route: "unified-sales-publication", metadata: { planHash: plan.planHash, productCode: mapping.productCode, packageCode: mapping.packageCode, supplierProductCode: mapping.supplierProductCode, supplierPackageCode: mapping.supplierPackageCode, acknowledgement: UNVERIFIED_LAUNCH_ACKNOWLEDGEMENT, successfulFulfillmentObserved: false } }], { session, ordered: true });
             await M.PackageSelection.findOneAndUpdate({ productCode: mapping.productCode, packageCode: mapping.packageCode, customerMarket: "GLOBAL" }, { $set: { supplierMappingId: mapping._id, selectedByAdminId: context.actor.id || context.actor._id || null, selectedByUsernameSnapshot: clean(context.actor.username), selectedAt: clock(), reason: "Unified Daily Pricing publication" }, $inc: { decisionVersion: 1 } }, { upsert: true, new: true, session, setDefaultsOnInsert: true, runValidators: true });
             const packages = [...(currentStore?.packages || []).filter(item => upper(item.packageCode) !== upper(mapping.packageCode)), { packageCode: mapping.packageCode, supplierProductMappingId: mapping._id }];
             const sellingRegions = [...new Set([...(currentStore?.sellingRegions || []), ...input.regions])];
@@ -166,4 +173,4 @@ function createUnifiedSalesPublicationService(models = {}, dependencies = {}) {
 }
 
 const service = createUnifiedSalesPublicationService();
-module.exports = Object.freeze({ UnifiedSalesPublicationError, exactAuthority, validReviewedPrices, createUnifiedSalesPublicationService, publishEligiblePackage: service.publish, preflightEligiblePackage: service.preflight });
+module.exports = Object.freeze({ UNVERIFIED_LAUNCH_STATUS, UNVERIFIED_LAUNCH_ACKNOWLEDGEMENT, UnifiedSalesPublicationError, exactAuthority, validReviewedPrices, createUnifiedSalesPublicationService, publishEligiblePackage: service.publish, preflightEligiblePackage: service.preflight });
