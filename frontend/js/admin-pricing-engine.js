@@ -494,10 +494,9 @@
     function updatePublishState() {
         reconcileSelection();
         const button = $("pricingPublishBtn");
-        const changed = workspaceRows().filter(row => previewFor(row)?.changed === true && rowSelectionEligible(row));
-        const productChanged = changed.filter(row => row.productCode === daily.selectedProductId);
-        button.disabled = daily.publishing || !activeSupplier() || changed.length === 0;
-        button.innerHTML = `<i class="fa-solid fa-cloud-arrow-up" aria-hidden="true"></i> Publish All Changes (${changed.length})`;
+        const productChanged = regionRows().filter(row => row.productCode === daily.selectedProductId && previewFor(row)?.changed === true && rowSelectionEligible(row));
+        button.disabled = daily.publishing || !activeSupplier() || productChanged.length === 0;
+        button.innerHTML = `<i class="fa-solid fa-cloud-arrow-up" aria-hidden="true"></i> Publish All Changes in This Product (${productChanged.length})`;
         const selectedButton = $("pricingPublishSelectedBtn");
         if (selectedButton) { selectedButton.disabled = daily.publishing || daily.selected.size === 0; selectedButton.textContent = `Publish Selected (${daily.selected.size})`; }
         const productButton = $("pricingPublishProductBtn");
@@ -680,8 +679,17 @@
             const publishedCount = Number(result.summary?.published || 0);
             const failedCount = Number(result.summary?.failed || 0);
             if (failedCount > 0) {
-                const reasons = (result.results || []).filter(item => item.failed).map(item => `${item.productCode}/${item.packageCode}/${item.region}: ${item.reason || item.code || "Publish failed"}`);
-                setDailyError(`${publishedCount} published; ${failedCount} failed.${reasons.length ? ` ${reasons.join(" · ")}` : ""}`, false);
+                const failures = new Map();
+                (result.results || []).filter(item => item.failed).forEach(item => {
+                    const key = `${item.productCode}/${item.packageCode}`;
+                    const entry = failures.get(key) || { regions: new Set(), blockers: new Set() };
+                    entry.regions.add(item.region);
+                    (item.blockingErrors || []).forEach(blocker => entry.blockers.add(text(blocker.code || blocker)));
+                    if (!entry.blockers.size) entry.blockers.add(text(item.code || item.reason || "PUBLISH_FAILED"));
+                    failures.set(key, entry);
+                });
+                const reasons = [...failures].map(([key, entry]) => `${key} [${[...entry.regions].join("/")}]: ${[...entry.blockers].join(", ")}`);
+                setDailyError(`${publishedCount} published; ${failures.size} package(s) blocked. ${reasons.join(" · ")}`, false);
                 $("pricingDailyState").textContent = publishedCount > 0 ? "Partially published" : "Publish failed";
             } else {
                 $("pricingDailyState").textContent = `${publishedCount} published`;
@@ -1028,7 +1036,7 @@
         $("pricingSelectVisible")?.addEventListener("click", () => selectVisible("ALL"));
         $("pricingSelectChanged")?.addEventListener("click", () => selectVisible("CHANGED"));
         $("pricingClearSelection")?.addEventListener("click", () => selectVisible("CLEAR"));
-        $("pricingPublishBtn")?.addEventListener("click", () => publishRows("WORKSPACE_CHANGED"));
+        $("pricingPublishBtn")?.addEventListener("click", () => publishRows("PRODUCT_CHANGED"));
         $("pricingPublishSelectedBtn")?.addEventListener("click", () => publishRows("SELECTION"));
         $("pricingPublishProductBtn")?.addEventListener("click", () => publishRows("PRODUCT_CHANGED"));
         $("pricingRetryRefresh")?.addEventListener("click", () => daily.productBrowserOpen ? loadInventory(true) : loadProductDetail(true, { preserveOnError: daily.detailLoaded }));

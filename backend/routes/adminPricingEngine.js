@@ -396,7 +396,15 @@ router.post("/admin/pricing-engine/workspace/publish", adminMiddleware, requireA
                 requested: result.summary.requested,
                 published: result.summary.published,
                 failed: result.summary.failed,
-                skipped: result.summary.skipped
+                skipped: result.summary.skipped,
+                outcomes: (result.results || []).map(item => ({
+                    productCode: item.productCode,
+                    packageCode: item.packageCode,
+                    region: item.region,
+                    status: item.published ? "PUBLISHED" : item.failed ? "BLOCKED" : "SKIPPED",
+                    code: item.code || "",
+                    blockers: (item.blockingErrors || []).map(blocker => blocker.code || blocker).filter(Boolean)
+                }))
             }
         }).catch(error => console.log("Admin audit failed:", error.message));
         return res.json(result);

@@ -1880,6 +1880,9 @@ async function publishDailyPricing({
                 });
             });
         } catch (error) {
+            const blockerCodes = Array.isArray(error.details?.blockers)
+                ? [...new Set(error.details.blockers.map(code => String(code || "").trim()).filter(Boolean))]
+                : [];
             publishableRegions.forEach(selectedRegion => {
                 results.push({
                     region: selectedRegion,
@@ -1888,7 +1891,8 @@ async function publishDailyPricing({
                     published: false,
                     failed: true,
                     reason: error.message || "Publish failed",
-                    code: error.code || "PUBLISH_FAILED"
+                    code: error.code || "PUBLISH_FAILED",
+                    blockingErrors: blockerCodes.map(code => ({ code, message: code }))
                 });
             });
         }

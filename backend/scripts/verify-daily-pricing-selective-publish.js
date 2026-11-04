@@ -98,9 +98,12 @@ function main() {
     const service = read("backend/services/commerce/adminPricingControlCenterService.js");
     assert(frontend.includes("daily.selected.has(rowKey(row))"), "Publish payload must contain selected rows only.");
     assert(frontend.includes('daily.selected.has(key) ? "checked" : ""'), "Rendered checkbox state must derive from the canonical selection Set.");
-    assert(frontend.includes("Publish All Changes (${changed.length})"), "Primary publish count must derive from all changed workspace rows.");
+    assert(frontend.includes("Publish All Changes in This Product (${productChanged.length})"), "Primary publish count must be scoped to the current product.");
     assert(frontend.includes('buildPublishRows(mode = "SELECTION"'), "All publish modes must use one canonical payload builder.");
-    assert(frontend.includes('publishRows("SELECTION")') && frontend.includes('publishRows("PRODUCT_CHANGED")') && frontend.includes('publishRows("WORKSPACE_CHANGED")'), "Selection, product, and workspace publishing controls must exist.");
+    assert(frontend.includes('publishRows("SELECTION")') && frontend.includes('$("pricingPublishBtn")?.addEventListener("click", () => publishRows("PRODUCT_CHANGED"))'), "Selection and current-product publishing controls must exist.");
+    assert(!frontend.includes('$("pricingPublishBtn")?.addEventListener("click", () => publishRows("WORKSPACE_CHANGED"))'), "Primary publication must not submit cached rows from unrelated products.");
+    assert(frontend.includes("const failures = new Map()") && frontend.includes("blockingErrors"), "Bulk publication failures must be grouped per package with blocker codes.");
+    assert(service.includes("error.details?.blockers") && service.includes("blockingErrors: blockerCodes.map"), "Publication must return structured unified-readiness blockers.");
     assert(frontend.includes("checkbox.checked = daily.selected.has(checkbox.dataset.rowSelection)"), "DOM checkbox properties must be synchronized from canonical selection state.");
     assert(frontend.includes("workspaceRows().filter(rowSelectionEligible)"), "Selection must survive product view filtering while remaining eligible.");
     assert(frontend.includes('code: "PREVIEW_IDENTITY_MISMATCH"') && frontend.includes('code: "PREVIEW_REGION_MISMATCH"'), "Missing preview rows and regions must fail closed with explicit diagnostics.");
