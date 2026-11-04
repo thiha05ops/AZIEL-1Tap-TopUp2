@@ -59,6 +59,7 @@
     "apply:master-catalog-canonicalization": "node backend/scripts/apply-master-catalog-canonicalization.js",
     "apply:supplier-master-catalog-ingestion": "node backend/scripts/apply-supplier-master-catalog-ingestion.js",
     "verify:fazercards-catalog-ingestion": "node backend/scripts/verify-fazercards-catalog-ingestion.js",
+    "verify:fazercards-rate-limit-retry": "node backend/scripts/verify-fazercards-rate-limit-retry.js",
     "verify:pubg-mobile-auto-migration": "node backend/scripts/verify-pubg-mobile-auto-migration.js",
     "verify:pubg-mobile-auto-migration-db": "node backend/scripts/verify-pubg-mobile-auto-migration-db.js",
     "pubg-mobile-auto:cutover": "node backend/scripts/cutover-pubg-mobile-auto-migration.js",

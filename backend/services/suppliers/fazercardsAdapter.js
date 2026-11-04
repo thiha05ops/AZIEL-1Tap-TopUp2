@@ -9,7 +9,19 @@ const MAX_AVAILABILITY_CATEGORIES = 40;
 const AVAILABILITY_CONCURRENCY = 4;
 const MAX_VALIDATION_CATEGORIES = 50;
 const MAX_VALIDATION_FIELDS = 12;
+const RATE_LIMIT_MAX_RETRIES = 3;
+const RATE_LIMIT_BASE_DELAY_MS = 500;
+const RATE_LIMIT_MAX_DELAY_MS = 5000;
 const clean = value => String(value == null ? "" : value).trim();
+
+function retryAfterMs(value, nowMs = Date.now()) {
+    const text = clean(value);
+    if (!text) return null;
+    const seconds = Number(text);
+    if (Number.isFinite(seconds) && seconds >= 0) return Math.ceil(seconds * 1000);
+    const dateMs = Date.parse(text);
+    return Number.isFinite(dateMs) ? Math.max(0, dateMs - nowMs) : null;
+}
 
 class FazerCardsAdapterError extends Error {
     constructor(code, message, details = {}) {
@@ -47,6 +59,17 @@ function result(status, providerStatus, supplierReference = "", rawMetadata = {}
 function createFazerCardsAdapter(options = {}) {
     const fetchImpl = options.fetchImpl || defaultFetch;
     const env = options.env || process.env;
+    const clock = options.clock || (() => Date.now());
+    const random = options.random || Math.random;
+    const sleep = options.sleep || ((delayMs, signal) => new Promise((resolve, reject) => {
+        if (signal?.aborted) return reject(Object.assign(new Error("FazerCards request was cancelled."), { code: "FAZERCARDS_REQUEST_ABORTED" }));
+        const timer = setTimeout(done, delayMs);
+        function done() { signal?.removeEventListener?.("abort", cancelled); resolve(); }
+        function cancelled() { clearTimeout(timer); signal?.removeEventListener?.("abort", cancelled); reject(Object.assign(new Error("FazerCards request was cancelled."), { code: "FAZERCARDS_REQUEST_ABORTED" })); }
+        signal?.addEventListener?.("abort", cancelled, { once: true });
+    }));
+    let retryQueue = Promise.resolve();
+    let rateLimitResumeAt = 0;
     const baseUrl = clean(options.baseUrl || env.FAZERCARDS_API_URL) || DEFAULT_BASE_URL;
     const apiKey = () => clean(env.FAZERCARDS_API_KEY);
     const isConfigured = () => Boolean(apiKey());
@@ -56,18 +79,47 @@ function createFazerCardsAdapter(options = {}) {
     const autoFulfillmentGateState = () => { const state=supplierAutoFulfillmentGateState("FAZERCARDS",env); return {...state,productGateEnabled:true,effectiveGateEnabled:state.supplierGateEnabled,blockerCode:state.supplierGateEnabled?"":"SUPPLIER_AUTO_FULFILLMENT_DISABLED"}; };
     const isAutoFulfillmentEnabled = product => autoFulfillmentGateState(product).effectiveGateEnabled;
 
-    async function request(path, options = {}) {
-        if (!isConfigured()) throw new FazerCardsAdapterError("FAZERCARDS_NOT_CONFIGURED", "FazerCards credentials are not configured.", { statusCode: 409 });
+    const queueRateLimitedRetry = task => {
+        const queued = retryQueue.then(task, task);
+        retryQueue = queued.catch(() => undefined);
+        return queued;
+    };
+
+    async function fetchResponse(path, requestOptions) {
         let response;
         try {
-            response = await fetchImpl(`${baseUrl}${path}`, { method: options.method || "GET", headers: { Accept: "application/json", "X-API-Key": apiKey(), ...(options.body ? { "Content-Type": "application/json" } : {}), ...(options.idempotencyKey ? { "Idempotency-Key": options.idempotencyKey } : {}) }, body: options.body ? JSON.stringify(options.body) : undefined, signal: options.signal });
-        } catch {
-            throw new FazerCardsAdapterError("FAZERCARDS_TRANSPORT_ERROR", "FazerCards request outcome could not be confirmed.", { retryable: true, submissionUncertain: options.submission === true });
+            response = await fetchImpl(`${baseUrl}${path}`, { method: requestOptions.method || "GET", headers: { Accept: "application/json", "X-API-Key": apiKey(), ...(requestOptions.body ? { "Content-Type": "application/json" } : {}), ...(requestOptions.idempotencyKey ? { "Idempotency-Key": requestOptions.idempotencyKey } : {}) }, body: requestOptions.body ? JSON.stringify(requestOptions.body) : undefined, signal: requestOptions.signal });
+        } catch (error) {
+            if (requestOptions.signal?.aborted || error?.code === "FAZERCARDS_REQUEST_ABORTED" || error?.name === "AbortError") throw new FazerCardsAdapterError("FAZERCARDS_REQUEST_ABORTED", "FazerCards request was cancelled.", { statusCode: 499 });
+            throw new FazerCardsAdapterError("FAZERCARDS_TRANSPORT_ERROR", "FazerCards request outcome could not be confirmed.", { retryable: true, submissionUncertain: requestOptions.submission === true });
         }
         let payload = {};
         try { payload = await response.json(); } catch { payload = {}; }
-        if (!response.ok) throw new FazerCardsAdapterError(`FAZERCARDS_HTTP_${response.status}`, clean(payload.message || payload.error) || "FazerCards returned an HTTP error.", { statusCode: response.status, retryable: response.status >= 500, submissionUncertain: options.submission === true && response.status >= 500, providerMetadata: payload });
-        return payload;
+        return { response, payload };
+    }
+
+    async function request(path, options = {}) {
+        if (!isConfigured()) throw new FazerCardsAdapterError("FAZERCARDS_NOT_CONFIGURED", "FazerCards credentials are not configured.", { statusCode: 409 });
+        const first = await fetchResponse(path, options);
+        if (first.response.ok) return first.payload;
+        const mayRetryRateLimit = options.retryOnRateLimit === true && first.response.status === 429 && (options.method || "GET") === "GET" && options.submission !== true;
+        if (mayRetryRateLimit) return queueRateLimitedRetry(async () => {
+            let current = first;
+            for (let retry = 1; retry <= RATE_LIMIT_MAX_RETRIES; retry += 1) {
+                if (options.signal?.aborted) throw new FazerCardsAdapterError("FAZERCARDS_REQUEST_ABORTED", "FazerCards request was cancelled.", { statusCode: 499 });
+                const headerDelay = retryAfterMs(current.response.headers?.get?.("retry-after"), clock());
+                const exponential = Math.min(RATE_LIMIT_MAX_DELAY_MS, RATE_LIMIT_BASE_DELAY_MS * (2 ** (retry - 1)));
+                const jittered = Math.ceil(exponential * (0.75 + (Math.max(0, Math.min(1, Number(random()) || 0)) * 0.5)));
+                const delayMs = Math.min(RATE_LIMIT_MAX_DELAY_MS, headerDelay == null ? jittered : headerDelay);
+                rateLimitResumeAt = Math.max(rateLimitResumeAt, clock() + delayMs);
+                await sleep(Math.max(0, rateLimitResumeAt - clock()), options.signal);
+                current = await fetchResponse(path, options);
+                if (current.response.ok) return current.payload;
+                if (current.response.status !== 429) break;
+            }
+            throw new FazerCardsAdapterError(`FAZERCARDS_HTTP_${current.response.status}`, clean(current.payload.message || current.payload.error) || "FazerCards returned an HTTP error.", { statusCode: current.response.status, retryable: current.response.status === 429 || current.response.status >= 500, submissionUncertain: false, providerMetadata: current.payload });
+        });
+        throw new FazerCardsAdapterError(`FAZERCARDS_HTTP_${first.response.status}`, clean(first.payload.message || first.payload.error) || "FazerCards returned an HTTP error.", { statusCode: first.response.status, retryable: first.response.status === 429 || first.response.status >= 500, submissionUncertain: options.submission === true && first.response.status >= 500, providerMetadata: first.payload });
     }
 
     const getAccount = () => request("/me");
@@ -78,8 +130,8 @@ function createFazerCardsAdapter(options = {}) {
         if (!Number.isFinite(balance) || balance < 0) throw new FazerCardsAdapterError("FAZERCARDS_INVALID_BALANCE", "FazerCards returned an invalid balance.");
         return result("SUCCEEDED", "BALANCE_OK", "", { balance, currency: clean(payload.currency || payload.data?.currency || "USD").toUpperCase() }, "FazerCards balance fetched successfully.");
     }
-    const getTopupCategories = (cursor = "", options = {}) => request(`/topups${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`, { signal: options.signal });
-    const getTopupOffers = (categoryId, options = {}) => request(`/topups/offers?category_id=${encodeURIComponent(clean(categoryId))}`, { signal: options.signal });
+    const getTopupCategories = (cursor = "", options = {}) => request(`/topups${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`, { signal: options.signal, retryOnRateLimit: true });
+    const getTopupOffers = (categoryId, options = {}) => request(`/topups/offers?category_id=${encodeURIComponent(clean(categoryId))}`, { signal: options.signal, retryOnRateLimit: true });
 
     function normalizePlayerValidationCapabilities(payload = {}) {
         const rows = Array.isArray(payload?.items) ? payload.items : [];
@@ -231,4 +283,4 @@ function createFazerCardsAdapter(options = {}) {
 }
 
 const adapter = createFazerCardsAdapter();
-module.exports = { ...adapter, createFazerCardsAdapter, normalizeProviderOrder, normalizeStatus, FazerCardsAdapterError, DEFAULT_BASE_URL, MAX_CATEGORY_PAGES, MAX_AVAILABILITY_CATEGORIES, AVAILABILITY_CONCURRENCY, MAX_VALIDATION_CATEGORIES, MAX_VALIDATION_FIELDS };
+module.exports = { ...adapter, createFazerCardsAdapter, normalizeProviderOrder, normalizeStatus, retryAfterMs, FazerCardsAdapterError, DEFAULT_BASE_URL, MAX_CATEGORY_PAGES, MAX_AVAILABILITY_CATEGORIES, AVAILABILITY_CONCURRENCY, MAX_VALIDATION_CATEGORIES, MAX_VALIDATION_FIELDS, RATE_LIMIT_MAX_RETRIES, RATE_LIMIT_BASE_DELAY_MS, RATE_LIMIT_MAX_DELAY_MS };

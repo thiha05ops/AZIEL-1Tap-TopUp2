@@ -173,7 +173,7 @@ async function main() {
     equal(partialFazer.missing.length, 0, "failed/partial Fazer refresh preserves previous offers");
     const partialWondd = wondd.planMutations({ supplierId: "s2", observedAt: now, products: [], offers: [], errors: [], contentRevision: "x", completenessEvidence: "SINGLE_RESPONSE_COMPLETENESS_UNPROVEN" }, { offers: [offer], products: [] });
     equal(partialWondd.missing.length, 0, "WonDD partial response never retires missing offers");
-    equal(fazer.OFFER_READ_CONCURRENCY, 8, "Fazer reads offers with bounded concurrency");
+    equal(fazer.OFFER_READ_CONCURRENCY, 2, "Fazer reads offers with conservative bounded concurrency");
 
     const root = path.resolve(__dirname, "..");
     const job = fs.readFileSync(path.join(root, "scripts/run-weekly-supplier-cost-sync.js"), "utf8");
