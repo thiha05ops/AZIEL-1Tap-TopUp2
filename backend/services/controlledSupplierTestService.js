@@ -9,12 +9,27 @@ const { assessProductionMapping } = require("./supplierProductionSelectionServic
 const { dispatchSubmission } = require("./suppliers/supplierFulfillmentDispatcher");
 
 const clean = value => String(value == null ? "" : value).trim();
+const HASH_PATTERN = /^[a-f0-9]{64}$/;
 function fail(code, message) { throw Object.assign(new Error(message), { code }); }
+function controlledCostAuthorityReady(mapping = {}, now = Date.now()) {
+    const authority = mapping.supplierCostAuthority || {};
+    const observedAt = new Date(authority.observedAt || authority.capturedAt);
+    const maximumAgeMs = Number(mapping.mappingMetadata?.costAuthorityMaximumAgeSeconds || 86400) * 1000;
+    return Number(authority.rawSupplierCost) > 0 && clean(authority.supplierCurrency).toUpperCase() === "USD" &&
+        clean(authority.providerProductCode) === clean(mapping.supplierProductCode) && clean(authority.providerOfferCode) === clean(mapping.supplierPackageCode) &&
+        clean(authority.verificationMode).toUpperCase() === "AUTOMATIC_VERIFIED_API" && Boolean(authority.ingestionRunId) &&
+        HASH_PATTERN.test(clean(authority.rawSnapshotHash).toLowerCase()) && HASH_PATTERN.test(clean(authority.observedCostHash).toLowerCase()) &&
+        Number.isFinite(observedAt.getTime()) && observedAt.getTime() <= now && now - observedAt.getTime() <= maximumAgeMs;
+}
 function controlledAssessmentBlockers(assessment, mapping) {
     const blockers = new Set(assessment?.blockers || []);
     // A controlled test is deliberately bound to a disabled, non-PRIMARY route.
     // Normal checkout still rejects this mapping; every other production gate remains required.
     blockers.delete("MAPPING_DISABLED");
+    if (controlledCostAuthorityReady(mapping)) {
+        blockers.delete("PRICING_NOT_READY");
+        blockers.delete("FULFILLMENT_NOT_READY");
+    }
     if (clean(mapping.region).toUpperCase() === "GLOBAL" && blockers.has("PRODUCTION_PRICE_NOT_PUBLISHED")) {
         const prices = assessment?.package?.prices || {};
         const valid = ["TH", "MM"].every(market => prices[market]?.enabled === true && Number(prices[market]?.amount) > 0);
@@ -51,6 +66,8 @@ async function authorizeControlledAttempt(input = {}, deps = {}) {
     const assessment = await (deps.assess || assessProductionMapping)(mapping.toObject ? mapping.toObject() : mapping);
     const blockers = controlledAssessmentBlockers(assessment, mapping);
     if (blockers.length) fail("CONTROLLED_TEST_NOT_READY", `Controlled test is blocked: ${blockers.join(", ")}`);
+    attempt.supplierRequest = { ...(attempt.supplierRequest || {}), controlledTestAuthorization: { approved: true, mappingId: String(mapping._id), authorizedAt: new Date(), scope: "EXACTLY_ONE_SUPPLIER_SUBMISSION" } };
+    if (typeof attempt.save === "function") await attempt.save();
     return { attempt, order, mapping, supplier, exact };
 }
 
@@ -61,4 +78,4 @@ async function executeControlledSupplierTest(input = {}, deps = {}) {
     return { dispatched: true, fulfillmentId: authority.attempt.fulfillmentId, supplier: authority.mapping.supplierCode, product: authority.mapping.productCode, packageCode: authority.mapping.packageCode };
 }
 
-module.exports = { authorizeControlledAttempt, executeControlledSupplierTest, controlledAssessmentBlockers };
+module.exports = { authorizeControlledAttempt, executeControlledSupplierTest, controlledAssessmentBlockers, controlledCostAuthorityReady };

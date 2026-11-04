@@ -76,7 +76,7 @@ async function protectedFingerprints() {
 }
 
 async function run() {
-    const replSet = await MongoMemoryReplSet.create({ replSet: { count: 1, storageEngine: "wiredTiger" } });
+    const replSet = await MongoMemoryReplSet.create({ binary: { version: "7.0.14" }, replSet: { count: 1, storageEngine: "wiredTiger" } });
     try {
         await mongoose.connect(replSet.getUri("aziel_pubg_auto_migration_test"), { autoIndex: true });
         for (const Model of [AdminAuditLog, StoreCatalogSelection, SupplierProductMapping, SupplierOfferAvailability, SupplierCatalogOffer, SupplierCatalogProduct, SupplierCatalogIngestionRun, CatalogPackage, CatalogProduct, Supplier]) await Model.syncIndexes();
@@ -121,7 +121,7 @@ async function run() {
         await assert.rejects(() => staleService.prepare(inputFor(stalePlan), actor), error => error.code === "PLAN_CHANGED");
         assert.strictEqual(await SupplierProductMapping.countDocuments({ supplierProductCode: TARGET_PRODUCT_CODE }), 0, "Stale plan must not create mappings.");
 
-        console.log(JSON.stringify({ result: "PASS", database: "isolated mongodb-memory-server replica set", packages: 6, transactionRollback: true, concurrencyStalePlanRejected: true, idempotentReplay: true, auditCreated: true, protectedCollectionsUnchanged: true, disabledMappingsProductionEligible: 0, planRegenerationOnEvidenceChange: true, productionConnections: 0, supplierCalls: 0, realOrders: 0 }, null, 2));
+        console.log(JSON.stringify({ result: "PASS", database: "isolated mongodb-memory-server replica set", mongoVersion: "7.0.14", packages: 6, transactionRollback: true, concurrencyStalePlanRejected: true, idempotentReplay: true, auditCreated: true, protectedCollectionsUnchanged: true, disabledMappingsProductionEligible: 0, planRegenerationOnEvidenceChange: true, productionConnections: 0, supplierCalls: 0, realOrders: 0 }, null, 2));
     } finally {
         await mongoose.disconnect().catch(() => null);
         await replSet.stop();

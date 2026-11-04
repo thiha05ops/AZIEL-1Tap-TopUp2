@@ -69,15 +69,17 @@ async function seed() {
             await Availability.collection.insertOne({ supplierCatalogOfferId: offerId, state: "AVAILABLE", evidenceCode: "AUTHENTICATED_API", observedAt: NOW, staleAt: null, lastAvailableAt: NOW, consecutiveMissingCount: 0, observationRunId: runId, coverageComplete: true, createdAt: NOW, updatedAt: NOW });
             const mappingId = productCode === SOURCE_PRODUCT_CODE ? sourceId : targetId;
             const sourceHash = productCode === SOURCE_PRODUCT_CODE ? "c".repeat(64) : "d".repeat(64);
-            await Mapping.collection.insertOne({ _id: mappingId, supplierId, supplierCode: "FAZERCARDS", productCode: PRODUCT_CODE, packageCode: item.packageCode, supplierProductCode: productCode, supplierPackageCode: item.offerCode, supplierCatalogOfferId: offerId, supplierDisplayName: item.name, region: "GLOBAL", enabled: productCode === SOURCE_PRODUCT_CODE, productionRole: productCode === SOURCE_PRODUCT_CODE ? "PRIMARY" : "DISABLED", archivedAt: null, executionMode: "API", supplierCostAuthority: { rawSupplierCost: amount, supplierCurrency: "USD", capturedAt: NOW, source: "AUTHENTICATED_API", providerProductCode: productCode, providerOfferCode: item.offerCode, ingestionRunId: runId, observedAt: NOW, rawSnapshotHash: offer.rawSnapshotHash, observedCostHash: observedCostHash(offer), verificationMode: "AUTOMATIC_VERIFIED_API", fundingCost: 0, otherAcquisitionCost: 0 }, mappingMetadata: { migration: { operation: "PREPARE_PUBG_MOBILE_AUTO_MIGRATION_V1" }, readiness: { supplierMapped: true, pricingReady: true, inputReady: true, validationReady: true, fulfillmentReady: true, storefrontReady: productCode === SOURCE_PRODUCT_CODE }, fulfillmentContract: contract(productCode, sourceHash, offer.rawSnapshotHash) }, fulfillmentEligibility: { mode: "GLOBAL", allowedCustomerMarkets: [], evidenceCode: "CONTROLLED_TEST", evidenceSource: "isolated successful order", verifiedAt: NOW, version: 1 }, createdAt: NOW, updatedAt: NOW, __v: 0 });
+            await Mapping.collection.insertOne({ _id: mappingId, supplierId, supplierCode: "FAZERCARDS", productCode: PRODUCT_CODE, packageCode: item.packageCode, supplierProductCode: productCode, supplierPackageCode: item.offerCode, supplierCatalogOfferId: offerId, supplierDisplayName: item.name, region: "GLOBAL", enabled: productCode === SOURCE_PRODUCT_CODE, productionRole: productCode === SOURCE_PRODUCT_CODE ? "PRIMARY" : "DISABLED", archivedAt: null, executionMode: "API", supplierCostAuthority: { rawSupplierCost: amount, supplierCurrency: "USD", capturedAt: NOW, source: "AUTHENTICATED_API", providerProductCode: productCode, providerOfferCode: item.offerCode, ingestionRunId: runId, observedAt: NOW, rawSnapshotHash: offer.rawSnapshotHash, observedCostHash: observedCostHash(offer), verificationMode: "AUTOMATIC_VERIFIED_API", fundingCost: 0, otherAcquisitionCost: 0 }, mappingMetadata: { migration: { operation: "PREPARE_PUBG_MOBILE_AUTO_MIGRATION_V1" }, readiness: { supplierMapped: true, pricingReady: productCode === SOURCE_PRODUCT_CODE, inputReady: true, validationReady: true, fulfillmentReady: productCode === SOURCE_PRODUCT_CODE, storefrontReady: productCode === SOURCE_PRODUCT_CODE }, fulfillmentContract: contract(productCode, sourceHash, offer.rawSnapshotHash) }, fulfillmentEligibility: { mode: "GLOBAL", allowedCustomerMarkets: [], evidenceCode: "CONTROLLED_TEST", evidenceSource: "isolated successful order", verifiedAt: NOW, version: 1 }, createdAt: NOW, updatedAt: NOW, __v: 0 });
         }
         await PackageSelection.collection.insertOne({ productCode: PRODUCT_CODE, packageCode: item.packageCode, customerMarket: "GLOBAL", supplierMappingId: sourceId, selectedByAdminId: ownerId, selectedByUsernameSnapshot: "fixture", selectedAt: NOW, decisionVersion: 1, reason: "fixture", createdAt: NOW, updatedAt: NOW });
         storePackages.push({ packageCode: item.packageCode, supplierProductMappingId: sourceId });
         const targetContract = (await Mapping.findById(targetId).lean()).mappingMetadata.fulfillmentContract;
         await Attempt.collection.insertOne({ fulfillmentId: `FUL-CONTROL-${index}`, orderId: new mongoose.Types.ObjectId(), orderModel: "CommerceOrder", orderCode: `CONTROL-${index}`, supplierId, supplierCodeSnapshot: "FAZERCARDS", supplierMappingId: targetId, productCode: PRODUCT_CODE, packageCode: item.packageCode, region: "TH", customerMarket: "TH", mode: "API", routeType: "SUPPLIER_API", status: "SUCCEEDED", idempotencyKey: `control-${index}`, supplierReference: `supplier-ok-${index}`, supplierRequest: { categoryId: TARGET_PRODUCT_CODE, offerId: item.offerCode, inputContractFingerprint: targetContract.fingerprint, fields: { player_id: "12***89" } }, startedAt: NOW, completedAt: NOW, createdAt: NOW, updatedAt: NOW });
     }
+    const unrelatedStoreMappingId = new mongoose.Types.ObjectId();
+    storePackages.splice(2, 0, { packageCode: "UNRELATED_PUBG_PACKAGE", supplierProductMappingId: unrelatedStoreMappingId });
     await StoreSelection.collection.insertOne({ productCode: PRODUCT_CODE, supplierId, supplierCode: "FAZERCARDS", supplierMarket: "GLOBAL", sellingRegions: ["TH", "MM"], visibleRegions: ["TH", "MM"], packages: storePackages, status: "ACTIVE", decisionVersion: 1, selectedBy: "fixture", selectedAt: NOW, createdAt: NOW, updatedAt: NOW });
-    return { supplierId };
+    return { supplierId, unrelatedStoreMappingId };
 }
 
 function service(env = { PUBG_MOBILE_AUTO_CUTOVER_ENABLED: "true", PUBG_MOBILE_AUTO_ROLLBACK_ENABLED: "true" }) {
@@ -89,13 +91,17 @@ async function run() {
     try {
         await mongoose.connect(repl.getUri("aziel_pubg_cutover"), { autoIndex: true });
         for (const Model of [Admin, Audit, Attempt, PackageSelection, StoreSelection, Mapping, Availability, LatestCost, CostChange, Offer, SupplierProduct, Run, Package, Supplier]) await Model.syncIndexes();
-        await seed();
+        const seeded = await seed();
         const sixtyCode = PACKAGE_MIGRATIONS.find(item => item.offerCode === "60_uc").packageCode;
         await Mapping.updateOne({ packageCode: sixtyCode, supplierProductCode: TARGET_PRODUCT_CODE }, { $set: { "supplierCostAuthority.verificationMode": "MANUAL_REVIEW", "supplierCostAuthority.ingestionRunId": null, "supplierCostAuthority.observedCostHash": "f".repeat(64) } });
         const blockedDiagnosis = await service().diagnose();
         assert.strictEqual(blockedDiagnosis.state, "BLOCKED");
         assert(blockedDiagnosis.packages.find(value => value.packageCode === sixtyCode).blockers.some(value => value.code === "COST_AUTHORITY_INVALID"));
         assert.strictEqual(blockedDiagnosis.packages.filter(value => value.blockers.length).length, 1, "diagnosis must continue through all six packages");
+        const duplicateStoreEntry = (await StoreSelection.findOne().lean()).packages[0];
+        await StoreSelection.updateOne({}, { $push: { packages: duplicateStoreEntry } });
+        await assert.rejects(() => service().preflight(), error => error.code === "SELECTION_SET_INCOMPLETE", "duplicate UC Store Catalog entries must fail closed");
+        await StoreSelection.updateOne({}, { $pop: { packages: 1 } });
         const recovery = createPubgMobileAutoCostRecoveryService({ clock: () => NOW, env: process.env });
         const recoveryPlan = await recovery.inspect();
         assert.strictEqual(recoveryPlan.state, "READY");
@@ -127,7 +133,9 @@ async function run() {
         assert.strictEqual(await Attempt.countDocuments(), attemptCount, "historical attempts changed");
         assert.strictEqual(await Mapping.countDocuments({ supplierProductCode: SOURCE_PRODUCT_CODE, enabled: true, productionRole: "DISABLED" }), 6, "old frozen routes must remain executable");
         assert.strictEqual(await Mapping.countDocuments({ supplierProductCode: TARGET_PRODUCT_CODE, enabled: true, productionRole: "PRIMARY" }), 6);
+        assert.strictEqual(await Mapping.countDocuments({ supplierProductCode: TARGET_PRODUCT_CODE, "mappingMetadata.readiness.pricingReady": true, "mappingMetadata.readiness.fulfillmentReady": true }), 6, "cutover must persist evidence-derived readiness without manual mapping edits");
         assert.deepStrictEqual((await StoreSelection.findOne().lean()).packages.map(value => value.packageCode), storeOrder, "Store Catalog presentation order changed");
+        assert.strictEqual(String((await StoreSelection.findOne().lean()).packages.find(value => value.packageCode === "UNRELATED_PUBG_PACKAGE").supplierProductMappingId), String(seeded.unrelatedStoreMappingId), "cutover changed an unrelated Store Catalog selection");
         const selected = await PackageSelection.findOne({ packageCode: PACKAGE_MIGRATIONS[0].packageCode }).lean();
         const target = await Mapping.findById(selected.supplierMappingId).lean();
         const newRoute = selectedRouteSnapshot(target, selected, "TH");
@@ -153,6 +161,7 @@ async function run() {
         assert.strictEqual(JSON.stringify((await Package.find().sort({ packageCode: 1 }).lean()).map(value => ({ id: String(value._id), packageCode: value.packageCode, enabled: value.enabled, prices: value.prices }))), packageState, "rollback changed canonical package identity, enabled state, or prices");
         assert.strictEqual(await Mapping.countDocuments({ supplierProductCode: SOURCE_PRODUCT_CODE, productionRole: "PRIMARY" }), 6);
         assert.strictEqual(await Mapping.countDocuments({ supplierProductCode: TARGET_PRODUCT_CODE, enabled: true, productionRole: "DISABLED" }), 6, "target frozen routes must survive rollback");
+        assert.strictEqual(String((await StoreSelection.findOne().lean()).packages.find(value => value.packageCode === "UNRELATED_PUBG_PACKAGE").supplierProductMappingId), String(seeded.unrelatedStoreMappingId), "rollback changed an unrelated Store Catalog selection");
         const rollbackReplay = await api.rollback(rollbackInput(rollbackPlan, plan.planHash), actor);
         assert.strictEqual(rollbackReplay.idempotentReplay, true);
         assert.strictEqual(await Audit.countDocuments({ action: ROLLBACK_OPERATION }), 1);
@@ -195,7 +204,7 @@ async function run() {
         assert.strictEqual(staleRecovery.state, "BLOCKED");
         assert(staleRecovery.decisions.some(value => value.code === "SUPPLIER_AVAILABILITY_NOT_CONFIRMED"));
 
-        console.log(JSON.stringify({ result: "PASS", mongoVersion: "7.0.14", isolatedReplicaSet: true, packages: 6, consolidatedSixPackageDiagnosis: true, verifiedCostAuthorityRecovery: true, sameAmountEvidenceReattestation: true, recoveryConcurrentSafe: true, recoveryIdempotent: true, recoveryStaleEvidenceBlocked: true, disabled1800UcPreserved: true, disabled1800UcPublicPurchasable: false, invalidExistingPriceBlocked: true, canonicalPackageIdsPreserved: true, atomicCutover: true, exactOnePrimary: true, storePresentationOrderPreserved: true, newOrderRoute: TARGET_PRODUCT_CODE, paidHistoricalRoute: SOURCE_PRODUCT_CODE, customerPricesUnchanged: true, historicalAttemptsUnchanged: true, transactionRollback: true, staleEvidenceBlocked: true, missingCostAuthorityBlocked: true, invalidContractBlocked: true, providerGateBlocked: true, stalePlanBlocked: true, cutoverIdempotent: true, rollbackIdempotent: true, auditsVerified: true, supplierCalls: 0, productionConnections: 0 }, null, 2));
+        console.log(JSON.stringify({ result: "PASS", mongoVersion: "7.0.14", isolatedReplicaSet: true, packages: 6, consolidatedSixPackageDiagnosis: true, verifiedCostAuthorityRecovery: true, sameAmountEvidenceReattestation: true, recoveryConcurrentSafe: true, recoveryIdempotent: true, recoveryStaleEvidenceBlocked: true, disabled1800UcPreserved: true, disabled1800UcPublicPurchasable: false, invalidExistingPriceBlocked: true, canonicalPackageIdsPreserved: true, atomicCutover: true, exactOnePrimary: true, storePresentationOrderPreserved: true, unrelatedStoreSelectionPreserved: true, newOrderRoute: TARGET_PRODUCT_CODE, paidHistoricalRoute: SOURCE_PRODUCT_CODE, customerPricesUnchanged: true, historicalAttemptsUnchanged: true, transactionRollback: true, staleEvidenceBlocked: true, missingCostAuthorityBlocked: true, invalidContractBlocked: true, providerGateBlocked: true, stalePlanBlocked: true, cutoverIdempotent: true, rollbackIdempotent: true, auditsVerified: true, supplierCalls: 0, productionConnections: 0 }, null, 2));
     } finally {
         await mongoose.disconnect().catch(() => null);
         await repl.stop();

@@ -4,7 +4,7 @@
 const assert = require("assert");
 const { createWeeklySupplierCostSyncService } = require("../services/supplierCatalog/weeklySupplierCostSyncService");
 const { observedCostHash } = require("../services/supplierCatalog/supplierCostComparisonService");
-const { workspaceSupplierCostState, resolvePricingInventoryMappings } = require("../services/commerce/adminPricingControlCenterService");
+const { workspaceSupplierCostState, pricingRouteEvidenceSummary, resolvePricingInventoryMappings } = require("../services/commerce/adminPricingControlCenterService");
 
 const NOW = new Date("2026-11-04T00:00:00.000Z");
 const HOUR = 60 * 60 * 1000;
@@ -71,6 +71,17 @@ async function main() {
         const missing = workspaceSupplierCostState({ ...wondd.mapping, supplierCostAuthority: {} }, wondd.observation);
         assert(missing.blockerCodes.includes("SUPPLIER_COST_AUTHORITY_MISSING"));
         assert.strictEqual(missing.previewSupplierCost, null);
+        const historicalRoute = pricingRouteEvidenceSummary({ ...fazer.mapping, supplierProductCode: "pubg_mobile_fast", supplierCostAuthority: {} }, { ...fazer.observation, amount: 23.2512 }, { selected: true });
+        assert.strictEqual(historicalRoute.observedCostUsage, "HISTORICAL_INFORMATIONAL_ONLY");
+        assert.strictEqual(historicalRoute.verifiedSupplierCost, null, "historical Fast cost must never become a pricing input");
+        const currentAutoRoute = pricingRouteEvidenceSummary(fazer.mapping, fazer.observation, { selected: false });
+        assert.strictEqual(currentAutoRoute.observedCostUsage, "UNSELECTED_ROUTE_NOT_PRICING_INPUT");
+        assert.strictEqual(currentAutoRoute.verifiedCostAvailable, true);
+        assert.strictEqual(currentAutoRoute.verifiedSupplierCost, null, "unselected Auto cost must not be displayed or used as a pricing input");
+        assert.strictEqual(currentAutoRoute.usableForPricing, false);
+        const selectedAutoRoute = pricingRouteEvidenceSummary(fazer.mapping, fazer.observation, { selected: true });
+        assert.strictEqual(selectedAutoRoute.verifiedSupplierCost, fazer.observation.amount);
+        assert.strictEqual(selectedAutoRoute.usableForPricing, true);
         const packageMap = new Map([[`${fazer.mapping.productCode}:${fazer.mapping.packageCode}`, { productCode: fazer.mapping.productCode, packageCode: fazer.mapping.packageCode, enabled: false }]]);
         const productMap = new Map([[fazer.mapping.productCode, { productCode: fazer.mapping.productCode }]]);
         const resolved = resolvePricingInventoryMappings({ mappings: [stale, fazer.mapping], packageMap, productMap, offerMap: new Map([[fazer.offer._id, { supplierCost: fazer.observation }]]), preferredMappingIds: new Set([String(fazer.mapping._id)]) });
@@ -78,7 +89,7 @@ async function main() {
         assert.strictEqual(resolved[0]._id, fazer.mapping._id, "fresh selected mapping wins over a stale duplicate reference");
         assert.strictEqual(packageMap.values().next().value.enabled, false, "pricing flow never enables an intentionally disabled package");
     } finally { Date.now = realNow; }
-    console.log(JSON.stringify({ result: "PASS", suppliers: ["FAZERCARDS", "WONDD"], manualScope: "ALL_EXACT_MAPPINGS", freshAuthorities: 2, staleEvidenceBlocked: true, structuredBlockers: true, disabledPackagePreserved: true, customerPricesWritten: 0, publicationWrites: 0, orderWrites: 0, paymentWrites: 0, fulfillmentWrites: 0 }, null, 2));
+    console.log(JSON.stringify({ result: "PASS", suppliers: ["FAZERCARDS", "WONDD"], manualScope: "ALL_EXACT_MAPPINGS", freshAuthorities: 2, staleEvidenceBlocked: true, structuredBlockers: true, historicalFastCostInformationalOnly: true, unselectedAutoCostHiddenFromPricing: true, disabledPackagePreserved: true, customerPricesWritten: 0, publicationWrites: 0, orderWrites: 0, paymentWrites: 0, fulfillmentWrites: 0 }, null, 2));
 }
 
 main().catch(error => { console.error(error.stack || error); process.exitCode = 1; });

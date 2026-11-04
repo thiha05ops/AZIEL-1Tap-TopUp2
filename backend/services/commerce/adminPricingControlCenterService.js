@@ -341,6 +341,9 @@ async function loadDailyPricingProductDetail({ supplierId = "", productCode = ""
                 profitOverride: overrideMap.get(`${mapping.productCode}:${pkg.packageCode}:${pricingRegion}`) || { mode: "INHERIT", value: null }
             }];
         }));
+        const supplierRouteAlternatives = mappings
+            .filter(candidate => candidate.productCode === mapping.productCode && candidate.packageCode === mapping.packageCode && String(candidate._id) !== String(mapping._id))
+            .map(candidate => pricingRouteEvidenceSummary(candidate, observedCostForMapping(candidate, latestCostMap), { selected: false }));
         return {
             rowId: String(mapping._id), mappingId: String(mapping._id), supplierId: selected.id, supplierCode: selected.supplierCode,
             supplierCatalogOfferId: mapping.supplierCatalogOfferId ? String(mapping.supplierCatalogOfferId) : "",
@@ -356,6 +359,9 @@ async function loadDailyPricingProductDetail({ supplierId = "", productCode = ""
             previewSupplierCost: Number.isFinite(costState.previewSupplierCost) ? costState.previewSupplierCost : null,
             supplierCurrency: evidence.supplierCurrency || observedSupplierCost?.currency || selected.supplierCurrency,
             observedSupplierCost: observedSupplierCost?.amount ?? null, observedSupplierCurrency: observedSupplierCost?.currency || "", observedSupplierCostAt: observedSupplierCost?.observedAt || null,
+            observedSupplierCostUsage: costState.authoritative ? "CURRENT_VERIFIED_AUTHORITY" : observedSupplierCost ? "HISTORICAL_INFORMATIONAL_ONLY" : "UNAVAILABLE",
+            selectedSupplierRoute: pricingRouteEvidenceSummary(mapping, observedSupplierCost, { selected: true }),
+            supplierRouteAlternatives,
             supplierCostStatus: costState.status === "REVIEW_REQUIRED" ? "COST_REVIEW_REQUIRED" : costState.status,
             supplierCostAuthorityState: costState.status,
             supplierCostBlockers: costState.blockers,
@@ -684,6 +690,29 @@ function workspaceSupplierCostState(mapping = {}, observedSupplierCost = null) {
             : authoritative ? "AUTHORITATIVE"
                 : observedFact ? "OBSERVED"
                     : "MISSING"
+    };
+}
+
+function pricingRouteEvidenceSummary(mapping = {}, observedSupplierCost = null, { selected = false } = {}) {
+    const costState = workspaceSupplierCostState(mapping, observedSupplierCost);
+    const verifiedCostAvailable = Number.isFinite(costState.approvedSupplierCost);
+    return {
+        mappingId: String(mapping._id || ""),
+        selected,
+        supplierProductCode: text(mapping.supplierProductCode),
+        supplierPackageCode: text(mapping.supplierPackageCode),
+        mappingEnabled: mapping.enabled === true,
+        productionRole: upper(mapping.productionRole || "DISABLED"),
+        costEvidenceState: costState.status,
+        verifiedCostAvailable,
+        verifiedSupplierCost: selected && verifiedCostAvailable ? costState.approvedSupplierCost : null,
+        supplierCurrency: upper(costState.authoritativeEvidence?.supplierCurrency || observedSupplierCost?.currency),
+        observedSupplierCost: selected ? observedSupplierCost?.amount ?? null : null,
+        observedAt: observedSupplierCost?.observedAt || null,
+        observedCostUsage: selected ? (costState.authoritative ? "CURRENT_VERIFIED_AUTHORITY" : observedSupplierCost ? "HISTORICAL_INFORMATIONAL_ONLY" : "UNAVAILABLE") : "UNSELECTED_ROUTE_NOT_PRICING_INPUT",
+        usableForPricing: selected && costState.authoritative,
+        readiness: mapping.mappingMetadata?.readiness || {},
+        blockerCodes: costState.blockerCodes
     };
 }
 
@@ -2061,6 +2090,7 @@ module.exports = Object.freeze({
     canonicalPricingRegions,
     pricingTargetRegions,
     workspaceSupplierCostState,
+    pricingRouteEvidenceSummary,
     pricingMappingPreference,
     resolvePricingInventoryMappings,
     storePublicationReadinessReasons,
