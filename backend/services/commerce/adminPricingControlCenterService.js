@@ -541,8 +541,14 @@ function resolveWorkspacePriceInstruction({ instruction = {}, calculatedPrice, c
 function buildWorkspacePricePatch({ regionalPreview = {}, normalized = {}, supplier = {}, row = {} } = {}) {
     const finalPrice = Number(regionalPreview.finalPreviewPrice ?? regionalPreview.recommendedSellingPrice);
     const priceMode = regionalPreview.priceMode || "CALCULATED";
+    const customerCurrency = REGION_CURRENCIES[upper(regionalPreview.region)];
+    if (!customerCurrency) {
+        throw new AdminPricingControlCenterError("WORKSPACE_CUSTOMER_CURRENCY_INVALID", "Pricing publication requires an authoritative THB or MMK customer region.");
+    }
     const patch = {
         amount: finalPrice,
+        currency: customerCurrency,
+        enabled: true,
         publishedPriceMode: priceMode === "CALCULATED" ? "POLICY_DERIVED" : "MANUAL_OVERRIDE",
         manualOverrideReason: priceMode === "CALCULATED" ? "" : regionalPreview.manualOverrideReason,
         pricingNote: priceMode === "ADJUSTMENT" ? regionalPreview.manualOverrideReason : normalized.pricingNote

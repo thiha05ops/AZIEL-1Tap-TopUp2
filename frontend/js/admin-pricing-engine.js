@@ -526,6 +526,9 @@
         return rows.map(row => ({
             rowId: rowKey(row), productCode: row.productCode, packageCode: row.packageCode,
             mappingId: row.mappingId,
+            supplierProductCode: row.supplierProductCode,
+            supplierPackageCode: row.supplierPackageCode,
+            fulfillmentVerificationStatus: row.fulfillmentVerificationStatus,
             newSupplierCost: daily.edits.has(rowKey(row)) ? daily.edits.get(rowKey(row)).value : (row.supplierCost ?? row.savedDraftSupplierCost ?? row.previewSupplierCost),
             supplierCostEdited: daily.edits.has(rowKey(row)),
             supplierCurrency: supplier.supplierCurrency, supplierName: supplier.name,

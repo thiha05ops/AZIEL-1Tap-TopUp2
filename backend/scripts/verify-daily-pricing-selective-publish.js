@@ -49,11 +49,13 @@ function main() {
     assert.strictEqual(percent.finalPrice, 11000);
     assert.notStrictEqual(manual.finalPrice, percent.finalPrice, "TH and MM instructions must remain independent.");
     const priceOnlyPatch = buildWorkspacePricePatch({
-        regionalPreview: { finalPreviewPrice: 99, priceMode: "MANUAL_OVERRIDE", manualOverrideReason: manual.reason },
+        regionalPreview: { region: "TH", currency: "THB", finalPreviewPrice: 99, priceMode: "MANUAL_OVERRIDE", manualOverrideReason: manual.reason },
         normalized: { supplierCostEdited: false, newSupplierCost: 40 },
         supplier: { supplierCurrency: "THB" }
     });
     assert.strictEqual(priceOnlyPatch.amount, 99);
+    assert.strictEqual(priceOnlyPatch.currency, "THB", "TH publication must carry the customer currency, not supplier USD.");
+    assert.strictEqual(priceOnlyPatch.enabled, true, "Reviewed publication must explicitly enable its regional price.");
     assert.strictEqual(priceOnlyPatch.publishedPriceMode, "MANUAL_OVERRIDE");
     assert(!Object.prototype.hasOwnProperty.call(priceOnlyPatch, "supplierCost"), "Price-only override must not patch supplier cost.");
     assert(!Object.prototype.hasOwnProperty.call(priceOnlyPatch, "rawSupplierCost"), "Price-only override must not patch raw supplier cost.");
@@ -104,6 +106,10 @@ function main() {
     assert(!frontend.includes('$("pricingPublishBtn")?.addEventListener("click", () => publishRows("WORKSPACE_CHANGED"))'), "Primary publication must not submit cached rows from unrelated products.");
     assert(frontend.includes("const failures = new Map()") && frontend.includes("blockingErrors"), "Bulk publication failures must be grouped per package with blocker codes.");
     assert(service.includes("error.details?.blockers") && service.includes("blockingErrors: blockerCodes.map"), "Publication must return structured unified-readiness blockers.");
+    assert(frontend.includes("supplierProductCode: row.supplierProductCode") && frontend.includes("fulfillmentVerificationStatus: row.fulfillmentVerificationStatus"), "Publish payload must retain route identity and fulfillment verification state for Owner acknowledgement.");
+    const publishRowsBody = frontend.slice(frontend.indexOf("async function publishRows"), frontend.indexOf("function cancelDetailWork"));
+    assert(publishRowsBody.indexOf("window.prompt(`PUBG Mobile Auto") < publishRowsBody.indexOf("for (const batch of chunks(rows))"), "One Owner acknowledgement must cover the reviewed multi-package request before any batch is sent.");
+    assert(service.includes("currency: customerCurrency") && service.includes("enabled: true"), "Server publication patches must include explicit THB/MMK customer currency and enabled state.");
     assert(frontend.includes("checkbox.checked = daily.selected.has(checkbox.dataset.rowSelection)"), "DOM checkbox properties must be synchronized from canonical selection state.");
     assert(frontend.includes("workspaceRows().filter(rowSelectionEligible)"), "Selection must survive product view filtering while remaining eligible.");
     assert(frontend.includes('code: "PREVIEW_IDENTITY_MISMATCH"') && frontend.includes('code: "PREVIEW_REGION_MISMATCH"'), "Missing preview rows and regions must fail closed with explicit diagnostics.");

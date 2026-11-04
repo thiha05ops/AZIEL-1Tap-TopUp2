@@ -63,7 +63,7 @@ assert.deepStrictEqual(
 );
 
 const patch = buildWorkspacePricePatch({
-    regionalPreview: { finalPreviewPrice: 651.08, priceMode: "CALCULATED" },
+    regionalPreview: { region: "TH", currency: "THB", finalPreviewPrice: 651.08, priceMode: "CALCULATED" },
     normalized: { newSupplierCost: 18.6488, supplierCostEdited: false },
     supplier: { supplierCurrency: "USD" },
     row: mapping
